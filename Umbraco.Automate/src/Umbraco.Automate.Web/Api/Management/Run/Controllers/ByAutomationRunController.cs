@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Web.Api.Management.Run.Models;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
+using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
 
@@ -14,13 +15,15 @@ namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
 public sealed class ByAutomationRunController : RunControllerBase
 {
     private readonly IAutomationRunService _runService;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ByAutomationRunController"/> class.
     /// </summary>
-    public ByAutomationRunController(IAutomationRunService runService)
+    public ByAutomationRunController(IAutomationRunService runService, IUmbracoMapper mapper)
     {
         _runService = runService;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -37,41 +40,10 @@ public sealed class ByAutomationRunController : RunControllerBase
     {
         var (items, total) = await _runService.GetRunsByAutomationPagedAsync(automationId, skip, take, cancellationToken);
 
-        var responseItems = items.Select(MapToResponse).ToList();
-
         return Ok(new PagedViewModel<AutomationRunResponseModel>
         {
             Total = total,
-            Items = responseItems,
+            Items = _mapper.MapEnumerable<AutomationRun, AutomationRunResponseModel>(items),
         });
     }
-
-    private static AutomationRunResponseModel MapToResponse(AutomationRun run)
-        => new()
-        {
-            Id = run.Id,
-            AutomationId = run.AutomationId,
-            AutomationVersion = run.AutomationVersion,
-            Status = run.Status,
-            StartedUtc = run.StartedUtc,
-            CompletedUtc = run.CompletedUtc,
-            InitiatedBy = run.InitiatedBy,
-            CorrelationId = run.CorrelationId,
-            Error = run.Error,
-            StepRuns = run.StepRuns.Select(MapStepRun).ToList(),
-        };
-
-    private static StepRunResponseModel MapStepRun(StepRun stepRun)
-        => new()
-        {
-            Id = stepRun.Id,
-            StepId = stepRun.StepId,
-            ActionAlias = stepRun.ActionAlias,
-            Status = stepRun.Status,
-            StartedUtc = stepRun.StartedUtc,
-            CompletedUtc = stepRun.CompletedUtc,
-            Error = stepRun.Error,
-            RetryCount = stepRun.RetryCount,
-            DurationMs = stepRun.Duration?.TotalMilliseconds,
-        };
 }

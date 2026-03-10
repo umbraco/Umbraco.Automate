@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
+using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -13,13 +14,15 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class ByIdAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ByIdAutomationController"/> class.
     /// </summary>
-    public ByIdAutomationController(IAutomationService automationService)
+    public ByIdAutomationController(IAutomationService automationService, IUmbracoMapper mapper)
     {
         _automationService = automationService;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -39,26 +42,6 @@ public sealed class ByIdAutomationController : AutomationControllerBase
             return AutomationNotFound();
         }
 
-        return Ok(MapToResponse(automation));
+        return Ok(_mapper.Map<AutomationResponseModel>(automation));
     }
-
-    private static AutomationResponseModel MapToResponse(Core.Automations.Automation automation)
-        => new()
-        {
-            Id = automation.Id,
-            Alias = automation.Alias,
-            Name = automation.Name,
-            Description = automation.Description,
-            IsEnabled = automation.IsEnabled,
-            Status = automation.Status,
-            PublishedVersion = automation.PublishedVersion,
-            DraftVersion = automation.DraftVersion,
-            Trigger = automation.Trigger,
-            Steps = automation.Steps,
-            Connections = automation.Connections,
-            CanvasState = automation.CanvasState,
-            Version = automation.Version,
-            DateCreated = automation.DateCreated,
-            DateModified = automation.DateModified,
-        };
 }

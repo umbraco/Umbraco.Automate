@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
+using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Controllers;
 
@@ -13,13 +14,15 @@ namespace Umbraco.Automate.Web.Api.Management.Catalogue.Controllers;
 public sealed class AllActionsController : CatalogueControllerBase
 {
     private readonly ActionCollection _actions;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AllActionsController"/> class.
     /// </summary>
-    public AllActionsController(ActionCollection actions)
+    public AllActionsController(ActionCollection actions, IUmbracoMapper mapper)
     {
         _actions = actions;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -30,16 +33,6 @@ public sealed class AllActionsController : CatalogueControllerBase
     [ProducesResponseType(typeof(IEnumerable<ActionItemResponseModel>), StatusCodes.Status200OK)]
     public ActionResult<IEnumerable<ActionItemResponseModel>> GetAllActions()
     {
-        var items = _actions.Select(a => new ActionItemResponseModel
-        {
-            Alias = a.Alias,
-            Name = a.Name,
-            Description = a.Description,
-            Group = a.Group,
-            Icon = a.Icon,
-            SettingsSchema = a.GetSettingsSchema(),
-        });
-
-        return Ok(items);
+        return Ok(_mapper.MapEnumerable<IAction, ActionItemResponseModel>(_actions));
     }
 }

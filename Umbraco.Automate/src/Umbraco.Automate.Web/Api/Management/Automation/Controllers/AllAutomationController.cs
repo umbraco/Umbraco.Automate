@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
+using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -14,13 +15,15 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class AllAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AllAutomationController"/> class.
     /// </summary>
-    public AllAutomationController(IAutomationService automationService)
+    public AllAutomationController(IAutomationService automationService, IUmbracoMapper mapper)
     {
         _automationService = automationService;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -37,26 +40,10 @@ public sealed class AllAutomationController : AutomationControllerBase
     {
         var (items, total) = await _automationService.GetAutomationsPagedAsync(filter, skip, take, cancellationToken);
 
-        var responseItems = items.Select(MapToItemResponse).ToList();
-
         return Ok(new PagedViewModel<AutomationItemResponseModel>
         {
             Total = total,
-            Items = responseItems,
+            Items = _mapper.MapEnumerable<Core.Automations.Automation, AutomationItemResponseModel>(items),
         });
     }
-
-    private static AutomationItemResponseModel MapToItemResponse(Core.Automations.Automation automation)
-        => new()
-        {
-            Id = automation.Id,
-            Alias = automation.Alias,
-            Name = automation.Name,
-            Description = automation.Description,
-            IsEnabled = automation.IsEnabled,
-            Status = automation.Status,
-            Version = automation.Version,
-            DateCreated = automation.DateCreated,
-            DateModified = automation.DateModified,
-        };
 }

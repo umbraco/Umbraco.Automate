@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Web.Api.Management.Run.Models;
+using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
 
@@ -13,13 +14,15 @@ namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
 public sealed class ByIdRunController : RunControllerBase
 {
     private readonly IAutomationRunService _runService;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ByIdRunController"/> class.
     /// </summary>
-    public ByIdRunController(IAutomationRunService runService)
+    public ByIdRunController(IAutomationRunService runService, IUmbracoMapper mapper)
     {
         _runService = runService;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -39,31 +42,6 @@ public sealed class ByIdRunController : RunControllerBase
             return RunNotFound();
         }
 
-        var response = new AutomationRunResponseModel
-        {
-            Id = run.Id,
-            AutomationId = run.AutomationId,
-            AutomationVersion = run.AutomationVersion,
-            Status = run.Status,
-            StartedUtc = run.StartedUtc,
-            CompletedUtc = run.CompletedUtc,
-            InitiatedBy = run.InitiatedBy,
-            CorrelationId = run.CorrelationId,
-            Error = run.Error,
-            StepRuns = run.StepRuns.Select(s => new StepRunResponseModel
-            {
-                Id = s.Id,
-                StepId = s.StepId,
-                ActionAlias = s.ActionAlias,
-                Status = s.Status,
-                StartedUtc = s.StartedUtc,
-                CompletedUtc = s.CompletedUtc,
-                Error = s.Error,
-                RetryCount = s.RetryCount,
-                DurationMs = s.Duration?.TotalMilliseconds,
-            }).ToList(),
-        };
-
-        return Ok(response);
+        return Ok(_mapper.Map<AutomationRunResponseModel>(run));
     }
 }

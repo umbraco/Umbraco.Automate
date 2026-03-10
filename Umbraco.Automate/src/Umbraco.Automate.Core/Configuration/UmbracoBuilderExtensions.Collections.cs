@@ -1,16 +1,51 @@
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
+using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Triggers;
+using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
 
 namespace Umbraco.Automate.Extensions;
 
 /// <summary>
-/// Extension methods for <see cref="IUmbracoBuilder"/> for Automate collection builders.
+/// Extension methods for <see cref="IUmbracoBuilder"/> for Automate core services.
 /// </summary>
 public static partial class UmbracoBuilderExtensions
 {
+    /// <summary>
+    /// Adds Umbraco Automate core services and collection builders.
+    /// </summary>
+    internal static IUmbracoBuilder AddUmbracoAutomateCore(this IUmbracoBuilder builder)
+    {
+        // Configuration options
+        builder.Services.Configure<AutomateOptions>(
+            builder.Config.GetSection("Umbraco:Automate"));
+
+        // Collection builders — triggers, actions, filters auto-discovered
+        builder.AutomateTriggers();
+        builder.AutomateActions();
+        builder.AutomateExpressionFilters();
+
+        // Action middleware — ordered pipeline
+        builder.AutomateActionMiddleware()
+            .Append<ErrorHandlingMiddleware>()
+            .Append<StepRunLoggingMiddleware>();
+
+        // Core services
+        builder.Services.AddSingleton<IAutomationService, AutomationService>();
+        builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
+        builder.Services.AddSingleton<ActionMiddlewarePipeline>();
+        builder.Services.AddSingleton<ExpressionEvaluator>();
+
+        // HTTP client for HttpRequestAction
+        builder.Services.AddHttpClient("UmbracoAutomate");
+
+        return builder;
+    }
+
     /// <summary>
     /// Gets the trigger collection builder. Triggers are auto-discovered.
     /// </summary>

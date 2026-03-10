@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
+using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -13,13 +14,15 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class UpdateAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UpdateAutomationController"/> class.
     /// </summary>
-    public UpdateAutomationController(IAutomationService automationService)
+    public UpdateAutomationController(IAutomationService automationService, IUmbracoMapper mapper)
     {
         _automationService = automationService;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -40,14 +43,7 @@ public sealed class UpdateAutomationController : AutomationControllerBase
             return AutomationNotFound();
         }
 
-        existing.Alias = requestModel.Alias;
-        existing.Name = requestModel.Name;
-        existing.Description = requestModel.Description;
-        existing.IsEnabled = requestModel.IsEnabled;
-        existing.Trigger = requestModel.Trigger;
-        existing.Steps = requestModel.Steps;
-        existing.Connections = requestModel.Connections;
-        existing.CanvasState = requestModel.CanvasState;
+        _mapper.Map(requestModel, existing);
 
         await _automationService.UpdateAutomationAsync(existing, cancellationToken: cancellationToken);
 

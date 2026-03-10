@@ -13,7 +13,7 @@ namespace Umbraco.Automate.Extensions;
 /// <summary>
 /// Extension methods for configuring Umbraco Automate persistence.
 /// </summary>
-public static partial class UmbracoBuilderPersistenceExtensions
+public static partial class UmbracoBuilderExtensions
 {
     /// <summary>
     /// Adds EF Core persistence for Umbraco Automate.

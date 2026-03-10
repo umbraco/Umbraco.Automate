@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
+using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -13,13 +14,15 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class CreateAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CreateAutomationController"/> class.
     /// </summary>
-    public CreateAutomationController(IAutomationService automationService)
+    public CreateAutomationController(IAutomationService automationService, IUmbracoMapper mapper)
     {
         _automationService = automationService;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -33,17 +36,7 @@ public sealed class CreateAutomationController : AutomationControllerBase
         CreateAutomationRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
-        var automation = new Core.Automations.Automation
-        {
-            Alias = requestModel.Alias,
-            Name = requestModel.Name,
-            Description = requestModel.Description,
-            IsEnabled = requestModel.IsEnabled,
-            Trigger = requestModel.Trigger,
-            Steps = requestModel.Steps,
-            Connections = requestModel.Connections,
-            CanvasState = requestModel.CanvasState,
-        };
+        var automation = _mapper.Map<Core.Automations.Automation>(requestModel)!;
 
         var created = await _automationService.CreateAutomationAsync(automation, cancellationToken: cancellationToken);
 
