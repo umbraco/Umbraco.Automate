@@ -12,7 +12,9 @@ public class UmbracoAutomateDbContextFactory : IDesignTimeDbContextFactory<Umbra
     public UmbracoAutomateDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-        optionsBuilder.UseSqlServer("Server=.;Database=UmbracoAutomate;Trusted_Connection=True;");
+        optionsBuilder.UseSqlServer(
+            "Server=.;Database=UmbracoAutomate;Trusted_Connection=True;",
+            x => x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer"));
         return new UmbracoAutomateDbContext(optionsBuilder.Options);
     }
 }

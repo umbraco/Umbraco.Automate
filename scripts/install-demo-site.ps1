@@ -82,7 +82,7 @@ Copy-Item -Path $composerSourcePath -Destination $composerDestPath -Force
 
 # Step 4: Create unified solution
 Write-Host "Creating unified solution..." -ForegroundColor Green
-dotnet new sln -n "Umbraco.Automate.local" --force --format sln
+dotnet new sln -n "Umbraco.Automate.local" --force
 
 # Helper function to add all projects from a product's src folder
 function Add-ProductProjects {

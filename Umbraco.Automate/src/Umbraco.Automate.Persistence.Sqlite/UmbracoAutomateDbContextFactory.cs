@@ -12,7 +12,9 @@ public class UmbracoAutomateDbContextFactory : IDesignTimeDbContextFactory<Umbra
     public UmbracoAutomateDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-        optionsBuilder.UseSqlite("Data Source=UmbracoAutomate.db");
+        optionsBuilder.UseSqlite(
+            "Data Source=UmbracoAutomate.db",
+            x => x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite"));
         return new UmbracoAutomateDbContext(optionsBuilder.Options);
     }
 }
