@@ -106,6 +106,39 @@ The engine state layer is WorkflowCore's internal bookkeeping. The audit layer i
 
 This is a well-established pattern — React-in-custom-element is used in production by many mixed-framework applications. The React runtime is isolated to the canvas component only.
 
+### Trigger Dispatch: CAP (DotNetCore.CAP)
+
+[CAP](https://github.com/dotnetcore/CAP) (`DotNetCore.CAP`, MIT licensed) provides the transactional outbox for resilient trigger event delivery. It handles persistence, retry with backoff, dead-lettering, and transport abstraction — avoiding the need to hand-roll a database-backed message queue.
+
+| Capability | CAP Support |
+|-----------|-------------|
+| Transactional outbox (EF Core) | Built-in — publishes within `SaveChanges` |
+| DB storage | SQL Server (`DotNetCore.CAP.SqlServer`), SQLite (`DotNetCore.CAP.Sqlite`) |
+| In-process transport | `UseInMemoryMessageQueue()` — no external infra for v1 |
+| External transports | RabbitMQ, Azure Service Bus, Kafka — NuGet package swap |
+| Retry & dead-lettering | Configurable retry count, interval, automatic dead-letter |
+| Dashboard | Optional monitoring UI |
+
+**CAP is an internal implementation detail** — it is not exposed in any public API, interface, or model. All public-facing code interacts only with `ITriggerDispatcher`. If CAP is ever replaced, nothing outside `Umbraco.Automate.Core` changes.
+
+#### SQLite Support
+
+CAP's official packages cover SQL Server, MySQL, and PostgreSQL but not SQLite. A community package [`DotNetCore.CAP.Sqlite`](https://github.com/colinin/DotNetCore.CAP.Sqlite) (MIT licensed) provides the SQLite storage provider:
+
+- Targets `net10.0`, tracks CAP `10.0.0`
+- Uses `Microsoft.Data.Sqlite` — same driver as Umbraco
+- Supports `TableNamePrefix` for table naming
+- Complete implementation of all three CAP storage interfaces (`IStorageInitializer`, `IDataStorage`, `IMonitoringApi`)
+
+**Table naming**: Both providers support configurable naming to keep CAP tables alongside Umbraco Automate tables:
+
+| Provider | Config | Tables created |
+|----------|--------|---------------|
+| SQL Server | `Schema = "UmbracoAutomate"` | `UmbracoAutomate.Published`, `UmbracoAutomate.Received`, `UmbracoAutomate.Lock` |
+| SQLite | `TableNamePrefix = "UmbracoAutomate"` | `UmbracoAutomate.Published`, `UmbracoAutomate.Received`, `UmbracoAutomate.Locks` |
+
+**Auto-detection**: The storage provider is selected automatically based on the configured database provider — same pattern as our EF Core migrations assemblies. No user configuration needed.
+
 ---
 
 ## Extensibility Model (Triggers & Actions)
@@ -139,6 +172,11 @@ public sealed class ActionAttribute(string alias, string name) : Attribute
 ```csharp
 // ── Triggers ──────────────────────────────────────────
 
+// Triggers are DEFINITIONS — they declare metadata, settings schema, and output shape.
+// They do NOT actively subscribe to events. Event listening is handled by
+// trigger-specific infrastructure (notification handlers, hosted services, endpoints)
+// that dispatches to the engine via ITriggerDispatcher.
+
 public interface ITrigger
 {
     string Alias { get; }
@@ -146,16 +184,22 @@ public interface ITrigger
     string? Description { get; }
     string? Group { get; }
     string? Icon { get; }
-    Type? SettingsType { get; }
+    Type? SettingsType { get; }    // Input: drives config UI
+    Type? OutputType { get; }      // Output: drives expression autocompletion
     EditableModelSchema? GetSettingsSchema();
 
-    Task SubscribeAsync(TriggerSubscription subscription, CancellationToken ct);
-    Task UnsubscribeAsync(TriggerSubscription subscription, CancellationToken ct);
+    /// <summary>
+    /// Describes the output properties this trigger produces, for expression autocompletion
+    /// and validation. Auto-derived from OutputType by the base class — override only if needed.
+    /// </summary>
+    IReadOnlyList<TriggerOutputProperty> GetOutputProperties();
 }
 
-// Base class — reads alias/name from attribute, builds schema from TSettings
-public abstract class TriggerBase<TSettings> : ITrigger
+// Base class — reads alias/name from attribute, builds schema from TSettings,
+// auto-derives output properties from TOutput via reflection.
+public abstract class TriggerBase<TSettings, TOutput> : ITrigger
     where TSettings : class, new()
+    where TOutput : class
 {
     private readonly ITriggerInfrastructure _infrastructure;
 
@@ -165,6 +209,7 @@ public abstract class TriggerBase<TSettings> : ITrigger
     public abstract string? Group { get; }
     public abstract string? Icon { get; }
     public Type SettingsType => typeof(TSettings);
+    public Type OutputType => typeof(TOutput);
 
     protected TriggerBase(ITriggerInfrastructure infrastructure)
     {
@@ -178,8 +223,79 @@ public abstract class TriggerBase<TSettings> : ITrigger
     public EditableModelSchema? GetSettingsSchema()
         => _infrastructure.SchemaBuilder.BuildForType<TSettings>(Alias);
 
-    public abstract Task SubscribeAsync(TriggerSubscription subscription, CancellationToken ct);
-    public abstract Task UnsubscribeAsync(TriggerSubscription subscription, CancellationToken ct);
+    // Auto-derived from TOutput — each public property becomes a TriggerOutputProperty.
+    // Override if you need custom descriptions or nested property flattening.
+    public virtual IReadOnlyList<TriggerOutputProperty> GetOutputProperties()
+        => OutputPropertyReflector.FromType<TOutput>();
+}
+
+// ── Trigger Output Models ────────────────────────────────────────────
+
+// Each trigger defines a strongly-typed POCO for its output.
+// These are compile-time safe at the handler boundary, then flattened
+// to a dictionary at the dispatcher for the dynamic expression engine.
+
+public class ContentPublishedOutput
+{
+    public required string ContentName { get; init; }
+    public required Guid ContentKey { get; init; }
+    public required string ContentType { get; init; }
+}
+
+// ── Trigger Events (strongly-typed) ──────────────────────────────────
+
+// Non-generic base — what the dispatcher interface accepts
+public class TriggerEvent
+{
+    public required string TriggerAlias { get; init; }
+    public required string InitiatorType { get; init; }  // "system", "user", "webhook", "ai"
+    public string? InitiatorId { get; init; }
+}
+
+// Internal interface for the dispatcher to extract output without knowing TOutput
+internal interface ITriggerEventWithOutput
+{
+    object GetOutput();
+}
+
+// Generic — carries strongly-typed output, created by handlers
+public class TriggerEvent<TOutput> : TriggerEvent, ITriggerEventWithOutput where TOutput : class
+{
+    public required TOutput Output { get; init; }
+    object ITriggerEventWithOutput.GetOutput() => Output;
+}
+
+// ── Trigger Event Handlers (infrastructure, not on the trigger itself) ──
+
+// Each trigger type has a corresponding handler that listens for events
+// and dispatches to the engine. These are registered once globally.
+//
+// Handlers are SIMPLE MAPPERS — they convert a CMS event into a
+// TriggerEvent<TOutput> and hand it to ITriggerDispatcher. They do NOT
+// look up automations or fan out. The dispatcher owns that.
+
+// Example: Content Published trigger handler
+public class ContentPublishedTriggerHandler : INotificationAsyncHandler<ContentPublishedNotification>
+{
+    private readonly ITriggerDispatcher _dispatcher;
+
+    public async Task HandleAsync(ContentPublishedNotification notification, CancellationToken ct)
+    {
+        foreach (var content in notification.PublishedEntities)
+        {
+            await _dispatcher.DispatchAsync(new TriggerEvent<ContentPublishedOutput>
+            {
+                TriggerAlias = "contentPublished",
+                InitiatorType = "system",
+                Output = new ContentPublishedOutput
+                {
+                    ContentName = content.Name!,
+                    ContentKey = content.Key,
+                    ContentType = content.ContentType.Alias,
+                }
+            }, ct);
+        }
+    }
 }
 
 // ── Actions ───────────────────────────────────────────
@@ -737,7 +853,11 @@ The `options` parameter exposes WorkflowCore's `WorkflowOptions` directly — no
 
 ### Trigger Dispatcher
 
-The trigger dispatcher sits between "trigger fires" and "workflow starts", abstracting how trigger events are delivered to the engine. This allows swapping from a simple in-process dispatch to a message bus without changing any trigger code.
+The trigger dispatcher sits between "trigger fires" and "workflow starts". Trigger handlers are **simple mappers** — they convert a CMS event into a `TriggerEvent` (trigger alias + data) and hand it to the dispatcher. The dispatcher owns **finding matching automations and starting workflows**. This separation means:
+
+- Handlers have no dependency on `IAutomationService` — just `ITriggerDispatcher`
+- Fan-out, deduplication, rate limiting, and filter evaluation are centralized in the processor
+- Swapping to a message bus requires zero changes to any trigger handler
 
 ```csharp
 public interface ITriggerDispatcher
@@ -745,56 +865,170 @@ public interface ITriggerDispatcher
     Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct);
 }
 
-public class TriggerEvent
+// TriggerEvent and TriggerEvent<TOutput> are defined above in the Interfaces section.
+// The dispatcher accepts the non-generic base and extracts the output via pattern matching.
+```
+
+#### Load Balancing & Resilience
+
+In a load-balanced Umbraco environment, trigger handlers fire on whichever node handled the request. We need to ensure automations run exactly once regardless of which node fires the trigger.
+
+Rather than hand-rolling a database-backed message queue, we use **[CAP](https://github.com/dotnetcore/CAP)** (`DotNetCore.CAP`, MIT licensed) — a lightweight transactional outbox library purpose-built for this pattern. It provides:
+
+- **Transactional outbox** — publishes within EF Core's `SaveChanges`, guaranteeing at-least-once delivery
+- **Retry with exponential backoff** and **dead-lettering** out of the box
+- **Database storage** — SQL Server and SQLite supported (matches our DB targets)
+- **Transport swappable** — starts with in-process (no external infrastructure), upgrades to RabbitMQ, Azure Service Bus, or Kafka via a NuGet package swap
+- **Dashboard** for monitoring published/received messages (optional)
+
+CAP is an **internal implementation detail** — it is not exposed in any public API, interface, or contract. All public-facing code interacts only with `ITriggerDispatcher`. If CAP is ever replaced, nothing outside `Umbraco.Automate.Core` changes.
+
+```
+Any node:            Handler → ITriggerDispatcher → ICapPublisher.PublishAsync()
+                                                         ↓
+                                                    CAP outbox table (persisted with SaveChanges)
+                                                         ↓
+SchedulingPublisher: CAP consumer → TriggerEventConsumer → finds automations → StartWorkflow
+```
+
+**Dispatcher** (publishes to CAP — runs on any node):
+
+```csharp
+internal class DefaultTriggerDispatcher(ICapPublisher capPublisher) : ITriggerDispatcher
 {
-    public required string AutomationAlias { get; init; }
-    public required Guid AutomationId { get; init; }
-    public required Dictionary<string, object?> Data { get; init; }
-    public required string InitiatorType { get; init; }  // "system", "user", "webhook", "ai"
+    public async Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct)
+    {
+        var outputJson = triggerEvent is ITriggerEventWithOutput typed
+            ? JsonSerializer.Serialize(typed.GetOutput())
+            : "{}";
+
+        await capPublisher.PublishAsync("automate.trigger.fired", new TriggerMessage
+        {
+            TriggerAlias = triggerEvent.TriggerAlias,
+            OutputJson = outputJson,
+            InitiatorType = triggerEvent.InitiatorType,
+            InitiatorId = triggerEvent.InitiatorId,
+        }, cancellationToken: ct);
+    }
+}
+
+// Internal message contract — never exposed publicly
+internal class TriggerMessage
+{
+    public required string TriggerAlias { get; init; }
+    public required string OutputJson { get; init; }
+    public required string InitiatorType { get; init; }
     public string? InitiatorId { get; init; }
 }
 ```
 
-**v1: Direct dispatcher** (default — calls WorkflowCore synchronously):
+**Consumer** (processes trigger events — CAP handles retry, dead-lettering, dedup):
 
 ```csharp
-internal class DirectTriggerDispatcher(IWorkflowHost workflowHost) : ITriggerDispatcher
+// CAP routes messages to this consumer. In load-balanced environments,
+// only the SchedulingPublisher node registers as a consumer.
+internal class TriggerEventConsumer(
+    IAutomationService automationService,
+    IWorkflowHost workflowHost) : ICapSubscribe
 {
-    public async Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct)
+    [CapSubscribe("automate.trigger.fired")]
+    public async Task HandleAsync(TriggerMessage message, CancellationToken ct)
     {
-        var data = new AutomationRunData { Trigger = triggerEvent.Data };
-        await workflowHost.StartWorkflow(
-            triggerEvent.AutomationAlias,
-            data: data,
-            reference: triggerEvent.AutomationId.ToString());
+        var data = JsonSerializer.Deserialize<Dictionary<string, object?>>(message.OutputJson)
+            ?? new Dictionary<string, object?>();
+
+        var automations = await automationService
+            .GetAutomationsByTriggerAliasAsync(message.TriggerAlias, ct);
+
+        foreach (var automation in automations)
+        {
+            var runData = new AutomationRunData { Trigger = data };
+            await workflowHost.StartWorkflow(
+                automation.Alias,
+                data: runData,
+                reference: automation.Id.ToString());
+        }
     }
 }
 ```
 
-**Future: Message bus dispatcher** (user swaps in when fan-out or multi-node is needed):
+**Registration** (CAP configured internally, DB provider auto-detected):
 
 ```csharp
-// Example: Azure Service Bus implementation (separate package)
-internal class ServiceBusTriggerDispatcher(ServiceBusSender sender) : ITriggerDispatcher
+// Internal — part of AddUmbracoAutomate()
+internal static IUmbracoBuilder AddTriggerDispatch(this IUmbracoBuilder builder)
 {
-    public async Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct)
+    builder.Services.AddSingleton<ITriggerDispatcher, DefaultTriggerDispatcher>();
+
+    builder.Services.AddCap(options =>
     {
-        var message = new ServiceBusMessage(JsonSerializer.SerializeToUtf8Bytes(triggerEvent));
-        await sender.SendMessageAsync(message, ct);
-    }
+        // Transport: in-process by default, swappable to external
+        options.UseInMemoryMessageQueue();
+
+        options.FailedRetryCount = 5;
+        options.FailedRetryInterval = 30;  // seconds
+    });
+
+    // Storage provider auto-detected from DB provider (same pattern as EF migrations).
+    // Uses Umbraco Automate's connection string if configured, otherwise falls back to Umbraco's.
+    builder.Services.AddCap(options =>
+    {
+        var config = builder.Services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+        var connectionString = config.GetConnectionString("umbracoAutomateDbDSN")
+            ?? config.GetConnectionString("umbracoDbDSN");
+        var providerName = config["ConnectionStrings:umbracoAutomateDbDSN_ProviderName"]
+            ?? config["ConnectionStrings:umbracoDbDSN_ProviderName"];
+
+        switch (providerName)
+        {
+            case Constants.ProviderNames.SQLServer:
+                options.UseSqlServer(sql =>
+                {
+                    sql.ConnectionString = connectionString!;
+                    sql.Schema = "UmbracoAutomate";
+                });
+                break;
+            case Constants.ProviderNames.SQLLite:
+            case "Microsoft.Data.SQLite":
+                options.UseSqlite(sql =>
+                {
+                    sql.ConnectionString = connectionString!;
+                    sql.TableNamePrefix = "UmbracoAutomate";
+                });
+                break;
+        }
+    });
+
+    return builder;
 }
 ```
 
-Configured via the existing options pattern:
+**Upgrading to an external transport** (e.g. RabbitMQ for multi-node fan-out):
 
 ```csharp
+// User swaps transport via options — no code changes to handlers or consumers
 builder.AddUmbracoAutomate(options =>
 {
-    options.UseTriggerDispatcher<ServiceBusTriggerDispatcher>();
+    options.UseRabbitMQ(rabbit =>
+    {
+        rabbit.HostName = "localhost";
+    });
 });
 ```
 
-All trigger base classes call `ITriggerDispatcher.DispatchAsync` — they never interact with `IWorkflowHost` directly. This means every trigger automatically benefits from a bus upgrade with zero code changes.
+**Key resilience features (provided by CAP):**
+
+| Concern | Solution |
+|---------|----------|
+| **Duplicate events** | CAP message deduplication |
+| **Consumer crash** | Transactional outbox — messages survive restarts, redelivered automatically |
+| **Poison messages** | Configurable retry count with backoff, then dead-lettered |
+| **Node failover** | Consumer registered on `SchedulingPublisher` only — Umbraco handles role failover |
+| **Scheduled triggers** | Fired by the processor node only — naturally single-fire |
+| **Observability** | CAP dashboard (optional), dead-lettered messages visible in backoffice |
+| **Transport upgrade** | Swap `UseInMemoryMessageQueue()` → `UseRabbitMQ()` / `UseAzureServiceBus()` — zero handler changes |
+
+All trigger handlers call `ITriggerDispatcher.DispatchAsync` — they never look up automations or interact with `IWorkflowHost` directly. CAP, the transport, and the consumer are internal implementation details behind `ITriggerDispatcher`.
 
 ---
 
@@ -881,6 +1115,9 @@ EntityVersion (generic — single table for all versioned entities, mirrors Umbr
 ├── CreatedUtc: DateTime
 ├── CreatedByUserId: Guid? (user key)
 ├── ChangeDescription: string? (optional change notes)
+
+// Note: Trigger event queue tables are managed by CAP (DotNetCore.CAP) —
+// no custom queue entity needed. CAP creates its own Published/Received tables.
 ```
 
 ### Entity Versioning System
@@ -1881,7 +2118,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | 2 | **WorkflowCore persistence** | Use WorkflowCore's own EF tables vs our own tables | ✅ **Decided: Custom `IPersistenceProvider`** — implements WorkflowCore's interface but uses Umbraco's `IEFCoreScopeProvider` for engine state. Our own tables for runs/audit (richer schema). Bypasses WorkflowCore's EF package entirely, avoiding the EF Core version mismatch (WC targets EF 9.x, Umbraco 17 uses EF 10.x). |
 | 3 | **Workflow definition storage** | Code-compiled vs JSON/YAML DSL | ✅ **Decided: JSON in DB, compiled to WorkflowCore at runtime.** Enables user-defined automations via the canvas editor. |
 | 4 | **Settings UI generation** | Auto-generate from POCO attributes vs hand-crafted per action | ✅ **Decided: `[Field]` attribute + `EditableModelSchemaBuilder`** — mirrors Umbraco.AI's `[AIField]` pattern exactly |
-| 5 | **Trigger delivery** | Direct event handler vs message bus | ✅ **Decided: `ITriggerDispatcher` abstraction with `DirectTriggerDispatcher` as v1 default.** Triggers call the dispatcher, never `IWorkflowHost` directly. Swappable to a message bus (Azure Service Bus, RabbitMQ) via `options.UseTriggerDispatcher<T>()` when fan-out or multi-node is needed. |
+| 5 | **Trigger delivery** | Direct event handler vs message bus | ✅ **Decided: CAP (`DotNetCore.CAP`, MIT) transactional outbox.** Trigger handlers are simple mappers (event → `TriggerEvent<TOutput>`). Dispatcher publishes via `ICapPublisher` — CAP handles persistence, retry with backoff, dead-lettering. Consumer on `SchedulingPublisher` node does fan-out. SQL Server via official `DotNetCore.CAP.SqlServer`, SQLite via community `DotNetCore.CAP.Sqlite` (MIT). Starts with in-memory transport, swappable to RabbitMQ/Azure Service Bus via config. CAP is an internal implementation detail — not exposed in any public API. |
 | 6 | **Multi-node / clustering** | Single-node only vs distributed from start | ✅ **Decided: Code-based via `AddUmbracoAutomate(options => ...)`**. Defaults to in-memory queue + Umbraco's connection string. Users install a WorkflowCore provider NuGet and configure in a Composer. See "Infrastructure Providers" section. |
 | 7 | **AI provider abstraction** | Direct SDK calls vs Umbraco AI abstraction | ✅ **Decided: Via Umbraco.AI.** All AI integration ships as `Umbraco.Automate.AI` and depends on Umbraco.AI's abstractions. Deferred to Phase 3. |
 | 8 | **Newtonsoft.Json** | Accept dual dependency vs replace | ✅ **Decided: Accept it.** WorkflowCore has a hard dep on Newtonsoft.Json. Isolated to the engine layer — our domain model and API use System.Text.Json. |
