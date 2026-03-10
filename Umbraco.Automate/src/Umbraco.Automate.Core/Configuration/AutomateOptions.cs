@@ -37,6 +37,42 @@ public sealed class ExecutionOptions
     /// Gets or sets the WorkflowCore poll interval.
     /// </summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Gets or sets the execution mode for workflow processing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="ExecutionMode.SchedulerOnly"/> (default): Only the <c>SchedulingPublisher</c>
+    /// (or <c>Single</c>) node consumes trigger events and executes workflows. Other nodes
+    /// capture notifications and dispatch them to the message bus, but do not process them.
+    /// This is safe with in-memory WorkflowCore persistence.
+    /// </para>
+    /// <para>
+    /// <see cref="ExecutionMode.Distributed"/>: All nodes participate in consuming trigger
+    /// events and executing workflow steps. Requires a shared WorkflowCore persistence provider
+    /// (e.g. EF Core backed by SQL Server) and a real message transport (e.g. RabbitMQ).
+    /// </para>
+    /// </remarks>
+    public ExecutionMode Mode { get; set; } = ExecutionMode.SchedulerOnly;
+}
+
+/// <summary>
+/// Controls which nodes participate in workflow execution.
+/// </summary>
+public enum ExecutionMode
+{
+    /// <summary>
+    /// Only the SchedulingPublisher (or Single) node processes workflows.
+    /// Safe with in-memory persistence.
+    /// </summary>
+    SchedulerOnly,
+
+    /// <summary>
+    /// All nodes participate in workflow execution via competing consumers.
+    /// Requires shared persistence and a real message transport.
+    /// </summary>
+    Distributed,
 }
 
 /// <summary>

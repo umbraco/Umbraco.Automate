@@ -49,10 +49,10 @@ It is the first CMS-embedded automation engine in the .NET ecosystem.
 
 | Package | Triggers | Actions |
 |---------|----------|---------|
-| **Umbraco.Automate.Forms** | Form Submitted, Form Entry Approved | Submit Form, Export Entries |
-| **Umbraco.Automate.Commerce** | Order Placed, Order Status Changed, Payment Captured, Stock Low | Update Order Status, Send Order Email, Adjust Stock |
-| **Umbraco.Automate.Workflow** | Approval Requested, Completed, Rejected | Request Approval, Approve Content, Reject Content |
-| **Umbraco.Automate.Engage** | Segment Entered/Exited, Persona Assigned | Assign Persona, Add to Segment, Trigger Personalization |
+| **Umbraco.Forms.Automate** | Form Submitted, Form Entry Approved | Submit Form, Export Entries |
+| **Umbraco.Commerce.Automate** | Order Placed, Order Status Changed, Payment Captured, Stock Low | Update Order Status, Send Order Email, Adjust Stock |
+| **Umbraco.Workflow.Automate** | Approval Requested, Completed, Rejected | Request Approval, Approve Content, Reject Content |
+| **Umbraco.Engage.Automate** | Segment Entered/Exited, Persona Assigned | Assign Persona, Add to Segment, Trigger Personalization |
 
 ### Third-party / community extensibility
 

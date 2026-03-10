@@ -1,0 +1,210 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Actions.Middleware;
+using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Actions.Middleware;
+using Umbraco.Automate.Core.Runs;
+using WorkflowCore.Interface;
+using WorkflowCore.Models;
+
+namespace Umbraco.Automate.Tests.Unit.Execution;
+
+public class AutomationExecutorTests
+{
+    private readonly Mock<IWorkflowHost> _workflowHost = new();
+    private readonly Mock<IWorkflowRegistry> _workflowRegistry = new();
+    private readonly Mock<IAutomationRunRepository> _runRepo = new();
+    private readonly AutomationExecutor _executor;
+
+    private readonly List<WorkflowDefinition> _registeredDefinitions = [];
+
+    public AutomationExecutorTests()
+    {
+        var action = new Mock<IAction>();
+        action.Setup(a => a.Alias).Returns("testAction");
+
+        var actions = CreateActionCollection(action.Object);
+        var pipeline = new ActionMiddlewarePipeline(new ActionMiddlewareCollection(Array.Empty<IActionMiddleware>));
+        var evaluator = new ExpressionEvaluator(new ExpressionFilterCollection(Array.Empty<IExpressionFilter>));
+
+        var services = new ServiceCollection();
+        services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
+        var sp = services.BuildServiceProvider();
+
+        _workflowRegistry.Setup(r => r.GetDefinition(It.IsAny<string>(), It.IsAny<int?>()))
+            .Returns((WorkflowDefinition?)null);
+        _workflowRegistry.Setup(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()))
+            .Callback<WorkflowDefinition>(d => _registeredDefinitions.Add(d));
+        _workflowHost.Setup(h => h.StartWorkflow(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<string>()))
+            .ReturnsAsync("instance-1");
+        _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
+
+        _executor = new AutomationExecutor(
+            _workflowHost.Object,
+            _workflowRegistry.Object,
+            actions,
+            pipeline,
+            evaluator,
+            _runRepo.Object,
+            sp,
+            Mock.Of<ILogger<AutomationExecutor>>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CreatesRunRecord()
+    {
+        var automation = CreateAutomation("testAction");
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        _runRepo.Verify(r => r.SaveAsync(
+            It.Is<AutomationRun>(run => run.AutomationId == automation.Id && run.Status == AutomationRunStatus.Running),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RegistersWorkflowDefinition()
+    {
+        var automation = CreateAutomation("testAction");
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        _registeredDefinitions.Count.ShouldBe(1);
+        _registeredDefinitions[0].Steps.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SkipsUnknownActions()
+    {
+        var automation = CreateAutomation("unknownAction");
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        _registeredDefinitions.Count.ShouldBe(1);
+        _registeredDefinitions[0].Steps.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MultipleSteps_WiresSequentialOutcomes()
+    {
+        var stepA = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step A" };
+        var stepB = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step B" };
+        var stepC = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step C" };
+
+        var automation = new Automation
+        {
+            Id = Guid.NewGuid(),
+            Alias = "test",
+            Name = "Test",
+            Version = 1,
+            Steps = [stepA, stepB, stepC],
+            Connections = [],
+        };
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(3);
+
+        // First two steps should have outcome pointing to next
+        def.Steps.FindById(0).Outcomes.Count.ShouldBe(1);
+        ((ValueOutcome)def.Steps.FindById(0).Outcomes[0]).NextStep.ShouldBe(1);
+
+        def.Steps.FindById(1).Outcomes.Count.ShouldBe(1);
+        ((ValueOutcome)def.Steps.FindById(1).Outcomes[0]).NextStep.ShouldBe(2);
+
+        // Last step has no outcomes
+        def.Steps.FindById(2).Outcomes.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithConnections_UsesTopologicalOrder()
+    {
+        // Define steps in reverse order, but connections dictate A → B → C
+        var stepA = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step A" };
+        var stepB = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step B" };
+        var stepC = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step C" };
+
+        var automation = new Automation
+        {
+            Id = Guid.NewGuid(),
+            Alias = "test",
+            Name = "Test",
+            Version = 1,
+            Steps = [stepC, stepB, stepA], // Deliberately reversed
+            Connections =
+            [
+                new StepConnection { SourceStepId = stepA.Id, TargetStepId = stepB.Id },
+                new StepConnection { SourceStepId = stepB.Id, TargetStepId = stepC.Id },
+            ],
+        };
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(3);
+        def.Steps.FindById(0).Name.ShouldBe("Step A");
+        def.Steps.FindById(1).Name.ShouldBe("Step B");
+        def.Steps.FindById(2).Name.ShouldBe("Step C");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StartsWorkflowOnHost()
+    {
+        var automation = CreateAutomation("testAction");
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.Is<string>(id => id.StartsWith("automate-")),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ReturnsRunId()
+    {
+        var automation = CreateAutomation("testAction");
+
+        var runId = await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        runId.ShouldNotBe(Guid.Empty);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotReRegisterExistingWorkflow()
+    {
+        var automation = CreateAutomation("testAction");
+        var workflowId = $"automate-{automation.Id}-v{automation.Version}";
+
+        _workflowRegistry.Setup(r => r.GetDefinition(workflowId, It.IsAny<int?>()))
+            .Returns(new WorkflowDefinition());
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        _workflowRegistry.Verify(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()), Times.Never);
+    }
+
+    private static Automation CreateAutomation(string actionAlias) => new()
+    {
+        Id = Guid.NewGuid(),
+        Alias = "test",
+        Name = "Test",
+        Version = 1,
+        Steps =
+        [
+            new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = actionAlias, Name = "Step 1" },
+        ],
+        Connections = [],
+    };
+
+    private static ActionCollection CreateActionCollection(params IAction[] actions)
+    {
+        IEnumerable<IAction> items = actions;
+        return new ActionCollection(() => items);
+    }
+}

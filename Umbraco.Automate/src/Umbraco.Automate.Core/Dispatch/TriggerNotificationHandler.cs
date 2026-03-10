@@ -8,6 +8,12 @@ namespace Umbraco.Automate.Core.Dispatch;
 /// Generic notification handler that bridges Umbraco notifications to trigger dispatch.
 /// One instance is auto-registered per distinct notification type discovered at startup.
 /// </summary>
+/// <remarks>
+/// No server-role filtering here — Umbraco notifications fire in-process on the node that
+/// handles the request and do not participate in distributed cache. Every node must capture
+/// the event and dispatch it to the message bus. Deduplication is the responsibility of
+/// the consumer / execution layer.
+/// </remarks>
 /// <typeparam name="TNotification">The Umbraco notification type.</typeparam>
 internal sealed class TriggerNotificationHandler<TNotification>(
     IEnumerable<INotificationTrigger<TNotification>> triggers,

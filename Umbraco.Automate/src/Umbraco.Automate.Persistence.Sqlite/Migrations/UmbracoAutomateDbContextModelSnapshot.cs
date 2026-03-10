@@ -185,6 +185,204 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
 
                     b.ToTable("umbracoAutomateStepRun", (string)null);
                 });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Transport.TransportMessageEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Body")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClaimedByGroup")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ClaimedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Headers")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedUtc");
+
+                    b.HasIndex("Topic", "ClaimedByGroup");
+
+                    b.ToTable("umbracoAutomateTransportMessage", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.EventEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventData")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EventTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsProcessed")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventName", "EventKey");
+
+                    b.HasIndex("IsProcessed", "EventTime");
+
+                    b.ToTable("umbracoAutomateEvent", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.EventSubscriptionEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExecutionPointerId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalToken")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ExternalTokenExpiry")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalWorkerId")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StepId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("SubscribeAsOf")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubscriptionData")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WorkflowId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventName", "EventKey");
+
+                    b.ToTable("umbracoAutomateEventSubscription", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.ScheduledCommandEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CommandName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExecuteTime")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExecuteTime");
+
+                    b.ToTable("umbracoAutomateScheduledCommand", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowInstanceEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompleteTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreateTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextExecution")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("WorkflowDefinitionId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextExecution");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("Status", "NextExecution");
+
+                    b.ToTable("umbracoAutomateWorkflowInstance", (string)null);
+                });
 #pragma warning restore 612, 618
         }
     }

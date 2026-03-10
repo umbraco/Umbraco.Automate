@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Persistence;
 
@@ -11,9 +12,11 @@ using Umbraco.Automate.Persistence;
 namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 {
     [DbContext(typeof(UmbracoAutomateDbContext))]
-    partial class UmbracoAutomateDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260310155418_UmbracoAutomate_AddWorkflowCoreTables")]
+    partial class UmbracoAutomate_AddWorkflowCoreTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -189,45 +192,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.HasIndex("RunId", "StepId");
 
                     b.ToTable("umbracoAutomateStepRun", (string)null);
-                });
-
-            modelBuilder.Entity("Umbraco.Automate.Persistence.Transport.TransportMessageEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Body")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ClaimedByGroup")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("ClaimedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Headers")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Topic")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedUtc");
-
-                    b.HasIndex("Topic", "ClaimedByGroup");
-
-                    b.ToTable("umbracoAutomateTransportMessage", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.EventEntity", b =>

@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 using Umbraco.Automate.Web.Api.Management.Run.Models;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
 using Umbraco.Cms.Core.Mapping;
@@ -12,7 +13,7 @@ namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
 /// Gets runs for a specific automation.
 /// </summary>
 [ApiVersion("1.0")]
-public sealed class ByAutomationRunController : RunControllerBase
+public sealed class ByAutomationRunController : AutomationControllerBase
 {
     private readonly IAutomationRunService _runService;
     private readonly IUmbracoMapper _mapper;
@@ -29,16 +30,16 @@ public sealed class ByAutomationRunController : RunControllerBase
     /// <summary>
     /// Gets paged runs for a specific automation.
     /// </summary>
-    [HttpGet("by-automation/{automationId:guid}")]
+    [HttpGet("{id:guid}/runs")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(PagedViewModel<AutomationRunResponseModel>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedViewModel<AutomationRunResponseModel>>> GetRunsByAutomation(
-        Guid automationId,
+        Guid id,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
     {
-        var (items, total) = await _runService.GetRunsByAutomationPagedAsync(automationId, skip, take, cancellationToken);
+        var (items, total) = await _runService.GetRunsByAutomationPagedAsync(id, skip, take, cancellationToken);
 
         return Ok(new PagedViewModel<AutomationRunResponseModel>
         {

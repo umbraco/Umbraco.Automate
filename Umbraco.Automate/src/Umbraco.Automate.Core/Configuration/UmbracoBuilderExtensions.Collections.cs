@@ -26,11 +26,16 @@ public static partial class UmbracoBuilderExtensions
         // Configuration options
         builder.Services.Configure<AutomateOptions>(
             builder.Config.GetSection("Umbraco:Automate"));
+        builder.Services.Configure<ExecutionOptions>(
+            builder.Config.GetSection("Umbraco:Automate:Execution"));
 
         // Collection builders — triggers, actions, filters auto-discovered
         builder.AutomateTriggers();
         builder.AutomateActions();
         builder.AutomateExpressionFilters();
+
+        // Wire notification triggers → TriggerNotificationHandler<T> for each notification type
+        builder.RegisterTriggerNotificationHandlers();
 
         // Action middleware — ordered pipeline
         builder.AutomateActionMiddleware()
@@ -53,17 +58,13 @@ public static partial class UmbracoBuilderExtensions
         // Automation execution
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
-        // WorkflowCore engine with custom persistence and queue
-        builder.Services.AddSingleton<IPersistenceProvider, InMemoryWorkflowPersistenceProvider>();
+        // WorkflowCore engine with custom queue (IPersistenceProvider registered in Persistence layer)
         builder.Services.AddSingleton<CapQueueProvider>();
         builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<CapQueueProvider>());
         builder.Services.AddWorkflow();
 
-        // CAP — in-memory storage and transport for v1
-        builder.Services.AddCap(cap =>
-        {
-            cap.UseInMemoryStorage();
-        });
+        // CAP — storage and transport are registered by the Persistence layer
+        // (database transport + in-memory CAP storage by default)
 
         return builder;
     }
