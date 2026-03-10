@@ -73,6 +73,7 @@ demo/
 
 # Monorepo
 *.local.sln
+*.local.slnx
 .worktrees
 
 # Claude Code
