@@ -120,14 +120,14 @@ Follows the same patterns established in **Umbraco.AI**: single class per compon
 
 ```csharp
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class AutomateTriggerAttribute(string alias, string name) : Attribute
+public sealed class TriggerAttribute(string alias, string name) : Attribute
 {
     public string Alias { get; } = alias;
     public string Name { get; } = name;
 }
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class AutomateActionAttribute(string alias, string name) : Attribute
+public sealed class ActionAttribute(string alias, string name) : Attribute
 {
     public string Alias { get; } = alias;
     public string Name { get; } = name;
@@ -139,7 +139,7 @@ public sealed class AutomateActionAttribute(string alias, string name) : Attribu
 ```csharp
 // ── Triggers ──────────────────────────────────────────
 
-public interface IAutomateTrigger
+public interface ITrigger
 {
     string Alias { get; }
     string Name { get; }
@@ -147,17 +147,17 @@ public interface IAutomateTrigger
     string? Group { get; }
     string? Icon { get; }
     Type? SettingsType { get; }
-    AutomateEditableModelSchema? GetSettingsSchema();
+    EditableModelSchema? GetSettingsSchema();
 
     Task SubscribeAsync(TriggerSubscription subscription, CancellationToken ct);
     Task UnsubscribeAsync(TriggerSubscription subscription, CancellationToken ct);
 }
 
 // Base class — reads alias/name from attribute, builds schema from TSettings
-public abstract class AutomateTriggerBase<TSettings> : IAutomateTrigger
+public abstract class TriggerBase<TSettings> : ITrigger
     where TSettings : class, new()
 {
-    private readonly IAutomateTriggerInfrastructure _infrastructure;
+    private readonly ITriggerInfrastructure _infrastructure;
 
     public string Alias { get; }
     public string Name { get; }
@@ -166,16 +166,16 @@ public abstract class AutomateTriggerBase<TSettings> : IAutomateTrigger
     public abstract string? Icon { get; }
     public Type SettingsType => typeof(TSettings);
 
-    protected AutomateTriggerBase(IAutomateTriggerInfrastructure infrastructure)
+    protected TriggerBase(ITriggerInfrastructure infrastructure)
     {
         _infrastructure = infrastructure;
-        var attr = GetType().GetCustomAttribute<AutomateTriggerAttribute>()
-            ?? throw new InvalidOperationException("Missing [AutomateTrigger] attribute");
+        var attr = GetType().GetCustomAttribute<TriggerAttribute>()
+            ?? throw new InvalidOperationException("Missing [Trigger] attribute");
         Alias = attr.Alias;
         Name = attr.Name;
     }
 
-    public AutomateEditableModelSchema? GetSettingsSchema()
+    public EditableModelSchema? GetSettingsSchema()
         => _infrastructure.SchemaBuilder.BuildForType<TSettings>(Alias);
 
     public abstract Task SubscribeAsync(TriggerSubscription subscription, CancellationToken ct);
@@ -184,7 +184,7 @@ public abstract class AutomateTriggerBase<TSettings> : IAutomateTrigger
 
 // ── Actions ───────────────────────────────────────────
 
-public interface IAutomateAction
+public interface IAction
 {
     string Alias { get; }
     string Name { get; }
@@ -192,16 +192,16 @@ public interface IAutomateAction
     string? Group { get; }
     string? Icon { get; }
     Type? SettingsType { get; }
-    AutomateEditableModelSchema? GetSettingsSchema();
+    EditableModelSchema? GetSettingsSchema();
 
     Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken ct);
 }
 
 // Base class — same pattern as triggers
-public abstract class AutomateActionBase<TSettings> : IAutomateAction
+public abstract class ActionBase<TSettings> : IAction
     where TSettings : class, new()
 {
-    private readonly IAutomateActionInfrastructure _infrastructure;
+    private readonly IActionInfrastructure _infrastructure;
 
     public string Alias { get; }
     public string Name { get; }
@@ -210,16 +210,16 @@ public abstract class AutomateActionBase<TSettings> : IAutomateAction
     public abstract string? Icon { get; }
     public Type SettingsType => typeof(TSettings);
 
-    protected AutomateActionBase(IAutomateActionInfrastructure infrastructure)
+    protected ActionBase(IActionInfrastructure infrastructure)
     {
         _infrastructure = infrastructure;
-        var attr = GetType().GetCustomAttribute<AutomateActionAttribute>()
-            ?? throw new InvalidOperationException("Missing [AutomateAction] attribute");
+        var attr = GetType().GetCustomAttribute<ActionAttribute>()
+            ?? throw new InvalidOperationException("Missing [Action] attribute");
         Alias = attr.Alias;
         Name = attr.Name;
     }
 
-    public AutomateEditableModelSchema? GetSettingsSchema()
+    public EditableModelSchema? GetSettingsSchema()
         => _infrastructure.SchemaBuilder.BuildForType<TSettings>(Alias);
 
     public abstract Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken ct);
@@ -231,7 +231,7 @@ public abstract class AutomateActionBase<TSettings> : IAutomateAction
 ```csharp
 // Attribute for settings fields — mirrors AIEditableModelFieldAttribute
 [AttributeUsage(AttributeTargets.Property)]
-public sealed class AutomateFieldAttribute : Attribute
+public sealed class FieldAttribute : Attribute
 {
     public string? Label { get; set; }
     public string? Description { get; set; }
@@ -242,31 +242,27 @@ public sealed class AutomateFieldAttribute : Attribute
     public string? Group { get; set; }
 }
 
-// Short alias for convenience
-[AttributeUsage(AttributeTargets.Property)]
-public sealed class AutoFieldAttribute : AutomateFieldAttribute { }
-
 // Settings POCO example
 public class SlackMessageSettings
 {
-    [AutoField(IsSensitive = true)]
+    [Field(IsSensitive = true)]
     [Required]
     public string? WebhookUrl { get; set; }
 
-    [AutoField(EditorUiAlias = "Umb.PropertyEditorUi.TextArea",
+    [Field(EditorUiAlias = "Umb.PropertyEditorUi.TextArea",
                EditorConfig = """[{ "alias": "rows", "value": 5 }]""")]
     [Required]
     public string? Message { get; set; }
 }
 ```
 
-The `AutomateEditableModelSchemaBuilder` (mirrors `AIEditableModelSchemaBuilder`) auto-discovers properties via reflection, infers editor UIs from C# types, collects validation attributes, and extracts default values — exactly as Umbraco.AI does.
+The `EditableModelSchemaBuilder` (mirrors `AIEditableModelSchemaBuilder`) auto-discovers properties via reflection, infers editor UIs from C# types, collects validation attributes, and extracts default values — exactly as Umbraco.AI does.
 
 ### Example: Complete Action
 
 ```csharp
-[AutomateAction("sendSlackMessage", "Send Slack Message")]
-public class SendSlackMessageAction : AutomateActionBase<SlackMessageSettings>
+[Action("sendSlackMessage", "Send Slack Message")]
+public class SendSlackMessageAction : ActionBase<SlackMessageSettings>
 {
     private readonly IHttpClientFactory _httpClientFactory;
 
@@ -275,7 +271,7 @@ public class SendSlackMessageAction : AutomateActionBase<SlackMessageSettings>
     public override string? Icon => "icon-chat";
 
     public SendSlackMessageAction(
-        IAutomateActionInfrastructure infrastructure,
+        IActionInfrastructure infrastructure,
         IHttpClientFactory httpClientFactory)
         : base(infrastructure)
         => _httpClientFactory = httpClientFactory;
@@ -295,26 +291,26 @@ Uses `LazyCollectionBuilderBase` with auto-discovery via `TypeLoader` — same p
 
 ```csharp
 // Collection builders
-public class AutomateTriggerCollectionBuilder
-    : LazyCollectionBuilderBase<AutomateTriggerCollectionBuilder, AutomateTriggerCollection, IAutomateTrigger>
+public class TriggerCollectionBuilder
+    : LazyCollectionBuilderBase<TriggerCollectionBuilder, TriggerCollection, ITrigger>
 {
-    protected override AutomateTriggerCollectionBuilder This => this;
+    protected override TriggerCollectionBuilder This => this;
 }
 
-public class AutomateActionCollectionBuilder
-    : LazyCollectionBuilderBase<AutomateActionCollectionBuilder, AutomateActionCollection, IAutomateAction>
+public class ActionCollectionBuilder
+    : LazyCollectionBuilderBase<ActionCollectionBuilder, ActionCollection, IAction>
 {
-    protected override AutomateActionCollectionBuilder This => this;
+    protected override ActionCollectionBuilder This => this;
 }
 ```
 
 ```csharp
 // UmbracoBuilderExtensions.Collections.cs (in Umbraco.Automate.Extensions namespace)
-public static AutomateTriggerCollectionBuilder AutomateTriggers(this IUmbracoBuilder builder)
-    => builder.WithCollectionBuilder<AutomateTriggerCollectionBuilder>();
+public static TriggerCollectionBuilder Triggers(this IUmbracoBuilder builder)
+    => builder.WithCollectionBuilder<TriggerCollectionBuilder>();
 
-public static AutomateActionCollectionBuilder AutomateActions(this IUmbracoBuilder builder)
-    => builder.WithCollectionBuilder<AutomateActionCollectionBuilder>();
+public static ActionCollectionBuilder Actions(this IUmbracoBuilder builder)
+    => builder.WithCollectionBuilder<ActionCollectionBuilder>();
 ```
 
 ```csharp
@@ -333,11 +329,11 @@ public static IUmbracoBuilder AddUmbracoAutomate(
 // Auto-discovers all triggers and actions
 internal static IUmbracoBuilder AddUmbracoAutomateCore(this IUmbracoBuilder builder)
 {
-    builder.AutomateTriggers()
-        .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAutomateTrigger, AutomateTriggerAttribute>(cache: true));
+    builder.Triggers()
+        .Add(() => builder.TypeLoader.GetTypesWithAttribute<ITrigger, TriggerAttribute>(cache: true));
 
-    builder.AutomateActions()
-        .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAutomateAction, AutomateActionAttribute>(cache: true));
+    builder.Actions()
+        .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAction, ActionAttribute>(cache: true));
 
     return builder;
 }
@@ -403,7 +399,7 @@ public class SlackAutomateComposer : IComposer
 {
     public void Compose(IUmbracoBuilder builder)
     {
-        builder.AutomateActions()
+        builder.Actions()
             .Add<SendSlackMessageAction>()
             .Add<CreateSlackChannelAction>();
     }
@@ -462,13 +458,13 @@ The endpoint:
 ```csharp
 public class WebhookReceivedTriggerSettings
 {
-    [AutoField(IsSensitive = true)]
+    [Field(IsSensitive = true)]
     public string? Secret { get; set; }  // Optional shared secret for validation
 
-    [AutoField]
+    [Field]
     public bool ValidateSignature { get; set; }  // HMAC-SHA256 signature validation
 
-    [AutoField]
+    [Field]
     public string? AllowedMethods { get; set; } = "POST";  // Comma-separated HTTP methods
 }
 ```
@@ -499,7 +495,7 @@ Several patterns from the Umbraco.AI codebase should be adopted directly — the
 Mirrors Umbraco.AI's `IAIChatMiddleware` pipeline. Cross-cutting concerns (logging, error handling, timing, validation) wrap action execution without polluting action implementations.
 
 ```csharp
-public interface IAutomateActionMiddleware
+public interface IActionMiddleware
 {
     Task<ActionResult> ApplyAsync(ActionContext context, ActionMiddlewareDelegate next, CancellationToken ct);
 }
@@ -510,17 +506,17 @@ public delegate Task<ActionResult> ActionMiddlewareDelegate(ActionContext contex
 Registered via an ordered collection builder:
 
 ```csharp
-builder.AutomateActionMiddleware()
+builder.ActionMiddleware()
     .Append<StepRunLoggingMiddleware>()       // Captures input/output/duration per step
     .Append<ErrorHandlingMiddleware>()        // Retry, suspend, terminate logic
-    .Append<SensitiveDataMaskingMiddleware>() // Masks [AutoField(IsSensitive=true)] values in logs
+    .Append<SensitiveDataMaskingMiddleware>() // Masks [Field(IsSensitive=true)] values in logs
     .Append<ValidationMiddleware>();          // Validates settings before execution
 ```
 
 Third parties can insert middleware:
 
 ```csharp
-builder.AutomateActionMiddleware()
+builder.ActionMiddleware()
     .InsertBefore<ErrorHandlingMiddleware, MyCustomMetricsMiddleware>();
 ```
 
@@ -647,9 +643,9 @@ Mirrors Umbraco.AI's hierarchical `IOptions` binding:
 ```
 
 ```csharp
-services.Configure<AutomateOptions>(config.GetSection("Umbraco:Automate"));
-services.Configure<AutomateExecutionOptions>(config.GetSection("Umbraco:Automate:Execution"));
-services.Configure<AutomateGovernanceOptions>(config.GetSection("Umbraco:Automate:Governance"));
+services.Configure<AutomationOptions>(config.GetSection("Umbraco:Automate"));
+services.Configure<ExecutionOptions>(config.GetSection("Umbraco:Automate:Execution"));
+services.Configure<GovernanceOptions>(config.GetSection("Umbraco:Automate:Governance"));
 ```
 
 ### Infrastructure Providers (Queue, Lock, Lifecycle)
@@ -744,7 +740,7 @@ The `options` parameter exposes WorkflowCore's `WorkflowOptions` directly — no
 The trigger dispatcher sits between "trigger fires" and "workflow starts", abstracting how trigger events are delivered to the engine. This allows swapping from a simple in-process dispatch to a message bus without changing any trigger code.
 
 ```csharp
-public interface IAutomateTriggerDispatcher
+public interface ITriggerDispatcher
 {
     Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct);
 }
@@ -762,7 +758,7 @@ public class TriggerEvent
 **v1: Direct dispatcher** (default — calls WorkflowCore synchronously):
 
 ```csharp
-internal class DirectTriggerDispatcher(IWorkflowHost workflowHost) : IAutomateTriggerDispatcher
+internal class DirectTriggerDispatcher(IWorkflowHost workflowHost) : ITriggerDispatcher
 {
     public async Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct)
     {
@@ -779,7 +775,7 @@ internal class DirectTriggerDispatcher(IWorkflowHost workflowHost) : IAutomateTr
 
 ```csharp
 // Example: Azure Service Bus implementation (separate package)
-internal class ServiceBusTriggerDispatcher(ServiceBusSender sender) : IAutomateTriggerDispatcher
+internal class ServiceBusTriggerDispatcher(ServiceBusSender sender) : ITriggerDispatcher
 {
     public async Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct)
     {
@@ -798,7 +794,7 @@ builder.AddUmbracoAutomate(options =>
 });
 ```
 
-All trigger base classes call `IAutomateTriggerDispatcher.DispatchAsync` — they never interact with `IWorkflowHost` directly. This means every trigger automatically benefits from a bus upgrade with zero code changes.
+All trigger base classes call `ITriggerDispatcher.DispatchAsync` — they never interact with `IWorkflowHost` directly. This means every trigger automatically benefits from a bus upgrade with zero code changes.
 
 ---
 
@@ -811,7 +807,9 @@ Automation
 ├── Name: string
 ├── Description: string
 ├── IsEnabled: bool
-├── Version: int
+├── Status: Draft | Published | Inactive
+├── PublishedVersion: int? (the version currently active for trigger evaluation)
+├── DraftVersion: int (the latest version, may be ahead of PublishedVersion)
 ├── GroupId: Guid? (for organizing)
 ├── CreatedUtc: DateTime
 ├── UpdatedUtc: DateTime
@@ -823,7 +821,7 @@ Automation
 │   ├── Id: Guid
 │   ├── ActionAlias: string
 │   ├── Name: string (user-defined label)
-│   ├── ConnectionName: string? (references a named Connection)
+│   ├── ConnectionId: Guid? (references a named Connection — resolved to alias during Deploy transfer)
 │   ├── Settings: Dictionary<string, object>
 │   ├── InputMappings: Dictionary<string, string>
 │   ├── Position: { X, Y } (canvas coordinates)
@@ -866,12 +864,161 @@ AutomationRun
 
 Connection
 ├── Id: Guid
-├── Name: string (unique logical name, e.g. "slack-notifications", "production-smtp")
+├── Alias: string (unique, URL-safe, e.g. "slack-notifications", "production-smtp" — used for referencing)
+├── Name: string (human-friendly display name, e.g. "Slack Notifications", "Production SMTP")
 ├── Type: string (e.g. "webhook", "smtp", "oauth2")
-├── Settings: Dictionary<string, object> (sensitive values encrypted via [AutoField(IsSensitive = true)])
+├── Version: int
+├── Settings: Dictionary<string, object> (sensitive values encrypted via [Field(IsSensitive = true)])
 ├── CreatedUtc: DateTime
 └── UpdatedUtc: DateTime
+
+EntityVersion (generic — single table for all versioned entities, mirrors Umbraco.AI's `umbracoAIEntityVersion`)
+├── Id: Guid
+├── EntityType: string (e.g. "Automation", "Connection")
+├── EntityId: Guid
+├── Version: int
+├── Snapshot: string (JSON — full serialized snapshot of the entity state)
+├── CreatedUtc: DateTime
+├── CreatedByUserId: Guid? (user key)
+├── ChangeDescription: string? (optional change notes)
 ```
+
+### Entity Versioning System
+
+Follows Umbraco.AI's **Strategy + Adapter** pattern for a unified versioning system:
+
+**Marker interface** — entities declare themselves versionable:
+```csharp
+public interface IVersionableEntity : IAuditableEntity
+{
+    int Version { get; }
+}
+```
+
+**Entity adapter** — each versionable entity provides a concrete adapter for entity-specific snapshot/restore/comparison logic:
+```csharp
+public interface IVersionableEntityAdapter
+{
+    string EntityTypeName { get; }  // discriminator: "Automation", "Connection"
+    Type EntityType { get; }
+    string CreateSnapshot(object entity);
+    object RestoreFromSnapshot(string json);
+    IReadOnlyList<ValueChange> CompareVersions(string fromJson, string toJson);
+    Task RollbackAsync(Guid entityId, int version, CancellationToken ct);
+    Task<object?> GetEntityAsync(Guid entityId, CancellationToken ct);
+}
+
+public abstract class VersionableEntityAdapterBase<TEntity> : IVersionableEntityAdapter
+    where TEntity : IVersionableEntity
+{
+    // Strongly-typed abstract methods for implementations to override
+    protected abstract string CreateSnapshot(TEntity entity);
+    protected abstract TEntity RestoreFromSnapshot(string json);
+    protected abstract IReadOnlyList<ValueChange> CompareVersions(string fromJson, string toJson);
+}
+```
+
+**Adapter collection** — registered via `LazyCollectionBuilderBase`, discovered at startup:
+```csharp
+builder.VersionableEntityAdapters()
+    .Add<AutomationVersionableEntityAdapter>()
+    .Add<ConnectionVersionableEntityAdapter>();
+```
+
+**Central version service** — delegates to adapters for entity-specific logic:
+```csharp
+public interface IEntityVersionService
+{
+    Task SaveVersionAsync<T>(T entity, Guid? userId, string? changeDescription, CancellationToken ct)
+        where T : IVersionableEntity;
+    Task<T?> GetVersionSnapshotAsync<T>(Guid entityId, int version, CancellationToken ct);
+    Task<IReadOnlyList<ValueChange>> CompareVersionsAsync(string entityType, Guid entityId, int fromVersion, int toVersion, CancellationToken ct);
+    Task RollbackAsync(string entityType, Guid entityId, int version, CancellationToken ct);
+    Task DeleteVersionsAsync(Guid entityId, string entityType, CancellationToken ct);
+}
+```
+
+**Save flow** — services explicitly create a version snapshot before updating:
+```csharp
+public async Task<Automation> SaveAutomationAsync(Automation automation, CancellationToken ct)
+{
+    var userId = _backOfficeSecurityAccessor?.BackOfficeSecurity?.CurrentUser?.Key;
+    var existing = await _repository.GetByIdAsync(automation.Id, ct);
+    if (existing is not null)
+    {
+        // Snapshot CURRENT state before overwriting
+        await _versionService.SaveVersionAsync(existing, userId, null, ct);
+    }
+    return await _repository.SaveAsync(automation, userId, ct);  // increments Version
+}
+```
+
+**Rollback** creates a **new version** from the target snapshot (append-only history):
+```csharp
+public async Task<Automation> RollbackAutomationAsync(Guid id, int targetVersion, CancellationToken ct)
+{
+    var current = await _repository.GetByIdAsync(id, ct);
+    await _versionService.SaveVersionAsync(current, userId, null, ct);  // save current before rollback
+    var snapshot = await _versionService.GetVersionSnapshotAsync<Automation>(id, targetVersion, ct);
+    // Restore properties from snapshot, save as new version
+    return await _repository.SaveAsync(restored, userId, ct);
+}
+```
+
+**Unified API** — single controller for all entity types:
+```
+GET  /api/automate/versions/{entityType}/{entityId}?skip=0&take=10
+GET  /api/automate/versions/{entityType}/{entityId}/{version}
+GET  /api/automate/versions/{entityType}/{entityId}/{fromVersion}/compare/{toVersion}
+POST /api/automate/versions/{entityType}/{entityId}/{version}/rollback
+```
+
+**Version cleanup** — background job with configurable retention:
+- Age-based: delete versions older than N days
+- Count-based: keep only the most recent N versions per entity
+
+**Versionable entities**: `Automation` (with draft/publish lifecycle) and `Connection` (immediate on save, no draft/publish). Sensitive values in connection version snapshots are stored masked to prevent historical credential leakage.
+
+---
+
+## Versioning & Publishing Lifecycle
+
+Automations follow a **draft → publish** lifecycle, similar to most automation platforms (n8n, Make, Power Automate) and consistent with Umbraco's own content publishing model. Editing an automation does not immediately affect running triggers — changes must be explicitly published.
+
+### States
+
+| Status | Triggers fire? | Description |
+|--------|---------------|-------------|
+| **Draft** | No | Newly created or never published. Can be edited and tested via dry run. |
+| **Published** | Yes (if enabled) | Has a published version. Triggers evaluate against the published definition. |
+| **Inactive** | No | Previously published, explicitly deactivated. Published version is retained for reference/rollback. |
+
+`IsEnabled` is separate from `Status` — a published automation can be disabled (kill switch) without losing its published state. Re-enabling resumes trigger evaluation immediately.
+
+### How it works
+
+1. **Every save** creates a new `EntityVersion` record (entity type `"automation"`) with a full JSON snapshot of the definition (trigger, steps, connections, canvas state). `DraftVersion` increments.
+2. **Publishing** sets `PublishedVersion = DraftVersion` and compiles the definition into a WorkflowCore workflow registration. Only published automations register triggers with the engine.
+3. **Editing a published automation** continues saving new draft versions without affecting the live version. The canvas shows a "unpublished changes" indicator (like Umbraco content).
+4. **In-flight runs** always execute against the version they started with (`AutomationRun.AutomationVersion`). Publishing a new version does not affect running instances.
+
+### Rollback
+
+Since every version is a complete snapshot, rollback is straightforward:
+
+```
+Publish v3 → users report issues → rollback to v2
+```
+
+The management API exposes:
+- `GET /api/automate/automation/{id}/versions` — list all versions with metadata
+- `POST /api/automate/automation/{id}/rollback/{version}` — creates a new draft from the specified version's snapshot, then publishes it
+
+Rollback creates a **new version** (v4 with v2's definition) rather than rewinding history — the version log is append-only.
+
+### Interaction with Deploy
+
+Deploy transfers the **published version** of an automation. On arrival, the automation is created as `Draft` (disabled) with the transferred definition as version 1. The operator reviews and explicitly publishes after configuring connections.
 
 ---
 
@@ -936,13 +1083,13 @@ ${ trigger.email | fallback:no-reply@example.com }
 
 #### Where expressions are used
 
-Expressions can appear in any **string-type** settings field on an action. The `AutomateEditableModelSchemaBuilder` marks string fields as expression-enabled by default. The middleware resolves expressions before passing settings to `ExecuteAsync`.
+Expressions can appear in any **string-type** settings field on an action. The `EditableModelSchemaBuilder` marks string fields as expression-enabled by default. The middleware resolves expressions before passing settings to `ExecuteAsync`.
 
 ```csharp
 // Settings POCO — expressions resolve before the action sees the values
 public class SendSlackMessageSettings
 {
-    [AutoField]
+    [Field]
     [Required]
     public string? Message { get; set; }  // "Published: ${ trigger.contentName }"
 }
@@ -955,13 +1102,13 @@ At runtime, the expression `"Published: ${ trigger.contentName }"` resolves to `
 Third parties register custom filters via collection builder:
 
 ```csharp
-builder.AutomateExpressionFilters()
+builder.ExpressionFilters()
     .Add<TruncateFilter>()
     .Add<FormatDateFilter>();
 
 // Custom filter
-[AutomateFilter("currencyFormat")]
-public class CurrencyFormatFilter : IAutomateExpressionFilter
+[ExpressionFilter("currencyFormat")]
+public class CurrencyFormatFilter : IExpressionFilter
 {
     public object? Apply(object? value, string[] args)
     {
@@ -985,8 +1132,8 @@ We investigated whether the CMS's **UFM (Umbraco Flavoured Markdown)** implement
 |-------------|---------------------|------------|
 | `${ expression }` syntax | Same tokenizer pattern (`/\$\{((?:[^{}]\|\{[^{}]*\})*)\}/`) | Pattern only — reimplemented in C# |
 | `\| filter:arg1:arg2` pipe syntax | Same pipe syntax | Pattern only |
-| `UmbUfmFilterApi` interface (`filter(...args)`) | `IAutomateExpressionFilter.Apply(object?, string[])` | Mirrored interface shape |
-| Extension manifest registration (`ufmFilter` type) | `AutomateExpressionFilterCollectionBuilder` | Umbraco DI equivalent |
+| `UmbUfmFilterApi` interface (`filter(...args)`) | `IExpressionFilter.Apply(object?, string[])` | Mirrored interface shape |
+| Extension manifest registration (`ufmFilter` type) | `ExpressionFilterCollectionBuilder` | Umbraco DI equivalent |
 | Built-in filters (truncate, fallback, lowercase, uppercase, stripHtml) | Same filter set, ported to C# | Behaviour ported |
 
 **What we cannot reuse:**
@@ -1060,17 +1207,17 @@ Leverage Umbraco's existing user group / permission model:
 | **Dry run mode** | Execute an automation without side effects; steps return what they *would* do |
 | **Rate limiting** | Configurable max runs per automation per time window |
 | **Kill switch** | Global and per-automation emergency disable |
-| **Automation versioning** | Each edit creates a new version; running instances complete on their original version |
+| **Automation versioning** | Each save creates an immutable version snapshot. Draft/publish lifecycle ensures edits don't affect live triggers. Running instances complete on their original version. Rollback restores any previous version. |
 | **Sensitive data masking** | Mark settings fields as sensitive; values are encrypted at rest and masked in run logs |
 
 ### Failure Notifications
 
 When an automation run fails, the system needs to notify relevant people — they won't always be staring at the backoffice.
 
-**Pluggable notification channels** via `IAutomateNotificationChannel`:
+**Pluggable notification channels** via `INotificationChannel`:
 
 ```csharp
-public interface IAutomateNotificationChannel
+public interface INotificationChannel
 {
     string Alias { get; }
     string Name { get; }
@@ -1118,16 +1265,16 @@ Automation
 }
 ```
 
-**Integration with lifecycle notifications:** Failure notifications fire from a handler on `AutomationRunCompletedNotification` — this means third parties can also add their own notification channels via the same `IAutomateNotificationChannel` collection builder:
+**Integration with lifecycle notifications:** Failure notifications fire from a handler on `AutomationRunCompletedNotification` — this means third parties can also add their own notification channels via the same `INotificationChannel` collection builder:
 
 ```csharp
-builder.AutomateNotificationChannels()
+builder.NotificationChannels()
     .Add<BackofficeNotificationChannel>()
     .Add<EmailNotificationChannel>()
     .Add<WebhookNotificationChannel>();
 
 // Third party adds a custom channel
-builder.AutomateNotificationChannels()
+builder.NotificationChannels()
     .Add<PagerDutyNotificationChannel>();
 ```
 
@@ -1173,22 +1320,22 @@ All AI capabilities come from **Umbraco.AI** — Umbraco.Automate does not integ
 Umbraco.AI agents are exposed as automation actions. This lets automations delegate complex reasoning tasks to AI.
 
 ```csharp
-[AutomateAction("executeAIAgent", "Execute AI Agent")]
-public class ExecuteAIAgentAction : AutomateActionBase<ExecuteAIAgentSettings>
+[Action("executeAIAgent", "Execute AI Agent")]
+public class ExecuteAIAgentAction : ActionBase<ExecuteAIAgentSettings>
 {
     // Resolves the agent from Umbraco.AI's agent registry and executes it
 }
 
 public class ExecuteAIAgentSettings
 {
-    [AutoField(EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.AIAgentPicker")]
+    [Field(EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.AIAgentPicker")]
     [Required]
     public string? AgentAlias { get; set; }
 
-    [AutoField(EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
+    [Field(EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
     public string? Prompt { get; set; }  // Supports data binding from previous steps
 
-    [AutoField]
+    [Field]
     public bool RequireHumanApproval { get; set; }  // HITL gate before agent executes
 }
 ```
@@ -1244,7 +1391,7 @@ This closes the loop: **agents can orchestrate automations, and automations can 
 All AI-related runs are fully auditable:
 - Runs initiated by an AI agent record `InitiatedBy: "ai-agent:{agentAlias}"`
 - Agent execution steps record the full prompt, response, and token usage in step-run data
-- HITL gates can be required for AI-initiated automations via `AutomateGovernanceOptions`:
+- HITL gates can be required for AI-initiated automations via `GovernanceOptions`:
 
 ```json
 {
@@ -1309,9 +1456,12 @@ This surfaces the same concerns as health checks but in context where editors an
 
 #### Workspace: Automation Editor
 
-Opened by clicking an automation in the tree. Single workspace containing the canvas and all editing UI.
+Opened by clicking an automation in the tree. Uses workspace apps (tabs) following the Umbraco.AI pattern — two apps:
 
-- **Top bar**: Automation name, alias, save, enable/disable toggle, test/dry-run button, version history
+**Workspace App: Workflow** (primary tab, `icon-nodes`)
+The canvas editor for building the automation.
+
+- **Top bar**: Automation name, alias, save, **publish** (with split button for "save draft"), enable/disable toggle, test/dry-run button. Shows "unpublished changes" badge when draft is ahead of published version.
 - **Full-width canvas**: React Flow node graph — no sidebars, maximum canvas space
   - Trigger node (single, at the top)
   - Action nodes with typed input/output handles
@@ -1328,9 +1478,26 @@ Opened by clicking an automation in the tree. Single workspace containing the ca
 
 **Node Settings Modal** (Umbraco modal):
 - Triggered by clicking the pencil icon on a node
-- Auto-generated form from the action's Settings POCO using `[AutoField]` attributes via `AutomateEditableModelSchemaBuilder`
+- Auto-generated form from the action's Settings POCO using `[Field]` attributes via `EditableModelSchemaBuilder`
 - Includes node name (user-defined label), error behavior config, and per-step settings
 - Standard Umbraco modal with save/cancel
+
+**Workspace App: Info** (secondary tab, `icon-info`)
+Follows the Umbraco.AI two-column layout (`<umb-automate-workspace-editor-layout>`):
+
+- **Left column**: Version history table
+  - Version number, author, timestamp, published/draft badge per row
+  - Clicking a version opens a read-only canvas view of that snapshot
+  - "Restore" button creates a new draft from the selected version (rollback)
+  - Phase 3+: diff link between any two versions
+- **Right column** (aside): Info box
+  - **Id** — automation unique ID (or "Unsaved" tag for new)
+  - **Alias** — URL-safe alias
+  - **Status** — Draft / Published / Inactive badge
+  - **Published version** — version number currently live
+  - **Date Created** — formatted timestamp
+  - **Date Modified** — formatted timestamp
+  - **Created By** — user who created the automation
 
 #### Workspace: Run Explorer
 
@@ -1377,28 +1544,35 @@ This is the hard part. An automation's steps may reference secrets (API keys, we
 
 #### Approach: Named Connections
 
-Rather than embedding credentials directly in step settings, sensitive integrations reference a **named connection** — a separately managed entity that maps a logical name to environment-specific credentials.
+Rather than embedding credentials directly in step settings, sensitive integrations reference a **named connection** — a separately managed entity that maps an alias to environment-specific credentials.
 
 ```
-Step settings:
-  ConnectionName: "slack-notifications"    ← transfers between environments
-  Channel: "#content-updates"              ← transfers between environments
+Step settings (in database):
+  ConnectionId: "a1b2c3d4-..."              ← Guid reference, used at runtime
+  Channel: "#content-updates"
 
 Connection (per-environment, does NOT transfer):
-  Name: "slack-notifications"
+  Id: "a1b2c3d4-..."
+  Alias: "slack-notifications"
+  Name: "Slack Notifications"
   Type: "webhook"
-  Credentials: { WebhookUrl: "https://hooks.slack.com/..." }  ← encrypted via [AutoField(IsSensitive = true)]
+  Credentials: { WebhookUrl: "https://hooks.slack.com/..." }  ← encrypted via [Field(IsSensitive = true)]
+
+Deploy artifact (serialized for transfer):
+  ConnectionAlias: "slack-notifications"    ← swapped from ID to alias during export
+  Channel: "#content-updates"
 ```
 
 On transfer:
-1. The automation definition transfers with `ConnectionName: "slack-notifications"` intact
-2. The **connection entity itself does NOT transfer** — it must be configured in the target environment
-3. On arrival, the automation is disabled and the startup validation flags: _"Automation 'Notify on Publish' requires connection 'slack-notifications' which is not configured"_
-4. The admin configures the connection with production credentials, then enables the automation
+1. During **export**, the Deploy connector resolves `ConnectionId` → `ConnectionAlias` in the artifact (same pattern as content key → UDI)
+2. During **import**, the connector resolves `ConnectionAlias` → `ConnectionId` by looking up the alias in the target environment
+3. The **connection entity itself does NOT transfer** — it must be configured in the target environment
+4. If the alias doesn't exist on arrival, the automation is created as Draft (disabled) and startup validation flags: _"Automation 'Notify on Publish' requires connection 'slack-notifications' which is not configured"_
+5. The admin configures the connection with production credentials, then publishes the automation
 
 This approach:
 - **Never moves credentials between environments** — credentials are always configured locally
-- **Preserves automation portability** — the definition references a logical name, not a raw secret
+- **Preserves automation portability** — the definition references an alias, not a raw secret
 - **Validates on arrival** — missing connections are surfaced immediately, not discovered at runtime when a run fails
 - **Credentials encrypted in-place** — sensitive connection settings are encrypted via Data Protection, environment-specific by nature
 
@@ -1407,9 +1581,10 @@ This approach:
 ```
 Connection
 ├── Id: Guid
-├── Name: string (unique, e.g. "slack-notifications", "production-smtp")
+├── Alias: string (unique, URL-safe, e.g. "slack-notifications", "production-smtp" — used for referencing)
+├── Name: string (human-friendly display name)
 ├── Type: string (e.g. "webhook", "smtp", "oauth2")
-├── Settings: Dictionary<string, object> (sensitive values encrypted via [AutoField(IsSensitive = true)])
+├── Settings: Dictionary<string, object> (sensitive values encrypted via [Field(IsSensitive = true)])
 ├── CreatedUtc: DateTime
 └── UpdatedUtc: DateTime
 ```
@@ -1418,7 +1593,7 @@ Connections are managed in the Automations section settings panel. They are **ne
 
 #### Inline Secrets (Fallback)
 
-For simple cases where a named connection is overkill (e.g., a one-off HTTP Request with a bearer token), `[AutoField(IsSensitive = true)]` settings are **stripped on export/transfer** and replaced with a placeholder:
+For simple cases where a named connection is overkill (e.g., a one-off HTTP Request with a bearer token), `[Field(IsSensitive = true)]` settings are **stripped on export/transfer** and replaced with a placeholder:
 
 ```json
 {
@@ -1483,8 +1658,8 @@ But if a third-party action references an entity from a community package withou
 Actions and triggers declare what external entity types they reference. This is metadata — it doesn't require the entity's product to be installed.
 
 ```csharp
-[AutomateAction("submitForm", "Submit Form")]
-public class SubmitFormAction : AutomateActionBase<SubmitFormSettings>
+[Action("submitForm", "Submit Form")]
+public class SubmitFormAction : ActionBase<SubmitFormSettings>
 {
     // Declares that this action references a Forms form entity
     public override IEnumerable<EntityDependency> GetDependencies(StepConfiguration step)
@@ -1519,7 +1694,7 @@ Action settings should prefer **aliases/names** over GUIDs where the referenced 
 ```csharp
 public class RequestApprovalSettings
 {
-    [AutoField]
+    [Field]
     public string? ApprovalGroupName { get; set; }  // ← preferred: survives transfer
 
     // NOT: public Guid? ApprovalGroupId { get; set; }  // ← breaks without Deploy
@@ -1540,7 +1715,7 @@ These concerns are baked into the architecture, not bolted on later.
 
 | Concern | Approach |
 |---------|----------|
-| **Secrets management** | Settings marked `[AutoField(IsSensitive = true)]` are automatically encrypted at rest using ASP.NET Core Data Protection (already in Umbraco's dependency tree) — mirroring Umbraco.AI's `[AIField(IsSensitive = true)]` pattern. Sensitive values are encrypted in-place on the entity (Connection settings, action settings) via EF Core value converters. No separate secrets table — the Connection entity itself centralises shared credentials. |
+| **Secrets management** | Settings marked `[Field(IsSensitive = true)]` are automatically encrypted at rest using ASP.NET Core Data Protection (already in Umbraco's dependency tree) — mirroring Umbraco.AI's `[AIField(IsSensitive = true)]` pattern. Sensitive values are encrypted in-place on the entity (Connection settings, action settings) via EF Core value converters. No separate secrets table — the Connection entity itself centralises shared credentials. |
 | **SSRF prevention** | HTTP Request action validates URLs against a configurable allowlist/denylist. Blocks internal IPs (`10.x`, `172.16.x`, `192.168.x`), link-local (`169.254.x`), and localhost by default. |
 | **Step-level timeout enforcement** | `CancellationToken` linked to a `CancellationTokenSource` with the configured timeout. Enforced by the middleware pipeline — actions that ignore cancellation are terminated after a grace period. |
 | **Trigger deduplication** | Optional `IdempotencyKey` on trigger events. `TriggerService` deduplicates within a configurable window (default 5 minutes). Incoming webhooks use `X-Request-Id` header or body hash. |
@@ -1589,7 +1764,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | Concern | Approach |
 |---------|----------|
 | **Audit log immutability** | Append-only table with no DELETE/UPDATE at SQL level, or cryptographic chaining (each record hashes the previous). |
-| **Automation version diff** | Store full serialized definition per version. Diff view in the UI for "what changed between v3 and v4." |
+| **Automation version diff** | Diff view in the UI for "what changed between v3 and v4" — definitions already stored as full JSON snapshots in `EntityVersion`. |
 | **Run history archival** | Move runs older than N days to an archive table or blob storage. Keeps the active table lean for query performance. |
 
 ---
@@ -1601,18 +1776,19 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 **Goal**: A working, secure automation engine with basic triggers/actions, canvas editor, and run logging.
 
 **Engine**:
-- Domain models (Automation, Step, Connection, Run, StepRun)
+- Domain models (Automation, EntityVersion, Step, Connection, Run, StepRun)
 - EF Core persistence (DbContext, migrations for SQL Server + SQLite)
 - WorkflowCore integration layer:
   - `AutomationWorkflowCompiler` — converts an `Automation` definition into a WorkflowCore `IWorkflow` at runtime
-  - `ActionStepBody` — generic StepBody that resolves and executes the appropriate `IAutomateAction`
+  - `ActionStepBody` — generic StepBody that resolves and executes the appropriate `IAction`
   - `TriggerService` — listens for Umbraco events and starts workflow instances
 - Trigger/action collection builders (`LazyCollectionBuilderBase`) with `TypeLoader` auto-discovery
-- Action execution middleware pipeline (`IAutomateActionMiddleware`) with ordered collection builder
+- Action execution middleware pipeline (`IActionMiddleware`) with ordered collection builder
 - `AutomationRunScope` (AsyncLocal ambient context for run/step tracking)
 - Background task queue for non-blocking run/step-run persistence
-- Automation lifecycle notifications (Saving/Saved, RunStarting/RunCompleted)
-- `AutomateOptions` / `AutomateExecutionOptions` / `AutomateGovernanceOptions` configuration
+- Draft/publish lifecycle with version snapshots and rollback
+- Automation lifecycle notifications (Saving/Saved, Publishing/Published, RunStarting/RunCompleted)
+- `AutomationOptions` / `ExecutionOptions` / `GovernanceOptions` configuration
 
 **Triggers & actions**:
 - Core triggers: Manual, Scheduled, Webhook Received
@@ -1621,7 +1797,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 - Content actions: Publish Content
 
 **Security & reliability** (see table above):
-- `[AutoField(IsSensitive = true)]` encryption via Data Protection
+- `[Field(IsSensitive = true)]` encryption via Data Protection
 - Step-level timeout enforcement via `CancellationToken`
 - Trigger deduplication (idempotency window)
 - Optimistic concurrency on automation definitions
@@ -1657,7 +1833,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 - Email notification action
 - Failure notification channels (email, webhook)
 - Dry run mode
-- **Named Connections** entity (logical name → environment-specific credentials, encrypted via `[AutoField(IsSensitive = true)]`)
+- **Named Connections** entity (alias → environment-specific credentials, encrypted via `[Field(IsSensitive = true)]`)
 - OAuth2 support in connections (authorization code flow + automatic refresh)
 - Connection management UI in settings panel
 - **Umbraco Deploy connector** (`Umbraco.Automate.Deploy`) — content transfer with credential stripping, disabled-on-arrival, missing connection validation
@@ -1688,7 +1864,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 
 - Parallel execution paths
 - Sub-automations (reusable fragments)
-- Automation version diff and rollback
+- Automation version diff
 - Audit log immutability (cryptographic chaining)
 - Run history archival
 - Rate limiting and kill switch
@@ -1704,8 +1880,8 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | 1 | **Visual editor library** | Rete.js (Lit-native) vs React Flow (wrapped) | ✅ **Decided: React Flow** — most polished/configurable, ~500KB tree-shaken, wrapped in custom element |
 | 2 | **WorkflowCore persistence** | Use WorkflowCore's own EF tables vs our own tables | ✅ **Decided: Custom `IPersistenceProvider`** — implements WorkflowCore's interface but uses Umbraco's `IEFCoreScopeProvider` for engine state. Our own tables for runs/audit (richer schema). Bypasses WorkflowCore's EF package entirely, avoiding the EF Core version mismatch (WC targets EF 9.x, Umbraco 17 uses EF 10.x). |
 | 3 | **Workflow definition storage** | Code-compiled vs JSON/YAML DSL | ✅ **Decided: JSON in DB, compiled to WorkflowCore at runtime.** Enables user-defined automations via the canvas editor. |
-| 4 | **Settings UI generation** | Auto-generate from POCO attributes vs hand-crafted per action | ✅ **Decided: `[AutoField]` attribute + `AutomateEditableModelSchemaBuilder`** — mirrors Umbraco.AI's `[AIField]` pattern exactly |
-| 5 | **Trigger delivery** | Direct event handler vs message bus | ✅ **Decided: `IAutomateTriggerDispatcher` abstraction with `DirectTriggerDispatcher` as v1 default.** Triggers call the dispatcher, never `IWorkflowHost` directly. Swappable to a message bus (Azure Service Bus, RabbitMQ) via `options.UseTriggerDispatcher<T>()` when fan-out or multi-node is needed. |
+| 4 | **Settings UI generation** | Auto-generate from POCO attributes vs hand-crafted per action | ✅ **Decided: `[Field]` attribute + `EditableModelSchemaBuilder`** — mirrors Umbraco.AI's `[AIField]` pattern exactly |
+| 5 | **Trigger delivery** | Direct event handler vs message bus | ✅ **Decided: `ITriggerDispatcher` abstraction with `DirectTriggerDispatcher` as v1 default.** Triggers call the dispatcher, never `IWorkflowHost` directly. Swappable to a message bus (Azure Service Bus, RabbitMQ) via `options.UseTriggerDispatcher<T>()` when fan-out or multi-node is needed. |
 | 6 | **Multi-node / clustering** | Single-node only vs distributed from start | ✅ **Decided: Code-based via `AddUmbracoAutomate(options => ...)`**. Defaults to in-memory queue + Umbraco's connection string. Users install a WorkflowCore provider NuGet and configure in a Composer. See "Infrastructure Providers" section. |
 | 7 | **AI provider abstraction** | Direct SDK calls vs Umbraco AI abstraction | ✅ **Decided: Via Umbraco.AI.** All AI integration ships as `Umbraco.Automate.AI` and depends on Umbraco.AI's abstractions. Deferred to Phase 3. |
 | 8 | **Newtonsoft.Json** | Accept dual dependency vs replace | ✅ **Decided: Accept it.** WorkflowCore has a hard dep on Newtonsoft.Json. Isolated to the engine layer — our domain model and API use System.Text.Json. |
@@ -1722,11 +1898,11 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | React-in-Lit integration friction | Low | Medium | Well-established pattern (React-in-custom-element). Isolate React to canvas only. Event bridging is straightforward via CustomEvent. |
 | Performance at scale (100s of automations, 1000s of runs/day) | High | Low (initially) | WorkflowCore supports distributed execution. Optimize poll intervals. Data retention purge + archival. Queue depth limits. |
 | SSRF via HTTP Request action | High | Medium | URL allowlist/denylist blocking internal IPs and metadata endpoints. Enforced by default, configurable. |
-| Credential exposure in run logs | High | Medium | `[AutoField(IsSensitive = true)]` encrypts values at rest. `SensitiveDataMaskingMiddleware` strips sensitive values from step-run data before persistence. |
+| Credential exposure in run logs | High | Medium | `[Field(IsSensitive = true)]` encrypts values at rest. `SensitiveDataMaskingMiddleware` strips sensitive values from step-run data before persistence. |
 | Duplicate runs from duplicate events | Medium | High | Trigger deduplication with configurable idempotency window. Webhook dedup via `X-Request-Id` or body hash. |
 | Stuck workflows after crash | High | Medium | Startup recovery sweep. Health check monitors for stuck instances. Graceful shutdown drains in-flight steps. |
 | Third-party action takes down host | High | Low | Step-level timeout enforcement. Queue depth limits as backpressure. Document resource guidelines for action authors. |
-| Trigger/action API stability | High | Medium | Design `IAutomateTrigger`/`IAutomateAction` interfaces carefully. Version the contract. Startup validation catches broken references. |
+| Trigger/action API stability | High | Medium | Design `ITrigger`/`IAction` interfaces carefully. Version the contract. Startup validation catches broken references. |
 
 ---
 
@@ -1825,7 +2001,7 @@ WorkflowCore covers all execution features we need. Elsa's extras (expression en
 
 ### Risk Mitigation for WorkflowCore's Bus Factor
 
-1. **Clean abstraction layer** — our `IAutomateAction`/`IAutomateTrigger` model does not leak WorkflowCore types. The `AutomationWorkflowCompiler` is the only code that touches WorkflowCore's API directly.
+1. **Clean abstraction layer** — our `IAction`/`ITrigger` model does not leak WorkflowCore types. The `AutomationWorkflowCompiler` is the only code that touches WorkflowCore's API directly.
 2. **Prepared to vendor-fork** — MIT license + small codebase makes this practical. If Daniel Gerlag stops maintaining, we fork and maintain the execution core.
 3. **Monitor Elsa as a long-term alternative** — if we ever outgrow WorkflowCore's capabilities AND Elsa resolves its integration friction (unlikely without architectural changes), migration would be possible through the abstraction layer.
 
