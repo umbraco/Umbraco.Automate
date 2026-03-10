@@ -28,6 +28,14 @@
     <PackageVersion Include="WorkflowCore" Version="3.9.0" />
   </ItemGroup>
 
+  <!-- CAP (transactional outbox + message queue) -->
+  <ItemGroup>
+    <PackageVersion Include="DotNetCore.CAP" Version="10.0.1" />
+    <PackageVersion Include="DotNetCore.CAP.InMemoryStorage" Version="10.0.1" />
+    <PackageVersion Include="DotNetCore.CAP.SqlServer" Version="10.0.1" />
+    <PackageVersion Include="DotNetCore.CAP.Sqlite" Version="10.0.0" />
+  </ItemGroup>
+
   <!-- Shared dependencies -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.0, 10.999.999)" />

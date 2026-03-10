@@ -2,11 +2,14 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Triggers;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
+using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Extensions;
 
@@ -42,6 +45,25 @@ public static partial class UmbracoBuilderExtensions
 
         // HTTP client for HttpRequestAction
         builder.Services.AddHttpClient("UmbracoAutomate");
+
+        // Trigger dispatch via CAP
+        builder.Services.AddSingleton<ITriggerDispatcher, CapTriggerDispatcher>();
+        builder.Services.AddTransient<TriggerEventConsumer>();
+
+        // Automation execution
+        builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
+
+        // WorkflowCore engine with custom persistence and queue
+        builder.Services.AddSingleton<IPersistenceProvider, InMemoryWorkflowPersistenceProvider>();
+        builder.Services.AddSingleton<CapQueueProvider>();
+        builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<CapQueueProvider>());
+        builder.Services.AddWorkflow();
+
+        // CAP — in-memory storage and transport for v1
+        builder.Services.AddCap(cap =>
+        {
+            cap.UseInMemoryStorage();
+        });
 
         return builder;
     }
