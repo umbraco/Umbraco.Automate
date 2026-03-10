@@ -5,9 +5,9 @@ namespace Umbraco.Automate.Web.Api.Management.Common.Configuration;
 /// <summary>
 /// Adds backoffice security requirements to Umbraco Automate Management API operations.
 /// </summary>
-public class UmbracoAutomateManagementApiBackOfficeSecurityRequirementsOperationFilter
+internal sealed class UmbracoAutomateManagementApiBackOfficeSecurityRequirementsOperationFilter(string apiName)
     : BackOfficeSecurityRequirementsOperationFilterBase
 {
     /// <inheritdoc />
-    protected override string ApiName => Constants.ManagementApi.ApiName;
+    protected override string ApiName => apiName;
 }
