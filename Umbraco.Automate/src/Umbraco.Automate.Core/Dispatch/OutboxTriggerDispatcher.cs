@@ -1,24 +1,24 @@
 using System.Text.Json;
-using DotNetCore.CAP;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
 /// <summary>
-/// Default <see cref="ITriggerDispatcher"/> implementation that publishes trigger events
-/// via CAP for transactional outbox guarantees and fan-out to matching automations.
+/// <see cref="ITriggerDispatcher"/> implementation that publishes trigger events
+/// to the outbox for reliable async dispatch to matching automations.
 /// </summary>
-internal sealed class CapTriggerDispatcher : ITriggerDispatcher
+internal sealed class OutboxTriggerDispatcher : ITriggerDispatcher
 {
     internal const string TopicName = "umbraco.automate.trigger";
 
-    private readonly ICapPublisher _capPublisher;
-    private readonly ILogger<CapTriggerDispatcher> _logger;
+    private readonly IOutbox _outbox;
+    private readonly ILogger<OutboxTriggerDispatcher> _logger;
 
-    public CapTriggerDispatcher(ICapPublisher capPublisher, ILogger<CapTriggerDispatcher> logger)
+    public OutboxTriggerDispatcher(IOutbox outbox, ILogger<OutboxTriggerDispatcher> logger)
     {
-        _capPublisher = capPublisher;
+        _outbox = outbox;
         _logger = logger;
     }
 
@@ -40,6 +40,6 @@ internal sealed class CapTriggerDispatcher : ITriggerDispatcher
 
         _logger.LogDebug("Dispatching trigger event for {TriggerAlias}", triggerEvent.TriggerAlias);
 
-        await _capPublisher.PublishAsync(TopicName, message, cancellationToken: cancellationToken);
+        await _outbox.PublishAsync(TopicName, message, cancellationToken);
     }
 }

@@ -1,17 +1,17 @@
-using DotNetCore.CAP.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Notifications;
+using Umbraco.Automate.Persistence;
+using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
-using Umbraco.Automate.Persistence.Transport;
 using Umbraco.Automate.Persistence.Workflows;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
-using Umbraco.Automate.Persistence;
 using Umbraco.Extensions;
 using WorkflowCore.Interface;
 
@@ -34,8 +34,6 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
     {
-        // Resolve connection string + provider at registration time from IConfiguration.
-        // This is needed because CAP's AddCap() runs its lambda immediately, not at runtime.
         var (connectionString, providerName) = ResolveConnectionInfo(builder.Config);
 
         builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>((_, options, _, _) =>
@@ -46,17 +44,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationRepository, EFCoreAutomationRepository>();
         builder.Services.AddSingleton<IAutomationRunRepository, EFCoreAutomationRunRepository>();
         builder.Services.AddSingleton<IPersistenceProvider, EFCoreWorkflowPersistenceProvider>();
-
-        // CAP — database storage (outbox/inbox) + database transport (shared table)
-        builder.Services.AddCap(cap =>
-        {
-            ConfigureCapStorage(cap, connectionString, providerName);
-            cap.UseDatabaseTransport();
-        });
-
-        // Override CAP's default storage initializer so tables are named
-        // umbracoAutomateOutboxPublished / umbracoAutomateOutboxReceived instead of cap.Published / cap.Received.
-        ConfigureCapStorageInitializer(builder.Services, providerName);
+        builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
 
         // Run pending EF Core migrations on startup.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();
@@ -80,55 +68,6 @@ public static partial class UmbracoBuilderExtensions
         }
 
         return (connectionString, providerName);
-    }
-
-    private static void ConfigureCapStorage(
-        DotNetCore.CAP.CapOptions cap,
-        string? connectionString,
-        string? providerName)
-    {
-        if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(providerName))
-        {
-            // Fallback to in-memory if no connection string (e.g. during design-time migration tooling)
-            cap.UseInMemoryStorage();
-            return;
-        }
-
-        switch (providerName)
-        {
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
-                cap.UseSqlServer(connectionString);
-                break;
-
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                cap.UseSqlite(connectionString);
-                break;
-
-            default:
-                cap.UseInMemoryStorage();
-                break;
-        }
-    }
-
-    private static void ConfigureCapStorageInitializer(IServiceCollection services, string? providerName)
-    {
-        if (string.IsNullOrEmpty(providerName))
-        {
-            return;
-        }
-
-        switch (providerName)
-        {
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
-                services.AddSingleton<IStorageInitializer, SqlServerCapStorageInitializer>();
-                break;
-
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                services.AddSingleton<IStorageInitializer, SqliteCapStorageInitializer>();
-                break;
-        }
     }
 
     private static void ConfigureDatabaseProvider(

@@ -1,7 +1,7 @@
 namespace Umbraco.Automate.Core.Dispatch;
 
 /// <summary>
-/// Serializable message published via CAP when a trigger fires.
+/// Serializable message published to the outbox when a trigger fires.
 /// </summary>
 internal sealed class TriggerEventMessage
 {

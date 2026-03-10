@@ -6,8 +6,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="DotNetCore.CAP.SqlServer" />
-        <PackageReference Include="DotNetCore.CAP.Sqlite" />
         <PackageReference Include="Umbraco.Cms.Persistence.EFCore" />
     </ItemGroup>
 

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
@@ -8,39 +9,39 @@ using Umbraco.Cms.Core.Sync;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
 
-public class TriggerEventConsumerTests
+public class TriggerEventHandlerTests
 {
     private readonly Mock<IAutomationService> _automationService = new();
     private readonly Mock<IAutomationExecutor> _executor = new();
     private readonly Mock<IServerRoleAccessor> _serverRoleAccessor = new();
-    private readonly TriggerEventConsumer _consumer;
+    private readonly TriggerEventHandler _handler;
 
-    public TriggerEventConsumerTests()
+    public TriggerEventHandlerTests()
     {
         _serverRoleAccessor.Setup(s => s.CurrentServerRole).Returns(ServerRole.Single);
 
-        _consumer = new TriggerEventConsumer(
+        _handler = new TriggerEventHandler(
             _automationService.Object,
             _executor.Object,
             _serverRoleAccessor.Object,
             Options.Create(new ExecutionOptions()),
-            Mock.Of<ILogger<TriggerEventConsumer>>());
+            Mock.Of<ILogger<TriggerEventHandler>>());
     }
 
     [Fact]
-    public async Task HandleTriggerEventAsync_MatchingAutomation_ExecutesRun()
+    public async Task HandleAsync_MatchingAutomation_ExecutesRun()
     {
         var automation = CreatePublishedAutomation("myTrigger");
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var message = new TriggerEventMessage
+        var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "myTrigger",
             InitiatorType = "system",
-        };
+        });
 
-        await _consumer.HandleTriggerEventAsync(message, CancellationToken.None);
+        await _handler.HandleAsync(body, CancellationToken.None);
 
         _executor.Verify(e => e.ExecuteAsync(
             automation,
@@ -51,19 +52,19 @@ public class TriggerEventConsumerTests
     }
 
     [Fact]
-    public async Task HandleTriggerEventAsync_NoMatchingAutomations_DoesNotExecute()
+    public async Task HandleAsync_NoMatchingAutomations_DoesNotExecute()
     {
         var automation = CreatePublishedAutomation("otherTrigger");
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var message = new TriggerEventMessage
+        var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "myTrigger",
             InitiatorType = "system",
-        };
+        });
 
-        await _consumer.HandleTriggerEventAsync(message, CancellationToken.None);
+        await _handler.HandleAsync(body, CancellationToken.None);
 
         _executor.Verify(e => e.ExecuteAsync(
             It.IsAny<Automation>(),
@@ -74,7 +75,7 @@ public class TriggerEventConsumerTests
     }
 
     [Fact]
-    public async Task HandleTriggerEventAsync_DisabledAutomation_DoesNotExecute()
+    public async Task HandleAsync_DisabledAutomation_DoesNotExecute()
     {
         var automation = CreatePublishedAutomation("myTrigger");
         automation.IsEnabled = false;
@@ -82,13 +83,13 @@ public class TriggerEventConsumerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var message = new TriggerEventMessage
+        var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "myTrigger",
             InitiatorType = "system",
-        };
+        });
 
-        await _consumer.HandleTriggerEventAsync(message, CancellationToken.None);
+        await _handler.HandleAsync(body, CancellationToken.None);
 
         _executor.Verify(e => e.ExecuteAsync(
             It.IsAny<Automation>(),
@@ -99,7 +100,7 @@ public class TriggerEventConsumerTests
     }
 
     [Fact]
-    public async Task HandleTriggerEventAsync_DraftAutomation_DoesNotExecute()
+    public async Task HandleAsync_DraftAutomation_DoesNotExecute()
     {
         var automation = CreatePublishedAutomation("myTrigger");
         automation.Status = AutomationStatus.Draft;
@@ -107,13 +108,13 @@ public class TriggerEventConsumerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var message = new TriggerEventMessage
+        var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "myTrigger",
             InitiatorType = "system",
-        };
+        });
 
-        await _consumer.HandleTriggerEventAsync(message, CancellationToken.None);
+        await _handler.HandleAsync(body, CancellationToken.None);
 
         _executor.Verify(e => e.ExecuteAsync(
             It.IsAny<Automation>(),
@@ -124,7 +125,7 @@ public class TriggerEventConsumerTests
     }
 
     [Fact]
-    public async Task HandleTriggerEventAsync_MultipleMatchingAutomations_ExecutesAll()
+    public async Task HandleAsync_MultipleMatchingAutomations_ExecutesAll()
     {
         var a1 = CreatePublishedAutomation("myTrigger");
         var a2 = CreatePublishedAutomation("myTrigger");
@@ -132,13 +133,13 @@ public class TriggerEventConsumerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { a1, a2 });
 
-        var message = new TriggerEventMessage
+        var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "myTrigger",
             InitiatorType = "system",
-        };
+        });
 
-        await _consumer.HandleTriggerEventAsync(message, CancellationToken.None);
+        await _handler.HandleAsync(body, CancellationToken.None);
 
         _executor.Verify(e => e.ExecuteAsync(
             It.IsAny<Automation>(),
@@ -149,7 +150,7 @@ public class TriggerEventConsumerTests
     }
 
     [Fact]
-    public async Task HandleTriggerEventAsync_WithOutputData_DeserializesAndPassesToExecutor()
+    public async Task HandleAsync_WithOutputData_DeserializesAndPassesToExecutor()
     {
         var automation = CreatePublishedAutomation("myTrigger");
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
@@ -166,14 +167,14 @@ public class TriggerEventConsumerTests
                 (_, _, _, data, _) => capturedData = data)
             .ReturnsAsync(Guid.NewGuid());
 
-        var message = new TriggerEventMessage
+        var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "myTrigger",
             InitiatorType = "system",
             OutputData = "{\"contentName\":\"Hello\"}",
-        };
+        });
 
-        await _consumer.HandleTriggerEventAsync(message, CancellationToken.None);
+        await _handler.HandleAsync(body, CancellationToken.None);
 
         capturedData.ShouldNotBeNull();
         capturedData.ShouldContainKey("contentName");
@@ -186,7 +187,7 @@ public class TriggerEventConsumerTests
     [InlineData(ServerRole.Unknown, ExecutionMode.SchedulerOnly, false)]
     [InlineData(ServerRole.Subscriber, ExecutionMode.Distributed, true)]
     [InlineData(ServerRole.Unknown, ExecutionMode.Distributed, true)]
-    public async Task HandleTriggerEventAsync_RespectsExecutionModeAndServerRole(
+    public async Task HandleAsync_RespectsExecutionModeAndServerRole(
         ServerRole role, ExecutionMode mode, bool shouldExecute)
     {
         var serverRole = new Mock<IServerRoleAccessor>();
@@ -199,16 +200,20 @@ public class TriggerEventConsumerTests
         automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var consumer = new TriggerEventConsumer(
+        var handler = new TriggerEventHandler(
             automationService.Object,
             executor.Object,
             serverRole.Object,
             Options.Create(new ExecutionOptions { Mode = mode }),
-            Mock.Of<ILogger<TriggerEventConsumer>>());
+            Mock.Of<ILogger<TriggerEventHandler>>());
 
-        await consumer.HandleTriggerEventAsync(
-            new TriggerEventMessage { TriggerAlias = "myTrigger", InitiatorType = "system" },
-            CancellationToken.None);
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "myTrigger",
+            InitiatorType = "system",
+        });
+
+        await handler.HandleAsync(body, CancellationToken.None);
 
         executor.Verify(
             e => e.ExecuteAsync(
@@ -219,6 +224,9 @@ public class TriggerEventConsumerTests
                 It.IsAny<CancellationToken>()),
             shouldExecute ? Times.Once : Times.Never);
     }
+
+    private static string SerializeMessage(TriggerEventMessage message)
+        => JsonSerializer.Serialize(message, JsonOptions.Default);
 
     private static Automation CreatePublishedAutomation(string triggerAlias) => new()
     {

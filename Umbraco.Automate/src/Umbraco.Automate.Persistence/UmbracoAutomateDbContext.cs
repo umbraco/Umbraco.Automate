@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Persistence.Automations;
+using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
-using Umbraco.Automate.Persistence.Transport;
 using Umbraco.Automate.Persistence.Workflows;
 
 namespace Umbraco.Automate.Persistence;
@@ -25,7 +25,7 @@ public class UmbracoAutomateDbContext : DbContext
 
     internal DbSet<ScheduledCommandEntity> ScheduledCommands { get; set; } = null!;
 
-    internal DbSet<TransportMessageEntity> TransportMessages { get; set; } = null!;
+    internal DbSet<OutboxMessageEntity> OutboxMessages { get; set; } = null!;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UmbracoAutomateDbContext"/> class.
@@ -162,21 +162,25 @@ public class UmbracoAutomateDbContext : DbContext
             entity.HasIndex(e => e.ExecuteTime);
         });
 
-        // Database-backed CAP transport table
+        // Outbox message table
 
-        modelBuilder.Entity<TransportMessageEntity>(entity =>
+        modelBuilder.Entity<OutboxMessageEntity>(entity =>
         {
-            entity.ToTable("umbracoAutomateTransportMessage");
+            entity.ToTable("umbracoAutomateOutbox");
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.Topic).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.Headers).IsRequired();
+            entity.Property(e => e.Body).IsRequired();
             entity.Property(e => e.CreatedUtc).IsRequired();
-            entity.Property(e => e.ClaimedByGroup).HasMaxLength(200);
+            entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.RetryCount).IsRequired().HasDefaultValue(0);
+            entity.Property(e => e.Error);
+            entity.Property(e => e.ClaimedByInstance).HasMaxLength(200);
+            entity.Property(e => e.ClaimedByInstance).IsConcurrencyToken();
 
-            entity.HasIndex(e => new { e.Topic, e.ClaimedByGroup });
-            entity.HasIndex(e => e.CreatedUtc);
+            entity.HasIndex(e => new { e.Topic, e.Status, e.NextRetryUtc });
+            entity.HasIndex(e => new { e.Status, e.CreatedUtc });
         });
     }
 }

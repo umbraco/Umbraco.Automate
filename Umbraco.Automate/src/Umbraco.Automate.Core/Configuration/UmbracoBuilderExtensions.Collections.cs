@@ -5,6 +5,7 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Triggers;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +29,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate"));
         builder.Services.Configure<ExecutionOptions>(
             builder.Config.GetSection("Umbraco:Automate:Execution"));
+        builder.Services.Configure<OutboxOptions>(
+            builder.Config.GetSection("Umbraco:Automate:Outbox"));
 
         // Collection builders — triggers, actions, filters auto-discovered
         builder.AutomateTriggers();
@@ -51,20 +54,23 @@ public static partial class UmbracoBuilderExtensions
         // HTTP client for HttpRequestAction
         builder.Services.AddHttpClient("UmbracoAutomate");
 
-        // Trigger dispatch via CAP
-        builder.Services.AddSingleton<ITriggerDispatcher, CapTriggerDispatcher>();
-        builder.Services.AddTransient<TriggerEventConsumer>();
+        // Outbox messaging — IOutbox + IOutboxStore registered by Persistence layer
+        builder.Services.AddSingleton<IOutbox, DatabaseOutbox>();
+        builder.Services.AddHostedService<OutboxDispatcher>();
+
+        // Trigger dispatch via outbox
+        builder.Services.AddSingleton<ITriggerDispatcher, OutboxTriggerDispatcher>();
+        builder.Services.AddSingleton<IMessageHandler, TriggerEventHandler>();
 
         // Automation execution
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
-        // WorkflowCore engine with custom queue (IPersistenceProvider registered in Persistence layer)
-        builder.Services.AddSingleton<CapQueueProvider>();
-        builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<CapQueueProvider>());
+        // WorkflowCore engine with outbox-backed queue
+        builder.Services.AddSingleton<OutboxQueueProvider>();
+        builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<OutboxQueueProvider>());
+        builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
+        builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
         builder.Services.AddWorkflow();
-
-        // CAP — storage and transport are registered by the Persistence layer
-        // (database transport + in-memory CAP storage by default)
 
         return builder;
     }

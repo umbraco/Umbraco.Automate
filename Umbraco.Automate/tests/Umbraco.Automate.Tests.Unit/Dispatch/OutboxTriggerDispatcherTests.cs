@@ -1,36 +1,35 @@
-using DotNetCore.CAP;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
 
-public class CapTriggerDispatcherTests
+public class OutboxTriggerDispatcherTests
 {
-    private readonly Mock<ICapPublisher> _capPublisher = new();
-    private readonly CapTriggerDispatcher _sut;
+    private readonly Mock<IOutbox> _outbox = new();
+    private readonly OutboxTriggerDispatcher _sut;
 
-    public CapTriggerDispatcherTests()
+    public OutboxTriggerDispatcherTests()
     {
-        _sut = new CapTriggerDispatcher(
-            _capPublisher.Object,
-            Mock.Of<ILogger<CapTriggerDispatcher>>());
+        _sut = new OutboxTriggerDispatcher(
+            _outbox.Object,
+            Mock.Of<ILogger<OutboxTriggerDispatcher>>());
     }
 
     [Fact]
     public async Task DispatchAsync_PublishesToCorrectTopicWithCorrectMessageFields()
     {
-        TriggerEventMessage? captured = null;
-        _capPublisher
+        object? captured = null;
+        _outbox
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
-                It.IsAny<TriggerEventMessage>(),
-                It.IsAny<string?>(),
+                It.IsAny<object>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, TriggerEventMessage?, string?, CancellationToken>(
-                (_, msg, _, _) => captured = msg)
+            .Callback<string, object, CancellationToken>(
+                (_, msg, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent
@@ -41,31 +40,30 @@ public class CapTriggerDispatcherTests
 
         await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
 
-        _capPublisher.Verify(
+        _outbox.Verify(
             p => p.PublishAsync(
-                CapTriggerDispatcher.TopicName,
-                It.IsAny<TriggerEventMessage>(),
-                It.IsAny<string?>(),
+                OutboxTriggerDispatcher.TopicName,
+                It.IsAny<object>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 
         captured.ShouldNotBeNull();
-        captured.TriggerAlias.ShouldBe("contentPublished");
-        captured.InitiatorType.ShouldBe("system");
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.TriggerAlias.ShouldBe("contentPublished");
+        msg.InitiatorType.ShouldBe("system");
     }
 
     [Fact]
     public async Task DispatchAsync_TypedTriggerEvent_IncludesSerializedOutputAndTypeName()
     {
-        TriggerEventMessage? captured = null;
-        _capPublisher
+        object? captured = null;
+        _outbox
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
-                It.IsAny<TriggerEventMessage>(),
-                It.IsAny<string?>(),
+                It.IsAny<object>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, TriggerEventMessage?, string?, CancellationToken>(
-                (_, msg, _, _) => captured = msg)
+            .Callback<string, object, CancellationToken>(
+                (_, msg, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent<TestOutput>
@@ -78,24 +76,24 @@ public class CapTriggerDispatcherTests
         await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
 
         captured.ShouldNotBeNull();
-        captured.OutputData.ShouldNotBeNullOrEmpty();
-        captured.OutputData.ShouldContain("Hello");
-        captured.OutputTypeName.ShouldNotBeNullOrEmpty();
-        captured.OutputTypeName.ShouldContain(nameof(TestOutput));
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.OutputData.ShouldNotBeNullOrEmpty();
+        msg.OutputData.ShouldContain("Hello");
+        msg.OutputTypeName.ShouldNotBeNullOrEmpty();
+        msg.OutputTypeName.ShouldContain(nameof(TestOutput));
     }
 
     [Fact]
     public async Task DispatchAsync_PlainTriggerEvent_LeavesOutputDataAndTypeNameNull()
     {
-        TriggerEventMessage? captured = null;
-        _capPublisher
+        object? captured = null;
+        _outbox
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
-                It.IsAny<TriggerEventMessage>(),
-                It.IsAny<string?>(),
+                It.IsAny<object>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, TriggerEventMessage?, string?, CancellationToken>(
-                (_, msg, _, _) => captured = msg)
+            .Callback<string, object, CancellationToken>(
+                (_, msg, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent
@@ -107,22 +105,22 @@ public class CapTriggerDispatcherTests
         await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
 
         captured.ShouldNotBeNull();
-        captured.OutputData.ShouldBeNull();
-        captured.OutputTypeName.ShouldBeNull();
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.OutputData.ShouldBeNull();
+        msg.OutputTypeName.ShouldBeNull();
     }
 
     [Fact]
     public async Task DispatchAsync_InitiatorId_IsPassedThrough()
     {
-        TriggerEventMessage? captured = null;
-        _capPublisher
+        object? captured = null;
+        _outbox
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
-                It.IsAny<TriggerEventMessage>(),
-                It.IsAny<string?>(),
+                It.IsAny<object>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, TriggerEventMessage?, string?, CancellationToken>(
-                (_, msg, _, _) => captured = msg)
+            .Callback<string, object, CancellationToken>(
+                (_, msg, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent
@@ -135,7 +133,8 @@ public class CapTriggerDispatcherTests
         await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
 
         captured.ShouldNotBeNull();
-        captured.InitiatorId.ShouldBe("user-42");
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.InitiatorId.ShouldBe("user-42");
     }
 
     private class TestOutput

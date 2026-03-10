@@ -4,7 +4,7 @@ namespace Umbraco.Automate.Core.Dispatch;
 
 /// <summary>
 /// Dispatches trigger events to matching automations.
-/// The default implementation publishes via CAP for transactional outbox guarantees.
+/// The default implementation publishes to the outbox for reliable async dispatch.
 /// </summary>
 public interface ITriggerDispatcher
 {

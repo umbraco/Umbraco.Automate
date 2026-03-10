@@ -89,6 +89,57 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.ToTable("umbracoAutomateAutomation", (string)null);
                 });
 
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Outbox.OutboxMessageEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClaimedByInstance")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("ClaimedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("NextRetryUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "CreatedUtc");
+
+                    b.HasIndex("Topic", "Status", "NextRetryUtc");
+
+                    b.ToTable("umbracoAutomateOutbox", (string)null);
+                });
+
             modelBuilder.Entity("Umbraco.Automate.Persistence.Runs.AutomationRunEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -189,45 +240,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.HasIndex("RunId", "StepId");
 
                     b.ToTable("umbracoAutomateStepRun", (string)null);
-                });
-
-            modelBuilder.Entity("Umbraco.Automate.Persistence.Transport.TransportMessageEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Body")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ClaimedByGroup")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("ClaimedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Headers")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Topic")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedUtc");
-
-                    b.HasIndex("Topic", "ClaimedByGroup");
-
-                    b.ToTable("umbracoAutomateTransportMessage", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.EventEntity", b =>

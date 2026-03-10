@@ -1,31 +1,31 @@
 using System.Text.Json;
-using DotNetCore.CAP;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Messaging;
 using Umbraco.Cms.Core.Sync;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
 /// <summary>
-/// CAP consumer that receives trigger events and starts matching automation runs.
+/// Handles trigger event messages from the outbox and starts matching automation runs.
 /// </summary>
-internal sealed class TriggerEventConsumer : ICapSubscribe
+internal sealed class TriggerEventHandler : IMessageHandler
 {
     private readonly IAutomationService _automationService;
     private readonly IAutomationExecutor _executor;
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IOptions<ExecutionOptions> _executionOptions;
-    private readonly ILogger<TriggerEventConsumer> _logger;
+    private readonly ILogger<TriggerEventHandler> _logger;
 
-    public TriggerEventConsumer(
+    public TriggerEventHandler(
         IAutomationService automationService,
         IAutomationExecutor executor,
         IServerRoleAccessor serverRoleAccessor,
         IOptions<ExecutionOptions> executionOptions,
-        ILogger<TriggerEventConsumer> logger)
+        ILogger<TriggerEventHandler> logger)
     {
         _automationService = automationService;
         _executor = executor;
@@ -34,9 +34,13 @@ internal sealed class TriggerEventConsumer : ICapSubscribe
         _logger = logger;
     }
 
-    [CapSubscribe(CapTriggerDispatcher.TopicName)]
-    public async Task HandleTriggerEventAsync(TriggerEventMessage message, CancellationToken cancellationToken)
+    public string Topic => OutboxTriggerDispatcher.TopicName;
+
+    public async Task HandleAsync(string body, CancellationToken cancellationToken)
     {
+        var message = JsonSerializer.Deserialize<TriggerEventMessage>(body, JsonOptions.Default)
+                      ?? throw new InvalidOperationException("Failed to deserialize TriggerEventMessage");
+
         if (!ShouldProcessOnThisNode())
         {
             _logger.LogDebug(

@@ -106,42 +106,34 @@ The engine state layer is WorkflowCore's internal bookkeeping. The audit layer i
 
 This is a well-established pattern — React-in-custom-element is used in production by many mixed-framework applications. The React runtime is isolated to the canvas component only.
 
-### Message Infrastructure: CAP (DotNetCore.CAP)
+### Message Infrastructure: Custom Outbox
 
-[CAP](https://github.com/dotnetcore/CAP) (`DotNetCore.CAP`, MIT licensed) is used for both **trigger event dispatch** and **WorkflowCore's internal work queue**. It handles persistence, retry with backoff, dead-lettering, and transport abstraction — a single infrastructure dependency for all messaging needs.
+Trigger event dispatch and WorkflowCore's internal work queue are powered by a **custom lightweight outbox** built on EF Core. This replaces a previous dependency on `DotNetCore.CAP` — the custom implementation is simpler, has zero external dependencies, and eliminates timing/startup issues that arose from CAP's architecture.
 
-| Capability | CAP Support |
+| Capability | Implementation |
 |-----------|-------------|
-| Transactional outbox (EF Core) | Built-in — publishes within `SaveChanges` |
-| DB storage | SQL Server (`DotNetCore.CAP.SqlServer`), SQLite (`DotNetCore.CAP.Sqlite`) |
-| In-process transport | `UseInMemoryMessageQueue()` — no external infra for v1 |
-| External transports | RabbitMQ, Azure Service Bus, Kafka — NuGet package swap |
-| Retry & dead-lettering | Configurable retry count, interval, automatic dead-letter |
-| Dashboard | Optional monitoring UI |
+| Outbox persistence | Single `umbracoAutomateOutbox` table via EF Core |
+| Retry with backoff | Exponential backoff (`BaseRetryDelay * 2^retryCount`), configurable max retries |
+| Dead-lettering | Messages exceeding max retries are marked `DeadLettered` for inspection |
+| Multi-instance safety | Optimistic concurrency via `ClaimedByInstance` column + stale claim recovery |
+| Stale claim recovery | Claims older than `StaleClaimThreshold` are released for reprocessing |
+| Cleanup | Completed messages purged after configurable retention period |
 
-**CAP is used for two purposes:**
-1. **Trigger dispatch** — `ITriggerDispatcher` publishes trigger events, CAP consumer does the fan-out
-2. **WorkflowCore queue** — custom `IQueueProvider` backed by CAP, so step execution is distributed across nodes
+**The outbox is used for two purposes:**
+1. **Trigger dispatch** — `ITriggerDispatcher` publishes trigger events, `TriggerEventHandler` does the fan-out
+2. **WorkflowCore queue** — custom `IQueueProvider` backed by the outbox, so step execution is distributed across nodes
 
-Both scale out with a single transport config change. CAP is an internal implementation detail — not exposed in any public API, interface, or model. All public-facing code interacts only with `ITriggerDispatcher` and WorkflowCore's standard interfaces. If CAP is ever replaced, nothing outside `Umbraco.Automate.Core` changes.
+The outbox is an internal implementation detail — not exposed in any public API, interface, or model. All public-facing code interacts only with `ITriggerDispatcher` and WorkflowCore's standard interfaces.
 
-#### SQLite Support
+**Configuration** (all optional, via `Umbraco:Automate:Outbox` in appsettings):
 
-CAP's official packages cover SQL Server, MySQL, and PostgreSQL but not SQLite. A community package [`DotNetCore.CAP.Sqlite`](https://github.com/colinin/DotNetCore.CAP.Sqlite) (MIT licensed) provides the SQLite storage provider:
-
-- Targets `net10.0`, tracks CAP `10.0.0`
-- Uses `Microsoft.Data.Sqlite` — same driver as Umbraco
-- Supports `TableNamePrefix` for table naming
-- Complete implementation of all three CAP storage interfaces (`IStorageInitializer`, `IDataStorage`, `IMonitoringApi`)
-
-**Table naming**: Both providers support configurable naming to keep CAP tables alongside Umbraco Automate tables:
-
-| Provider | Config | Tables created |
-|----------|--------|---------------|
-| SQL Server | `Schema = "UmbracoAutomate"` | `UmbracoAutomate.Published`, `UmbracoAutomate.Received`, `UmbracoAutomate.Lock` |
-| SQLite | `TableNamePrefix = "UmbracoAutomate"` | `UmbracoAutomate.Published`, `UmbracoAutomate.Received`, `UmbracoAutomate.Locks` |
-
-**Auto-detection**: The storage provider is selected automatically based on the configured database provider — same pattern as our EF Core migrations assemblies. No user configuration needed.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `PollInterval` | 500ms | How often the dispatcher polls for messages |
+| `MaxRetries` | 3 | Delivery attempts before dead-lettering |
+| `BaseRetryDelay` | 5s | Base delay for exponential backoff |
+| `StaleClaimThreshold` | 5min | How long before a claimed message is considered stale |
+| `CompletedRetention` | 1 day | How long completed messages are kept |
 
 ---
 
@@ -981,209 +973,127 @@ public interface ITriggerDispatcher
 
 In a load-balanced Umbraco environment, trigger handlers fire on whichever node handled the request. We need to ensure automations run exactly once regardless of which node fires the trigger.
 
-Rather than hand-rolling a database-backed message queue, we use **[CAP](https://github.com/dotnetcore/CAP)** (`DotNetCore.CAP`, MIT licensed) — a lightweight transactional outbox library purpose-built for this pattern. It provides:
+We use a **custom database-backed outbox** for reliable message dispatch. Messages are written to the `umbracoAutomateOutbox` table and consumed by a `BackgroundService` that polls, routes to handlers, and manages retry/dead-lettering.
 
-- **Transactional outbox** — publishes within EF Core's `SaveChanges`, guaranteeing at-least-once delivery
-- **Retry with exponential backoff** and **dead-lettering** out of the box
-- **Database storage** — SQL Server and SQLite supported (matches our DB targets)
-- **Transport swappable** — starts with in-process (no external infrastructure), upgrades to RabbitMQ, Azure Service Bus, or Kafka via a NuGet package swap
-- **Dashboard** for monitoring published/received messages (optional)
-
-CAP is an **internal implementation detail** — it is not exposed in any public API, interface, or contract. All public-facing code interacts only with `ITriggerDispatcher`. If CAP is ever replaced, nothing outside `Umbraco.Automate.Core` changes.
+The outbox is an **internal implementation detail** — not exposed in any public API, interface, or contract. All public-facing code interacts only with `ITriggerDispatcher`.
 
 ```
-Any node:            Handler → ITriggerDispatcher → ICapPublisher.PublishAsync()
+Any node:            Handler → ITriggerDispatcher → IOutbox.PublishAsync()
                                                          ↓
-                                                    CAP outbox table (persisted with SaveChanges)
+                                                    umbracoAutomateOutbox table (Status=Pending)
                                                          ↓
-SchedulingPublisher: CAP consumer → TriggerEventConsumer → finds automations → StartWorkflow
+SchedulingPublisher: OutboxDispatcher → TriggerEventHandler → finds automations → StartWorkflow
 ```
 
-**Dispatcher** (publishes to CAP — runs on any node):
+**Dispatcher** (publishes to outbox — runs on any node):
 
 ```csharp
-internal class DefaultTriggerDispatcher(ICapPublisher capPublisher) : ITriggerDispatcher
+internal class OutboxTriggerDispatcher(IOutbox outbox) : ITriggerDispatcher
 {
     public async Task DispatchAsync(TriggerEvent triggerEvent, CancellationToken ct)
     {
-        var outputJson = triggerEvent is ITriggerEventWithOutput typed
-            ? JsonSerializer.Serialize(typed.GetOutput())
-            : "{}";
-
-        await capPublisher.PublishAsync("automate.trigger.fired", new TriggerMessage
+        var message = new TriggerEventMessage
         {
             TriggerAlias = triggerEvent.TriggerAlias,
-            OutputJson = outputJson,
             InitiatorType = triggerEvent.InitiatorType,
             InitiatorId = triggerEvent.InitiatorId,
-        }, cancellationToken: ct);
-    }
-}
+        };
 
-// Internal message contract — never exposed publicly
-internal class TriggerMessage
-{
-    public required string TriggerAlias { get; init; }
-    public required string OutputJson { get; init; }
-    public required string InitiatorType { get; init; }
-    public string? InitiatorId { get; init; }
+        if (triggerEvent is ITriggerEventWithOutput withOutput)
+        {
+            message.OutputData = JsonSerializer.Serialize(withOutput.GetOutput());
+            message.OutputTypeName = withOutput.GetOutput().GetType().AssemblyQualifiedName;
+        }
+
+        await outbox.PublishAsync("umbraco.automate.trigger", message, ct);
+    }
 }
 ```
 
-**Consumer** (processes trigger events — CAP handles retry, dead-lettering, dedup):
+**Handler** (processes trigger events — outbox dispatcher handles retry, dead-lettering):
 
 ```csharp
-// CAP routes messages to this consumer. In load-balanced environments,
-// only the SchedulingPublisher node registers as a consumer.
-internal class TriggerEventConsumer(
+// OutboxDispatcher routes messages to this handler by topic.
+// Server role filtering ensures only appropriate nodes process events.
+internal class TriggerEventHandler(
     IAutomationService automationService,
-    IWorkflowHost workflowHost) : ICapSubscribe
+    IAutomationExecutor executor,
+    IServerRoleAccessor serverRoleAccessor) : IMessageHandler
 {
-    [CapSubscribe("automate.trigger.fired")]
-    public async Task HandleAsync(TriggerMessage message, CancellationToken ct)
+    public string Topic => "umbraco.automate.trigger";
+
+    public async Task HandleAsync(string body, CancellationToken ct)
     {
-        var data = JsonSerializer.Deserialize<Dictionary<string, object?>>(message.OutputJson)
-            ?? new Dictionary<string, object?>();
+        var message = JsonSerializer.Deserialize<TriggerEventMessage>(body);
+        var automations = await automationService.GetAllAutomationsAsync(ct);
+        var matching = automations.Where(a => a.IsEnabled && a.Status == Published
+            && a.Trigger?.TriggerAlias == message.TriggerAlias);
 
-        var automations = await automationService
-            .GetAutomationsByTriggerAliasAsync(message.TriggerAlias, ct);
-
-        foreach (var automation in automations)
-        {
-            var runData = new AutomationRunData { Trigger = data };
-            await workflowHost.StartWorkflow(
-                automation.Alias,
-                data: runData,
-                reference: automation.Id.ToString());
-        }
+        foreach (var automation in matching)
+            await executor.ExecuteAsync(automation, message.InitiatorType,
+                message.InitiatorId, triggerOutputData, ct);
     }
 }
 ```
 
-**Registration** (CAP configured internally, DB provider auto-detected):
-
-```csharp
-// Internal — part of AddUmbracoAutomate()
-internal static IUmbracoBuilder AddTriggerDispatch(this IUmbracoBuilder builder)
-{
-    builder.Services.AddSingleton<ITriggerDispatcher, DefaultTriggerDispatcher>();
-
-    builder.Services.AddCap(options =>
-    {
-        // Transport: in-process by default, swappable to external
-        options.UseInMemoryMessageQueue();
-
-        options.FailedRetryCount = 5;
-        options.FailedRetryInterval = 30;  // seconds
-    });
-
-    // Storage provider auto-detected from DB provider (same pattern as EF migrations).
-    // Uses Umbraco Automate's connection string if configured, otherwise falls back to Umbraco's.
-    builder.Services.AddCap(options =>
-    {
-        var config = builder.Services.BuildServiceProvider().GetRequiredService<IConfiguration>();
-        var connectionString = config.GetConnectionString("umbracoAutomateDbDSN")
-            ?? config.GetConnectionString("umbracoDbDSN");
-        var providerName = config["ConnectionStrings:umbracoAutomateDbDSN_ProviderName"]
-            ?? config["ConnectionStrings:umbracoDbDSN_ProviderName"];
-
-        switch (providerName)
-        {
-            case Constants.ProviderNames.SQLServer:
-                options.UseSqlServer(sql =>
-                {
-                    sql.ConnectionString = connectionString!;
-                    sql.Schema = "UmbracoAutomate";
-                });
-                break;
-            case Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                options.UseSqlite(sql =>
-                {
-                    sql.ConnectionString = connectionString!;
-                    sql.TableNamePrefix = "UmbracoAutomate";
-                });
-                break;
-        }
-    });
-
-    return builder;
-}
-```
-
-**Upgrading to an external transport** (e.g. RabbitMQ for multi-node fan-out):
-
-```csharp
-// User swaps transport via options — no code changes to handlers or consumers
-builder.AddUmbracoAutomate(options =>
-{
-    options.UseRabbitMQ(rabbit =>
-    {
-        rabbit.HostName = "localhost";
-    });
-});
-```
-
-**Key resilience features (provided by CAP):**
+**Key resilience features:**
 
 | Concern | Solution |
 |---------|----------|
-| **Duplicate events** | CAP message deduplication |
-| **Consumer crash** | Transactional outbox — messages survive restarts, redelivered automatically |
-| **Poison messages** | Configurable retry count with backoff, then dead-lettered |
-| **Node failover** | Consumer registered on `SchedulingPublisher` only — Umbraco handles role failover |
+| **Consumer crash** | Database outbox — messages survive restarts, stale claims recovered automatically |
+| **Poison messages** | Configurable retry count with exponential backoff, then dead-lettered |
+| **Multi-instance safety** | Optimistic concurrency on `ClaimedByInstance` column |
+| **Node failover** | Server role filtering — Umbraco handles role failover |
 | **Scheduled triggers** | Fired by the processor node only — naturally single-fire |
-| **Observability** | CAP dashboard (optional), dead-lettered messages visible in backoffice |
-| **Transport upgrade** | Swap `UseInMemoryMessageQueue()` → `UseRabbitMQ()` / `UseAzureServiceBus()` — zero handler changes |
 
-All trigger handlers call `ITriggerDispatcher.DispatchAsync` — they never look up automations or interact with `IWorkflowHost` directly. CAP, the transport, and the consumer are internal implementation details behind `ITriggerDispatcher`.
+All trigger handlers call `ITriggerDispatcher.DispatchAsync` — they never look up automations or interact with `IWorkflowHost` directly. The outbox, dispatcher, and handlers are internal implementation details behind `ITriggerDispatcher`.
 
 #### WorkflowCore Execution
 
 WorkflowCore uses a background polling thread to pick up workflow instances and execute steps. In a load-balanced environment, if `IWorkflowHost` runs on every node, multiple nodes could execute the same step simultaneously.
 
-**Approach**: Since we already use CAP for trigger dispatch, we also use it for WorkflowCore's internal work queue via a custom `IQueueProvider`. This means every node can run the WorkflowCore host — CAP guarantees each queued step is consumed by exactly one node.
+**Approach**: Since we already use the outbox for trigger dispatch, we also use it for WorkflowCore's internal work queue via a custom `IQueueProvider`. This means every node can run the WorkflowCore host — the outbox's optimistic claiming guarantees each queued step is consumed by exactly one node.
 
 ```csharp
-// CAP-backed queue provider for WorkflowCore
-internal class CapQueueProvider(ICapPublisher publisher) : IQueueProvider
+// Outbox-backed queue provider for WorkflowCore
+internal class OutboxQueueProvider(IOutbox outbox) : IQueueProvider
 {
-    public bool IsDequeueBlocking => true;
+    public bool IsDequeueBlocking => false;
 
     public async Task QueueWork(string id, QueueType queue)
     {
-        await publisher.PublishAsync($"automate.workflow.{queue}", new WorkflowQueueMessage
-        {
-            Id = id,
-            Queue = queue,
-        });
+        var topic = queue == QueueType.Workflow
+            ? "umbraco.automate.workflow.queue"
+            : "umbraco.automate.workflow.events";
+        await outbox.PublishAsync(topic, new QueueMessage { Id = id, Queue = (int)queue });
     }
 
-    public async Task<string> DequeueWork(QueueType queue, CancellationToken ct)
+    public Task<string?> DequeueWork(QueueType queue, CancellationToken ct)
     {
-        // CAP consumer delivers messages to a channel; this blocks until one arrives
-        return await _channels[queue].Reader.ReadAsync(ct);
+        // Local ConcurrentQueue fed by IMessageHandler implementations
+        return localQueues[queue].TryDequeue(out var id)
+            ? Task.FromResult<string?>(id) : Task.FromResult<string?>(null);
     }
 }
 
-// CAP consumer — receives queued work items and feeds them to the channel
-internal class WorkflowQueueConsumer(CapQueueProvider provider) : ICapSubscribe
+// Message handlers receive outbox messages and feed them into local queues
+internal class WorkflowQueueHandler(OutboxQueueProvider provider) : IMessageHandler
 {
-    [CapSubscribe("automate.workflow.Workflow")]
-    public Task HandleWorkflow(WorkflowQueueMessage message)
-        => provider.Enqueue(message);
-
-    [CapSubscribe("automate.workflow.Event")]
-    public Task HandleEvent(WorkflowQueueMessage message)
-        => provider.Enqueue(message);
+    public string Topic => "umbraco.automate.workflow.queue";
+    public Task HandleAsync(string body, CancellationToken ct)
+    {
+        var msg = JsonSerializer.Deserialize<QueueMessage>(body);
+        provider.EnqueueLocally(QueueType.Workflow, msg.Id);
+        return Task.CompletedTask;
+    }
 }
 ```
 
 This gives us:
 
-- **Single node** (in-memory transport): behaves like WorkflowCore's default in-memory queue — no overhead
-- **Multi-node** (RabbitMQ/Azure Service Bus): competing consumers — each step executes on exactly one node, no distributed locking needed
-- **Same transport config** as trigger dispatch — one `UseRabbitMQ()` call scales out everything
+- **Single node**: behaves like WorkflowCore's default in-memory queue — minimal overhead (DB poll only)
+- **Multi-node**: optimistic claiming on the outbox table — each step executes on exactly one node, no distributed locking needed
+- **Same outbox infrastructure** as trigger dispatch — single table, single background service
 - **No `SchedulingPublisher` gate** on WorkflowCore — all nodes participate in execution
 
 WorkflowCore's `IWorkflowHost` starts on every node:
@@ -1196,7 +1106,7 @@ internal class WorkflowEngineComponent(IWorkflowHost host) : IAsyncComponent
 }
 ```
 
-**Note on Umbraco's `IDistributedLockingMechanism`**: We deliberately do not use it. It is scope-bound (requires an active `IUmbracoDatabase` transaction via `IScopeAccessor`), uses integer lock IDs against the `umbracoLock` table, and solves a different problem (protecting database writes within a transaction). WorkflowCore's background processing runs outside Umbraco scopes and needs async, string-key-based coordination — which CAP's message delivery handles naturally.
+**Note on Umbraco's `IDistributedLockingMechanism`**: We deliberately do not use it. It is scope-bound (requires an active `IUmbracoDatabase` transaction via `IScopeAccessor`), uses integer lock IDs against the `umbracoLock` table, and solves a different problem (protecting database writes within a transaction). WorkflowCore's background processing runs outside Umbraco scopes and needs async, string-key-based coordination — which the outbox's optimistic claiming handles naturally.
 
 #### Scheduled Triggers (CRON)
 
@@ -1225,16 +1135,16 @@ This follows the same pattern as Umbraco's own `ScheduledPublishing` and `Health
 | Concern | SchedulingPublisher | Subscriber nodes |
 |---------|:------------------:|:----------------:|
 | **Trigger handlers** (notification → `TriggerEvent`) | Yes | Yes |
-| **CAP outbox** (persist trigger events) | Yes | Yes |
-| **CAP consumer** (process trigger events → fan-out) | Yes | Yes |
+| **Outbox write** (persist trigger events) | Yes | Yes |
+| **Outbox dispatch** (process trigger events → fan-out) | Yes | Yes |
 | **WorkflowCore host** (execute workflow steps) | Yes | Yes |
 | **Scheduled triggers** (CRON evaluation) | Yes | No |
-| **HITL approval resume** | Any node (via CAP message) | Any node (via CAP message) |
+| **HITL approval resume** | Any node (via outbox message) | Any node (via outbox message) |
 | **Backoffice UI** (view runs, manage automations) | Yes | Yes |
 
-CAP's message delivery ensures exactly-once consumption across nodes — both trigger fan-out and workflow step execution scale out automatically when an external transport (RabbitMQ, Azure Service Bus) is configured. The only concern still gated to `SchedulingPublisher` is **scheduled trigger evaluation** (CRON), which must fire once.
+The outbox's optimistic claiming ensures each message is consumed by exactly one node — both trigger fan-out and workflow step execution scale out automatically in multi-node deployments. The only concern still gated to `SchedulingPublisher` is **scheduled trigger evaluation** (CRON), which must fire once.
 
-**In-flight runs during rolling deployments**: Workflow state is persisted to the database by WorkflowCore's `IPersistenceProvider`. When a node restarts, its WorkflowCore host resumes and picks up work from the CAP queue. Steps that were mid-execution when the node went down will be redelivered by CAP — action implementations should be idempotent where possible.
+**In-flight runs during rolling deployments**: Workflow state is persisted to the database by WorkflowCore's `IPersistenceProvider`. When a node restarts, its WorkflowCore host resumes and picks up work from the outbox. Steps that were mid-execution when the node went down will have their stale claims recovered — action implementations should be idempotent where possible.
 
 ---
 
@@ -1322,8 +1232,8 @@ EntityVersion (generic — single table for all versioned entities, mirrors Umbr
 ├── CreatedByUserId: Guid? (user key)
 ├── ChangeDescription: string? (optional change notes)
 
-// Note: Trigger event queue tables are managed by CAP (DotNetCore.CAP) —
-// no custom queue entity needed. CAP creates its own Published/Received tables.
+// Outbox message table (umbracoAutomateOutbox) — used for trigger dispatch and WorkflowCore queue.
+// Managed by EF Core alongside all other Umbraco Automate tables.
 ```
 
 ### Entity Versioning System
@@ -2324,8 +2234,8 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | 2 | **WorkflowCore persistence** | Use WorkflowCore's own EF tables vs our own tables | ✅ **Decided: Custom `IPersistenceProvider`** — implements WorkflowCore's interface but uses Umbraco's `IEFCoreScopeProvider` for engine state. Our own tables for runs/audit (richer schema). Bypasses WorkflowCore's EF package entirely, avoiding the EF Core version mismatch (WC targets EF 9.x, Umbraco 17 uses EF 10.x). |
 | 3 | **Workflow definition storage** | Code-compiled vs JSON/YAML DSL | ✅ **Decided: JSON in DB, compiled to WorkflowCore at runtime.** Enables user-defined automations via the canvas editor. |
 | 4 | **Settings UI generation** | Auto-generate from POCO attributes vs hand-crafted per action | ✅ **Decided: `[Field]` attribute + `EditableModelSchemaBuilder`** — mirrors Umbraco.AI's `[AIField]` pattern exactly |
-| 5 | **Messaging infrastructure** | Direct dispatch vs message bus | ✅ **Decided: CAP (`DotNetCore.CAP`, MIT) for both trigger dispatch and WorkflowCore queue.** Trigger handlers are simple mappers (event → `TriggerEvent<TOutput>`). WorkflowCore's `IQueueProvider` backed by CAP. SQL Server via `DotNetCore.CAP.SqlServer`, SQLite via `DotNetCore.CAP.Sqlite` (MIT). In-memory transport by default, swappable to RabbitMQ/Azure Service Bus — one config change scales out both trigger fan-out and step execution. All nodes run WorkflowCore host; no SchedulingPublisher gate needed (except for CRON triggers). CAP is an internal implementation detail. |
-| 6 | **Multi-node / clustering** | Single-node only vs distributed from start | ✅ **Decided: Code-based via `AddUmbracoAutomate(options => ...)`**. Defaults to in-memory queue + Umbraco's connection string. Users install a WorkflowCore provider NuGet and configure in a Composer. See "Infrastructure Providers" section. |
+| 5 | **Messaging infrastructure** | Direct dispatch vs message bus vs custom outbox | ✅ **Decided: Custom database-backed outbox.** Single `umbracoAutomateOutbox` EF Core table handles both trigger dispatch and WorkflowCore queue. Zero external dependencies. Optimistic concurrency for multi-instance safety. Exponential backoff retry + dead-lettering. Initially used DotNetCore.CAP but replaced — CAP's timing constraints, sealed APIs, and startup ordering issues added more friction than value. The outbox is an internal implementation detail behind `ITriggerDispatcher`. |
+| 6 | **Multi-node / clustering** | Single-node only vs distributed from start | ✅ **Decided: Database-backed outbox with optimistic claiming.** Multi-node safe out of the box — all nodes share the same database. No external infrastructure needed. |
 | 7 | **AI provider abstraction** | Direct SDK calls vs Umbraco AI abstraction | ✅ **Decided: Via Umbraco.AI.** All AI integration ships as `Umbraco.AI.Automate` and depends on Umbraco.AI's abstractions. Deferred to Phase 3. |
 | 8 | **Newtonsoft.Json** | Accept dual dependency vs replace | ✅ **Decided: Accept it.** WorkflowCore has a hard dep on Newtonsoft.Json. Isolated to the engine layer — our domain model and API use System.Text.Json. |
 | 9 | **Workflow data model** | Typed TData POCO vs generic dictionary bag | ✅ **Decided: `AutomationRunData` dictionary bag.** User-defined automations have variable steps, so a generic `Dictionary<string, object?>` data bag is the right fit. Steps read/write via typed accessors. |
