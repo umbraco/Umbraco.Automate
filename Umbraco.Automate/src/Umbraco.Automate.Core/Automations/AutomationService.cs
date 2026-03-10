@@ -89,6 +89,59 @@ internal sealed class AutomationService : IAutomationService
         return saved;
     }
 
+    public async Task<Automation> PublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default)
+    {
+        using ICoreScope scope = _scopeProvider.CreateCoreScope();
+
+        var automation = await _automationRepository.GetAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{id}' not found.");
+
+        var eventMessages = _eventMessagesFactory.Get();
+
+        var publishingNotification = new AutomationPublishingNotification(automation, eventMessages);
+        if (scope.Notifications.PublishCancelable(publishingNotification))
+        {
+            throw new OperationCanceledException("Automation publish was cancelled by a notification handler.");
+        }
+
+        automation.PublishedVersion = automation.DraftVersion;
+        automation.Status = AutomationStatus.Published;
+        automation.IsEnabled = true;
+
+        var saved = await _automationRepository.SaveAsync(automation, userId, cancellationToken);
+
+        scope.Notifications.Publish(new AutomationPublishedNotification(saved, eventMessages));
+        scope.Complete();
+
+        return saved;
+    }
+
+    public async Task<Automation> UnpublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default)
+    {
+        using ICoreScope scope = _scopeProvider.CreateCoreScope();
+
+        var automation = await _automationRepository.GetAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{id}' not found.");
+
+        var eventMessages = _eventMessagesFactory.Get();
+
+        var unpublishingNotification = new AutomationUnpublishingNotification(automation, eventMessages);
+        if (scope.Notifications.PublishCancelable(unpublishingNotification))
+        {
+            throw new OperationCanceledException("Automation unpublish was cancelled by a notification handler.");
+        }
+
+        automation.Status = AutomationStatus.Inactive;
+        automation.IsEnabled = false;
+
+        var saved = await _automationRepository.SaveAsync(automation, userId, cancellationToken);
+
+        scope.Notifications.Publish(new AutomationUnpublishedNotification(saved, eventMessages));
+        scope.Complete();
+
+        return saved;
+    }
+
     public async Task<bool> DeleteAutomationAsync(Guid id, CancellationToken cancellationToken = default)
     {
         using ICoreScope scope = _scopeProvider.CreateCoreScope();

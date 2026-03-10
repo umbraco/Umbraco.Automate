@@ -30,6 +30,18 @@ public sealed class AutomationPublishedNotification(Automation target, EventMess
     : ObjectNotification<Automation>(target, messages);
 
 /// <summary>
+/// Notification fired before an automation is unpublished. Can be cancelled.
+/// </summary>
+public sealed class AutomationUnpublishingNotification(Automation target, EventMessages messages)
+    : CancelableObjectNotification<Automation>(target, messages);
+
+/// <summary>
+/// Notification fired after an automation has been unpublished.
+/// </summary>
+public sealed class AutomationUnpublishedNotification(Automation target, EventMessages messages)
+    : ObjectNotification<Automation>(target, messages);
+
+/// <summary>
 /// Notification fired before an automation is deleted. Can be cancelled.
 /// </summary>
 public sealed class AutomationDeletingNotification(Automation target, EventMessages messages)

@@ -40,6 +40,16 @@ public interface IAutomationService
     Task<Automation> UpdateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Publishes an automation, making its current draft the active version.
+    /// </summary>
+    Task<Automation> PublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Unpublishes an automation, setting it to inactive.
+    /// </summary>
+    Task<Automation> UnpublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes an automation and all its runs.
     /// </summary>
     Task<bool> DeleteAutomationAsync(Guid id, CancellationToken cancellationToken = default);
