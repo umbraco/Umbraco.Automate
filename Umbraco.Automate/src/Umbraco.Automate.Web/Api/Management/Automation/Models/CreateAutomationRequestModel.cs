@@ -1,0 +1,36 @@
+using System.ComponentModel.DataAnnotations;
+using Umbraco.Automate.Core.Automations;
+
+namespace Umbraco.Automate.Web.Api.Management.Automation.Models;
+
+/// <summary>
+/// Request model for creating a new automation.
+/// </summary>
+public sealed class CreateAutomationRequestModel
+{
+    /// <summary>The unique alias.</summary>
+    [Required]
+    public required string Alias { get; init; }
+
+    /// <summary>The display name.</summary>
+    [Required]
+    public required string Name { get; init; }
+
+    /// <summary>Optional description.</summary>
+    public string? Description { get; init; }
+
+    /// <summary>Whether triggers are active.</summary>
+    public bool IsEnabled { get; init; }
+
+    /// <summary>The trigger configuration.</summary>
+    public TriggerConfiguration? Trigger { get; init; }
+
+    /// <summary>The step configurations.</summary>
+    public IList<StepConfiguration> Steps { get; init; } = [];
+
+    /// <summary>The connections between steps.</summary>
+    public IList<StepConnection> Connections { get; init; } = [];
+
+    /// <summary>The serialised canvas state.</summary>
+    public string? CanvasState { get; init; }
+}

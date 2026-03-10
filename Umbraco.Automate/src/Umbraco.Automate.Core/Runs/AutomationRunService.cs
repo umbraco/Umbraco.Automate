@@ -1,0 +1,24 @@
+namespace Umbraco.Automate.Core.Runs;
+
+/// <summary>
+/// Default implementation of <see cref="IAutomationRunService"/>.
+/// </summary>
+internal sealed class AutomationRunService : IAutomationRunService
+{
+    private readonly IAutomationRunRepository _runRepository;
+
+    public AutomationRunService(IAutomationRunRepository runRepository)
+    {
+        _runRepository = runRepository;
+    }
+
+    public Task<AutomationRun?> GetRunAsync(Guid id, CancellationToken cancellationToken = default)
+        => _runRepository.GetAsync(id, cancellationToken);
+
+    public Task<(IEnumerable<AutomationRun> Items, int Total)> GetRunsByAutomationPagedAsync(
+        Guid automationId,
+        int skip = 0,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+        => _runRepository.GetPagedByAutomationAsync(automationId, skip, take, cancellationToken);
+}
