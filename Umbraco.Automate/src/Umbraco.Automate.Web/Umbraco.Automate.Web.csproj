@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Title>Umbraco Automate Web</Title>
+        <Description>Management API for Umbraco Automate</Description>
+        <RootNamespace>Umbraco.Automate.Web</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Umbraco.Cms.Api.Management" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>Umbraco.Automate.Startup</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+</Project>

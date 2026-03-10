@@ -1,0 +1,25 @@
+{
+    "id": "Umbraco.Automate",
+    "name": "Umbraco Automate",
+    "version": "0.0.0",
+    "allowTelemetry": true,
+    "extensions": [
+        {
+            "name": "Umbraco Automate",
+            "alias": "UmbracoAutomate.Bundle",
+            "type": "bundle",
+            "js": "/App_Plugins/UmbracoAutomate/umbraco-automate-manifests.js"
+        },
+        {
+            "type": "backofficeEntryPoint",
+            "name": "Umbraco Automate Backoffice Entry Point",
+            "alias": "Umbraco.Automate.BackofficeEntryPoint",
+            "js": "/App_Plugins/UmbracoAutomate/umbraco-automate-app.js"
+        }
+    ],
+    "importmap": {
+        "imports": {
+            "@umbraco-automate/core": "/App_Plugins/UmbracoAutomate/umbraco-automate-app.js"
+        }
+    }
+}

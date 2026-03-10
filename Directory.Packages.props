@@ -1,0 +1,47 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!-- Global packages (SourceLink, NBGV, Umbraco.Code) -->
+  <ItemGroup>
+    <GlobalPackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" />
+    <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118" />
+    <GlobalPackageReference Include="Umbraco.Code" Version="2.4.0" />
+    <GlobalPackageReference Include="Umbraco.GitVersioning.Extensions" Version="0.2.0" />
+    <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.3.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Umbraco CMS -->
+  <ItemGroup>
+    <PackageVersion Include="Umbraco.Cms.Core" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[17.1.0, 17.999.999)" />
+  </ItemGroup>
+
+  <!-- WorkflowCore (automation engine) -->
+  <ItemGroup>
+    <PackageVersion Include="WorkflowCore" Version="3.9.0" />
+  </ItemGroup>
+
+  <!-- Shared dependencies -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.0, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.0, 10.999.999)" />
+  </ItemGroup>
+
+  <!-- Test dependencies -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="[10.0.0, 10.999.999)" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Shouldly" Version="4.2.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+</Project>
