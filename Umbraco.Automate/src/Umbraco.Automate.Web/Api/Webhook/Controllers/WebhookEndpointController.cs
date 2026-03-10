@@ -22,6 +22,7 @@ namespace Umbraco.Automate.Web.Api.Webhook.Controllers;
 [MapToApi(Constants.WebhookApi.ApiName)]
 [JsonOptionsName(Constants.WebhookApi.ApiName)]
 [ApiExplorerSettings(GroupName = Constants.WebhookApi.ApiName)]
+[Tags("Webhooks")]
 public sealed class WebhookEndpointController : ControllerBase
 {
     internal const string SecretHeaderName = "X-Webhook-Secret";
