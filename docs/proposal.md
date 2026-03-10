@@ -832,7 +832,9 @@ Automation
 │   └── MaxRetries: int?
 ├── Connections: List<StepConnection>
 │   ├── SourceStepId: Guid
+│   ├── SourceHandle: string? (React Flow handle ID, e.g. "success", "error", "default")
 │   ├── TargetStepId: Guid
+│   ├── TargetHandle: string? (React Flow handle ID)
 │   ├── Outcome: string? (for branching)
 │   └── Filter: FilterExpression? (conditional)
 └── CanvasState: string (JSON — viewport, layout metadata)
