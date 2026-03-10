@@ -28,6 +28,7 @@ public static partial class UmbracoBuilderExtensions
     internal static IUmbracoBuilder AddUmbracoAutomateWeb(this IUmbracoBuilder builder)
     {
         builder.AddUmbracoAutomateManagementApi();
+        builder.AddUmbracoAutomateWebhookApi();
         builder.AddUmbracoAutomateMapDefinitions();
 
         return builder;
@@ -66,6 +67,26 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ISchemaIdHandler, UmbracoAutomateApiSchemaIdHandler>();
 
         builder.AddUmbracoAutomateJsonOptions();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateWebhookApi(this IUmbracoBuilder builder)
+    {
+        builder.Services.Configure<SwaggerGenOptions>(options =>
+        {
+            if (options.SwaggerGeneratorOptions.SwaggerDocs.ContainsKey(Constants.WebhookApi.ApiName))
+                return;
+
+            options.SwaggerDoc(
+                Constants.WebhookApi.ApiName,
+                new OpenApiInfo
+                {
+                    Title = Constants.WebhookApi.ApiTitle,
+                    Version = "Latest",
+                    Description = "Public webhook endpoints for triggering automations from external systems. No authentication required.",
+                });
+        });
 
         return builder;
     }

@@ -14,4 +14,5 @@ public sealed class TriggerConfiguration
     /// Gets or sets the trigger settings as a key-value dictionary.
     /// </summary>
     public Dictionary<string, object?> Settings { get; set; } = [];
+
 }

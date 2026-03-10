@@ -77,4 +77,20 @@ public class Constants
             }
         }
     }
+
+    /// <summary>
+    /// Constants for the Automate Webhook API (public, no auth).
+    /// </summary>
+    public static class WebhookApi
+    {
+        /// <summary>
+        /// The API name used for Swagger doc and JSON options.
+        /// </summary>
+        public const string ApiName = "automate-webhook";
+
+        /// <summary>
+        /// The API title.
+        /// </summary>
+        public const string ApiTitle = "Umbraco Automate Webhook API";
+    }
 }
