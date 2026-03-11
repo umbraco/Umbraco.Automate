@@ -36,6 +36,9 @@ public sealed class AutomationResponseModel
     /// <summary>The draft version number.</summary>
     public int DraftVersion { get; set; }
 
+    /// <summary>The workspace this automation belongs to.</summary>
+    public Guid? WorkspaceId { get; set; }
+
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; set; }
 

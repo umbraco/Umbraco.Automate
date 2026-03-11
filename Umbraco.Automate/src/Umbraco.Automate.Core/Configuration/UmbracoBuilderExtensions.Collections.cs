@@ -9,6 +9,7 @@ using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
@@ -75,6 +76,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<AutomateMetrics>();
 
         // Core services
+        builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();

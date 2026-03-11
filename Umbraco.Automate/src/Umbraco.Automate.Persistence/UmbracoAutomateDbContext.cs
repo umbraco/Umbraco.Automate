@@ -4,6 +4,7 @@ using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Persistence.Versioning;
 using Umbraco.Automate.Persistence.Workflows;
+using Umbraco.Automate.Persistence.Workspaces;
 
 namespace Umbraco.Automate.Persistence;
 
@@ -29,6 +30,8 @@ public class UmbracoAutomateDbContext : DbContext
     internal DbSet<OutboxMessageEntity> OutboxMessages { get; set; } = null!;
 
     internal DbSet<EntityVersionEntity> EntityVersions { get; set; } = null!;
+
+    internal DbSet<WorkspaceEntity> Workspaces { get; set; } = null!;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UmbracoAutomateDbContext"/> class.
@@ -63,6 +66,7 @@ public class UmbracoAutomateDbContext : DbContext
             entity.HasIndex(e => e.Alias).IsUnique();
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.GroupId);
+            entity.HasIndex(e => e.WorkspaceId);
         });
 
         modelBuilder.Entity<AutomationRunEntity>(entity =>
@@ -181,6 +185,45 @@ public class UmbracoAutomateDbContext : DbContext
 
             entity.HasIndex(e => new { e.EntityId, e.EntityType, e.Version }).IsUnique();
             entity.HasIndex(e => new { e.EntityId, e.EntityType });
+        });
+
+        // Workspace tables
+
+        modelBuilder.Entity<WorkspaceEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkspace");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Alias).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.ServiceAccountKey).IsRequired();
+            entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
+            entity.Property(e => e.DateCreated).IsRequired();
+            entity.Property(e => e.DateModified).IsRequired();
+
+            entity.HasIndex(e => e.Alias).IsUnique();
+
+            entity.HasMany(e => e.UserGroups)
+                .WithOne()
+                .HasForeignKey(e => e.WorkspaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(e => e.Connections)
+                .WithOne()
+                .HasForeignKey(e => e.WorkspaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkspaceUserGroupEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkspaceUserGroup");
+            entity.HasKey(e => new { e.WorkspaceId, e.UserGroupId });
+        });
+
+        modelBuilder.Entity<WorkspaceConnectionEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkspaceConnection");
+            entity.HasKey(e => new { e.WorkspaceId, e.ConnectionId });
         });
 
         // Outbox message table

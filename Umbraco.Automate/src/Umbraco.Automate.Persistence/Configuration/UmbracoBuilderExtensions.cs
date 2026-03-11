@@ -5,9 +5,11 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Notifications;
 using Umbraco.Automate.Persistence;
+using Umbraco.Automate.Persistence.Workspaces;
 using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Persistence.Versioning;
@@ -45,6 +47,7 @@ public static partial class UmbracoBuilderExtensions
 
         builder.Services.AddSingleton<AutomationFactory>();
         builder.Services.AddSingleton<IAutomationRepository, EFCoreAutomationRepository>();
+        builder.Services.AddSingleton<IWorkspaceRepository, EFCoreWorkspaceRepository>();
         builder.Services.AddSingleton<IAutomationRunRepository, EFCoreAutomationRunRepository>();
         builder.Services.AddSingleton<IPersistenceProvider, EFCoreWorkflowPersistenceProvider>();
         builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
