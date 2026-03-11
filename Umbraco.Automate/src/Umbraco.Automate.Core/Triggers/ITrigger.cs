@@ -53,4 +53,12 @@ public interface ITrigger : IDiscoverable
     /// Gets the output properties available for expression binding.
     /// </summary>
     IReadOnlyList<TriggerOutputProperty> GetOutputProperties();
+
+    /// <summary>
+    /// Resolves trigger settings from a raw dictionary to a typed instance,
+    /// applying configuration variable substitution and validation.
+    /// </summary>
+    /// <param name="settings">The raw settings dictionary from the trigger configuration.</param>
+    /// <returns>The resolved settings object, or null if settings are empty or the trigger has no settings type.</returns>
+    object? ResolveSettings(Dictionary<string, object?> settings);
 }

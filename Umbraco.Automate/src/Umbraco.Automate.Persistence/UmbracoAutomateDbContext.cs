@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
+using Umbraco.Automate.Persistence.Versioning;
 using Umbraco.Automate.Persistence.Workflows;
 
 namespace Umbraco.Automate.Persistence;
@@ -26,6 +27,8 @@ public class UmbracoAutomateDbContext : DbContext
     internal DbSet<ScheduledCommandEntity> ScheduledCommands { get; set; } = null!;
 
     internal DbSet<OutboxMessageEntity> OutboxMessages { get; set; } = null!;
+
+    internal DbSet<EntityVersionEntity> EntityVersions { get; set; } = null!;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UmbracoAutomateDbContext"/> class.
@@ -160,6 +163,24 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.ExecuteTime).IsRequired();
 
             entity.HasIndex(e => e.ExecuteTime);
+        });
+
+        // Entity version table
+
+        modelBuilder.Entity<EntityVersionEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateEntityVersion");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.EntityId).IsRequired();
+            entity.Property(e => e.EntityType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Version).IsRequired();
+            entity.Property(e => e.Snapshot).IsRequired();
+            entity.Property(e => e.DateCreated).IsRequired();
+            entity.Property(e => e.ChangeDescription).HasMaxLength(500);
+
+            entity.HasIndex(e => new { e.EntityId, e.EntityType, e.Version }).IsUnique();
+            entity.HasIndex(e => new { e.EntityId, e.EntityType });
         });
 
         // Outbox message table

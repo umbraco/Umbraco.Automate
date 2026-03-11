@@ -43,4 +43,11 @@ internal interface IAutomationRepository
     /// Checks whether an automation with the given ID exists.
     /// </summary>
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the published version references for all automations that have a published version.
+    /// This is a lightweight projection — no full entity mapping.
+    /// </summary>
+    Task<IReadOnlyCollection<(Guid Id, int PublishedVersion)>> GetPublishedVersionReferencesAsync(
+        CancellationToken cancellationToken = default);
 }

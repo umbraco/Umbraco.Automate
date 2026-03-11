@@ -5,6 +5,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Versioning;
 using Umbraco.Cms.Core.Sync;
 
 namespace Umbraco.Automate.Core.Dispatch;
@@ -15,6 +16,7 @@ namespace Umbraco.Automate.Core.Dispatch;
 internal sealed class TriggerEventHandler : IMessageHandler
 {
     private readonly IAutomationService _automationService;
+    private readonly IEntityVersionService _versionService;
     private readonly IAutomationExecutor _executor;
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IOptions<ExecutionOptions> _executionOptions;
@@ -22,12 +24,14 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
     public TriggerEventHandler(
         IAutomationService automationService,
+        IEntityVersionService versionService,
         IAutomationExecutor executor,
         IServerRoleAccessor serverRoleAccessor,
         IOptions<ExecutionOptions> executionOptions,
         ILogger<TriggerEventHandler> logger)
     {
         _automationService = automationService;
+        _versionService = versionService;
         _executor = executor;
         _serverRoleAccessor = serverRoleAccessor;
         _executionOptions = executionOptions;
@@ -74,12 +78,32 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
         foreach (var automation in matching)
         {
+            // Resolve the published version snapshot for execution.
+            // This ensures we run the frozen, published state — not the current draft.
+            var executionAutomation = automation;
+            if (automation.PublishedVersion.HasValue)
+            {
+                var snapshot = await _versionService.GetVersionSnapshotAsync<Automation>(
+                    automation.Id, automation.PublishedVersion.Value, cancellationToken);
+
+                if (snapshot is not null)
+                {
+                    executionAutomation = snapshot;
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Published version {Version} snapshot not found for automation {AutomationId}, using current state",
+                        automation.PublishedVersion.Value, automation.Id);
+                }
+            }
+
             _logger.LogInformation(
-                "Starting run for automation {AutomationAlias} ({AutomationId}) from trigger {TriggerAlias}",
-                automation.Alias, automation.Id, message.TriggerAlias);
+                "Starting run for automation {AutomationAlias} ({AutomationId}) version {Version} from trigger {TriggerAlias}",
+                executionAutomation.Alias, executionAutomation.Id, executionAutomation.Version, message.TriggerAlias);
 
             await _executor.ExecuteAsync(
-                automation,
+                executionAutomation,
                 message.InitiatorType,
                 message.InitiatorId,
                 triggerOutputData,

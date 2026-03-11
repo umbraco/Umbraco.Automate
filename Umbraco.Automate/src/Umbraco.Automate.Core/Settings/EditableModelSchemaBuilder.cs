@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
 namespace Umbraco.Automate.Core.Settings;
@@ -48,7 +49,27 @@ public static class EditableModelSchemaBuilder
             SortOrder = attr?.SortOrder ?? 0,
             IsSensitive = attr?.IsSensitive ?? false,
             Group = attr?.Group,
+            ValidationRules = InferValidationAttributes(property),
         };
+    }
+
+    private static IEnumerable<ValidationAttribute> InferValidationAttributes(PropertyInfo property)
+    {
+        var validationAttributes = property.GetCustomAttributes<ValidationAttribute>().ToList();
+
+        // If the property is a non-nullable reference type and doesn't already have a
+        // Required attribute, add one. Value types always have a default value so skip them.
+        var nullabilityContext = new NullabilityInfoContext();
+        var nullabilityInfo = nullabilityContext.Create(property);
+
+        if (nullabilityInfo.WriteState != NullabilityState.Nullable
+            && !property.PropertyType.IsValueType
+            && !validationAttributes.OfType<RequiredAttribute>().Any())
+        {
+            validationAttributes.Add(new RequiredAttribute());
+        }
+
+        return validationAttributes;
     }
 
     /// <summary>

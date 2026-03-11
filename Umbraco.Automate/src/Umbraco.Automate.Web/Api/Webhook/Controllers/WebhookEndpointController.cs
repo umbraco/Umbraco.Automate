@@ -26,7 +26,6 @@ public sealed class WebhookEndpointController : ControllerBase
 {
     internal const string SecretHeaderName = "X-Webhook-Secret";
     internal const string SecretQueryParam = "secret";
-    internal const string SecretSettingsKey = "secret";
 
     private readonly IAutomationService _automationService;
     private readonly ITriggerDispatcher _dispatcher;
@@ -87,25 +86,28 @@ public sealed class WebhookEndpointController : ControllerBase
         }
 
         // Verify the automation's trigger is a webhook trigger and accepts this HTTP method.
-        var trigger = _triggers.FirstOrDefault(t => t.Alias == triggerAlias);
-        if (trigger is not IWebhookTrigger webhookTrigger)
+        var trigger = _triggers.GetByAlias<WebhookTrigger>(triggerAlias);
+        if (trigger is null)
         {
             return NotFound();
         }
 
-        // Validate the webhook secret.
-        var expectedSecret = GetSecretFromSettings(automation.Trigger);
-        if (!string.IsNullOrEmpty(expectedSecret) && !ValidateSecret(expectedSecret))
+        // Validate the webhook secret (resolves $ConfigKey references via the trigger's resolver).
+        var triggerSettings = automation.Trigger?.Settings != null
+            ? trigger.ResolveSettings(automation.Trigger.Settings)
+            : null;
+        if (!string.IsNullOrEmpty(triggerSettings?.Secret) && !ValidateSecret(triggerSettings.Secret))
         {
             return Unauthorized();
         }
 
-        if (!webhookTrigger.AllowedMethods.Contains(Request.Method, StringComparer.OrdinalIgnoreCase))
+        var allowedMethods = triggerSettings?.AllowedMethods ?? ["POST"];
+        if (!allowedMethods.Contains(Request.Method, StringComparer.OrdinalIgnoreCase))
         {
             return StatusCode(StatusCodes.Status405MethodNotAllowed, new ProblemDetails
             {
                 Title = "Method not allowed",
-                Detail = $"This webhook accepts: {string.Join(", ", webhookTrigger.AllowedMethods)}",
+                Detail = $"This webhook accepts: {string.Join(", ", allowedMethods)}",
                 Status = StatusCodes.Status405MethodNotAllowed,
             });
         }
@@ -143,16 +145,6 @@ public sealed class WebhookEndpointController : ControllerBase
             cancellationToken);
 
         return Accepted();
-    }
-
-    private static string? GetSecretFromSettings(TriggerConfiguration? trigger)
-    {
-        if (trigger?.Settings.TryGetValue(SecretSettingsKey, out var value) is true)
-        {
-            return value?.ToString();
-        }
-
-        return null;
     }
 
     private bool ValidateSecret(string expectedSecret)

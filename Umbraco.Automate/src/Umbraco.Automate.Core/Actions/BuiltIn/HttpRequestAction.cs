@@ -14,7 +14,8 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings>
     /// <summary>
     /// Initializes a new instance of the <see cref="HttpRequestAction"/> class.
     /// </summary>
-    public HttpRequestAction(IHttpClientFactory httpClientFactory)
+    public HttpRequestAction(ActionInfrastructure infrastructure, IHttpClientFactory httpClientFactory)
+        : base(infrastructure)
     {
         _httpClientFactory = httpClientFactory;
     }

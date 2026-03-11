@@ -4,6 +4,7 @@ using Moq.Protected;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
+using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
@@ -101,6 +102,7 @@ public class HttpRequestActionTests
         var factory = new Mock<IHttpClientFactory>();
         factory.Setup(f => f.CreateClient("UmbracoAutomate")).Returns(client);
 
-        return new HttpRequestAction(factory.Object);
+        var deps = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
+        return new HttpRequestAction(deps, factory.Object);
     }
 }

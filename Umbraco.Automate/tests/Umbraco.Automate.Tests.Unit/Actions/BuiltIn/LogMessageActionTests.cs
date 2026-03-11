@@ -3,12 +3,15 @@ using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
+using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
 public class LogMessageActionTests
 {
-    private readonly LogMessageAction _action = new(Mock.Of<ILogger<LogMessageAction>>());
+    private readonly LogMessageAction _action = new(
+        new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
+        Mock.Of<ILogger<LogMessageAction>>());
 
     [Fact]
     public void HasCorrectAlias()

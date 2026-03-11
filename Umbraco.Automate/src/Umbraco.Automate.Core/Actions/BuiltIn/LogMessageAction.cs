@@ -14,7 +14,8 @@ public sealed class LogMessageAction : ActionBase<LogMessageSettings>
     /// <summary>
     /// Initializes a new instance of the <see cref="LogMessageAction"/> class.
     /// </summary>
-    public LogMessageAction(ILogger<LogMessageAction> logger)
+    public LogMessageAction(ActionInfrastructure infrastructure, ILogger<LogMessageAction> logger)
+        : base(infrastructure)
     {
         _logger = logger;
     }

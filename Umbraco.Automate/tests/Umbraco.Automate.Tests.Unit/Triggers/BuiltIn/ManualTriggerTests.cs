@@ -1,11 +1,15 @@
+using Moq;
 using Shouldly;
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 
 namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 
 public class ManualTriggerTests
 {
-    private readonly ManualTrigger _trigger = new();
+    private readonly ManualTrigger _trigger = new(
+        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
 
     [Fact]
     public void HasCorrectAlias()

@@ -1,12 +1,16 @@
 using System.Text.Json;
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Persistence.Automations;
 
 /// <summary>
 /// Maps between <see cref="Automation"/> domain model and <see cref="AutomationEntity"/> EF entity.
+/// Delegates encryption/decryption of sensitive settings to <see cref="IEditableModelSerializer"/>.
 /// </summary>
-internal static class AutomationFactory
+internal sealed class AutomationFactory
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -14,12 +18,26 @@ internal static class AutomationFactory
         WriteIndented = false,
     };
 
-    public static Automation BuildDomain(AutomationEntity entity)
+    private readonly IEditableModelSerializer _serializer;
+    private readonly ActionCollection _actions;
+    private readonly TriggerCollection _triggers;
+
+    public AutomationFactory(
+        IEditableModelSerializer serializer,
+        ActionCollection actions,
+        TriggerCollection triggers)
+    {
+        _serializer = serializer;
+        _actions = actions;
+        _triggers = triggers;
+    }
+
+    public Automation BuildDomain(AutomationEntity entity)
     {
         AutomationDefinitionDto? definition = null;
         if (!string.IsNullOrEmpty(entity.Definition))
         {
-            definition = JsonSerializer.Deserialize<AutomationDefinitionDto>(entity.Definition, JsonOptions);
+            definition = _serializer.Deserialize<AutomationDefinitionDto>(entity.Definition);
         }
 
         return new Automation
@@ -45,7 +63,7 @@ internal static class AutomationFactory
         };
     }
 
-    public static AutomationEntity BuildEntity(Automation automation)
+    public AutomationEntity BuildEntity(Automation automation)
     {
         return new AutomationEntity
         {
@@ -67,7 +85,7 @@ internal static class AutomationFactory
         };
     }
 
-    public static void UpdateEntity(AutomationEntity entity, Automation automation)
+    public void UpdateEntity(AutomationEntity entity, Automation automation)
     {
         entity.Alias = automation.Alias;
         entity.Name = automation.Name;
@@ -84,21 +102,112 @@ internal static class AutomationFactory
         // DateCreated and CreatedByUserId intentionally not updated
     }
 
-    private static string? SerializeDefinition(Automation automation)
+    private string? SerializeDefinition(Automation automation)
     {
         if (automation.Trigger is null && automation.Steps.Count == 0 && automation.Connections.Count == 0)
         {
             return null;
         }
 
+        // Encrypt sensitive settings per step/trigger before serializing the definition.
+        var trigger = EncryptTriggerSettings(automation.Trigger);
+        var steps = automation.Steps.Select(EncryptStepSettings).ToList();
+
         var dto = new AutomationDefinitionDto
         {
-            Trigger = automation.Trigger,
-            Steps = automation.Steps,
+            Trigger = trigger,
+            Steps = steps,
             Connections = automation.Connections,
             CanvasState = automation.CanvasState,
         };
 
         return JsonSerializer.Serialize(dto, JsonOptions);
+    }
+
+    private TriggerConfiguration? EncryptTriggerSettings(TriggerConfiguration? trigger)
+    {
+        if (trigger is null || trigger.Settings.Count == 0)
+        {
+            return trigger;
+        }
+
+        var schema = GetTriggerSchema(trigger.TriggerAlias);
+        var encryptedSettings = EncryptSettings(trigger.Settings, schema);
+
+        if (encryptedSettings == trigger.Settings)
+        {
+            return trigger;
+        }
+
+        return new TriggerConfiguration
+        {
+            TriggerAlias = trigger.TriggerAlias,
+            Settings = encryptedSettings,
+        };
+    }
+
+    private StepConfiguration EncryptStepSettings(StepConfiguration step)
+    {
+        if (step.Settings.Count == 0)
+        {
+            return step;
+        }
+
+        var schema = GetActionSchema(step.ActionAlias);
+        var encryptedSettings = EncryptSettings(step.Settings, schema);
+
+        if (encryptedSettings == step.Settings)
+        {
+            return step;
+        }
+
+        return new StepConfiguration
+        {
+            Id = step.Id,
+            ActionAlias = step.ActionAlias,
+            Name = step.Name,
+            ConnectionId = step.ConnectionId,
+            Settings = encryptedSettings,
+            InputMappings = step.InputMappings,
+            Position = step.Position,
+            ErrorBehavior = step.ErrorBehavior,
+            RetryInterval = step.RetryInterval,
+            MaxRetries = step.MaxRetries,
+        };
+    }
+
+    /// <summary>
+    /// Encrypts sensitive values in a settings dictionary by serializing through
+    /// <see cref="IEditableModelSerializer"/> and deserializing back to a dictionary.
+    /// Returns the original dictionary if no encryption was needed.
+    /// </summary>
+    private Dictionary<string, object?> EncryptSettings(
+        Dictionary<string, object?> settings,
+        EditableModelSchema? schema)
+    {
+        if (schema is null || !schema.Fields.Any(f => f.IsSensitive))
+        {
+            return settings;
+        }
+
+        var encryptedJson = _serializer.Serialize(settings, schema);
+        if (encryptedJson is null)
+        {
+            return settings;
+        }
+
+        return JsonSerializer.Deserialize<Dictionary<string, object?>>(encryptedJson, JsonOptions) ?? settings;
+    }
+
+    private EditableModelSchema? GetActionSchema(string actionAlias)
+    {
+        var action = _actions.FirstOrDefault(a => a.Alias == actionAlias);
+        return action?.GetSettingsSchema();
+    }
+
+    private EditableModelSchema? GetTriggerSchema(string triggerAlias)
+    {
+        var trigger = _triggers.FirstOrDefault(t => t.Alias == triggerAlias);
+        return trigger?.GetSettingsSchema();
     }
 }

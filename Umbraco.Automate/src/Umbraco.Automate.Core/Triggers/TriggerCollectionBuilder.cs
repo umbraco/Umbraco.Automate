@@ -28,4 +28,10 @@ public sealed class TriggerCollection : BuilderCollectionBase<ITrigger>
     /// </summary>
     public ITrigger? GetByAlias(string alias)
         => this.FirstOrDefault(t => string.Equals(t.Alias, alias, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Gets a trigger by its alias, cast to a specific type.
+    /// </summary>
+    public T? GetByAlias<T>(string alias) where T : class, ITrigger
+        => GetByAlias(alias) as T;
 }

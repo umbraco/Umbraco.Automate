@@ -8,6 +8,13 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class WebhookTriggerSettings
 {
     /// <summary>
+    /// Gets or sets the HTTP methods this webhook accepts (e.g. "POST", "PUT").
+    /// Defaults to POST only.
+    /// </summary>
+    [Field(Label = "Allowed Methods", Description = "HTTP methods this webhook accepts.")]
+    public List<string> AllowedMethods { get; set; } = ["POST"];
+
+    /// <summary>
     /// Gets or sets the secret used to authenticate incoming webhook requests.
     /// Validated via the <c>X-Webhook-Secret</c> header or <c>secret</c> query parameter.
     /// Auto-generated on first save if empty.

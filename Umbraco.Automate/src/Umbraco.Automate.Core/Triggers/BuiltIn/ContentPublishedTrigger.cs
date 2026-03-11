@@ -10,6 +10,13 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class ContentPublishedTrigger
     : NotificationTriggerBase<ContentPublishedTriggerSettings, ContentPublishedTriggerOutput, ContentPublishedNotification>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ContentPublishedTrigger"/> class.
+    /// </summary>
+    public ContentPublishedTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
+    {
+    }
+
     /// <inheritdoc />
     public override string? Description => "Fires when content is published.";
 

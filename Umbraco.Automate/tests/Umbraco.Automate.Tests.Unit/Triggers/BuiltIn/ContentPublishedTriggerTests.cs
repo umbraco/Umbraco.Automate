@@ -1,5 +1,6 @@
 using Moq;
 using Shouldly;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Cms.Core.Events;
@@ -10,7 +11,8 @@ namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 
 public class ContentPublishedTriggerTests
 {
-    private readonly ContentPublishedTrigger _trigger = new();
+    private readonly ContentPublishedTrigger _trigger = new(
+        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
 
     [Fact]
     public void HasCorrectAlias()

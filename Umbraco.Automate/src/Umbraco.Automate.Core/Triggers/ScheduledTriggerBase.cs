@@ -12,6 +12,13 @@ public abstract class ScheduledTriggerBase<TSettings, TOutput>
     where TSettings : class, new()
     where TOutput : class
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ScheduledTriggerBase{TSettings, TOutput}"/> class.
+    /// </summary>
+    protected ScheduledTriggerBase(TriggerInfrastructure infrastructure) : base(infrastructure)
+    {
+    }
+
     /// <inheritdoc />
     public abstract string GetCronExpression(object? settings);
 }

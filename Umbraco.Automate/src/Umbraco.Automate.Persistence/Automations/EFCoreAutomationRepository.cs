@@ -10,10 +10,14 @@ namespace Umbraco.Automate.Persistence.Automations;
 internal sealed class EFCoreAutomationRepository : IAutomationRepository
 {
     private readonly IEFCoreScopeProvider<UmbracoAutomateDbContext> _scopeProvider;
+    private readonly AutomationFactory _factory;
 
-    public EFCoreAutomationRepository(IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider)
+    public EFCoreAutomationRepository(
+        IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider,
+        AutomationFactory factory)
     {
         _scopeProvider = scopeProvider;
+        _factory = factory;
     }
 
     public async Task<Automation?> GetAsync(Guid id, CancellationToken cancellationToken = default)
@@ -24,7 +28,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
             await db.Automations.FirstOrDefaultAsync(a => a.Id == id, cancellationToken));
 
         scope.Complete();
-        return entity is null ? null : AutomationFactory.BuildDomain(entity);
+        return entity is null ? null : _factory.BuildDomain(entity);
     }
 
     public async Task<Automation?> GetByAliasAsync(string alias, CancellationToken cancellationToken = default)
@@ -36,7 +40,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
                 a => a.Alias == alias, cancellationToken));
 
         scope.Complete();
-        return entity is null ? null : AutomationFactory.BuildDomain(entity);
+        return entity is null ? null : _factory.BuildDomain(entity);
     }
 
     public async Task<IEnumerable<Automation>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -49,7 +53,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
                 .ToListAsync(cancellationToken));
 
         scope.Complete();
-        return entities.Select(AutomationFactory.BuildDomain);
+        return entities.Select(_factory.BuildDomain);
     }
 
     public async Task<(IEnumerable<Automation> Items, int Total)> GetPagedAsync(
@@ -80,7 +84,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
         });
 
         scope.Complete();
-        return (result.items.Select(AutomationFactory.BuildDomain), result.total);
+        return (result.items.Select(_factory.BuildDomain), result.total);
     }
 
     public async Task<Automation> SaveAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
@@ -98,7 +102,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
                 automation.CreatedByUserId = userId;
                 automation.ModifiedByUserId = userId;
 
-                AutomationEntity newEntity = AutomationFactory.BuildEntity(automation);
+                AutomationEntity newEntity = _factory.BuildEntity(automation);
                 db.Automations.Add(newEntity);
             }
             else
@@ -107,7 +111,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
                 automation.DateModified = DateTime.UtcNow;
                 automation.ModifiedByUserId = userId;
 
-                AutomationFactory.UpdateEntity(existing, automation);
+                _factory.UpdateEntity(existing, automation);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -148,5 +152,20 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
 
         scope.Complete();
         return exists;
+    }
+
+    public async Task<IReadOnlyCollection<(Guid Id, int PublishedVersion)>> GetPublishedVersionReferencesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var results = await scope.ExecuteWithContextAsync(async db =>
+            await db.Automations
+                .Where(a => a.PublishedVersion != null)
+                .Select(a => new { a.Id, PublishedVersion = a.PublishedVersion!.Value })
+                .ToListAsync(cancellationToken));
+
+        scope.Complete();
+        return results.Select(r => (r.Id, r.PublishedVersion)).ToList();
     }
 }

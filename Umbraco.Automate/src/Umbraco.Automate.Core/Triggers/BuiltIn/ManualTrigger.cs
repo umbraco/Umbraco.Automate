@@ -7,6 +7,13 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.manual", "Manual Trigger")]
 public sealed class ManualTrigger : TriggerBase<object, object>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ManualTrigger"/> class.
+    /// </summary>
+    public ManualTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
+    {
+    }
+
     /// <inheritdoc />
     public override string? Description => "Fires when the automation is triggered manually.";
 

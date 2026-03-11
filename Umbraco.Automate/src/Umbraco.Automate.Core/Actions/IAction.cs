@@ -45,6 +45,14 @@ public interface IAction : IDiscoverable
     EditableModelSchema? GetSettingsSchema();
 
     /// <summary>
+    /// Resolves action settings from a raw dictionary to a typed instance,
+    /// applying configuration variable substitution and validation.
+    /// </summary>
+    /// <param name="settings">The raw settings dictionary from the step configuration.</param>
+    /// <returns>The resolved settings object, or null if settings are empty or the action has no settings type.</returns>
+    object? ResolveSettings(Dictionary<string, object?> settings);
+
+    /// <summary>
     /// Executes the action.
     /// </summary>
     /// <param name="context">The execution context containing settings, inputs, and run metadata.</param>

@@ -50,12 +50,11 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Resolve input mappings via expressions.
         var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, expressionData);
 
-        // Deserialize settings for the action.
+        // Resolve settings for the action (deserialize, resolve $config refs, validate).
         object? settings = null;
         if (_action.SettingsType is not null && _stepConfig.Settings.Count > 0)
         {
-            var settingsJson = JsonSerializer.Serialize(_stepConfig.Settings, Dispatch.JsonOptions.Default);
-            settings = JsonSerializer.Deserialize(settingsJson, _action.SettingsType, Dispatch.JsonOptions.Default);
+            settings = _action.ResolveSettings(_stepConfig.Settings);
         }
 
         // Create action context.

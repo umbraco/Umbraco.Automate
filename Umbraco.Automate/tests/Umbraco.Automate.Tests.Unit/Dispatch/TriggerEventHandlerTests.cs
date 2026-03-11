@@ -5,6 +5,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Versioning;
 using Umbraco.Cms.Core.Sync;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
@@ -22,6 +23,7 @@ public class TriggerEventHandlerTests
 
         _handler = new TriggerEventHandler(
             _automationService.Object,
+            Mock.Of<IEntityVersionService>(),
             _executor.Object,
             _serverRoleAccessor.Object,
             Options.Create(new ExecutionOptions()),
@@ -202,6 +204,7 @@ public class TriggerEventHandlerTests
 
         var handler = new TriggerEventHandler(
             automationService.Object,
+            Mock.Of<IEntityVersionService>(),
             executor.Object,
             serverRole.Object,
             Options.Create(new ExecutionOptions { Mode = mode }),

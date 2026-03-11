@@ -7,7 +7,10 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
 using WorkflowCore.Interface;
@@ -31,11 +34,15 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:Execution"));
         builder.Services.Configure<OutboxOptions>(
             builder.Config.GetSection("Umbraco:Automate:Outbox"));
+        builder.Services.Configure<VersionCleanupPolicy>(
+            builder.Config.GetSection("Umbraco:Automate:VersionCleanup"));
 
         // Collection builders — triggers, actions, filters auto-discovered
         builder.AutomateTriggers();
         builder.AutomateActions();
         builder.AutomateExpressionFilters();
+        builder.AutomateVersionableEntityAdapters()
+            .Add<AutomationVersionableEntityAdapter>();
 
         // Wire notification triggers → TriggerNotificationHandler<T> for each notification type
         builder.RegisterTriggerNotificationHandlers();
@@ -44,6 +51,19 @@ public static partial class UmbracoBuilderExtensions
         builder.AutomateActionMiddleware()
             .Append<ErrorHandlingMiddleware>()
             .Append<StepRunLoggingMiddleware>();
+
+        // Security
+        builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
+
+        // Settings infrastructure
+        builder.Services.AddSingleton<IEditableModelSerializer, EditableModelSerializer>();
+        builder.Services.AddSingleton<IEditableModelResolver, EditableModelResolver>();
+        builder.Services.AddSingleton<ActionInfrastructure>();
+        builder.Services.AddSingleton<TriggerInfrastructure>();
+
+        // Versioning
+        builder.Services.AddSingleton<IEntityVersionService, EntityVersionService>();
+        builder.Services.AddHostedService<VersionCleanupBackgroundJob>();
 
         // Core services
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
@@ -98,4 +118,10 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static ActionMiddlewareCollectionBuilder AutomateActionMiddleware(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<ActionMiddlewareCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the versionable entity adapter collection builder.
+    /// </summary>
+    public static VersionableEntityAdapterCollectionBuilder AutomateVersionableEntityAdapters(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<VersionableEntityAdapterCollectionBuilder>();
 }

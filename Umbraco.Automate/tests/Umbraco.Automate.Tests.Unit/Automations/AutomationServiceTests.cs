@@ -2,6 +2,7 @@ using System.Data;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Versioning;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
 
@@ -32,6 +33,7 @@ public class AutomationServiceTests
         _service = new AutomationService(
             _repo.Object,
             _runRepo.Object,
+            Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
     }
@@ -163,8 +165,8 @@ public class AutomationServiceTests
             .ReturnsAsync(automation);
 
         // Simulate notification cancellation
-        _notifications.Setup(n => n.PublishCancelable(It.IsAny<AutomationPublishingNotification>()))
-            .Returns(true);
+        _notifications.Setup(n => n.PublishCancelableAsync(It.IsAny<AutomationPublishingNotification>()))
+            .ReturnsAsync(true);
 
         await Should.ThrowAsync<OperationCanceledException>(
             () => _service.PublishAutomationAsync(id));

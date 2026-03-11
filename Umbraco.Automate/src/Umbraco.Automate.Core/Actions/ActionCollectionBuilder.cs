@@ -28,4 +28,10 @@ public sealed class ActionCollection : BuilderCollectionBase<IAction>
     /// </summary>
     public IAction? GetByAlias(string alias)
         => this.FirstOrDefault(a => string.Equals(a.Alias, alias, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Gets an action by its alias, cast to a specific type.
+    /// </summary>
+    public T? GetByAlias<T>(string alias) where T : class, IAction
+        => GetByAlias(alias) as T;
 }

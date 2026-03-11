@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Umbraco.Automate.Core.Settings;
 
 /// <summary>
@@ -61,4 +63,9 @@ public sealed class EditableModelFieldDescriptor
     /// Gets the UI group name, or null for the default group.
     /// </summary>
     public string? Group { get; init; }
+
+    /// <summary>
+    /// Gets the validation rules inferred from data annotation attributes on the property.
+    /// </summary>
+    public IEnumerable<ValidationAttribute> ValidationRules { get; init; } = [];
 }

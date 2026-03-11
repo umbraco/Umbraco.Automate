@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Versioning;
+
 namespace Umbraco.Automate.Core.Automations;
 
 /// <summary>
@@ -53,4 +55,52 @@ public interface IAutomationService
     /// Deletes an automation and all its runs.
     /// </summary>
     Task<bool> DeleteAutomationAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the version history for an automation.
+    /// </summary>
+    /// <param name="automationId">The automation ID.</param>
+    /// <param name="skip">Number of versions to skip.</param>
+    /// <param name="take">Maximum number of versions to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A tuple containing the paginated version history (ordered by version descending) and the total count.</returns>
+    Task<(IEnumerable<EntityVersion> Items, int Total)> GetAutomationVersionHistoryAsync(
+        Guid automationId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a specific version snapshot of an automation.
+    /// </summary>
+    /// <param name="automationId">The automation ID.</param>
+    /// <param name="version">The version number to retrieve.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The automation at that version, or null if not found.</returns>
+    Task<Automation?> GetAutomationVersionSnapshotAsync(
+        Guid automationId,
+        int version,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the published version references for all automations that have a published version.
+    /// Returns lightweight (Id, PublishedVersion) pairs without loading full entities.
+    /// </summary>
+    Task<IReadOnlyCollection<(Guid Id, int PublishedVersion)>> GetPublishedVersionReferencesAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Rolls back an automation to a previous version, creating a new draft version with that state.
+    /// </summary>
+    /// <param name="automationId">The automation ID.</param>
+    /// <param name="targetVersion">The version to rollback to.</param>
+    /// <param name="userId">The user performing the rollback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated automation at the new version.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the automation or target version is not found.</exception>
+    Task<Automation> RollbackAutomationAsync(
+        Guid automationId,
+        int targetVersion,
+        Guid? userId = null,
+        CancellationToken cancellationToken = default);
 }

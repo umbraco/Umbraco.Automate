@@ -16,6 +16,13 @@ public abstract class NotificationTriggerBase<TSettings, TOutput, TNotification>
     where TOutput : class
     where TNotification : INotification
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NotificationTriggerBase{TSettings, TOutput, TNotification}"/> class.
+    /// </summary>
+    protected NotificationTriggerBase(TriggerInfrastructure infrastructure) : base(infrastructure)
+    {
+    }
+
     /// <inheritdoc />
     public abstract IEnumerable<TriggerEvent> MapEvent(TNotification notification);
 }

@@ -14,12 +14,14 @@ public abstract class TriggerBase<TSettings, TOutput> : ITrigger
     where TOutput : class
 {
     private readonly TriggerAttribute _attribute;
+    private readonly TriggerInfrastructure _infrastructure;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TriggerBase{TSettings, TOutput}"/> class.
     /// </summary>
-    protected TriggerBase()
+    protected TriggerBase(TriggerInfrastructure infrastructure)
     {
+        _infrastructure = infrastructure;
         _attribute = GetType().GetCustomAttribute<TriggerAttribute>(inherit: false)
             ?? throw new InvalidOperationException(
                 $"Trigger '{GetType().FullName}' is missing required [Trigger] attribute.");
@@ -74,4 +76,17 @@ public abstract class TriggerBase<TSettings, TOutput> : ITrigger
             })
             .ToList();
     }
+
+    /// <summary>
+    /// Resolves trigger settings from a raw dictionary to a typed <typeparamref name="TSettings"/> instance,
+    /// applying configuration variable substitution and validation.
+    /// </summary>
+    /// <param name="settings">The raw settings dictionary from the trigger configuration.</param>
+    /// <returns>The resolved settings, or null if settings are empty or the trigger has no settings type.</returns>
+    public TSettings? ResolveSettings(Dictionary<string, object?> settings)
+        => _infrastructure.ModelResolver.ResolveModel<TSettings>(Alias, settings);
+
+    /// <inheritdoc />
+    object? ITrigger.ResolveSettings(Dictionary<string, object?> settings)
+        => ResolveSettings(settings);
 }

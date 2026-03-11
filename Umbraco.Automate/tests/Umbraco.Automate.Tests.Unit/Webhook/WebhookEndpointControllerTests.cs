@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Web.Api.Webhook.Controllers;
@@ -17,7 +20,15 @@ public class WebhookEndpointControllerTests
 
     public WebhookEndpointControllerTests()
     {
-        var triggers = new TriggerCollection(() => new ITrigger[] { new WebhookTrigger() });
+        var configuration = new ConfigurationBuilder().Build();
+        var actions = new ActionCollection(Array.Empty<IAction>);
+        TriggerCollection? triggers = null;
+        triggers = new TriggerCollection(() =>
+        {
+            var modelResolver = new EditableModelResolver(actions, triggers!, configuration);
+            var deps = new TriggerInfrastructure(modelResolver);
+            return new ITrigger[] { new WebhookTrigger(deps) };
+        });
 
         _controller = new WebhookEndpointController(
             _automationService.Object,
