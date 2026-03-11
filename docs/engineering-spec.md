@@ -1159,7 +1159,6 @@ Automation
 ├── IsEnabled: bool
 ├── Status: Draft | Published | Inactive
 ├── PublishedVersion: int? (the version currently active for trigger evaluation)
-├── DraftVersion: int (the latest version, may be ahead of PublishedVersion)
 ├── GroupId: Guid? (for organizing)
 ├── CreatedUtc: DateTime
 ├── UpdatedUtc: DateTime
@@ -1350,8 +1349,8 @@ Automations follow a **draft → publish** lifecycle, similar to most automation
 
 ### How it works
 
-1. **Every save** creates a new `EntityVersion` record (entity type `"automation"`) with a full JSON snapshot of the definition (trigger, steps, connections, canvas state). `DraftVersion` increments.
-2. **Publishing** sets `PublishedVersion = DraftVersion` and compiles the definition into a WorkflowCore workflow registration. Only published automations register triggers with the engine.
+1. **Every save** creates a new `EntityVersion` record (entity type `"automation"`) with a full JSON snapshot of the definition (trigger, steps, connections, canvas state). `Version` auto-increments.
+2. **Publishing** sets `PublishedVersion = Version` and compiles the definition into a WorkflowCore workflow registration. Only published automations register triggers with the engine.
 3. **Editing a published automation** continues saving new draft versions without affecting the live version. The canvas shows a "unpublished changes" indicator (like Umbraco content).
 4. **In-flight runs** always execute against the version they started with (`AutomationRun.AutomationVersion`). Publishing a new version does not affect running instances.
 

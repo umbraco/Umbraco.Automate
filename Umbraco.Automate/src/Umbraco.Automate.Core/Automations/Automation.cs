@@ -41,11 +41,6 @@ public sealed class Automation : IVersionableEntity
     public int? PublishedVersion { get; set; }
 
     /// <summary>
-    /// Gets or sets the latest draft version number.
-    /// </summary>
-    public int DraftVersion { get; set; }
-
-    /// <summary>
     /// Gets or sets the folder group ID, or null if at the root.
     /// </summary>
     public Guid? GroupId { get; set; }

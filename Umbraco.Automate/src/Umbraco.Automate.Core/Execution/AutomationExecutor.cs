@@ -58,7 +58,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         {
             Id = Guid.NewGuid(),
             AutomationId = automation.Id,
-            AutomationVersion = automation.PublishedVersion ?? automation.DraftVersion,
+            AutomationVersion = automation.PublishedVersion ?? automation.Version,
             Status = AutomationRunStatus.Running,
             StartedUtc = DateTime.UtcNow,
             InitiatedBy = initiatorType,
