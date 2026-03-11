@@ -30,10 +30,27 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
         using var scope = _scopeProvider.CreateScope();
         await scope.ExecuteWithContextAsync<Task>(async db =>
         {
+            // Idempotency: if a message with the same topic + key already exists, skip.
+            if (!string.IsNullOrEmpty(message.IdempotencyKey))
+            {
+                var exists = await db.OutboxMessages.AnyAsync(
+                    m => m.Topic == message.Topic && m.IdempotencyKey == message.IdempotencyKey,
+                    cancellationToken);
+
+                if (exists)
+                {
+                    _logger.LogDebug(
+                        "Duplicate outbox message for topic {Topic} with idempotency key {IdempotencyKey}, skipping",
+                        message.Topic, message.IdempotencyKey);
+                    return;
+                }
+            }
+
             db.OutboxMessages.Add(new OutboxMessageEntity
             {
                 Topic = message.Topic,
                 Body = message.Body,
+                IdempotencyKey = message.IdempotencyKey,
                 CreatedUtc = message.CreatedUtc,
                 Status = (int)MessageStatus.Pending,
                 RetryCount = 0,
@@ -161,5 +178,29 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
                 .ExecuteDeleteAsync(cancellationToken);
         });
         scope.Complete();
+    }
+
+    public async Task<OutboxStats> GetStatsAsync(CancellationToken cancellationToken)
+    {
+        using var scope = _scopeProvider.CreateScope();
+
+        var stats = await scope.ExecuteWithContextAsync(async db =>
+        {
+            var counts = await db.OutboxMessages
+                .GroupBy(m => m.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken);
+
+            return new OutboxStats
+            {
+                Pending = counts.FirstOrDefault(c => c.Status == (int)MessageStatus.Pending)?.Count ?? 0,
+                Processing = counts.FirstOrDefault(c => c.Status == (int)MessageStatus.Processing)?.Count ?? 0,
+                Failed = counts.FirstOrDefault(c => c.Status == (int)MessageStatus.Failed)?.Count ?? 0,
+                DeadLettered = counts.FirstOrDefault(c => c.Status == (int)MessageStatus.DeadLettered)?.Count ?? 0,
+            };
+        });
+
+        scope.Complete();
+        return stats;
     }
 }

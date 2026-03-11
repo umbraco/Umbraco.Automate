@@ -19,6 +19,14 @@ public class TriggerEvent
     /// Gets an optional identifier for the initiator (e.g. user key, webhook ID).
     /// </summary>
     public string? InitiatorId { get; init; }
+
+    /// <summary>
+    /// Gets an optional idempotency key. When set, the outbox will silently drop
+    /// duplicate messages with the same topic and key.
+    /// Triggers should generate deterministic keys based on event identity
+    /// (e.g. "{triggerAlias}:{entityKey}:{eventTimestamp}").
+    /// </summary>
+    public string? IdempotencyKey { get; init; }
 }
 
 /// <summary>

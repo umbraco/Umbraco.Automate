@@ -193,6 +193,7 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.Topic).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Body).IsRequired();
+            entity.Property(e => e.IdempotencyKey).HasMaxLength(500);
             entity.Property(e => e.CreatedUtc).IsRequired();
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.RetryCount).IsRequired().HasDefaultValue(0);
@@ -202,6 +203,9 @@ public class UmbracoAutomateDbContext : DbContext
 
             entity.HasIndex(e => new { e.Topic, e.Status, e.NextRetryUtc });
             entity.HasIndex(e => new { e.Status, e.CreatedUtc });
+            // Non-unique index for idempotency lookups. Provider-specific migrations should add
+            // a unique filtered index (WHERE IdempotencyKey IS NOT NULL) for safety.
+            entity.HasIndex(e => new { e.Topic, e.IdempotencyKey });
         });
     }
 }

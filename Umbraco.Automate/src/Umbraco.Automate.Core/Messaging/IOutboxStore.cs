@@ -39,4 +39,9 @@ internal interface IOutboxStore
     /// Removes completed messages older than the specified age.
     /// </summary>
     Task CleanupCompletedAsync(TimeSpan olderThan, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets the count of messages grouped by status.
+    /// </summary>
+    Task<OutboxStats> GetStatsAsync(CancellationToken cancellationToken);
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Services;
 
@@ -16,20 +17,29 @@ internal sealed class OutboxDispatcher : BackgroundService
     private readonly IEnumerable<IMessageHandler> _handlers;
     private readonly IRuntimeState _runtimeState;
     private readonly IOptions<OutboxOptions> _options;
+    private readonly AutomateMetrics _metrics;
     private readonly ILogger<OutboxDispatcher> _logger;
     private readonly string _instanceId = Guid.NewGuid().ToString("N")[..12];
+
+    /// <summary>
+    /// Tracks whether a message is currently being dispatched. Used during shutdown
+    /// to give the in-flight message a grace period before forceful cancellation.
+    /// </summary>
+    private Task? _activeDispatch;
 
     public OutboxDispatcher(
         IOutboxStore store,
         IEnumerable<IMessageHandler> handlers,
         IRuntimeState runtimeState,
         IOptions<OutboxOptions> options,
+        AutomateMetrics metrics,
         ILogger<OutboxDispatcher> logger)
     {
         _store = store;
         _handlers = handlers;
         _runtimeState = runtimeState;
         _options = options;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -55,6 +65,10 @@ internal sealed class OutboxDispatcher : BackgroundService
 
         var options = _options.Value;
 
+        // Drain token: used to give the in-flight message a grace period on shutdown.
+        // stoppingToken stops the polling loop; drainCts cancels after DrainTimeout.
+        using var drainCts = new CancellationTokenSource();
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -67,7 +81,9 @@ internal sealed class OutboxDispatcher : BackgroundService
                     continue;
                 }
 
-                await DispatchMessageAsync(message, handlersByTopic, options, stoppingToken);
+                _activeDispatch = DispatchMessageAsync(message, handlersByTopic, options, drainCts.Token);
+                await _activeDispatch;
+                _activeDispatch = null;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -76,29 +92,57 @@ internal sealed class OutboxDispatcher : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error in outbox dispatch loop, retrying");
-                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                _activeDispatch = null;
+
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
             }
         }
+
+        // Graceful drain: if a message is in-flight, wait up to DrainTimeout for it to finish.
+        if (_activeDispatch is not null)
+        {
+            _logger.LogInformation(
+                "Outbox dispatcher draining — waiting up to {DrainTimeout} for in-flight message",
+                options.DrainTimeout);
+
+            var completed = await Task.WhenAny(_activeDispatch, Task.Delay(options.DrainTimeout));
+
+            if (completed != _activeDispatch)
+            {
+                _logger.LogWarning("Drain timeout exceeded, cancelling in-flight message");
+                await drainCts.CancelAsync();
+            }
+        }
+
+        _logger.LogInformation("Outbox dispatcher stopped (instance {InstanceId})", _instanceId);
     }
 
     private async Task DispatchMessageAsync(
         OutboxMessage message,
         Dictionary<string, IMessageHandler> handlersByTopic,
         OutboxOptions options,
-        CancellationToken stoppingToken)
+        CancellationToken cancellationToken)
     {
         if (!handlersByTopic.TryGetValue(message.Topic, out var handler))
         {
             _logger.LogWarning("No handler for topic {Topic}, dead-lettering message {MessageId}",
                 message.Topic, message.Id);
-            await _store.MarkDeadLetteredAsync(message.Id, $"No handler for topic '{message.Topic}'", stoppingToken);
+            await _store.MarkDeadLetteredAsync(message.Id, $"No handler for topic '{message.Topic}'", cancellationToken);
             return;
         }
 
         try
         {
-            await handler.HandleAsync(message.Body, stoppingToken);
-            await _store.MarkCompletedAsync(message.Id, stoppingToken);
+            await handler.HandleAsync(message.Body, cancellationToken);
+            await _store.MarkCompletedAsync(message.Id, cancellationToken);
+            _metrics.OutboxMessageCompleted(message.Topic);
         }
         catch (Exception ex)
         {
@@ -108,13 +152,14 @@ internal sealed class OutboxDispatcher : BackgroundService
             if (message.RetryCount + 1 >= options.MaxRetries)
             {
                 _logger.LogError("Message {MessageId} exhausted retries, dead-lettering", message.Id);
-                await _store.MarkDeadLetteredAsync(message.Id, ex.Message, stoppingToken);
+                await _store.MarkDeadLetteredAsync(message.Id, ex.Message, cancellationToken);
+                _metrics.OutboxMessageDeadLettered(message.Topic);
             }
             else
             {
                 var delay = options.BaseRetryDelay * Math.Pow(2, message.RetryCount);
                 var nextRetry = DateTime.UtcNow.Add(delay);
-                await _store.MarkFailedAsync(message.Id, ex.Message, nextRetry, stoppingToken);
+                await _store.MarkFailedAsync(message.Id, ex.Message, nextRetry, cancellationToken);
             }
         }
     }

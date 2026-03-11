@@ -13,6 +13,20 @@ public sealed class AutomateOptions
 }
 
 /// <summary>
+/// Configuration options for the webhook endpoint.
+/// Bound to <c>Umbraco:Automate:Webhook</c> in appsettings.json.
+/// </summary>
+public sealed class WebhookOptions
+{
+    /// <summary>
+    /// Gets or sets the maximum allowed webhook payload size in bytes.
+    /// Requests exceeding this limit are rejected with <c>413 Payload Too Large</c>.
+    /// Default: 1 MB.
+    /// </summary>
+    public long MaxPayloadBytes { get; set; } = 1_048_576;
+}
+
+/// <summary>
 /// Configuration options for automation execution.
 /// Bound to <c>Umbraco:Automate:Execution</c> in appsettings.json.
 /// </summary>

@@ -13,6 +13,8 @@ internal sealed class OutboxMessageEntity
 
     public required string Body { get; set; }
 
+    public string? IdempotencyKey { get; set; }
+
     public DateTime CreatedUtc { get; set; }
 
     public int Status { get; set; }
@@ -32,6 +34,7 @@ internal sealed class OutboxMessageEntity
         Id = Id,
         Topic = Topic,
         Body = Body,
+        IdempotencyKey = IdempotencyKey,
         CreatedUtc = CreatedUtc,
         Status = (MessageStatus)Status,
         RetryCount = RetryCount,

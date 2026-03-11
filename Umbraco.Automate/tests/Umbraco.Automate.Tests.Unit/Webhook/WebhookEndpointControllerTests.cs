@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
@@ -34,6 +36,7 @@ public class WebhookEndpointControllerTests
             _automationService.Object,
             _dispatcher.Object,
             triggers,
+            Options.Create(new WebhookOptions()),
             Mock.Of<ILogger<WebhookEndpointController>>());
 
         _controller.ControllerContext = new ControllerContext

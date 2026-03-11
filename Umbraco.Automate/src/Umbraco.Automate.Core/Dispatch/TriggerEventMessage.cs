@@ -29,4 +29,9 @@ internal sealed class TriggerEventMessage
     /// Gets or sets the assembly-qualified type name of the output data.
     /// </summary>
     public string? OutputTypeName { get; set; }
+
+    /// <summary>
+    /// Gets or sets an optional idempotency key for duplicate prevention.
+    /// </summary>
+    public string? IdempotencyKey { get; set; }
 }

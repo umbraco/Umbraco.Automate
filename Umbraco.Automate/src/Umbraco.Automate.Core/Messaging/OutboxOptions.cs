@@ -32,4 +32,17 @@ public sealed class OutboxOptions
     /// How long to keep completed messages before cleanup removes them.
     /// </summary>
     public TimeSpan CompletedRetention { get; set; } = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Grace period during shutdown: the dispatcher stops claiming new messages
+    /// but waits up to this duration for any in-flight message to finish processing.
+    /// </summary>
+    public TimeSpan DrainTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Maximum number of pending messages allowed in the outbox.
+    /// When the limit is reached, new publish calls are rejected with <see cref="OutboxBackpressureException"/>.
+    /// Set to 0 to disable the limit.
+    /// </summary>
+    public int MaxPendingMessages { get; set; } = 10_000;
 }

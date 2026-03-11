@@ -53,6 +53,10 @@ public static partial class UmbracoBuilderExtensions
         // Run pending EF Core migrations on startup.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();
 
+        // Recover runs stuck in Running/Pending from the previous process.
+        // Registered after migrations so the schema is up-to-date.
+        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, StuckRunRecoveryNotificationHandler>();
+
         return builder;
     }
 

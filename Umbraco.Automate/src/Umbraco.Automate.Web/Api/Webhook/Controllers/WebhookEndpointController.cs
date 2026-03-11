@@ -1,12 +1,16 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
+using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.Filters;
 
@@ -30,6 +34,7 @@ public sealed class WebhookEndpointController : ControllerBase
     private readonly IAutomationService _automationService;
     private readonly ITriggerDispatcher _dispatcher;
     private readonly TriggerCollection _triggers;
+    private readonly IOptions<WebhookOptions> _webhookOptions;
     private readonly ILogger<WebhookEndpointController> _logger;
 
     /// <inheritdoc cref="WebhookEndpointController"/>
@@ -37,11 +42,13 @@ public sealed class WebhookEndpointController : ControllerBase
         IAutomationService automationService,
         ITriggerDispatcher dispatcher,
         TriggerCollection triggers,
+        IOptions<WebhookOptions> webhookOptions,
         ILogger<WebhookEndpointController> logger)
     {
         _automationService = automationService;
         _dispatcher = dispatcher;
         _triggers = triggers;
+        _webhookOptions = webhookOptions;
         _logger = logger;
     }
 
@@ -59,6 +66,8 @@ public sealed class WebhookEndpointController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status405MethodNotAllowed)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> ReceiveWebhook(
         Guid automationId,
         CancellationToken cancellationToken)
@@ -112,12 +121,59 @@ public sealed class WebhookEndpointController : ControllerBase
             });
         }
 
-        // Read the request body.
+        // Validate payload size before reading into memory.
+        var maxPayloadBytes = _webhookOptions.Value.MaxPayloadBytes;
+        if (Request.ContentLength > maxPayloadBytes)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge, new ProblemDetails
+            {
+                Title = "Payload too large",
+                Detail = $"Maximum webhook payload size is {maxPayloadBytes} bytes.",
+                Status = StatusCodes.Status413PayloadTooLarge,
+            });
+        }
+
+        // Read the request body with size-limited stream.
         string? body = null;
         if (Request.ContentLength is > 0)
         {
+            Request.Body = new LimitedStream(Request.Body, maxPayloadBytes);
             using var reader = new StreamReader(Request.Body);
-            body = await reader.ReadToEndAsync(cancellationToken);
+
+            try
+            {
+                body = await reader.ReadToEndAsync(cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+                return StatusCode(StatusCodes.Status413PayloadTooLarge, new ProblemDetails
+                {
+                    Title = "Payload too large",
+                    Detail = $"Maximum webhook payload size is {maxPayloadBytes} bytes.",
+                    Status = StatusCodes.Status413PayloadTooLarge,
+                });
+            }
+
+            // Validate JSON structure when content type declares JSON.
+            var contentType = Request.ContentType;
+            if (contentType is not null
+                && contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(body))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(body);
+                }
+                catch (JsonException)
+                {
+                    return UnprocessableEntity(new ProblemDetails
+                    {
+                        Title = "Invalid JSON",
+                        Detail = "The request body is not valid JSON.",
+                        Status = StatusCodes.Status422UnprocessableEntity,
+                    });
+                }
+            }
         }
 
         var output = new WebhookTriggerOutput

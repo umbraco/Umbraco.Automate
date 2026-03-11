@@ -2,6 +2,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
@@ -36,6 +37,10 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:Outbox"));
         builder.Services.Configure<VersionCleanupPolicy>(
             builder.Config.GetSection("Umbraco:Automate:VersionCleanup"));
+        builder.Services.Configure<RunCleanupPolicy>(
+            builder.Config.GetSection("Umbraco:Automate:RunCleanup"));
+        builder.Services.Configure<WebhookOptions>(
+            builder.Config.GetSection("Umbraco:Automate:Webhook"));
 
         // Collection builders — triggers, actions, filters auto-discovered
         builder.AutomateTriggers();
@@ -64,6 +69,10 @@ public static partial class UmbracoBuilderExtensions
         // Versioning
         builder.Services.AddSingleton<IEntityVersionService, EntityVersionService>();
         builder.Services.AddHostedService<VersionCleanupBackgroundJob>();
+        builder.Services.AddHostedService<RunCleanupBackgroundJob>();
+
+        // Diagnostics / metrics
+        builder.Services.AddSingleton<AutomateMetrics>();
 
         // Core services
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
@@ -71,12 +80,17 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<ExpressionEvaluator>();
 
-        // HTTP client for HttpRequestAction
-        builder.Services.AddHttpClient("UmbracoAutomate");
+        // HTTP client for HttpRequestAction — with SSRF protection
+        builder.Services.AddHttpClient("UmbracoAutomate")
+            .ConfigurePrimaryHttpMessageHandler(_ => SsrfProtectionHandler.Create());
 
         // Outbox messaging — IOutbox + IOutboxStore registered by Persistence layer
         builder.Services.AddSingleton<IOutbox, DatabaseOutbox>();
         builder.Services.AddHostedService<OutboxDispatcher>();
+
+        // Health checks
+        builder.Services.AddHealthChecks()
+            .AddCheck<OutboxHealthCheck>("umbraco-automate-outbox", tags: ["automate"]);
 
         // Trigger dispatch via outbox
         builder.Services.AddSingleton<ITriggerDispatcher, OutboxTriggerDispatcher>();

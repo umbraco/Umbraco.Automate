@@ -108,6 +108,10 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.Property<string>("Error")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("NextRetryUtc")
                         .HasColumnType("TEXT");
 
@@ -127,6 +131,8 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Status", "CreatedUtc");
+
+                    b.HasIndex("Topic", "IdempotencyKey");
 
                     b.HasIndex("Topic", "Status", "NextRetryUtc");
 
@@ -233,6 +239,47 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.HasIndex("RunId", "StepId");
 
                     b.ToTable("umbracoAutomateStepRun", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Versioning.EntityVersionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChangeDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Snapshot")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntityId", "EntityType");
+
+                    b.HasIndex("EntityId", "EntityType", "Version")
+                        .IsUnique();
+
+                    b.ToTable("umbracoAutomateEntityVersion", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.EventEntity", b =>

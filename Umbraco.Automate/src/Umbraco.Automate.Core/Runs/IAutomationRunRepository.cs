@@ -33,4 +33,18 @@ internal interface IAutomationRunRepository
     /// Deletes all runs for an automation (cascade deletes step runs).
     /// </summary>
     Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes all completed runs older than the specified threshold (cascade deletes step runs).
+    /// Running or pending runs are never deleted.
+    /// </summary>
+    /// <returns>The number of runs deleted.</returns>
+    Task<int> DeleteRunsOlderThanAsync(DateTime threshold, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes excess completed runs per automation, keeping only the most recent N runs.
+    /// Running or pending runs are never deleted.
+    /// </summary>
+    /// <returns>The number of runs deleted.</returns>
+    Task<int> DeleteExcessRunsAsync(int maxRunsPerAutomation, CancellationToken cancellationToken = default);
 }

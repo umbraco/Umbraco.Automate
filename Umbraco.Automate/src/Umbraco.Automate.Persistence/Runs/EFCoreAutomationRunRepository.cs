@@ -152,4 +152,83 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         scope.Complete();
         return count;
     }
+
+    private static readonly int[] TerminalStatuses =
+    [
+        (int)AutomationRunStatus.Completed,
+        (int)AutomationRunStatus.Failed,
+        (int)AutomationRunStatus.Cancelled,
+    ];
+
+    public async Task<int> DeleteRunsOlderThanAsync(DateTime threshold, CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var deleted = await scope.ExecuteWithContextAsync(async db =>
+        {
+            // Only delete terminal runs — never delete running/pending/suspended.
+            var runIds = await db.AutomationRuns
+                .Where(r => r.StartedUtc < threshold && TerminalStatuses.Contains(r.Status))
+                .Select(r => r.Id)
+                .ToListAsync(cancellationToken);
+
+            if (runIds.Count == 0)
+            {
+                return 0;
+            }
+
+            await db.StepRuns
+                .Where(s => runIds.Contains(s.RunId))
+                .ExecuteDeleteAsync(cancellationToken);
+
+            return await db.AutomationRuns
+                .Where(r => runIds.Contains(r.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        });
+
+        scope.Complete();
+        return deleted;
+    }
+
+    public async Task<int> DeleteExcessRunsAsync(int maxRunsPerAutomation, CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var totalDeleted = await scope.ExecuteWithContextAsync(async db =>
+        {
+            var groups = await db.AutomationRuns
+                .Where(r => TerminalStatuses.Contains(r.Status))
+                .GroupBy(r => r.AutomationId)
+                .Where(g => g.Count() > maxRunsPerAutomation)
+                .Select(g => new { AutomationId = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken);
+
+            var deleted = 0;
+            foreach (var group in groups)
+            {
+                var runIdsToDelete = await db.AutomationRuns
+                    .Where(r => r.AutomationId == group.AutomationId && TerminalStatuses.Contains(r.Status))
+                    .OrderByDescending(r => r.StartedUtc)
+                    .Skip(maxRunsPerAutomation)
+                    .Select(r => r.Id)
+                    .ToListAsync(cancellationToken);
+
+                if (runIdsToDelete.Count > 0)
+                {
+                    await db.StepRuns
+                        .Where(s => runIdsToDelete.Contains(s.RunId))
+                        .ExecuteDeleteAsync(cancellationToken);
+
+                    deleted += await db.AutomationRuns
+                        .Where(r => runIdsToDelete.Contains(r.Id))
+                        .ExecuteDeleteAsync(cancellationToken);
+                }
+            }
+
+            return deleted;
+        });
+
+        scope.Complete();
+        return totalDeleted;
+    }
 }
