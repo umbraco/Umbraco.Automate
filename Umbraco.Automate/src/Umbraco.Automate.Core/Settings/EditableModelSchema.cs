@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Umbraco.Automate.Core.Settings;
 
@@ -22,6 +23,7 @@ public sealed class EditableModelFieldDescriptor
     /// <summary>
     /// Gets the property name on the settings POCO.
     /// </summary>
+    [JsonIgnore]
     public required string PropertyName { get; init; }
 
     /// <summary>
@@ -32,6 +34,7 @@ public sealed class EditableModelFieldDescriptor
     /// <summary>
     /// Gets the CLR type of the property.
     /// </summary>
+    [JsonIgnore]
     public required Type PropertyType { get; init; }
 
     /// <summary>
@@ -67,5 +70,6 @@ public sealed class EditableModelFieldDescriptor
     /// <summary>
     /// Gets the validation rules inferred from data annotation attributes on the property.
     /// </summary>
+    [JsonIgnore]
     public IEnumerable<ValidationAttribute> ValidationRules { get; init; } = [];
 }

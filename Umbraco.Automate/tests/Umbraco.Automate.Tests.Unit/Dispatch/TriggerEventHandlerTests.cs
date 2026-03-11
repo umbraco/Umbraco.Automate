@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Tests.Common.Builders;
 using Umbraco.Cms.Core.Sync;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
@@ -79,8 +80,9 @@ public class TriggerEventHandlerTests
     [Fact]
     public async Task HandleAsync_DisabledAutomation_DoesNotExecute()
     {
-        var automation = CreatePublishedAutomation("myTrigger");
-        automation.IsEnabled = false;
+        Automation automation = new AutomationBuilder()
+            .WithTrigger("myTrigger")
+            .WithIsEnabled(false);
 
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
@@ -104,8 +106,9 @@ public class TriggerEventHandlerTests
     [Fact]
     public async Task HandleAsync_DraftAutomation_DoesNotExecute()
     {
-        var automation = CreatePublishedAutomation("myTrigger");
-        automation.Status = AutomationStatus.Draft;
+        Automation automation = new AutomationBuilder()
+            .WithTrigger("myTrigger")
+            .AsDraft();
 
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
@@ -231,13 +234,8 @@ public class TriggerEventHandlerTests
     private static string SerializeMessage(TriggerEventMessage message)
         => JsonSerializer.Serialize(message, JsonOptions.Default);
 
-    private static Automation CreatePublishedAutomation(string triggerAlias) => new()
-    {
-        Id = Guid.NewGuid(),
-        Alias = "test-automation",
-        Name = "Test Automation",
-        Status = AutomationStatus.Published,
-        IsEnabled = true,
-        Trigger = new TriggerConfiguration { TriggerAlias = triggerAlias },
-    };
+    private static Automation CreatePublishedAutomation(string triggerAlias) =>
+        new AutomationBuilder()
+            .WithTrigger(triggerAlias)
+            .Build();
 }

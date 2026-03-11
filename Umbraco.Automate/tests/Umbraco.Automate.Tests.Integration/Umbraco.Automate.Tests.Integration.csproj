@@ -21,7 +21,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="WorkflowCore" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
+    <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence\Umbraco.Automate.Persistence.csproj" />
     <ProjectReference Include="..\Umbraco.Automate.Tests.Common\Umbraco.Automate.Tests.Common.csproj" />
   </ItemGroup>
 

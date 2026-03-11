@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Tests.Common.Builders;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
 
@@ -42,14 +43,11 @@ public class AutomationServiceTests
     public async Task PublishAutomationAsync_SetsPublishedVersionAndStatus()
     {
         var id = Guid.NewGuid();
-        var automation = new Automation
-        {
-            Id = id,
-            Alias = "test",
-            Name = "Test",
-            DraftVersion = 3,
-            Status = AutomationStatus.Draft,
-        };
+        var automation = new AutomationBuilder()
+            .WithId(id)
+            .AsDraft()
+            .WithVersion(3)
+            .Build();
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
@@ -67,14 +65,7 @@ public class AutomationServiceTests
     public async Task UnpublishAutomationAsync_SetsInactiveAndDisabled()
     {
         var id = Guid.NewGuid();
-        var automation = new Automation
-        {
-            Id = id,
-            Alias = "test",
-            Name = "Test",
-            Status = AutomationStatus.Published,
-            IsEnabled = true,
-        };
+        Automation automation = new AutomationBuilder().WithId(id);
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
@@ -110,7 +101,7 @@ public class AutomationServiceTests
     [Fact]
     public async Task CreateAutomationAsync_AssignsIdWhenEmpty()
     {
-        var automation = new Automation { Alias = "test", Name = "Test" };
+        Automation automation = new AutomationBuilder().AsDraft();
 
         _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
@@ -135,7 +126,7 @@ public class AutomationServiceTests
     public async Task DeleteAutomationAsync_Found_DeletesRunsAndAutomation()
     {
         var id = Guid.NewGuid();
-        var automation = new Automation { Id = id, Alias = "test", Name = "Test" };
+        Automation automation = new AutomationBuilder().WithId(id);
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
@@ -153,13 +144,7 @@ public class AutomationServiceTests
     public async Task PublishAutomationAsync_CancelledByNotification_Throws()
     {
         var id = Guid.NewGuid();
-        var automation = new Automation
-        {
-            Id = id,
-            Alias = "test",
-            Name = "Test",
-            Status = AutomationStatus.Draft,
-        };
+        Automation automation = new AutomationBuilder().WithId(id).AsDraft();
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);

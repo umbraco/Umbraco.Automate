@@ -5,8 +5,8 @@ using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
-using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Tests.Common.Builders;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -91,19 +91,15 @@ public class AutomationExecutorTests
     [Fact]
     public async Task ExecuteAsync_MultipleSteps_WiresSequentialOutcomes()
     {
-        var stepA = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step A" };
-        var stepB = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step B" };
-        var stepC = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step C" };
+        StepConfiguration stepA = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration stepB = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step B");
+        StepConfiguration stepC = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step C");
 
-        var automation = new Automation
-        {
-            Id = Guid.NewGuid(),
-            Alias = "test",
-            Name = "Test",
-            Version = 1,
-            Steps = [stepA, stepB, stepC],
-            Connections = [],
-        };
+        var automation = new AutomationBuilder()
+            .AddStep(stepA)
+            .AddStep(stepB)
+            .AddStep(stepC)
+            .Build();
 
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
@@ -125,23 +121,17 @@ public class AutomationExecutorTests
     public async Task ExecuteAsync_WithConnections_UsesTopologicalOrder()
     {
         // Define steps in reverse order, but connections dictate A → B → C
-        var stepA = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step A" };
-        var stepB = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step B" };
-        var stepC = new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = "testAction", Name = "Step C" };
+        StepConfiguration stepA = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration stepB = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step B");
+        StepConfiguration stepC = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step C");
 
-        var automation = new Automation
-        {
-            Id = Guid.NewGuid(),
-            Alias = "test",
-            Name = "Test",
-            Version = 1,
-            Steps = [stepC, stepB, stepA], // Deliberately reversed
-            Connections =
-            [
-                new StepConnection { SourceStepId = stepA.Id, TargetStepId = stepB.Id },
-                new StepConnection { SourceStepId = stepB.Id, TargetStepId = stepC.Id },
-            ],
-        };
+        var automation = new AutomationBuilder()
+            .AddStep(stepC)  // Deliberately reversed
+            .AddStep(stepB)
+            .AddStep(stepA)
+            .WithConnection(stepA.Id, stepB.Id)
+            .WithConnection(stepB.Id, stepC.Id)
+            .Build();
 
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
@@ -189,18 +179,10 @@ public class AutomationExecutorTests
         _workflowRegistry.Verify(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()), Times.Never);
     }
 
-    private static Automation CreateAutomation(string actionAlias) => new()
-    {
-        Id = Guid.NewGuid(),
-        Alias = "test",
-        Name = "Test",
-        Version = 1,
-        Steps =
-        [
-            new StepConfiguration { Id = Guid.NewGuid(), ActionAlias = actionAlias, Name = "Step 1" },
-        ],
-        Connections = [],
-    };
+    private static Automation CreateAutomation(string actionAlias) =>
+        new AutomationBuilder()
+            .AddStep(new StepConfigurationBuilder().WithActionAlias(actionAlias).WithName("Step 1"))
+            .Build();
 
     private static ActionCollection CreateActionCollection(params IAction[] actions)
     {

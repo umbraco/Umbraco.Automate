@@ -61,6 +61,9 @@ public static partial class UmbracoBuilderExtensions
                 });
 
             options.OperationFilter<UmbracoAutomateManagementApiBackOfficeSecurityRequirementsOperationFilter>(Constants.ManagementApi.ApiName);
+
+            // Map System.Type to string in OpenAPI schema (JsonStringTypeConverter handles serialization)
+            options.MapType<Type>(() => new OpenApiSchema { Type = JsonSchemaType.String });
         });
 
         builder.Services.AddSingleton<IOperationIdHandler, UmbracoAutomateApiOperationIdHandler>();
@@ -106,6 +109,7 @@ public static partial class UmbracoBuilderExtensions
                 };
 
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                options.JsonSerializerOptions.Converters.Add(new JsonStringTypeConverter());
                 options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
                 options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeJsonConverter());
             });

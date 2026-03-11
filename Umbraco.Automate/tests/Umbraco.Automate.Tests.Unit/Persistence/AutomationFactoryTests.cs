@@ -5,6 +5,7 @@ using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Persistence.Automations;
+using Umbraco.Automate.Tests.Common.Builders;
 
 namespace Umbraco.Automate.Tests.Unit.Persistence;
 
@@ -46,47 +47,29 @@ public class AutomationFactoryTests
     {
         var factory = CreatePassthroughFactory();
 
-        var automation = new Automation
-        {
-            Id = Guid.NewGuid(),
-            Alias = "testAutomation",
-            Name = "Test Automation",
-            Description = "A test",
-            IsEnabled = true,
-            Status = AutomationStatus.Published,
-            PublishedVersion = 2,
-            DraftVersion = 3,
-            Version = 5,
-            DateCreated = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            DateModified = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
-            CreatedByUserId = Guid.NewGuid(),
-            ModifiedByUserId = Guid.NewGuid(),
-            Trigger = new TriggerConfiguration
-            {
-                TriggerAlias = "umbracoAutomate.contentPublished",
-                Settings = new Dictionary<string, object?> { ["contentTypeAlias"] = "blogPost" },
-            },
-            Steps =
-            [
-                new StepConfiguration
-                {
-                    Id = Guid.NewGuid(),
-                    ActionAlias = "umbracoAutomate.logMessage",
-                    Name = "Log it",
-                    Settings = new Dictionary<string, object?> { ["message"] = "hello" },
-                },
-            ],
-            Connections =
-            [
-                new StepConnection
-                {
-                    SourceStepId = Guid.NewGuid(),
-                    TargetStepId = Guid.NewGuid(),
-                    Outcome = "true",
-                },
-            ],
-            CanvasState = "{\"zoom\":1}",
-        };
+        var stepId = Guid.NewGuid();
+        var sourceStepId = Guid.NewGuid();
+        var targetStepId = Guid.NewGuid();
+
+        var automation = new AutomationBuilder()
+            .WithAlias("testAutomation")
+            .WithName("Test Automation")
+            .WithDescription("A test")
+            .WithVersion(5)
+            .WithPublishedVersion(2)
+            .WithDraftVersion(3)
+            .WithDateCreated(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc))
+            .WithDateModified(new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc))
+            .WithCreatedByUserId(Guid.NewGuid())
+            .WithModifiedByUserId(Guid.NewGuid())
+            .WithTrigger("umbracoAutomate.contentPublished", new Dictionary<string, object?> { ["contentTypeAlias"] = "blogPost" })
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.logMessage")
+                .WithName("Log it")
+                .WithSetting("message", "hello"))
+            .WithConnection(sourceStepId, targetStepId, "true")
+            .WithCanvasState("{\"zoom\":1}")
+            .Build();
 
         AutomationEntity entity = factory.BuildEntity(automation);
         Automation roundTripped = factory.BuildDomain(entity);
@@ -146,14 +129,11 @@ public class AutomationFactoryTests
             CreatedByUserId = originalCreatedBy,
         };
 
-        var updated = new Automation
-        {
-            Alias = "updated",
-            Name = "Updated",
-            Version = 2,
-            DateModified = DateTime.UtcNow,
-            ModifiedByUserId = Guid.NewGuid(),
-        };
+        Automation updated = new AutomationBuilder()
+            .WithAlias("updated")
+            .WithName("Updated")
+            .WithVersion(2)
+            .WithModifiedByUserId(Guid.NewGuid());
 
         factory.UpdateEntity(entity, updated);
 
