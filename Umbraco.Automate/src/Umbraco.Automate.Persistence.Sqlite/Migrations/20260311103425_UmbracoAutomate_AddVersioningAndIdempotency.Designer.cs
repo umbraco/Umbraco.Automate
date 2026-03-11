@@ -47,9 +47,6 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("DraftVersion")
-                        .HasColumnType("INTEGER");
-
                     b.Property<Guid?>("GroupId")
                         .HasColumnType("TEXT");
 

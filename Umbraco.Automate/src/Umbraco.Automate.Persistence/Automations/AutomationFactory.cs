@@ -49,7 +49,6 @@ internal sealed class AutomationFactory
             IsEnabled = entity.IsEnabled,
             Status = (AutomationStatus)entity.Status,
             PublishedVersion = entity.PublishedVersion,
-            DraftVersion = entity.DraftVersion,
             GroupId = entity.GroupId,
             Trigger = definition?.Trigger,
             Steps = definition?.Steps ?? [],
@@ -74,7 +73,6 @@ internal sealed class AutomationFactory
             IsEnabled = automation.IsEnabled,
             Status = (int)automation.Status,
             PublishedVersion = automation.PublishedVersion,
-            DraftVersion = automation.DraftVersion,
             GroupId = automation.GroupId,
             Definition = SerializeDefinition(automation),
             Version = automation.Version,
@@ -93,7 +91,6 @@ internal sealed class AutomationFactory
         entity.IsEnabled = automation.IsEnabled;
         entity.Status = (int)automation.Status;
         entity.PublishedVersion = automation.PublishedVersion;
-        entity.DraftVersion = automation.DraftVersion;
         entity.GroupId = automation.GroupId;
         entity.Definition = SerializeDefinition(automation);
         entity.Version = automation.Version;

@@ -22,7 +22,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     IsEnabled = table.Column<bool>(type: "bit", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     PublishedVersion = table.Column<int>(type: "int", nullable: true),
-                    DraftVersion = table.Column<int>(type: "int", nullable: false),
                     GroupId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     Definition = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Version = table.Column<int>(type: "int", nullable: false, defaultValue: 1),

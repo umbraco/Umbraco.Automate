@@ -54,7 +54,6 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(2000);
             entity.Property(e => e.IsEnabled).IsRequired();
             entity.Property(e => e.Status).IsRequired();
-            entity.Property(e => e.DraftVersion).IsRequired();
             entity.Property(e => e.Definition);
             entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
             entity.Property(e => e.DateCreated).IsRequired();
