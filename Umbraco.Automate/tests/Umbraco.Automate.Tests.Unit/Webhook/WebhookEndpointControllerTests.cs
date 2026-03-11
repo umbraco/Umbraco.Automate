@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
+using Umbraco.Automate.Tests.Common.Builders;
 using Umbraco.Automate.Web.Api.Webhook.Controllers;
 
 namespace Umbraco.Automate.Tests.Unit.Webhook;
@@ -23,11 +23,9 @@ public class WebhookEndpointControllerTests
     public WebhookEndpointControllerTests()
     {
         var configuration = new ConfigurationBuilder().Build();
-        var actions = new ActionCollection(Array.Empty<IAction>);
-        TriggerCollection? triggers = null;
-        triggers = new TriggerCollection(() =>
+        var modelResolver = new EditableModelResolver(configuration);
+        var triggers = new TriggerCollection(() =>
         {
-            var modelResolver = new EditableModelResolver(actions, triggers!, configuration);
             var deps = new TriggerInfrastructure(modelResolver);
             return new ITrigger[] { new WebhookTrigger(deps) };
         });
@@ -208,24 +206,19 @@ public class WebhookEndpointControllerTests
         string triggerAlias = "umbracoAutomate.webhook",
         string? secret = null)
     {
-        var settings = new Dictionary<string, object?>();
-        if (secret is not null)
+        var builder = new AutomationBuilder()
+            .WithStatus(status)
+            .WithIsEnabled(isEnabled);
+
+        if (triggerAlias == "umbracoAutomate.webhook")
         {
-            settings["secret"] = secret;
+            builder.WithWebhookTrigger(secret);
+        }
+        else
+        {
+            builder.WithTrigger(triggerAlias);
         }
 
-        return new Automation
-        {
-            Id = Guid.NewGuid(),
-            Alias = "test-automation",
-            Name = "Test Automation",
-            Status = status,
-            IsEnabled = isEnabled,
-            Trigger = new TriggerConfiguration
-            {
-                TriggerAlias = triggerAlias,
-                Settings = settings,
-            },
-        };
+        return builder.Build();
     }
 }

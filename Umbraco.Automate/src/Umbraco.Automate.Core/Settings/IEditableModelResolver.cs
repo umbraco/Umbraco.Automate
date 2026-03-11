@@ -14,8 +14,9 @@ public interface IEditableModelResolver
     /// <typeparam name="TModel">The type of model to resolve to.</typeparam>
     /// <param name="modelId">The model ID for validation context (action alias or trigger alias).</param>
     /// <param name="data">The data object to resolve (can be JsonElement, typed object, or null).</param>
+    /// <param name="schema">Optional schema for validation. When null, validation is skipped.</param>
     /// <returns>Typed model instance, or null if data parameter was null.</returns>
-    TModel? ResolveModel<TModel>(string modelId, object? data)
+    TModel? ResolveModel<TModel>(string modelId, object? data, EditableModelSchema? schema = null)
         where TModel : class, new();
 
     /// <summary>
@@ -25,6 +26,7 @@ public interface IEditableModelResolver
     /// <param name="modelId">The model ID for validation context (action alias or trigger alias).</param>
     /// <param name="modelType">The target type to deserialize to.</param>
     /// <param name="data">The data object to resolve (can be JsonElement, typed object, or null).</param>
+    /// <param name="schema">Optional schema for validation. When null, validation is skipped.</param>
     /// <returns>Typed model instance, or null if data parameter was null.</returns>
-    object? ResolveModel(string modelId, Type modelType, object? data);
+    object? ResolveModel(string modelId, Type modelType, object? data, EditableModelSchema? schema = null);
 }

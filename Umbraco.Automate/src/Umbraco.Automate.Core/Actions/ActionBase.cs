@@ -61,7 +61,7 @@ public abstract class ActionBase<TSettings> : IAction
     /// <param name="settings">The raw settings dictionary from the step configuration.</param>
     /// <returns>The resolved settings, or null if settings are empty or the action has no settings type.</returns>
     public TSettings? ResolveSettings(Dictionary<string, object?> settings)
-        => _infrastructure.ModelResolver.ResolveModel<TSettings>(Alias, settings);
+        => _infrastructure.ModelResolver.ResolveModel<TSettings>(Alias, settings, GetSettingsSchema());
 
     /// <inheritdoc />
     object? IAction.ResolveSettings(Dictionary<string, object?> settings)

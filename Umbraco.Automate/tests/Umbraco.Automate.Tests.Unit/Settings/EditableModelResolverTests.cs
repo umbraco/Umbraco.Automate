@@ -1,16 +1,12 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
-using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Tests.Unit.Settings;
 
 public class EditableModelResolverTests
 {
     private readonly IConfiguration _configuration;
-    private readonly List<IAction> _actions = [];
-    private readonly List<ITrigger> _triggers = [];
 
     public EditableModelResolverTests()
     {
@@ -28,11 +24,7 @@ public class EditableModelResolverTests
     }
 
     private EditableModelResolver CreateResolver()
-    {
-        var actions = new ActionCollection(() => _actions);
-        var triggers = new TriggerCollection(() => _triggers);
-        return new EditableModelResolver(actions, triggers, _configuration);
-    }
+        => new(_configuration);
 
     #region ResolveModel<TModel> — Null handling
 

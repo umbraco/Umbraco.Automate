@@ -84,7 +84,7 @@ public abstract class TriggerBase<TSettings, TOutput> : ITrigger
     /// <param name="settings">The raw settings dictionary from the trigger configuration.</param>
     /// <returns>The resolved settings, or null if settings are empty or the trigger has no settings type.</returns>
     public TSettings? ResolveSettings(Dictionary<string, object?> settings)
-        => _infrastructure.ModelResolver.ResolveModel<TSettings>(Alias, settings);
+        => _infrastructure.ModelResolver.ResolveModel<TSettings>(Alias, settings, GetSettingsSchema());
 
     /// <inheritdoc />
     object? ITrigger.ResolveSettings(Dictionary<string, object?> settings)

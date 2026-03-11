@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
-using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Dispatch;
-using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Core.Settings;
 
@@ -16,27 +14,20 @@ internal sealed class EditableModelResolver : IEditableModelResolver
 {
     private const string ConfigPrefix = "$";
 
-    private readonly ActionCollection _actions;
-    private readonly TriggerCollection _triggers;
     private readonly IConfiguration _configuration;
 
-    public EditableModelResolver(
-        ActionCollection actions,
-        TriggerCollection triggers,
-        IConfiguration configuration)
+    public EditableModelResolver(IConfiguration configuration)
     {
-        _actions = actions;
-        _triggers = triggers;
         _configuration = configuration;
     }
 
     /// <inheritdoc />
-    public TModel? ResolveModel<TModel>(string modelId, object? data)
+    public TModel? ResolveModel<TModel>(string modelId, object? data, EditableModelSchema? schema = null)
         where TModel : class, new()
-        => (TModel?)ResolveModel(modelId, typeof(TModel), data);
+        => (TModel?)ResolveModel(modelId, typeof(TModel), data, schema);
 
     /// <inheritdoc />
-    public object? ResolveModel(string modelId, Type modelType, object? data)
+    public object? ResolveModel(string modelId, Type modelType, object? data, EditableModelSchema? schema = null)
     {
         if (data is null)
         {
@@ -51,7 +42,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             if (deserialized is not null)
             {
                 ResolveConfigurationVariablesInObject(deserialized);
-                ValidateModel(modelId, deserialized);
+                ValidateModel(modelId, deserialized, schema);
             }
 
             return deserialized;
@@ -64,7 +55,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             if (deserialized is not null)
             {
                 ResolveConfigurationVariablesInObject(deserialized);
-                ValidateModel(modelId, deserialized);
+                ValidateModel(modelId, deserialized, schema);
             }
 
             return deserialized;
@@ -78,7 +69,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             if (deserialized is not null)
             {
                 ResolveConfigurationVariablesInObject(deserialized);
-                ValidateModel(modelId, deserialized);
+                ValidateModel(modelId, deserialized, schema);
             }
 
             return deserialized;
@@ -182,9 +173,8 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         return value;
     }
 
-    private void ValidateModel(string modelId, object model)
+    private static void ValidateModel(string modelId, object model, EditableModelSchema? schema)
     {
-        var schema = GetSettingsSchema(modelId);
         if (schema is null)
         {
             return;
@@ -230,18 +220,5 @@ internal sealed class EditableModelResolver : IEditableModelResolver
                                string.Join("\n", validationErrors);
             throw new InvalidOperationException(errorMessage);
         }
-    }
-
-    private EditableModelSchema? GetSettingsSchema(string modelId)
-    {
-        // Try actions first, then triggers.
-        var action = _actions.FirstOrDefault(a => a.Alias == modelId);
-        if (action is not null)
-        {
-            return action.GetSettingsSchema();
-        }
-
-        var trigger = _triggers.FirstOrDefault(t => t.Alias == modelId);
-        return trigger?.GetSettingsSchema();
     }
 }
