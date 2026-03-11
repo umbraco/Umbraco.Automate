@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Diagnostics;
+using Umbraco.Automate.Core.Persistence;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Services;
 
@@ -88,6 +89,20 @@ internal sealed class OutboxDispatcher : BackgroundService
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
+            }
+            catch (Exception ex) when (DatabaseExceptions.IsMissingTable(ex))
+            {
+                _logger.LogDebug("Outbox table not yet created, waiting for migrations to complete");
+                _activeDispatch = null;
+
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
             }
             catch (Exception ex)
             {

@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 
@@ -26,5 +25,5 @@ public sealed class ActionItemResponseModel
     public string? Icon { get; set; }
 
     /// <summary>The settings schema, or null if no settings.</summary>
-    public EditableModelSchema? SettingsSchema { get; set; }
+    public EditableModelSchemaResponseModel? SettingsSchema { get; set; }
 }

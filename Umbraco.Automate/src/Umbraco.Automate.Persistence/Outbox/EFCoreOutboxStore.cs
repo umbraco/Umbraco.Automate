@@ -28,7 +28,7 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
     public async Task InsertAsync(OutboxMessage message, CancellationToken cancellationToken)
     {
         using var scope = _scopeProvider.CreateScope();
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             // Idempotency: if a message with the same topic + key already exists, skip.
             if (!string.IsNullOrEmpty(message.IdempotencyKey))
@@ -66,7 +66,7 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
         using var scope = _scopeProvider.CreateScope();
         var staleThreshold = DateTime.UtcNow - _options.Value.StaleClaimThreshold;
 
-        var result = await scope.ExecuteWithContextAsync<OutboxMessage?>(async db =>
+        OutboxMessage? result = await scope.ExecuteWithContextAsync(async db =>
         {
             // Find the oldest message that is either:
             // - Pending (new message)
@@ -117,7 +117,7 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
     public async Task MarkCompletedAsync(long messageId, CancellationToken cancellationToken)
     {
         using var scope = _scopeProvider.CreateScope();
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.OutboxMessages.FindAsync([messageId], cancellationToken);
             if (entity is not null)
@@ -132,7 +132,7 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
     public async Task MarkFailedAsync(long messageId, string error, DateTime? nextRetryUtc, CancellationToken cancellationToken)
     {
         using var scope = _scopeProvider.CreateScope();
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.OutboxMessages.FindAsync([messageId], cancellationToken);
             if (entity is not null)
@@ -152,7 +152,7 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
     public async Task MarkDeadLetteredAsync(long messageId, string error, CancellationToken cancellationToken)
     {
         using var scope = _scopeProvider.CreateScope();
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.OutboxMessages.FindAsync([messageId], cancellationToken);
             if (entity is not null)
@@ -171,7 +171,7 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
     {
         using var scope = _scopeProvider.CreateScope();
         var threshold = DateTime.UtcNow - olderThan;
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             await db.OutboxMessages
                 .Where(m => m.Status == (int)MessageStatus.Completed && m.CreatedUtc < threshold)

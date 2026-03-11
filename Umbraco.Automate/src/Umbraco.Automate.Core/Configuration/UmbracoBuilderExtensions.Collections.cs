@@ -42,9 +42,12 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.Configure<WebhookOptions>(
             builder.Config.GetSection("Umbraco:Automate:Webhook"));
 
-        // Collection builders — triggers, actions, filters auto-discovered
-        builder.AutomateTriggers();
-        builder.AutomateActions();
+        // Collection builders — triggers, actions, filters (auto-discovered via TypeLoader)
+        builder.AutomateTriggers()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<ITrigger, TriggerAttribute>(cache: true));
+
+        builder.AutomateActions()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAction, ActionAttribute>(cache: true));
         builder.AutomateExpressionFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>();

@@ -70,6 +70,13 @@ public static partial class UmbracoBuilderExtensions
         // GetUmbracoConnectionString resolves the |DataDirectory| placeholder.
         var connectionString = config.GetUmbracoConnectionString(ConnectionStringName, out var providerName);
 
+        // If a dedicated connection string is present but no explicit provider is configured,
+        // fall back to the primary Umbraco provider.
+        if (!string.IsNullOrEmpty(connectionString) && string.IsNullOrEmpty(providerName))
+        {
+            config.GetUmbracoConnectionString(out providerName);
+        }
+
         if (string.IsNullOrEmpty(connectionString))
         {
             connectionString = config.GetUmbracoConnectionString(out providerName);

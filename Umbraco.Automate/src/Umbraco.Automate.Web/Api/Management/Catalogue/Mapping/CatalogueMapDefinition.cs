@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -25,7 +27,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Description = source.Description;
         target.Group = source.Group;
         target.Icon = source.Icon;
-        target.SettingsSchema = source.GetSettingsSchema();
+        target.SettingsSchema = MapSchema(source.GetSettingsSchema());
     }
 
     // Umbraco.Code.MapAll
@@ -36,7 +38,37 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Description = source.Description;
         target.Group = source.Group;
         target.Icon = source.Icon;
-        target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputProperties = source.GetOutputProperties();
+        target.SettingsSchema = MapSchema(source.GetSettingsSchema());
+        target.OutputProperties = source.GetOutputProperties()
+            .Select(p => new TriggerOutputPropertyResponseModel
+            {
+                Name = p.Name,
+                Type = p.Type.Name,
+                Description = p.Description,
+            })
+            .ToList();
+    }
+
+    private static EditableModelSchemaResponseModel? MapSchema(EditableModelSchema? schema)
+    {
+        if (schema is null)
+            return null;
+
+        return new EditableModelSchemaResponseModel
+        {
+            Fields = schema.Fields.Select(f => new EditableModelFieldDescriptorResponseModel
+            {
+                PropertyName = f.PropertyName,
+                Label = f.Label,
+                PropertyType = f.PropertyType.Name,
+                Description = f.Description,
+                EditorUiAlias = f.EditorUiAlias,
+                EditorConfig = f.EditorConfig,
+                SortOrder = f.SortOrder,
+                IsSensitive = f.IsSensitive,
+                Group = f.Group,
+                IsRequired = f.ValidationRules.OfType<RequiredAttribute>().Any(),
+            }).ToList(),
+        };
     }
 }

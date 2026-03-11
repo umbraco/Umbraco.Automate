@@ -50,7 +50,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             db.WorkflowInstances.Add(ToEntity(workflow));
             await db.SaveChangesAsync(cancellationToken);
@@ -64,7 +64,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
             if (entity is not null)
@@ -81,7 +81,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
             if (entity is not null)
@@ -208,7 +208,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             db.EventSubscriptions.Add(ToEntity(subscription));
             await db.SaveChangesAsync(cancellationToken);
@@ -285,7 +285,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
             if (entity is not null)
@@ -326,7 +326,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
             if (entity is not null && entity.ExternalToken == token)
@@ -352,7 +352,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             db.Events.Add(ToEntity(newEvent));
             await db.SaveChangesAsync(cancellationToken);
@@ -414,7 +414,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.Events.FindAsync([id], cancellationToken);
             if (entity is not null)
@@ -431,7 +431,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var entity = await db.Events.FindAsync([id], cancellationToken);
             if (entity is not null)
@@ -452,7 +452,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             db.ScheduledCommands.Add(new ScheduledCommandEntity
             {
@@ -471,7 +471,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         using var scope = _scopeProvider.CreateScope();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
         {
             var asOfUtc = asOf.UtcDateTime;
             var due = await db.ScheduledCommands
