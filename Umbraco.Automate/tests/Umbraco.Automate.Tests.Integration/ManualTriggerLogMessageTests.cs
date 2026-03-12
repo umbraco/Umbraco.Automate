@@ -39,6 +39,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
     private TriggerEventHandler _handler = null!;
     private IAutomationRunRepository _runRepository = null!;
     private Automation _automation = null!;
+    private Workspace _workspace = null!;
 
     public async Task InitializeAsync()
     {
@@ -83,10 +84,11 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton<ActionMiddlewarePipeline>();
         services.AddSingleton<AutomateMetrics>();
 
-        // Workspace service — returns a valid workspace for any ID.
+        // Workspace service — returns a known workspace so we can verify execution context.
+        _workspace = new WorkspaceBuilder().WithName("Smoke Test Workspace").Build();
         var workspaceService = new Mock<IWorkspaceService>();
         workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Guid id, CancellationToken _) => new WorkspaceBuilder().WithId(id).Build());
+            .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
 
         // Execution.
