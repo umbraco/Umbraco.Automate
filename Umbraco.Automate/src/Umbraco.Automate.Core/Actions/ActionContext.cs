@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Execution;
+
 namespace Umbraco.Automate.Core.Actions;
 
 /// <summary>
@@ -47,4 +49,10 @@ public sealed class ActionContext
     /// Gets a cancellation token linked to the step timeout.
     /// </summary>
     public CancellationToken CancellationToken { get; init; }
+
+    /// <summary>
+    /// Gets the execution context carrying the service account identity and workspace info.
+    /// Available for CMS-modifying actions that need to execute as the workspace's service account.
+    /// </summary>
+    public AutomationExecutionContext? ExecutionContext { get; init; }
 }

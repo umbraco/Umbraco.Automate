@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Workspaces;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -23,6 +24,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly ExpressionEvaluator _expressionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
+    private readonly IWorkspaceService _workspaceService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AutomationExecutor> _logger;
 
@@ -33,6 +35,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         ActionMiddlewarePipeline pipeline,
         ExpressionEvaluator expressionEvaluator,
         IAutomationRunRepository runRepository,
+        IWorkspaceService workspaceService,
         IServiceProvider serviceProvider,
         ILogger<AutomationExecutor> logger)
     {
@@ -42,6 +45,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _pipeline = pipeline;
         _expressionEvaluator = expressionEvaluator;
         _runRepository = runRepository;
+        _workspaceService = workspaceService;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -53,6 +57,10 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         Dictionary<string, object?>? triggerOutputData,
         CancellationToken cancellationToken)
     {
+        // Resolve workspace and service account.
+        var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken)
+            ?? throw new InvalidOperationException($"Workspace '{automation.WorkspaceId}' not found for automation '{automation.Name}'.");
+
         // Create the automation run record.
         var run = new AutomationRun
         {
@@ -70,6 +78,21 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 
         await _runRepository.SaveAsync(run, cancellationToken);
 
+        // Set the execution context for the current async flow.
+        var executionContext = new AutomationExecutionContext
+        {
+            ServiceAccountKey = workspace.ServiceAccountKey,
+            WorkspaceId = workspace.Id,
+            WorkspaceName = workspace.Name,
+            AutomationId = automation.Id,
+            AutomationName = automation.Name,
+            RunId = run.Id,
+            InitiatorType = initiatorType,
+            InitiatorId = initiatorId,
+        };
+
+        using var _ = ExecutionContextAccessor.Set(executionContext);
+
         // Register the workflow definition if not already registered.
         var workflowId = $"automate-{automation.Id}-v{automation.Version}";
         var existing = _workflowRegistry.GetDefinition(workflowId);
@@ -86,13 +109,14 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             RunId = run.Id,
             AutomationId = automation.Id,
             TriggerOutput = triggerOutputData ?? [],
+            ExecutionContext = executionContext,
         };
 
         var instanceId = await _workflowHost.StartWorkflow(workflowId, workflowData);
 
         _logger.LogInformation(
-            "Started workflow {WorkflowId} (instance {InstanceId}) for run {RunId}",
-            workflowId, instanceId, run.Id);
+            "Started workflow {WorkflowId} (instance {InstanceId}) for run {RunId} as service account {ServiceAccountKey}",
+            workflowId, instanceId, run.Id, workspace.ServiceAccountKey);
 
         return run.Id;
     }

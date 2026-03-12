@@ -106,6 +106,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IMessageHandler, TriggerEventHandler>();
 
         // Automation execution
+        builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         // WorkflowCore engine with outbox-backed queue

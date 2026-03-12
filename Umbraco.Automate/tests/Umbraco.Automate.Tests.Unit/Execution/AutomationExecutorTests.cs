@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Tests.Common.Builders;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -17,9 +18,12 @@ public class AutomationExecutorTests
     private readonly Mock<IWorkflowHost> _workflowHost = new();
     private readonly Mock<IWorkflowRegistry> _workflowRegistry = new();
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
+    private readonly Mock<IWorkspaceService> _workspaceService = new();
     private readonly AutomationExecutor _executor;
 
+    private readonly Workspace _defaultWorkspace;
     private readonly List<WorkflowDefinition> _registeredDefinitions = [];
+    private AutomationWorkflowData? _capturedWorkflowData;
 
     public AutomationExecutorTests()
     {
@@ -34,6 +38,10 @@ public class AutomationExecutorTests
         services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
         var sp = services.BuildServiceProvider();
 
+        _defaultWorkspace = new WorkspaceBuilder().Build();
+
+        _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_defaultWorkspace);
         _workflowRegistry.Setup(r => r.GetDefinition(It.IsAny<string>(), It.IsAny<int?>()))
             .Returns((WorkflowDefinition?)null);
         _workflowRegistry.Setup(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()))
@@ -50,6 +58,7 @@ public class AutomationExecutorTests
             pipeline,
             evaluator,
             _runRepo.Object,
+            _workspaceService.Object,
             sp,
             Mock.Of<ILogger<AutomationExecutor>>());
     }
@@ -163,6 +172,40 @@ public class AutomationExecutorTests
         var runId = await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
         runId.ShouldNotBe(Guid.Empty);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SetsExecutionContextOnWorkflowData()
+    {
+        var automation = CreateAutomation("testAction");
+
+        _workflowHost.Setup(h => h.StartWorkflow(It.IsAny<string>(), It.IsAny<AutomationWorkflowData>(), It.IsAny<string>()))
+            .ReturnsAsync("instance-1")
+            .Callback<string, AutomationWorkflowData, string>((_, data, _) => _capturedWorkflowData = data);
+
+        await _executor.ExecuteAsync(automation, "user", "user@test.com", null, CancellationToken.None);
+
+        _capturedWorkflowData.ShouldNotBeNull();
+        _capturedWorkflowData.ExecutionContext.ShouldNotBeNull();
+        _capturedWorkflowData.ExecutionContext.ServiceAccountKey.ShouldBe(_defaultWorkspace.ServiceAccountKey);
+        _capturedWorkflowData.ExecutionContext.WorkspaceId.ShouldBe(_defaultWorkspace.Id);
+        _capturedWorkflowData.ExecutionContext.WorkspaceName.ShouldBe(_defaultWorkspace.Name);
+        _capturedWorkflowData.ExecutionContext.AutomationId.ShouldBe(automation.Id);
+        _capturedWorkflowData.ExecutionContext.AutomationName.ShouldBe(automation.Name);
+        _capturedWorkflowData.ExecutionContext.InitiatorType.ShouldBe("user");
+        _capturedWorkflowData.ExecutionContext.InitiatorId.ShouldBe("user@test.com");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ThrowsWhenWorkspaceNotFound()
+    {
+        _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace?)null);
+
+        var automation = CreateAutomation("testAction");
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None));
     }
 
     [Fact]
