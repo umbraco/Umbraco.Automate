@@ -43,4 +43,10 @@ public interface IConnectionService
     /// Deletes a connection.
     /// </summary>
     Task<bool> DeleteConnectionAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a connection with its type resolved and settings deserialized, ready for runtime use.
+    /// Returns null if the connection or its type is not found.
+    /// </summary>
+    Task<ConfiguredConnection?> GetConfiguredConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default);
 }

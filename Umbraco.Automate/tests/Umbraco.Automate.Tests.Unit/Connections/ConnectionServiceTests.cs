@@ -29,6 +29,7 @@ public class ConnectionServiceTests
 
         _service = new ConnectionService(
             _repo.Object,
+            new ConnectionTypeCollection(() => []),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
     }

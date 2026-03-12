@@ -12,6 +12,13 @@ This is a monorepo containing Umbraco.Automate and its add-on packages:
 | ------------------------ | -------------------------------------------------- | -------------------- |
 | **Umbraco.Automate**     | Core automation system for Umbraco CMS             | `Umbraco.Automate/`  |
 
+**Add-on packages:**
+
+| Product                          | Description                                            | Location                        |
+| -------------------------------- | ------------------------------------------------------ | ------------------------------- |
+| **Umbraco.Automate.OpenIddict**  | Reusable OAuth infrastructure via OpenIddict WebIntegration | `Umbraco.Automate.OpenIddict/` |
+| **Umbraco.Automate.Slack**       | Slack connection and actions                           | `Umbraco.Automate.Slack/`      |
+
 Each product has its own solution file, CLAUDE.md, and can be built independently. For detailed guidance on a specific product, see its CLAUDE.md file.
 
 ## Development Environment

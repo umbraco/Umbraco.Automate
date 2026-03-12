@@ -11,15 +11,18 @@ namespace Umbraco.Automate.Core.Connections;
 internal sealed class ConnectionService : IConnectionService
 {
     private readonly IConnectionRepository _connectionRepository;
+    private readonly ConnectionTypeCollection _connectionTypeCollection;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
 
     public ConnectionService(
         IConnectionRepository connectionRepository,
+        ConnectionTypeCollection connectionTypeCollection,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory)
     {
         _connectionRepository = connectionRepository;
+        _connectionTypeCollection = connectionTypeCollection;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
     }
@@ -112,5 +115,23 @@ internal sealed class ConnectionService : IConnectionService
 
         scope.Complete();
         return deleted;
+    }
+
+    public async Task<ConfiguredConnection?> GetConfiguredConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default)
+    {
+        var connection = await _connectionRepository.GetAsync(connectionId, cancellationToken);
+        if (connection is null)
+        {
+            return null;
+        }
+
+        var connectionType = _connectionTypeCollection.GetByAlias(connection.Type);
+        if (connectionType is null)
+        {
+            return null;
+        }
+
+        var resolvedSettings = connectionType.ResolveSettings(connection.Settings);
+        return new ConfiguredConnection(connection, connectionType, resolvedSettings);
     }
 }

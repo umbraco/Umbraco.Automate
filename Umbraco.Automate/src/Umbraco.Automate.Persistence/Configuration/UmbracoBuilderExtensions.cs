@@ -16,6 +16,7 @@ using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Persistence.Versioning;
 using Umbraco.Automate.Persistence.Workflows;
+using Umbraco.Automate.Core.Persistence;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Extensions;
@@ -29,18 +30,11 @@ namespace Umbraco.Automate.Extensions;
 public static partial class UmbracoBuilderExtensions
 {
     /// <summary>
-    /// The connection string name for the dedicated Automate database.
-    /// Follows the Umbraco Commerce convention (<c>umbracoAutomateDbDSN</c>).
-    /// When not set, falls back to the main Umbraco connection string (<c>umbracoDbDSN</c>).
-    /// </summary>
-    internal const string ConnectionStringName = "umbracoAutomateDbDSN";
-
-    /// <summary>
     /// Adds EF Core persistence for Umbraco Automate.
     /// </summary>
     public static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
     {
-        var (connectionString, providerName) = ResolveConnectionInfo(builder.Config);
+        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(builder.Config);
 
         builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>((_, options, _, _) =>
         {
@@ -65,24 +59,6 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, StuckRunRecoveryNotificationHandler>();
 
         return builder;
-    }
-
-    /// <summary>
-    /// Resolves the connection string and provider name from configuration at registration time.
-    /// Checks for a dedicated <c>umbracoAutomateDbDSN</c> first, then falls back to <c>umbracoDbDSN</c>.
-    /// </summary>
-    private static (string? ConnectionString, string? ProviderName) ResolveConnectionInfo(IConfiguration config)
-    {
-        // Check for dedicated Automate connection string, fall back to Umbraco's.
-        // GetUmbracoConnectionString resolves the |DataDirectory| placeholder.
-        var connectionString = config.GetUmbracoConnectionString(ConnectionStringName, out var providerName);
-
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            connectionString = config.GetUmbracoConnectionString(out providerName);
-        }
-
-        return (connectionString, providerName);
     }
 
     private static void ConfigureDatabaseProvider(

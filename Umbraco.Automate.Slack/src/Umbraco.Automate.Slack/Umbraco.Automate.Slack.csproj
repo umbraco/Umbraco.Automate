@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <Title>Umbraco Automate Slack</Title>
+        <Description>Slack connection and actions for Umbraco Automate</Description>
+        <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+        <StaticWebAssetBasePath>App_Plugins/UmbracoAutomateSlack</StaticWebAssetBasePath>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <UseProjectReferences Condition="'$(UseProjectReferences)' == ''">true</UseProjectReferences>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="OpenIddict.Client.WebIntegration" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(UseProjectReferences)' == 'true'">
+        <ProjectReference Include="..\..\..\Umbraco.Automate\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
+        <ProjectReference Include="..\..\..\Umbraco.Automate.OpenIddict\src\Umbraco.Automate.OpenIddict\Umbraco.Automate.OpenIddict.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(UseProjectReferences)' != 'true'">
+        <PackageReference Include="Umbraco.Automate.Core" />
+        <PackageReference Include="Umbraco.Automate.OpenIddict" />
+    </ItemGroup>
+
+</Project>

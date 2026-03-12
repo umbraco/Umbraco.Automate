@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
@@ -21,6 +22,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly ExpressionEvaluator _expressionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
+    private readonly IConnectionService _connectionService;
     private readonly ILogger<ActionStepBody> _logger;
 
     public ActionStepBody(
@@ -29,6 +31,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         ActionMiddlewarePipeline pipeline,
         ExpressionEvaluator expressionEvaluator,
         IAutomationRunRepository runRepository,
+        IConnectionService connectionService,
         ILogger<ActionStepBody> logger)
     {
         _stepConfig = stepConfig;
@@ -36,6 +39,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _pipeline = pipeline;
         _expressionEvaluator = expressionEvaluator;
         _runRepository = runRepository;
+        _connectionService = connectionService;
         _logger = logger;
     }
 
@@ -57,6 +61,13 @@ internal sealed class ActionStepBody : StepBodyAsync
             settings = _action.ResolveSettings(_stepConfig.Settings);
         }
 
+        // Resolve connection for this step (if configured).
+        ConfiguredConnection? connection = null;
+        if (_stepConfig.ConnectionId is { } connectionId)
+        {
+            connection = await _connectionService.GetConfiguredConnectionAsync(connectionId, cancellationToken);
+        }
+
         // Create action context.
         var actionContext = new ActionContext
         {
@@ -68,6 +79,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             InputData = resolvedInputs,
             CancellationToken = cancellationToken,
             ExecutionContext = data.ExecutionContext,
+            Connection = connection,
         };
 
         // Create and persist step run.

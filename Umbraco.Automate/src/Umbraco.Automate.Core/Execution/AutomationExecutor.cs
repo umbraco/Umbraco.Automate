@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
@@ -24,6 +25,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly ExpressionEvaluator _expressionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
+    private readonly IConnectionService _connectionService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AutomationExecutor> _logger;
@@ -35,6 +37,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         ActionMiddlewarePipeline pipeline,
         ExpressionEvaluator expressionEvaluator,
         IAutomationRunRepository runRepository,
+        IConnectionService connectionService,
         IWorkspaceService workspaceService,
         IServiceProvider serviceProvider,
         ILogger<AutomationExecutor> logger)
@@ -45,6 +48,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _pipeline = pipeline;
         _expressionEvaluator = expressionEvaluator;
         _runRepository = runRepository;
+        _connectionService = connectionService;
         _workspaceService = workspaceService;
         _serviceProvider = serviceProvider;
         _logger = logger;
@@ -151,6 +155,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
                 _pipeline,
                 _expressionEvaluator,
                 _runRepository,
+                _connectionService,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
             var workflowStep = new ActionWorkflowStep(stepBody)
