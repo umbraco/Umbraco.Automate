@@ -26,8 +26,8 @@ Umbraco.Automate/
 ## Build & Test
 
 ```bash
-dotnet build Umbraco.Automate.sln
-dotnet test Umbraco.Automate.sln
+dotnet build Umbraco.Automate.slnx
+dotnet test Umbraco.Automate.slnx
 ```
 
 ## Key Concepts
