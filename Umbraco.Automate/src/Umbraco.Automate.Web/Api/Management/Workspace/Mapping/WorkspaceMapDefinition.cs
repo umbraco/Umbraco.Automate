@@ -38,7 +38,7 @@ public class WorkspaceMapDefinition : IMapDefinition
     {
         target.ServiceAccountKey = source.ServiceAccountKey;
         target.UserGroups = source.UserGroups;
-        target.Connections = source.Connections;
+        target.AllowedConnections = source.AllowedConnections;
     }
 
     // Umbraco.Code.MapAll -Id -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
@@ -48,7 +48,7 @@ public class WorkspaceMapDefinition : IMapDefinition
         target.Name = source.Name;
         target.ServiceAccountKey = source.ServiceAccountKey;
         target.UserGroups = source.UserGroups;
-        target.Connections = source.Connections;
+        target.AllowedConnections = source.AllowedConnections;
     }
 
     // Umbraco.Code.MapAll
@@ -59,7 +59,7 @@ public class WorkspaceMapDefinition : IMapDefinition
         target.Name = source.Name;
         target.ServiceAccountKey = source.ServiceAccountKey;
         target.UserGroups = source.UserGroups;
-        target.Connections = source.Connections;
+        target.AllowedConnections = source.AllowedConnections;
         target.Version = source.Version;
         target.DateCreated = source.DateCreated;
         target.DateModified = source.DateModified;

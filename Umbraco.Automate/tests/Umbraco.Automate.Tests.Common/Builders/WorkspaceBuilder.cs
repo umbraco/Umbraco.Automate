@@ -24,7 +24,7 @@ public class WorkspaceBuilder
     public WorkspaceBuilder WithName(string name) { _name = name; return this; }
     public WorkspaceBuilder WithServiceAccountKey(Guid key) { _serviceAccountKey = key; return this; }
     public WorkspaceBuilder WithUserGroups(params Guid[] groupIds) { _userGroups = groupIds.ToList(); return this; }
-    public WorkspaceBuilder WithConnections(params Guid[] connectionIds) { _connections = connectionIds.ToList(); return this; }
+    public WorkspaceBuilder WithAllowedConnections(params Guid[] connectionIds) { _connections = connectionIds.ToList(); return this; }
     public WorkspaceBuilder WithVersion(int version) { _version = version; return this; }
     public WorkspaceBuilder WithDateCreated(DateTime dateCreated) { _dateCreated = dateCreated; return this; }
     public WorkspaceBuilder WithDateModified(DateTime dateModified) { _dateModified = dateModified; return this; }
@@ -38,7 +38,7 @@ public class WorkspaceBuilder
         Name = _name,
         ServiceAccountKey = _serviceAccountKey,
         UserGroups = _userGroups,
-        Connections = _connections,
+        AllowedConnections = _connections,
         Version = _version,
         DateCreated = _dateCreated,
         DateModified = _dateModified,

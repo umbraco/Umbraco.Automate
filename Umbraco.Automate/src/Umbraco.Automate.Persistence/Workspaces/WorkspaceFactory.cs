@@ -16,7 +16,7 @@ internal static class WorkspaceFactory
             Name = entity.Name,
             ServiceAccountKey = entity.ServiceAccountKey,
             UserGroups = entity.UserGroups.Select(ug => ug.UserGroupId).ToList(),
-            Connections = entity.Connections.Select(c => c.ConnectionId).ToList(),
+            AllowedConnections = entity.AllowedConnections.Select(c => c.ConnectionId).ToList(),
             Version = entity.Version,
             DateCreated = entity.DateCreated,
             DateModified = entity.DateModified,
@@ -36,7 +36,7 @@ internal static class WorkspaceFactory
             UserGroups = workspace.UserGroups
                 .Select(id => new WorkspaceUserGroupEntity { WorkspaceId = workspace.Id, UserGroupId = id })
                 .ToList(),
-            Connections = workspace.Connections
+            AllowedConnections = workspace.AllowedConnections
                 .Select(id => new WorkspaceConnectionEntity { WorkspaceId = workspace.Id, ConnectionId = id })
                 .ToList(),
             Version = workspace.Version,
@@ -61,7 +61,7 @@ internal static class WorkspaceFactory
         entity.UserGroups = workspace.UserGroups
             .Select(id => new WorkspaceUserGroupEntity { WorkspaceId = entity.Id, UserGroupId = id })
             .ToList();
-        entity.Connections = workspace.Connections
+        entity.AllowedConnections = workspace.AllowedConnections
             .Select(id => new WorkspaceConnectionEntity { WorkspaceId = entity.Id, ConnectionId = id })
             .ToList();
     }

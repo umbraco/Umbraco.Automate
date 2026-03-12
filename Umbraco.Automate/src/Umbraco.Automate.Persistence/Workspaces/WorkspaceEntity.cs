@@ -25,5 +25,5 @@ internal sealed class WorkspaceEntity
 
     public ICollection<WorkspaceUserGroupEntity> UserGroups { get; set; } = [];
 
-    public ICollection<WorkspaceConnectionEntity> Connections { get; set; } = [];
+    public ICollection<WorkspaceConnectionEntity> AllowedConnections { get; set; } = [];
 }

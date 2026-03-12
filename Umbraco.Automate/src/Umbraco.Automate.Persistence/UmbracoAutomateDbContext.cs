@@ -211,7 +211,7 @@ public class UmbracoAutomateDbContext : DbContext
                 .HasForeignKey(e => e.WorkspaceId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasMany(e => e.Connections)
+            entity.HasMany(e => e.AllowedConnections)
                 .WithOne()
                 .HasForeignKey(e => e.WorkspaceId)
                 .OnDelete(DeleteBehavior.Cascade);

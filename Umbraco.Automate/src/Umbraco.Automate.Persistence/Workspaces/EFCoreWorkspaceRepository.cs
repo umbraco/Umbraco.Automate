@@ -23,7 +23,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         WorkspaceEntity? entity = await scope.ExecuteWithContextAsync(async db =>
             await db.Workspaces
                 .Include(w => w.UserGroups)
-                .Include(w => w.Connections)
+                .Include(w => w.AllowedConnections)
                 .FirstOrDefaultAsync(w => w.Id == id, cancellationToken));
 
         scope.Complete();
@@ -37,7 +37,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         WorkspaceEntity? entity = await scope.ExecuteWithContextAsync(async db =>
             await db.Workspaces
                 .Include(w => w.UserGroups)
-                .Include(w => w.Connections)
+                .Include(w => w.AllowedConnections)
                 .FirstOrDefaultAsync(w => w.Alias == alias, cancellationToken));
 
         scope.Complete();
@@ -51,7 +51,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         var entities = await scope.ExecuteWithContextAsync(async db =>
             await db.Workspaces
                 .Include(w => w.UserGroups)
-                .Include(w => w.Connections)
+                .Include(w => w.AllowedConnections)
                 .OrderBy(w => w.Name)
                 .ToListAsync(cancellationToken));
 
@@ -71,7 +71,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         {
             IQueryable<WorkspaceEntity> query = db.Workspaces
                 .Include(w => w.UserGroups)
-                .Include(w => w.Connections);
+                .Include(w => w.AllowedConnections);
 
             if (!string.IsNullOrWhiteSpace(filter))
             {
@@ -100,7 +100,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         {
             WorkspaceEntity? existing = await db.Workspaces
                 .Include(w => w.UserGroups)
-                .Include(w => w.Connections)
+                .Include(w => w.AllowedConnections)
                 .FirstOrDefaultAsync(w => w.Id == workspace.Id, cancellationToken);
 
             if (existing is null)
@@ -121,7 +121,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
 
                 // Remove old join table rows, EF will add new ones via UpdateEntity
                 db.Set<WorkspaceUserGroupEntity>().RemoveRange(existing.UserGroups);
-                db.Set<WorkspaceConnectionEntity>().RemoveRange(existing.Connections);
+                db.Set<WorkspaceConnectionEntity>().RemoveRange(existing.AllowedConnections);
 
                 WorkspaceFactory.UpdateEntity(existing, workspace);
             }

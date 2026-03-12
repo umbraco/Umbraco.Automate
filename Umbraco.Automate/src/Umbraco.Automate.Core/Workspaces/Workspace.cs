@@ -33,9 +33,9 @@ public sealed class Workspace : IVersionableEntity
     public IList<Guid> UserGroups { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets the connection IDs available within this workspace.
+    /// Gets or sets the connection IDs that automations in this workspace are allowed to use.
     /// </summary>
-    public IList<Guid> Connections { get; set; } = [];
+    public IList<Guid> AllowedConnections { get; set; } = [];
 
     /// <inheritdoc />
     public int Version { get; internal set; } = 1;

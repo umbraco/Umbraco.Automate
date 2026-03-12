@@ -26,8 +26,8 @@ public sealed class WorkspaceResponseModel
     /// <summary>User group keys with access.</summary>
     public IList<Guid> UserGroups { get; set; } = [];
 
-    /// <summary>Connection IDs available in this workspace.</summary>
-    public IList<Guid> Connections { get; set; } = [];
+    /// <summary>Connection IDs that automations in this workspace are allowed to use.</summary>
+    public IList<Guid> AllowedConnections { get; set; } = [];
 
     /// <summary>The entity version.</summary>
     public int Version { get; set; }

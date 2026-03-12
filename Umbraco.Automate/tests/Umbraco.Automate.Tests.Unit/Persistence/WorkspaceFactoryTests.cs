@@ -20,7 +20,7 @@ public class WorkspaceFactoryTests
             Name = "Test Workspace",
             ServiceAccountKey = Guid.NewGuid(),
             UserGroups = [userGroup1, userGroup2],
-            Connections = [connection1],
+            AllowedConnections = [connection1],
             Version = 3,
             DateCreated = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             DateModified = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -38,8 +38,8 @@ public class WorkspaceFactoryTests
         roundTripped.UserGroups.Count.ShouldBe(2);
         roundTripped.UserGroups.ShouldContain(userGroup1);
         roundTripped.UserGroups.ShouldContain(userGroup2);
-        roundTripped.Connections.Count.ShouldBe(1);
-        roundTripped.Connections.ShouldContain(connection1);
+        roundTripped.AllowedConnections.Count.ShouldBe(1);
+        roundTripped.AllowedConnections.ShouldContain(connection1);
         roundTripped.Version.ShouldBe(3);
         roundTripped.DateCreated.ShouldBe(workspace.DateCreated);
         roundTripped.DateModified.ShouldBe(workspace.DateModified);
@@ -60,13 +60,13 @@ public class WorkspaceFactoryTests
             DateCreated = DateTime.UtcNow,
             DateModified = DateTime.UtcNow,
             UserGroups = [],
-            Connections = [],
+            AllowedConnections = [],
         };
 
         var workspace = WorkspaceFactory.BuildDomain(entity);
 
         workspace.UserGroups.ShouldBeEmpty();
-        workspace.Connections.ShouldBeEmpty();
+        workspace.AllowedConnections.ShouldBeEmpty();
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class WorkspaceFactoryTests
             DateModified = originalCreated,
             CreatedByUserId = originalCreatedBy,
             UserGroups = [],
-            Connections = [],
+            AllowedConnections = [],
         };
 
         var updated = new Workspace
@@ -121,7 +121,7 @@ public class WorkspaceFactoryTests
             Name = "Test",
             ServiceAccountKey = Guid.NewGuid(),
             UserGroups = [userGroupId],
-            Connections = [connectionId],
+            AllowedConnections = [connectionId],
         };
 
         var entity = WorkspaceFactory.BuildEntity(workspace);
@@ -130,8 +130,8 @@ public class WorkspaceFactoryTests
         entity.UserGroups.First().WorkspaceId.ShouldBe(workspaceId);
         entity.UserGroups.First().UserGroupId.ShouldBe(userGroupId);
 
-        entity.Connections.ShouldHaveSingleItem();
-        entity.Connections.First().WorkspaceId.ShouldBe(workspaceId);
-        entity.Connections.First().ConnectionId.ShouldBe(connectionId);
+        entity.AllowedConnections.ShouldHaveSingleItem();
+        entity.AllowedConnections.First().WorkspaceId.ShouldBe(workspaceId);
+        entity.AllowedConnections.First().ConnectionId.ShouldBe(connectionId);
     }
 }

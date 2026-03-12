@@ -22,6 +22,6 @@ public sealed class UpdateWorkspaceRequestModel
     /// <summary>User group keys with access to this workspace.</summary>
     public IList<Guid> UserGroups { get; init; } = [];
 
-    /// <summary>Connection IDs available in this workspace.</summary>
-    public IList<Guid> Connections { get; init; } = [];
+    /// <summary>Connection IDs that automations in this workspace are allowed to use.</summary>
+    public IList<Guid> AllowedConnections { get; init; } = [];
 }

@@ -15,7 +15,7 @@ Workspace
 ├── Name: string
 ├── ServiceAccountKey: Guid            ← required — the identity all automations in this workspace run as
 ├── UserGroups: List<Guid>       ← user groups with access to this workspace
-├── Connections: List<Guid>     ← connections available within this workspace
+├── AllowedConnections: List<Guid>     ← connections available within this workspace
 ```
 
 ### How It Works
@@ -262,7 +262,7 @@ Workspace
 ├── Name: string
 ├── ServiceAccountKey: Guid (required — UserKind.Api user, execution identity for all automations)
 ├── UserGroups: List<Guid>
-├── Connections: List<Guid>
+├── AllowedConnections: List<Guid>
 
 Connection (unchanged from engineering-spec.md — access controlled at workspace level)
 ```
