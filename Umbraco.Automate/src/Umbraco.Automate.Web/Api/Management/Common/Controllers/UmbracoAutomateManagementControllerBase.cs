@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.Builders;
 using Umbraco.Cms.Api.Common.Filters;
-using Umbraco.Cms.Web.Common.Authorization;
+using Umbraco.Automate.Web.Authorization;
 
 namespace Umbraco.Automate.Web.Api.Management.Common.Controllers;
 
@@ -13,7 +13,7 @@ namespace Umbraco.Automate.Web.Api.Management.Common.Controllers;
 [ApiController]
 [MapToApi(Constants.ManagementApi.ApiName)]
 [JsonOptionsName(Constants.ManagementApi.ApiName)]
-[Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
+[Authorize(Policy = AutomateAuthorizationPolicies.SectionAccessAutomate)]
 [Produces("application/json")]
 public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
 {

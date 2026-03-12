@@ -3,7 +3,9 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
+using OpenIddict.Validation.AspNetCore;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
@@ -29,6 +31,7 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     internal static IUmbracoBuilder AddUmbracoAutomateWeb(this IUmbracoBuilder builder)
     {
+        builder.AddUmbracoAutomateAuthorization();
         builder.AddUmbracoAutomateManagementApi();
         builder.AddUmbracoAutomateWebhookApi();
         builder.AddUmbracoAutomateMapDefinitions();
@@ -44,6 +47,22 @@ public static partial class UmbracoBuilderExtensions
             .Add<CatalogueMapDefinition>()
             .Add<WorkspaceMapDefinition>()
             .Add<ConnectionMapDefinition>();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateAuthorization(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddAuthorization(o =>
+        {
+            o.AddPolicy(AutomateAuthorizationPolicies.SectionAccessAutomate, policy =>
+            {
+                policy.AuthenticationSchemes.Add(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+#pragma warning disable CS0618 // Type or member is obsolete
+                policy.RequireClaim(Umbraco.Cms.Core.Constants.Security.AllowedApplicationsClaimType, Core.Constants.Sections.Automate);
+#pragma warning restore CS0618 // Type or member is obsolete
+            });
+        });
 
         return builder;
     }

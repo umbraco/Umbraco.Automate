@@ -14,4 +14,15 @@ public static class Constants
     /// The prefix applied to all database migration names.
     /// </summary>
     public const string DatabaseMigrationPrefix = "UmbracoAutomate_";
+
+    /// <summary>
+    /// Section constants for Umbraco.Automate.
+    /// </summary>
+    internal static class Sections
+    {
+        /// <summary>
+        /// Section alias for Umbraco.Automate.
+        /// </summary>
+        public const string Automate = "automate";
+    }
 }
