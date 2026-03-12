@@ -7,6 +7,8 @@ A provider-driven automation system for [Umbraco CMS](https://umbraco.com). Comp
 | Package | Description |
 |---------|-------------|
 | **Umbraco.Automate** | Core automation system |
+| **Umbraco.Automate.OpenIddict** | Reusable OAuth infrastructure via OpenIddict WebIntegration |
+| **Umbraco.Automate.Slack** | Slack connection and actions |
 
 ## Quick Start
 
@@ -57,7 +59,7 @@ Automations are organised into **workspaces** - admin-configured containers that
 
 ### Connections
 
-Named, reusable credential sets for external services. Connections are scoped to workspaces and support an extensible type system for custom connection types.
+Named, reusable credential sets for external services. Connections are scoped to workspaces and support an extensible type system for custom connection types. The **Umbraco.Automate.OpenIddict** package adds OAuth connection support via OpenIddict Client WebIntegration, with 100+ pre-configured providers.
 
 ### Versioning & Publishing
 
@@ -74,8 +76,16 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 ### Build & Test
 
 ```bash
+# Core
 dotnet build Umbraco.Automate/Umbraco.Automate.slnx
 dotnet test Umbraco.Automate/Umbraco.Automate.slnx
+
+# OpenIddict (OAuth infrastructure)
+dotnet build Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.slnx
+dotnet test Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.slnx
+
+# Slack provider
+dotnet build Umbraco.Automate.Slack/Umbraco.Automate.Slack.slnx
 ```
 
 ### Demo Site

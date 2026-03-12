@@ -151,9 +151,12 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 ## Database
 
 - SQL Server and SQLite supported via EF Core
-- Each product has its own migrations with prefix: `UmbracoAutomate_`
-- Domain tables: Automation, Step, AutomationRun, StepRun, Workspace, Connection, OutboxMessage
-- Engine tables: WorkflowInstance, ExecutionPointer, EventSubscription, Event, ScheduledCommand
+- Each product has its own migrations:
+  - Core prefix: `UmbracoAutomate_`
+  - OpenIddict prefix: `UmbracoAutomateOpenIddict_`
+- Core domain tables: Automation, Step, AutomationRun, StepRun, Workspace, Connection, OutboxMessage
+- Core engine tables: WorkflowInstance, ExecutionPointer, EventSubscription, Event, ScheduledCommand
+- OpenIddict tables: umbracoAutomateOpenIddictCredentials
 
 ## Target Framework
 
