@@ -82,6 +82,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(triggers);
         services.AddSingleton(middlewareCollection);
         services.AddSingleton(new ExpressionEvaluator(Array.Empty<IExpressionFilter>()));
+        services.AddSingleton<SettingsExpressionResolver>();
         services.AddSingleton<ActionMiddlewarePipeline>();
         services.AddSingleton<AutomateMetrics>();
 

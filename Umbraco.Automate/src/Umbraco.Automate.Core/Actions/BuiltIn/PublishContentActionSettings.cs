@@ -10,7 +10,7 @@ public sealed class PublishContentActionSettings
     /// <summary>
     /// Gets or sets the key (GUID) of the content item to publish. Supports expression syntax.
     /// </summary>
-    [Field(Label = "Content Key", Description = "The key of the content item to publish. Supports ${ expression } syntax.")]
+    [Field(Label = "Content Key", Description = "The key of the content item to publish. Supports ${ expression } syntax.", SupportsExpressions = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>
