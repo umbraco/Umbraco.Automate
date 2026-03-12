@@ -41,11 +41,6 @@ public sealed class Automation : IVersionableEntity
     public int? PublishedVersion { get; set; }
 
     /// <summary>
-    /// Gets or sets the latest draft version number.
-    /// </summary>
-    public int DraftVersion { get; set; }
-
-    /// <summary>
     /// Gets or sets the workspace this automation belongs to.
     /// </summary>
     public Guid WorkspaceId { get; set; }

@@ -49,9 +49,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<int>("DraftVersion")
-                        .HasColumnType("int");
-
                     b.Property<Guid?>("GroupId")
                         .HasColumnType("uniqueidentifier");
 

@@ -122,7 +122,7 @@ internal sealed class AutomationService : IAutomationService
             throw new OperationCanceledException("Automation publish was cancelled by a notification handler.");
         }
 
-        automation.PublishedVersion = automation.DraftVersion;
+        automation.PublishedVersion = automation.Version;
         automation.Status = AutomationStatus.Published;
         automation.IsEnabled = true;
 
