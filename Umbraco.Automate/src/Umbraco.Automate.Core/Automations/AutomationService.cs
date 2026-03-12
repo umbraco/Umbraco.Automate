@@ -1,6 +1,7 @@
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
 
@@ -17,6 +18,7 @@ internal sealed class AutomationService : IAutomationService
     private readonly IAutomationRepository _automationRepository;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IEntityVersionService _versionService;
+    private readonly IWorkspaceService _workspaceService;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
 
@@ -24,12 +26,14 @@ internal sealed class AutomationService : IAutomationService
         IAutomationRepository automationRepository,
         IAutomationRunRepository runRepository,
         IEntityVersionService versionService,
+        IWorkspaceService workspaceService,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory)
     {
         _automationRepository = automationRepository;
         _runRepository = runRepository;
         _versionService = versionService;
+        _workspaceService = workspaceService;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
     }
@@ -107,6 +111,9 @@ internal sealed class AutomationService : IAutomationService
         var automation = await _automationRepository.GetAsync(id, cancellationToken)
             ?? throw new InvalidOperationException($"Automation '{id}' not found.");
 
+        // Publish-time validation.
+        await ValidateForPublishAsync(automation, cancellationToken);
+
         var eventMessages = _eventMessagesFactory.Get();
 
         var publishingNotification = new AutomationPublishingNotification(automation, eventMessages);
@@ -125,6 +132,56 @@ internal sealed class AutomationService : IAutomationService
         scope.Complete();
 
         return saved;
+    }
+
+    private async Task ValidateForPublishAsync(Automation automation, CancellationToken cancellationToken)
+    {
+        var errors = new List<string>();
+
+        // 1. Trigger must be configured.
+        if (automation.Trigger is null)
+        {
+            errors.Add("A trigger must be configured before publishing.");
+        }
+
+        // 2. Workspace must exist and have a valid service account.
+        var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken);
+        if (workspace is null)
+        {
+            errors.Add($"Workspace '{automation.WorkspaceId}' not found.");
+        }
+        else
+        {
+            if (workspace.ServiceAccountKey == Guid.Empty)
+            {
+                errors.Add("The workspace's service account is not configured.");
+            }
+
+            // 3. All step connections must be allowed by the workspace.
+            var stepConnectionIds = automation.Steps
+                .Where(s => s.ConnectionId.HasValue)
+                .Select(s => s.ConnectionId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (stepConnectionIds.Count > 0)
+            {
+                var allowedSet = workspace.AllowedConnections.ToHashSet();
+                var disallowed = stepConnectionIds.Where(id => !allowedSet.Contains(id)).ToList();
+
+                foreach (var connectionId in disallowed)
+                {
+                    errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
+                }
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new AutomationValidationException(
+                $"Cannot publish automation '{automation.Name}'.",
+                errors);
+        }
     }
 
     public async Task<Automation> UnpublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default)

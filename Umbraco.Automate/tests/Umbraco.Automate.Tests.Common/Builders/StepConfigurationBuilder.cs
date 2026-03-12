@@ -12,9 +12,11 @@ public class StepConfigurationBuilder
     private string _name = "Test Step";
     private Dictionary<string, object?> _settings = [];
     private Dictionary<string, string> _inputMappings = [];
+    private Guid? _connectionId;
     private StepErrorBehavior _errorBehavior = StepErrorBehavior.Terminate;
 
     public StepConfigurationBuilder WithId(Guid id) { _id = id; return this; }
+    public StepConfigurationBuilder WithConnectionId(Guid? connectionId) { _connectionId = connectionId; return this; }
     public StepConfigurationBuilder WithActionAlias(string alias) { _actionAlias = alias; return this; }
     public StepConfigurationBuilder WithName(string name) { _name = name; return this; }
     public StepConfigurationBuilder WithErrorBehavior(StepErrorBehavior behavior) { _errorBehavior = behavior; return this; }
@@ -57,6 +59,7 @@ public class StepConfigurationBuilder
         Id = _id,
         ActionAlias = _actionAlias,
         Name = _name,
+        ConnectionId = _connectionId,
         Settings = _settings,
         InputMappings = _inputMappings,
         ErrorBehavior = _errorBehavior,
