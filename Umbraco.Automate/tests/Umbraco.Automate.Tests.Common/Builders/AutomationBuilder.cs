@@ -14,9 +14,9 @@ public class AutomationBuilder
     private string? _description;
     private AutomationStatus _status = AutomationStatus.Published;
     private bool _isEnabled = true;
-    private int _draftVersion = 1;
     private int? _publishedVersion = 1;
     private int _version = 1;
+    private Guid _workspaceId = Guid.NewGuid();
     private Guid? _groupId;
     private DateTime _dateCreated = DateTime.UtcNow;
     private DateTime _dateModified = DateTime.UtcNow;
@@ -33,16 +33,15 @@ public class AutomationBuilder
     public AutomationBuilder WithDescription(string? description) { _description = description; return this; }
     public AutomationBuilder WithStatus(AutomationStatus status) { _status = status; return this; }
     public AutomationBuilder WithIsEnabled(bool isEnabled) { _isEnabled = isEnabled; return this; }
-    public AutomationBuilder WithVersion(int version) { _version = version; _draftVersion = version; return this; }
+    public AutomationBuilder WithVersion(int version) { _version = version; return this; }
     public AutomationBuilder WithPublishedVersion(int? publishedVersion) { _publishedVersion = publishedVersion; return this; }
+    public AutomationBuilder WithWorkspaceId(Guid workspaceId) { _workspaceId = workspaceId; return this; }
     public AutomationBuilder WithGroupId(Guid? groupId) { _groupId = groupId; return this; }
     public AutomationBuilder WithDateCreated(DateTime dateCreated) { _dateCreated = dateCreated; return this; }
     public AutomationBuilder WithDateModified(DateTime dateModified) { _dateModified = dateModified; return this; }
     public AutomationBuilder WithCreatedByUserId(Guid? userId) { _createdByUserId = userId; return this; }
     public AutomationBuilder WithModifiedByUserId(Guid? userId) { _modifiedByUserId = userId; return this; }
     public AutomationBuilder WithCanvasState(string? canvasState) { _canvasState = canvasState; return this; }
-    public AutomationBuilder WithDraftVersion(int draftVersion) { _draftVersion = draftVersion; return this; }
-
     public AutomationBuilder WithTrigger(string triggerAlias, Dictionary<string, object?>? settings = null)
     {
         _trigger = new TriggerConfiguration
@@ -133,9 +132,9 @@ public class AutomationBuilder
         Description = _description,
         Status = _status,
         IsEnabled = _isEnabled,
-        DraftVersion = _draftVersion,
         PublishedVersion = _publishedVersion,
         Version = _version,
+        WorkspaceId = _workspaceId,
         GroupId = _groupId,
         DateCreated = _dateCreated,
         DateModified = _dateModified,

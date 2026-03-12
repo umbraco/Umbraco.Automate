@@ -49,9 +49,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<int>("DraftVersion")
-                        .HasColumnType("int");
-
                     b.Property<Guid?>("GroupId")
                         .HasColumnType("uniqueidentifier");
 
@@ -77,6 +74,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(1);
 
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Alias")
@@ -86,7 +86,58 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("WorkspaceId");
+
                     b.ToTable("umbracoAutomateAutomation", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Connections.ConnectionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Alias")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Settings")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Version")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Alias")
+                        .IsUnique();
+
+                    b.ToTable("umbracoAutomateConnection", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Outbox.OutboxMessageEntity", b =>
@@ -173,6 +224,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("ServiceAccountKey")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime?>("StartedUtc")
                         .HasColumnType("datetime2");
 
@@ -181,6 +235,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 
                     b.Property<string>("TriggerData")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
@@ -450,6 +507,101 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.HasIndex("Status", "NextExecution");
 
                     b.ToTable("umbracoAutomateWorkflowInstance", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("WorkspaceId", "ConnectionId");
+
+                    b.ToTable("umbracoAutomateWorkspaceConnection", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Alias")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<Guid>("ServiceAccountKey")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Version")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Alias")
+                        .IsUnique();
+
+                    b.ToTable("umbracoAutomateWorkspace", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceUserGroupEntity", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserGroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("WorkspaceId", "UserGroupId");
+
+                    b.ToTable("umbracoAutomateWorkspaceUserGroup", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
+                {
+                    b.HasOne("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", null)
+                        .WithMany("AllowedConnections")
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceUserGroupEntity", b =>
+                {
+                    b.HasOne("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", null)
+                        .WithMany("UserGroups")
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", b =>
+                {
+                    b.Navigation("AllowedConnections");
+
+                    b.Navigation("UserGroups");
                 });
 #pragma warning restore 612, 618
         }

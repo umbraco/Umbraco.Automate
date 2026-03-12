@@ -26,4 +26,9 @@ public sealed class AutomationWorkflowData
     /// Each step can produce output that subsequent steps reference via expressions.
     /// </summary>
     public Dictionary<Guid, Dictionary<string, object?>> StepOutputs { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the execution context carrying the service account identity and workspace info.
+    /// </summary>
+    public AutomationExecutionContext? ExecutionContext { get; set; }
 }

@@ -20,7 +20,7 @@ git clone https://github.com/umbraco/Umbraco.Automate.git
 cd Umbraco.Automate
 
 # Build
-dotnet build Umbraco.Automate/Umbraco.Automate.sln
+dotnet build Umbraco.Automate/Umbraco.Automate.slnx
 ```
 
 ### Repository Structure
@@ -66,8 +66,8 @@ git checkout -b feature/add-triggers
 # Edit: Umbraco.Automate/src/Umbraco.Automate.Core/...
 
 # 3. Build and test
-dotnet build Umbraco.Automate/Umbraco.Automate.sln
-dotnet test Umbraco.Automate/Umbraco.Automate.sln
+dotnet build Umbraco.Automate/Umbraco.Automate.slnx
+dotnet test Umbraco.Automate/Umbraco.Automate.slnx
 
 # 4. Commit changes
 git add .

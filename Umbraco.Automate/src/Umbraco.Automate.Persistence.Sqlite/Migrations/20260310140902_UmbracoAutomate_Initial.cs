@@ -22,7 +22,6 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     IsEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
                     PublishedVersion = table.Column<int>(type: "INTEGER", nullable: true),
-                    DraftVersion = table.Column<int>(type: "INTEGER", nullable: false),
                     GroupId = table.Column<Guid>(type: "TEXT", nullable: true),
                     Definition = table.Column<string>(type: "TEXT", nullable: true),
                     Version = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 1),

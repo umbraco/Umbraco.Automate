@@ -21,6 +21,16 @@ public sealed class AutomationRun : IAutomateEntity
     public required int AutomationVersion { get; init; }
 
     /// <summary>
+    /// Gets or sets the workspace ID at the time of execution (snapshot).
+    /// </summary>
+    public required Guid WorkspaceId { get; init; }
+
+    /// <summary>
+    /// Gets or sets the service account key used for execution (snapshot).
+    /// </summary>
+    public required Guid ServiceAccountKey { get; init; }
+
+    /// <summary>
     /// Gets or sets the execution status.
     /// </summary>
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Pending;

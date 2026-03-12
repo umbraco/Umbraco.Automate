@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Tests.Common.Builders;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
@@ -13,6 +14,7 @@ public class AutomationServiceTests
 {
     private readonly Mock<IAutomationRepository> _repo = new();
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
+    private readonly Mock<IWorkspaceService> _workspaceService = new();
     private readonly Mock<ICoreScopeProvider> _scopeProvider = new();
     private readonly Mock<ICoreScope> _scope = new();
     private readonly Mock<IScopedNotificationPublisher> _notifications = new();
@@ -31,10 +33,15 @@ public class AutomationServiceTests
                 It.IsAny<bool>()))
             .Returns(_scope.Object);
 
+        // Default workspace mock — returns a valid workspace for any ID.
+        _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WorkspaceBuilder().Build());
+
         _service = new AutomationService(
             _repo.Object,
             _runRepo.Object,
             Mock.Of<IEntityVersionService>(),
+            _workspaceService.Object,
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
     }
@@ -47,6 +54,7 @@ public class AutomationServiceTests
             .WithId(id)
             .AsDraft()
             .WithVersion(3)
+            .WithManualTrigger()
             .Build();
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
@@ -141,10 +149,109 @@ public class AutomationServiceTests
     }
 
     [Fact]
+    public async Task PublishAutomationAsync_NoTrigger_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var automation = new AutomationBuilder().WithId(id).AsDraft().Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains("trigger"));
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_WorkspaceNotFound_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var automation = new AutomationBuilder().WithId(id).AsDraft().WithManualTrigger().Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+        _workspaceService.Setup(w => w.GetWorkspaceAsync(automation.WorkspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace?)null);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains("Workspace"));
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_DisallowedConnection_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var disallowedConnectionId = Guid.NewGuid();
+
+        var step = new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithConnectionId(disallowedConnectionId)
+            .Build();
+
+        var automation = new AutomationBuilder()
+            .WithId(id)
+            .AsDraft()
+            .WithManualTrigger()
+            .AddStep(step)
+            .Build();
+
+        // Workspace allows no connections.
+        var workspace = new WorkspaceBuilder().Build();
+        _workspaceService.Setup(w => w.GetWorkspaceAsync(automation.WorkspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(workspace);
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains(disallowedConnectionId.ToString()));
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_AllowedConnection_Succeeds()
+    {
+        var id = Guid.NewGuid();
+        var connectionId = Guid.NewGuid();
+
+        var step = new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithConnectionId(connectionId)
+            .Build();
+
+        var automation = new AutomationBuilder()
+            .WithId(id)
+            .AsDraft()
+            .WithManualTrigger()
+            .AddStep(step)
+            .Build();
+
+        // Workspace allows the connection.
+        var workspace = new WorkspaceBuilder()
+            .WithAllowedConnections(connectionId)
+            .Build();
+        _workspaceService.Setup(w => w.GetWorkspaceAsync(automation.WorkspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(workspace);
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var result = await _service.PublishAutomationAsync(id);
+
+        result.Status.ShouldBe(AutomationStatus.Published);
+    }
+
+    [Fact]
     public async Task PublishAutomationAsync_CancelledByNotification_Throws()
     {
         var id = Guid.NewGuid();
-        Automation automation = new AutomationBuilder().WithId(id).AsDraft();
+        Automation automation = new AutomationBuilder().WithId(id).AsDraft().WithManualTrigger();
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);

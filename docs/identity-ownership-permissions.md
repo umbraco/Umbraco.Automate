@@ -14,7 +14,7 @@ Workspace
 ├── Alias: string (unique, URL-safe — used for Deploy transfer)
 ├── Name: string
 ├── ServiceAccountKey: Guid            ← required — the identity all automations in this workspace run as
-├── MemberUserGroups: List<Guid>       ← user groups with access to this workspace
+├── UserGroups: List<Guid>       ← user groups with access to this workspace
 ├── AllowedConnections: List<Guid>     ← connections available within this workspace
 ```
 
@@ -234,7 +234,7 @@ Workspaces and service accounts have environment-specific aspects that affect ho
 - Service account (on workspace): matched by username. Missing → workspace flagged, automations blocked from publishing.
 - Connections: matched by alias. Missing → draft state + dashboard warning (existing behaviour from engineering-spec.md).
 
-**User groups on workspaces**: User groups are **not** transferable entities in Deploy. Workspace membership (`MemberUserGroups`) is stripped from the artifact on export. The workspace arrives on the target with its service account and allowed connections resolved, but with no member groups — the admin configures membership as part of environment setup.
+**User groups on workspaces**: User groups are **not** transferable entities in Deploy. Workspace membership (`UserGroups`) is stripped from the artifact on export. The workspace arrives on the target with its service account and allowed connections resolved, but with no member groups — the admin configures membership as part of environment setup.
 
 ### Post-Import Checklist
 
@@ -261,7 +261,7 @@ Workspace
 ├── Alias: string (unique, URL-safe — used for Deploy transfer)
 ├── Name: string
 ├── ServiceAccountKey: Guid (required — UserKind.Api user, execution identity for all automations)
-├── MemberUserGroups: List<Guid>
+├── UserGroups: List<Guid>
 ├── AllowedConnections: List<Guid>
 
 Connection (unchanged from engineering-spec.md — access controlled at workspace level)

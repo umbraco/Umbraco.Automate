@@ -33,8 +33,9 @@ public sealed class AutomationResponseModel
     /// <summary>The published version number, or null.</summary>
     public int? PublishedVersion { get; set; }
 
-    /// <summary>The draft version number.</summary>
-    public int DraftVersion { get; set; }
+    /// <summary>The workspace this automation belongs to.</summary>
+    [Required]
+    public Guid WorkspaceId { get; set; }
 
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; set; }

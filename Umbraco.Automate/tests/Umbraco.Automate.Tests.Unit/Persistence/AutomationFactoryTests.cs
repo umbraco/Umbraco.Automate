@@ -57,7 +57,6 @@ public class AutomationFactoryTests
             .WithDescription("A test")
             .WithVersion(5)
             .WithPublishedVersion(2)
-            .WithDraftVersion(3)
             .WithDateCreated(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc))
             .WithDateModified(new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc))
             .WithCreatedByUserId(Guid.NewGuid())

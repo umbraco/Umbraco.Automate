@@ -65,6 +65,30 @@ public class Constants
             }
 
             /// <summary>
+            /// Workspace feature constants.
+            /// </summary>
+            public static class Workspace
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "workspaces";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Workspaces";
+            }
+
+            /// <summary>
+            /// Connection feature constants.
+            /// </summary>
+            public static class Connection
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "connections";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Connections";
+            }
+
+            /// <summary>
             /// Catalogue feature constants (triggers + actions registry).
             /// </summary>
             public static class Catalogue
