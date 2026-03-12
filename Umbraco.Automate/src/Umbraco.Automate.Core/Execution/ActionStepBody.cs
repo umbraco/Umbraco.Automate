@@ -21,6 +21,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly IAction _action;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly ExpressionEvaluator _expressionEvaluator;
+    private readonly SettingsExpressionResolver _settingsExpressionResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
     private readonly ILogger<ActionStepBody> _logger;
@@ -30,6 +31,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         IAction action,
         ActionMiddlewarePipeline pipeline,
         ExpressionEvaluator expressionEvaluator,
+        SettingsExpressionResolver settingsExpressionResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
         ILogger<ActionStepBody> logger)
@@ -38,6 +40,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _action = action;
         _pipeline = pipeline;
         _expressionEvaluator = expressionEvaluator;
+        _settingsExpressionResolver = settingsExpressionResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
         _logger = logger;
@@ -59,6 +62,12 @@ internal sealed class ActionStepBody : StepBodyAsync
         if (_action.SettingsType is not null && _stepConfig.Settings.Count > 0)
         {
             settings = _action.ResolveSettings(_stepConfig.Settings);
+        }
+
+        // Evaluate ${ } expressions in settings properties marked with SupportsExpressions.
+        if (settings is not null)
+        {
+            _settingsExpressionResolver.ResolveExpressions(settings, expressionData);
         }
 
         // Resolve connection for this step (if configured).

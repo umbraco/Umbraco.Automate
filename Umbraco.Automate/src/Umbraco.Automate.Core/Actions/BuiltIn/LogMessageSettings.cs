@@ -10,7 +10,7 @@ public sealed class LogMessageSettings
     /// <summary>
     /// Gets or sets the message to log. Supports expression syntax.
     /// </summary>
-    [Field(Label = "Message", Description = "The message to write to the log. Supports ${ expression } syntax.")]
+    [Field(Label = "Message", Description = "The message to write to the log. Supports ${ expression } syntax.", SupportsExpressions = true)]
     public string Message { get; set; } = string.Empty;
 
     /// <summary>

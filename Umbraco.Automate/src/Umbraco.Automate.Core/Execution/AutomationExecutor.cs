@@ -24,6 +24,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly ActionCollection _actions;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly ExpressionEvaluator _expressionEvaluator;
+    private readonly SettingsExpressionResolver _settingsExpressionResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
     private readonly IWorkspaceService _workspaceService;
@@ -36,6 +37,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         ActionCollection actions,
         ActionMiddlewarePipeline pipeline,
         ExpressionEvaluator expressionEvaluator,
+        SettingsExpressionResolver settingsExpressionResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
         IWorkspaceService workspaceService,
@@ -47,6 +49,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _actions = actions;
         _pipeline = pipeline;
         _expressionEvaluator = expressionEvaluator;
+        _settingsExpressionResolver = settingsExpressionResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
         _workspaceService = workspaceService;
@@ -154,6 +157,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
                 action,
                 _pipeline,
                 _expressionEvaluator,
+                _settingsExpressionResolver,
                 _runRepository,
                 _connectionService,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());

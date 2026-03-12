@@ -58,6 +58,7 @@ public class AutomationExecutorTests
             actions,
             pipeline,
             evaluator,
+            new SettingsExpressionResolver(evaluator),
             _runRepo.Object,
             Mock.Of<IConnectionService>(),
             _workspaceService.Object,

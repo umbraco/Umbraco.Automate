@@ -88,6 +88,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<ExpressionEvaluator>();
+        builder.Services.AddSingleton<SettingsExpressionResolver>();
 
         // HTTP client for HttpRequestAction — with SSRF protection
         builder.Services.AddHttpClient("UmbracoAutomate")
