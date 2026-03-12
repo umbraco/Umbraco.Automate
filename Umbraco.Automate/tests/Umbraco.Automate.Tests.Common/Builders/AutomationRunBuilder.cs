@@ -10,6 +10,8 @@ public class AutomationRunBuilder
     private Guid _id = Guid.NewGuid();
     private Guid _automationId = Guid.NewGuid();
     private int _automationVersion = 1;
+    private Guid _workspaceId = Guid.NewGuid();
+    private Guid _serviceAccountKey = Guid.NewGuid();
     private AutomationRunStatus _status = AutomationRunStatus.Running;
     private DateTime _startedUtc = DateTime.UtcNow;
     private DateTime? _completedUtc;
@@ -22,6 +24,8 @@ public class AutomationRunBuilder
     public AutomationRunBuilder WithId(Guid id) { _id = id; return this; }
     public AutomationRunBuilder WithAutomationId(Guid automationId) { _automationId = automationId; return this; }
     public AutomationRunBuilder WithAutomationVersion(int version) { _automationVersion = version; return this; }
+    public AutomationRunBuilder WithWorkspaceId(Guid workspaceId) { _workspaceId = workspaceId; return this; }
+    public AutomationRunBuilder WithServiceAccountKey(Guid key) { _serviceAccountKey = key; return this; }
     public AutomationRunBuilder WithStatus(AutomationRunStatus status) { _status = status; return this; }
     public AutomationRunBuilder WithStartedUtc(DateTime startedUtc) { _startedUtc = startedUtc; return this; }
     public AutomationRunBuilder WithCompletedUtc(DateTime? completedUtc) { _completedUtc = completedUtc; return this; }
@@ -50,6 +54,8 @@ public class AutomationRunBuilder
         Id = _id,
         AutomationId = _automationId,
         AutomationVersion = _automationVersion,
+        WorkspaceId = _workspaceId,
+        ServiceAccountKey = _serviceAccountKey,
         Status = _status,
         StartedUtc = _startedUtc,
         CompletedUtc = _completedUtc,

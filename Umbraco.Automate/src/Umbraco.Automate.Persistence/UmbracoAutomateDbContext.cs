@@ -78,6 +78,8 @@ public class UmbracoAutomateDbContext : DbContext
 
             entity.Property(e => e.AutomationId).IsRequired();
             entity.Property(e => e.AutomationVersion).IsRequired();
+            entity.Property(e => e.WorkspaceId).IsRequired();
+            entity.Property(e => e.ServiceAccountKey).IsRequired();
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.TriggerData);
             entity.Property(e => e.InitiatedBy).HasMaxLength(100).IsRequired();

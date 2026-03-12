@@ -71,7 +71,11 @@ public class AutomationExecutorTests
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
         _runRepo.Verify(r => r.SaveAsync(
-            It.Is<AutomationRun>(run => run.AutomationId == automation.Id && run.Status == AutomationRunStatus.Running),
+            It.Is<AutomationRun>(run =>
+                run.AutomationId == automation.Id &&
+                run.Status == AutomationRunStatus.Running &&
+                run.WorkspaceId == _defaultWorkspace.Id &&
+                run.ServiceAccountKey == _defaultWorkspace.ServiceAccountKey),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

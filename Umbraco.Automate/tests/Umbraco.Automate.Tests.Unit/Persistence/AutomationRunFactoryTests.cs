@@ -15,6 +15,8 @@ public class AutomationRunFactoryTests
             Id = Guid.NewGuid(),
             AutomationId = Guid.NewGuid(),
             AutomationVersion = 3,
+            WorkspaceId = Guid.NewGuid(),
+            ServiceAccountKey = Guid.NewGuid(),
             Status = AutomationRunStatus.Running,
             StartedUtc = DateTime.UtcNow,
             TriggerData = "{\"key\":\"value\"}",
@@ -28,6 +30,8 @@ public class AutomationRunFactoryTests
         roundTripped.Id.ShouldBe(run.Id);
         roundTripped.AutomationId.ShouldBe(run.AutomationId);
         roundTripped.AutomationVersion.ShouldBe(3);
+        roundTripped.WorkspaceId.ShouldBe(run.WorkspaceId);
+        roundTripped.ServiceAccountKey.ShouldBe(run.ServiceAccountKey);
         roundTripped.Status.ShouldBe(AutomationRunStatus.Running);
         roundTripped.InitiatedBy.ShouldBe("user");
         roundTripped.CorrelationId.ShouldBe("corr-123");

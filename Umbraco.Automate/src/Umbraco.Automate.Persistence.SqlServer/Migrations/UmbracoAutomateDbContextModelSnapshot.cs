@@ -224,6 +224,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("ServiceAccountKey")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime?>("StartedUtc")
                         .HasColumnType("datetime2");
 
@@ -232,6 +235,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 
                     b.Property<string>("TriggerData")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
@@ -576,7 +582,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
                 {
                     b.HasOne("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", null)
-                        .WithMany("Connections")
+                        .WithMany("AllowedConnections")
                         .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -593,7 +599,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", b =>
                 {
-                    b.Navigation("Connections");
+                    b.Navigation("AllowedConnections");
 
                     b.Navigation("UserGroups");
                 });

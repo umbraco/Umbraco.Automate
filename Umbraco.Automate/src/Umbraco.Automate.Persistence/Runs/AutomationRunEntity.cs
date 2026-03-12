@@ -11,6 +11,10 @@ internal sealed class AutomationRunEntity
 
     public int AutomationVersion { get; set; }
 
+    public Guid WorkspaceId { get; set; }
+
+    public Guid ServiceAccountKey { get; set; }
+
     public int Status { get; set; }
 
     public DateTime? StartedUtc { get; set; }

@@ -67,6 +67,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             Id = Guid.NewGuid(),
             AutomationId = automation.Id,
             AutomationVersion = automation.PublishedVersion ?? automation.Version,
+            WorkspaceId = workspace.Id,
+            ServiceAccountKey = workspace.ServiceAccountKey,
             Status = AutomationRunStatus.Running,
             StartedUtc = DateTime.UtcNow,
             InitiatedBy = initiatorType,
