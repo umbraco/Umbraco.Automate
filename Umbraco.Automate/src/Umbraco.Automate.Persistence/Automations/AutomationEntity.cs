@@ -21,7 +21,7 @@ internal sealed class AutomationEntity
 
     public int DraftVersion { get; set; }
 
-    public Guid? WorkspaceId { get; set; }
+    public Guid WorkspaceId { get; set; }
 
     public Guid? GroupId { get; set; }
 

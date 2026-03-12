@@ -165,4 +165,27 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         scope.Complete();
         return exists;
     }
+
+    public async Task<IReadOnlySet<Guid>> GetIdsByUserGroupKeysAsync(
+        IEnumerable<Guid> userGroupKeys,
+        CancellationToken cancellationToken = default)
+    {
+        var keys = userGroupKeys.ToList();
+        if (keys.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var ids = await scope.ExecuteWithContextAsync(async db =>
+            await db.Set<WorkspaceUserGroupEntity>()
+                .Where(ug => keys.Contains(ug.UserGroupId))
+                .Select(ug => ug.WorkspaceId)
+                .Distinct()
+                .ToListAsync(cancellationToken));
+
+        scope.Complete();
+        return ids.ToHashSet();
+    }
 }

@@ -75,7 +75,7 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(1);
 
-                    b.Property<Guid?>("WorkspaceId")
+                    b.Property<Guid>("WorkspaceId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

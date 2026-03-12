@@ -58,6 +58,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
 
     public async Task<(IEnumerable<Automation> Items, int Total)> GetPagedAsync(
         string? filter = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
@@ -67,6 +68,11 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
         var result = await scope.ExecuteWithContextAsync(async db =>
         {
             IQueryable<AutomationEntity> query = db.Automations;
+
+            if (workspaceIds is not null)
+            {
+                query = query.Where(a => workspaceIds.Contains(a.WorkspaceId));
+            }
 
             if (!string.IsNullOrWhiteSpace(filter))
             {

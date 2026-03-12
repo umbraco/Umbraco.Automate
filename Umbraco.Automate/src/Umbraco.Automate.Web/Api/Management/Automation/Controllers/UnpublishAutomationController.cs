@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
@@ -12,13 +13,17 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class UnpublishAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IAuthorizationService _authorizationService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UnpublishAutomationController"/> class.
     /// </summary>
-    public UnpublishAutomationController(IAutomationService automationService)
+    public UnpublishAutomationController(
+        IAutomationService automationService,
+        IAuthorizationService authorizationService)
     {
         _automationService = automationService;
+        _authorizationService = authorizationService;
     }
 
     /// <summary>
@@ -36,6 +41,12 @@ public sealed class UnpublishAutomationController : AutomationControllerBase
         if (existing is null)
         {
             return AutomationNotFound();
+        }
+
+        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, existing.WorkspaceId);
+        if (forbidden is not null)
+        {
+            return forbidden;
         }
 
         await _automationService.UnpublishAutomationAsync(id, cancellationToken: cancellationToken);

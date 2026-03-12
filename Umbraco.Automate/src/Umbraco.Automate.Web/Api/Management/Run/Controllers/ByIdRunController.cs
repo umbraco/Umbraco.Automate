@@ -1,6 +1,8 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Web.Api.Management.Run.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -13,15 +15,23 @@ namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
 [ApiVersion("1.0")]
 public sealed class ByIdRunController : RunControllerBase
 {
+    private readonly IAutomationService _automationService;
     private readonly IAutomationRunService _runService;
+    private readonly IAuthorizationService _authorizationService;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ByIdRunController"/> class.
     /// </summary>
-    public ByIdRunController(IAutomationRunService runService, IUmbracoMapper mapper)
+    public ByIdRunController(
+        IAutomationService automationService,
+        IAutomationRunService runService,
+        IAuthorizationService authorizationService,
+        IUmbracoMapper mapper)
     {
+        _automationService = automationService;
         _runService = runService;
+        _authorizationService = authorizationService;
         _mapper = mapper;
     }
 
@@ -40,6 +50,18 @@ public sealed class ByIdRunController : RunControllerBase
         if (run is null)
         {
             return RunNotFound();
+        }
+
+        var automation = await _automationService.GetAutomationAsync(run.AutomationId, cancellationToken);
+        if (automation is null)
+        {
+            return RunNotFound();
+        }
+
+        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, automation.WorkspaceId);
+        if (forbidden is not null)
+        {
+            return forbidden;
         }
 
         return Ok(_mapper.Map<AutomationRunResponseModel>(run));

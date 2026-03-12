@@ -113,4 +113,9 @@ internal sealed class WorkspaceService : IWorkspaceService
         scope.Complete();
         return deleted;
     }
+
+    public Task<IReadOnlySet<Guid>> GetAccessibleWorkspaceIdsAsync(
+        IEnumerable<Guid> userGroupKeys,
+        CancellationToken cancellationToken = default)
+        => _workspaceRepository.GetIdsByUserGroupKeysAsync(userGroupKeys, cancellationToken);
 }

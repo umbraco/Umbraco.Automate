@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
@@ -53,6 +54,8 @@ public static partial class UmbracoBuilderExtensions
 
     private static IUmbracoBuilder AddUmbracoAutomateAuthorization(this IUmbracoBuilder builder)
     {
+        builder.Services.AddSingleton<IAuthorizationHandler, WorkspaceAccessHandler>();
+
         builder.Services.AddAuthorization(o =>
         {
             o.AddPolicy(AutomateAuthorizationPolicies.SectionAccessAutomate, policy =>
@@ -61,6 +64,12 @@ public static partial class UmbracoBuilderExtensions
 #pragma warning disable CS0618 // Type or member is obsolete
                 policy.RequireClaim(Umbraco.Cms.Core.Constants.Security.AllowedApplicationsClaimType, Core.Constants.Sections.Automate);
 #pragma warning restore CS0618 // Type or member is obsolete
+            });
+
+            o.AddPolicy(AutomateAuthorizationPolicies.WorkspaceAccess, policy =>
+            {
+                policy.AuthenticationSchemes.Add(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+                policy.Requirements.Add(new WorkspaceAccessRequirement());
             });
         });
 

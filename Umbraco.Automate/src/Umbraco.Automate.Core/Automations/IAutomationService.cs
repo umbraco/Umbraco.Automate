@@ -23,10 +23,16 @@ public interface IAutomationService
     Task<IEnumerable<Automation>> GetAllAutomationsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a paged list of automations.
+    /// Gets a paged list of automations, optionally scoped to specific workspace IDs.
     /// </summary>
+    /// <param name="filter">Optional name/alias filter.</param>
+    /// <param name="workspaceIds">When provided, only returns automations in these workspaces. Pass <c>null</c> to return all.</param>
+    /// <param name="skip">Number of items to skip.</param>
+    /// <param name="take">Maximum number of items to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     Task<(IEnumerable<Automation> Items, int Total)> GetAutomationsPagedAsync(
         string? filter = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default);

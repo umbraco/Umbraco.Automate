@@ -43,4 +43,11 @@ internal interface IWorkspaceRepository
     /// Checks whether a workspace with the given ID exists.
     /// </summary>
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the IDs of workspaces that contain any of the given user group keys.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetIdsByUserGroupKeysAsync(
+        IEnumerable<Guid> userGroupKeys,
+        CancellationToken cancellationToken = default);
 }

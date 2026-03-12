@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
@@ -12,13 +13,17 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class DeleteAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IAuthorizationService _authorizationService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeleteAutomationController"/> class.
     /// </summary>
-    public DeleteAutomationController(IAutomationService automationService)
+    public DeleteAutomationController(
+        IAutomationService automationService,
+        IAuthorizationService authorizationService)
     {
         _automationService = automationService;
+        _authorizationService = authorizationService;
     }
 
     /// <summary>
@@ -32,11 +37,19 @@ public sealed class DeleteAutomationController : AutomationControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var deleted = await _automationService.DeleteAutomationAsync(id, cancellationToken);
-        if (!deleted)
+        var automation = await _automationService.GetAutomationAsync(id, cancellationToken);
+        if (automation is null)
         {
             return AutomationNotFound();
         }
+
+        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, automation.WorkspaceId);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
+        await _automationService.DeleteAutomationAsync(id, cancellationToken);
 
         return Ok();
     }

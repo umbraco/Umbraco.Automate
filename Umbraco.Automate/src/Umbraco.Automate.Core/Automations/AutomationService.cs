@@ -45,10 +45,11 @@ internal sealed class AutomationService : IAutomationService
 
     public Task<(IEnumerable<Automation> Items, int Total)> GetAutomationsPagedAsync(
         string? filter = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
-        => _automationRepository.GetPagedAsync(filter, skip, take, cancellationToken);
+        => _automationRepository.GetPagedAsync(filter, workspaceIds, skip, take, cancellationToken);
 
     public async Task<Automation> CreateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {

@@ -43,4 +43,11 @@ public interface IWorkspaceService
     /// Deletes a workspace.
     /// </summary>
     Task<bool> DeleteWorkspaceAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the IDs of workspaces accessible to any of the given user group keys.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetAccessibleWorkspaceIdsAsync(
+        IEnumerable<Guid> userGroupKeys,
+        CancellationToken cancellationToken = default);
 }

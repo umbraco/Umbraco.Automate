@@ -80,7 +80,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(1);
 
-                    b.Property<Guid?>("WorkspaceId")
+                    b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");

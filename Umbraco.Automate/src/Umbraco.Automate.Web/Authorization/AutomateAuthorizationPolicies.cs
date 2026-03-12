@@ -9,4 +9,9 @@ public static class AutomateAuthorizationPolicies
     /// Represents the policy name for accessing the Automate section.
     /// </summary>
     public const string SectionAccessAutomate = nameof(SectionAccessAutomate);
+
+    /// <summary>
+    /// Represents the policy name for workspace membership access (resource-based).
+    /// </summary>
+    public const string WorkspaceAccess = nameof(WorkspaceAccess);
 }

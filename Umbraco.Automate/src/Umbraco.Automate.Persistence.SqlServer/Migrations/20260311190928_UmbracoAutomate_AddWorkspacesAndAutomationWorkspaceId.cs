@@ -15,7 +15,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                 name: "WorkspaceId",
                 table: "umbracoAutomateAutomation",
                 type: "uniqueidentifier",
-                nullable: true);
+                nullable: false);
 
             migrationBuilder.CreateTable(
                 name: "umbracoAutomateWorkspace",

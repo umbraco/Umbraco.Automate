@@ -15,7 +15,7 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                 name: "WorkspaceId",
                 table: "umbracoAutomateAutomation",
                 type: "TEXT",
-                nullable: true);
+                nullable: false);
 
             migrationBuilder.CreateTable(
                 name: "umbracoAutomateWorkspace",
