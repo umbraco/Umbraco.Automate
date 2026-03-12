@@ -69,16 +69,21 @@ if ! grep -qF '.claude/worktrees' "$GIT_ROOT/.gitignore" 2>/dev/null; then
 fi
 
 # --- Determine base branch ---
-# Use the default remote branch (usually dev or main)
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@') || true
-if [[ -z "$DEFAULT_BRANCH" ]]; then
-  # Fallback: check common branch names
-  for candidate in dev main master; do
-    if git show-ref --verify --quiet "refs/remotes/origin/$candidate" 2>/dev/null; then
-      DEFAULT_BRANCH="$candidate"
-      break
-    fi
-  done
+# Prefer origin/dev when it exists (gitflow convention), then fall back to origin/HEAD,
+# then probe common branch names.
+DEFAULT_BRANCH=""
+if git show-ref --verify --quiet "refs/remotes/origin/dev" 2>/dev/null; then
+  DEFAULT_BRANCH="dev"
+else
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@') || true
+  if [[ -z "$DEFAULT_BRANCH" ]]; then
+    for candidate in main master; do
+      if git show-ref --verify --quiet "refs/remotes/origin/$candidate" 2>/dev/null; then
+        DEFAULT_BRANCH="$candidate"
+        break
+      fi
+    done
+  fi
 fi
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-dev}"
 

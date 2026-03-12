@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Umbraco.Automate.Web.Authorization;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.Builders;
 using Umbraco.Cms.Api.Common.Filters;
-using Umbraco.Cms.Web.Common.Authorization;
+using Umbraco.Cms.Core.Security.Authorization;
+using Umbraco.Extensions;
 
 namespace Umbraco.Automate.Web.Api.Management.Common.Controllers;
 
@@ -13,7 +16,7 @@ namespace Umbraco.Automate.Web.Api.Management.Common.Controllers;
 [ApiController]
 [MapToApi(Constants.ManagementApi.ApiName)]
 [JsonOptionsName(Constants.ManagementApi.ApiName)]
-[Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
+[Authorize(Policy = AutomateAuthorizationPolicies.SectionAccessAutomate)]
 [Produces("application/json")]
 public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
 {
@@ -43,4 +46,30 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
             .WithTitle("Run not found")
             .WithDetail("The specified run could not be found.")
             .Build());
+
+    /// <summary>
+    /// Returns a 403 Forbidden response.
+    /// </summary>
+    /// <remarks>
+    /// Use this method instead of the controller base class's <c>Forbid()</c> method.
+    /// This ensures a proper 403 status code is returned to the client.
+    /// </remarks>
+    protected IActionResult Forbidden()
+        => new StatusCodeResult(StatusCodes.Status403Forbidden);
+
+    /// <summary>
+    /// Authorizes workspace access for the current user. Returns <c>null</c> if authorized,
+    /// or a 403 Forbidden result if the user is not a member of the workspace.
+    /// </summary>
+    protected async Task<IActionResult?> AuthorizeWorkspaceAccessAsync(
+        IAuthorizationService authorizationService,
+        Guid workspaceId)
+    {
+        var result = await authorizationService.AuthorizeResourceAsync(
+            User,
+            WorkspaceAccessResource.WithId(workspaceId),
+            AutomateAuthorizationPolicies.WorkspaceAccess);
+
+        return result.Succeeded ? null : Forbidden();
+    }
 }

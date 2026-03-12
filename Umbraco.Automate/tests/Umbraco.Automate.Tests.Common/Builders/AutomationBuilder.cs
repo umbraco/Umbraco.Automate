@@ -16,6 +16,7 @@ public class AutomationBuilder
     private bool _isEnabled = true;
     private int? _publishedVersion = 1;
     private int _version = 1;
+    private Guid _workspaceId = Guid.NewGuid();
     private Guid? _groupId;
     private DateTime _dateCreated = DateTime.UtcNow;
     private DateTime _dateModified = DateTime.UtcNow;
@@ -34,6 +35,7 @@ public class AutomationBuilder
     public AutomationBuilder WithIsEnabled(bool isEnabled) { _isEnabled = isEnabled; return this; }
     public AutomationBuilder WithVersion(int version) { _version = version; return this; }
     public AutomationBuilder WithPublishedVersion(int? publishedVersion) { _publishedVersion = publishedVersion; return this; }
+    public AutomationBuilder WithWorkspaceId(Guid workspaceId) { _workspaceId = workspaceId; return this; }
     public AutomationBuilder WithGroupId(Guid? groupId) { _groupId = groupId; return this; }
     public AutomationBuilder WithDateCreated(DateTime dateCreated) { _dateCreated = dateCreated; return this; }
     public AutomationBuilder WithDateModified(DateTime dateModified) { _dateModified = dateModified; return this; }
@@ -132,6 +134,7 @@ public class AutomationBuilder
         IsEnabled = _isEnabled,
         PublishedVersion = _publishedVersion,
         Version = _version,
+        WorkspaceId = _workspaceId,
         GroupId = _groupId,
         DateCreated = _dateCreated,
         DateModified = _dateModified,

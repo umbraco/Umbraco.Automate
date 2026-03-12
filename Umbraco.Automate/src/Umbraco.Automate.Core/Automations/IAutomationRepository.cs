@@ -21,10 +21,11 @@ internal interface IAutomationRepository
     Task<IEnumerable<Automation>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a paged list of automations.
+    /// Gets a paged list of automations, optionally scoped to specific workspace IDs.
     /// </summary>
     Task<(IEnumerable<Automation> Items, int Total)> GetPagedAsync(
         string? filter = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default);

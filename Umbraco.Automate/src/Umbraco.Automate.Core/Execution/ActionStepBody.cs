@@ -67,6 +67,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             Settings = settings,
             InputData = resolvedInputs,
             CancellationToken = cancellationToken,
+            ExecutionContext = data.ExecutionContext,
         };
 
         // Create and persist step run.

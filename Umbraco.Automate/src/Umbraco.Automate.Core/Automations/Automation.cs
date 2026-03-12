@@ -41,6 +41,11 @@ public sealed class Automation : IVersionableEntity
     public int? PublishedVersion { get; set; }
 
     /// <summary>
+    /// Gets or sets the workspace this automation belongs to.
+    /// </summary>
+    public Guid WorkspaceId { get; set; }
+
+    /// <summary>
     /// Gets or sets the folder group ID, or null if at the root.
     /// </summary>
     public Guid? GroupId { get; set; }

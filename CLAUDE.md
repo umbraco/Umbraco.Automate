@@ -28,10 +28,10 @@ Each product has its own solution file, CLAUDE.md, and can be built independentl
 
 ```bash
 # Build individual product
-dotnet build Umbraco.Automate/Umbraco.Automate.sln
+dotnet build Umbraco.Automate/Umbraco.Automate.slnx
 
 # Run tests for a product
-dotnet test Umbraco.Automate/Umbraco.Automate.sln
+dotnet test Umbraco.Automate/Umbraco.Automate.slnx
 ```
 
 ## Architecture Overview
@@ -56,7 +56,7 @@ ProductName/
 │   ├── ProductName.Tests.Unit/
 │   ├── ProductName.Tests.Integration/
 │   └── ProductName.Tests.Common/
-├── ProductName.sln                 # Individual solution
+├── ProductName.slnx                # Individual solution (XML solution format)
 └── CLAUDE.md                       # Product-specific guidance
 ```
 

@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
@@ -15,14 +16,19 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class TriggerAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IAuthorizationService _authorizationService;
     private readonly ITriggerDispatcher _dispatcher;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TriggerAutomationController"/> class.
     /// </summary>
-    public TriggerAutomationController(IAutomationService automationService, ITriggerDispatcher dispatcher)
+    public TriggerAutomationController(
+        IAutomationService automationService,
+        IAuthorizationService authorizationService,
+        ITriggerDispatcher dispatcher)
     {
         _automationService = automationService;
+        _authorizationService = authorizationService;
         _dispatcher = dispatcher;
     }
 
@@ -42,6 +48,12 @@ public sealed class TriggerAutomationController : AutomationControllerBase
         if (automation is null)
         {
             return AutomationNotFound();
+        }
+
+        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, automation.WorkspaceId);
+        if (forbidden is not null)
+        {
+            return forbidden;
         }
 
         if (automation.Status != AutomationStatus.Published || !automation.IsEnabled)

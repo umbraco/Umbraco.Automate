@@ -18,6 +18,7 @@ using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Tests.Common.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
@@ -38,6 +39,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
     private TriggerEventHandler _handler = null!;
     private IAutomationRunRepository _runRepository = null!;
     private Automation _automation = null!;
+    private Workspace _workspace = null!;
 
     public async Task InitializeAsync()
     {
@@ -81,6 +83,13 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(new ExpressionEvaluator(Array.Empty<IExpressionFilter>()));
         services.AddSingleton<ActionMiddlewarePipeline>();
         services.AddSingleton<AutomateMetrics>();
+
+        // Workspace service — returns a known workspace so we can verify execution context.
+        _workspace = new WorkspaceBuilder().WithName("Smoke Test Workspace").Build();
+        var workspaceService = new Mock<IWorkspaceService>();
+        workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_workspace);
+        services.AddSingleton(workspaceService.Object);
 
         // Execution.
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();

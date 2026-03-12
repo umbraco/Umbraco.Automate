@@ -7,8 +7,10 @@ using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
@@ -42,9 +44,13 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.Configure<WebhookOptions>(
             builder.Config.GetSection("Umbraco:Automate:Webhook"));
 
-        // Collection builders — triggers, actions, filters auto-discovered
-        builder.AutomateTriggers();
-        builder.AutomateActions();
+        // Collection builders — triggers, actions, connections, filters auto-discovered
+        builder.AutomateTriggers()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<ITrigger, TriggerAttribute>(cache: true));
+        builder.AutomateActions()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAction, ActionAttribute>(cache: true));
+        builder.AutomateConnectionTypes()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<IConnectionType, ConnectionTypeAttribute>(cache: true));
         builder.AutomateExpressionFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>();
@@ -65,6 +71,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEditableModelResolver, EditableModelResolver>();
         builder.Services.AddSingleton<ActionInfrastructure>();
         builder.Services.AddSingleton<TriggerInfrastructure>();
+        builder.Services.AddSingleton<ConnectionTypeInfrastructure>();
 
         // Versioning
         builder.Services.AddSingleton<IEntityVersionService, EntityVersionService>();
@@ -75,6 +82,8 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<AutomateMetrics>();
 
         // Core services
+        builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
+        builder.Services.AddSingleton<IConnectionService, ConnectionService>();
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
@@ -97,6 +106,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IMessageHandler, TriggerEventHandler>();
 
         // Automation execution
+        builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         // WorkflowCore engine with outbox-backed queue
@@ -132,6 +142,12 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static ActionMiddlewareCollectionBuilder AutomateActionMiddleware(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<ActionMiddlewareCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the connection type collection builder. Connection types are auto-discovered.
+    /// </summary>
+    public static ConnectionTypeCollectionBuilder AutomateConnectionTypes(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<ConnectionTypeCollectionBuilder>();
 
     /// <summary>
     /// Gets the versionable entity adapter collection builder.
