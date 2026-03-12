@@ -41,16 +41,44 @@ See [vocabulary.md](../docs/vocabulary.md) for the complete terminology.
 - **Provider** - Package contributing triggers and actions
 - **Action** - Reusable unit of work (`StepBody` / `StepBodyAsync`)
 - **Trigger** - Event entry point for an automation
-- **Settings** - POCO model driving the config UI
-- **Automation** - User-defined trigger + steps (`IWorkflow`)
+- **Settings** - POCO model driving the config UI via EditableModels infrastructure (`[EditableModelField]`)
+- **Automation** - User-defined trigger + steps (`IWorkflow`) with draft/published lifecycle
 - **Step** - Configured action instance with input bindings
-- **Run** - Single automation execution
+- **Run** - Single automation execution with per-step tracking
+- **Workspace** - Admin-configured container grouping automations, scoping connections and membership
+- **Connection** - Named, reusable credential set for external services (extensible type system)
+- **Service Account** - Execution identity (`UserKind.Api`) tied to a workspace
+
+### Key Services
+
+| Service | Responsibility |
+| --- | --- |
+| `IAutomationService` | CRUD + publish/unpublish lifecycle |
+| `IWorkspaceService` | Workspace management and membership |
+| `IConnectionService` | Connection CRUD |
+| `IAutomationRunService` | Run tracking and history |
+| `IEntityVersionService` | Version history |
+
+### Runtime & Dispatch
+
+- Custom outbox pattern (`IOutboxStore`, `OutboxDispatcher`, `OutboxHealthCheck`) for reliable trigger dispatch
+- `TriggerEventHandler` / `TriggerNotificationHandler` for Umbraco notification integration
+- Custom `IPersistenceProvider` for WorkflowCore (avoids EF Core version conflicts)
+
+### Security
+
+- Workspace-based access control with membership checks
+- Automate section access authorization policy
+- SSRF protection for HTTP actions
+- Sensitive field masking for credentials
 
 ### Database
 
 - Migration prefix: `UmbracoAutomate_`
 - DbContext: `UmbracoAutomateDbContext`
 - SQL Server and SQLite supported via EF Core
+- Domain tables: Automation, Step, AutomationRun, StepRun, Workspace, Connection, OutboxMessage
+- Engine tables: WorkflowInstance, ExecutionPointer, EventSubscription, Event, ScheduledCommand
 
 ## Commit Scopes
 
