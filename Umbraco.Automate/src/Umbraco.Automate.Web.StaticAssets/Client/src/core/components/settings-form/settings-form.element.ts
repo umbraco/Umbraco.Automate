@@ -1,7 +1,7 @@
 import { css, html, customElement, property } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import type { EditableModelFieldDescriptorResponseModel } from "../../../api/types.gen.js";
+import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.js";
 import { resolveEditorType, type FieldEditorType } from "./field-mapper.js";
 
 export interface SettingsChangeDetail {
@@ -10,20 +10,20 @@ export interface SettingsChangeDetail {
 
 interface GroupedFields {
     group: string;
-    fields: EditableModelFieldDescriptorResponseModel[];
+    fields: EditableModelFieldDescriptorModel[];
 }
 
 @customElement("ua-settings-form")
 export class UaSettingsFormElement extends UmbLitElement {
     @property({ type: Array })
-    fields: EditableModelFieldDescriptorResponseModel[] = [];
+    fields: EditableModelFieldDescriptorModel[] = [];
 
     @property({ type: Object })
     values: Record<string, unknown> = {};
 
-    #groupFields(fields: EditableModelFieldDescriptorResponseModel[]): GroupedFields[] {
+    #groupFields(fields: EditableModelFieldDescriptorModel[]): GroupedFields[] {
         const sorted = [...fields].sort((a, b) => a.sortOrder - b.sortOrder);
-        const groups = new Map<string, EditableModelFieldDescriptorResponseModel[]>();
+        const groups = new Map<string, EditableModelFieldDescriptorModel[]>();
 
         for (const field of sorted) {
             const group = field.group || "";
@@ -47,7 +47,7 @@ export class UaSettingsFormElement extends UmbLitElement {
         );
     }
 
-    #renderField(field: EditableModelFieldDescriptorResponseModel) {
+    #renderField(field: EditableModelFieldDescriptorModel) {
         const editorType = resolveEditorType(field.editorUiAlias, field.propertyType, field.isSensitive);
         const value = this.values[field.propertyName];
 
@@ -68,7 +68,7 @@ export class UaSettingsFormElement extends UmbLitElement {
     }
 
     #renderEditor(
-        field: EditableModelFieldDescriptorResponseModel,
+        field: EditableModelFieldDescriptorModel,
         editorType: FieldEditorType,
         value: unknown,
     ) {

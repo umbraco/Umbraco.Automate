@@ -2,7 +2,7 @@ import { css, customElement, html, property, state } from "@umbraco-cms/backoffi
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
-import type { EditableModelFieldDescriptorResponseModel, EditableModelSchemaResponseModel } from "../../../api/types.gen.js";
+import type { EditableModelFieldDescriptorModel, EditableModelSchemaModel } from "../../../api/types.gen.js";
 
 /**
  * Event detail for model editor value changes.
@@ -33,7 +33,7 @@ export class UaModelEditorElement extends UmbLitElement {
      * The schema defining the fields to render.
      */
     @property({ type: Object })
-    schema?: EditableModelSchemaResponseModel;
+    schema?: EditableModelSchemaModel;
 
     /**
      * The current model values for the fields (key-value pairs keyed by propertyName).

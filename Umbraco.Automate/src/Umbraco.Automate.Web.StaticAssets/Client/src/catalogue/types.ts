@@ -1,4 +1,4 @@
-import type { EditableModelSchemaResponseModel, TriggerOutputPropertyResponseModel } from "../api/types.gen.js";
+import type { EditableModelSchemaModel, TriggerOutputPropertyModel } from "../api/types.gen.js";
 
 export interface UaCatalogueItemModel {
     alias: string;
@@ -6,11 +6,11 @@ export interface UaCatalogueItemModel {
     description: string | null;
     group: string | null;
     icon: string | null;
-    settingsSchema: EditableModelSchemaResponseModel | null;
+    settingsSchema: EditableModelSchemaModel | null;
 }
 
 export interface UaTriggerCatalogueItemModel extends UaCatalogueItemModel {
-    outputProperties: TriggerOutputPropertyResponseModel[];
+    outputProperties: TriggerOutputPropertyModel[];
 }
 
 export interface UaActionCatalogueItemModel extends UaCatalogueItemModel {}

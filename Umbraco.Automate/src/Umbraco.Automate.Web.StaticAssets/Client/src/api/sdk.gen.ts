@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteAutomationsByIdData, DeleteAutomationsByIdErrors, DeleteAutomationsByIdResponses, DeleteConnectionsByIdData, DeleteConnectionsByIdErrors, DeleteConnectionsByIdResponses, DeleteWorkspacesByIdData, DeleteWorkspacesByIdErrors, DeleteWorkspacesByIdResponses, GetAutomationsByIdData, GetAutomationsByIdErrors, GetAutomationsByIdResponses, GetAutomationsByIdRunsData, GetAutomationsByIdRunsErrors, GetAutomationsByIdRunsResponses, GetAutomationsData, GetAutomationsErrors, GetAutomationsResponses, GetCatalogueActionsData, GetCatalogueActionsErrors, GetCatalogueActionsResponses, GetCatalogueConnectionTypesData, GetCatalogueConnectionTypesErrors, GetCatalogueConnectionTypesResponses, GetCatalogueTriggersData, GetCatalogueTriggersErrors, GetCatalogueTriggersResponses, GetConnectionsByIdData, GetConnectionsByIdErrors, GetConnectionsByIdResponses, GetConnectionsData, GetConnectionsErrors, GetConnectionsResponses, GetRunsByIdData, GetRunsByIdErrors, GetRunsByIdResponses, GetWorkspacesByIdData, GetWorkspacesByIdErrors, GetWorkspacesByIdResponses, GetWorkspacesData, GetWorkspacesErrors, GetWorkspacesResponses, PostAutomationsByIdPublishData, PostAutomationsByIdPublishErrors, PostAutomationsByIdPublishResponses, PostAutomationsByIdTriggerData, PostAutomationsByIdTriggerErrors, PostAutomationsByIdTriggerResponses, PostAutomationsByIdUnpublishData, PostAutomationsByIdUnpublishErrors, PostAutomationsByIdUnpublishResponses, PostAutomationsData, PostAutomationsErrors, PostAutomationsResponses, PostConnectionsData, PostConnectionsErrors, PostConnectionsResponses, PostWorkspacesData, PostWorkspacesErrors, PostWorkspacesResponses, PutAutomationsByIdData, PutAutomationsByIdErrors, PutAutomationsByIdResponses, PutConnectionsByIdData, PutConnectionsByIdErrors, PutConnectionsByIdResponses, PutWorkspacesByIdData, PutWorkspacesByIdErrors, PutWorkspacesByIdResponses } from './types.gen';
+import type { DeleteAutomationsByIdData, DeleteAutomationsByIdErrors, DeleteAutomationsByIdResponses, DeleteConnectionsByIdData, DeleteConnectionsByIdErrors, DeleteConnectionsByIdResponses, DeleteWorkspacesByIdData, DeleteWorkspacesByIdErrors, DeleteWorkspacesByIdGroupsByGroupIdData, DeleteWorkspacesByIdGroupsByGroupIdErrors, DeleteWorkspacesByIdGroupsByGroupIdResponses, DeleteWorkspacesByIdResponses, GetApprovalsPendingData, GetApprovalsPendingErrors, GetApprovalsPendingResponses, GetAutomationsByIdData, GetAutomationsByIdErrors, GetAutomationsByIdResponses, GetAutomationsByIdRunsData, GetAutomationsByIdRunsErrors, GetAutomationsByIdRunsResponses, GetAutomationsData, GetAutomationsErrors, GetAutomationsResponses, GetCatalogueActionsData, GetCatalogueActionsErrors, GetCatalogueActionsResponses, GetCatalogueConnectionTypesData, GetCatalogueConnectionTypesErrors, GetCatalogueConnectionTypesResponses, GetCatalogueNotificationChannelsData, GetCatalogueNotificationChannelsErrors, GetCatalogueNotificationChannelsResponses, GetCatalogueTriggersData, GetCatalogueTriggersErrors, GetCatalogueTriggersResponses, GetConnectionsByIdData, GetConnectionsByIdErrors, GetConnectionsByIdResponses, GetConnectionsData, GetConnectionsErrors, GetConnectionsResponses, GetMetricsByAutomationData, GetMetricsByAutomationErrors, GetMetricsByAutomationResponses, GetMetricsData, GetMetricsErrors, GetMetricsResponses, GetRunsByIdData, GetRunsByIdErrors, GetRunsByIdResponses, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdData, GetVersionHistoryByEntityTypeByEntityIdErrors, GetVersionHistoryByEntityTypeByEntityIdResponses, GetVersionHistorySupportedTypesData, GetVersionHistorySupportedTypesErrors, GetVersionHistorySupportedTypesResponses, GetWorkspacesByIdData, GetWorkspacesByIdErrors, GetWorkspacesByIdGroupsByGroupIdData, GetWorkspacesByIdGroupsByGroupIdErrors, GetWorkspacesByIdGroupsByGroupIdResponses, GetWorkspacesByIdGroupsData, GetWorkspacesByIdGroupsErrors, GetWorkspacesByIdGroupsResponses, GetWorkspacesByIdResponses, GetWorkspacesData, GetWorkspacesErrors, GetWorkspacesResponses, PostApprovalsByRunIdStepsByStepIdDecisionData, PostApprovalsByRunIdStepsByStepIdDecisionErrors, PostApprovalsByRunIdStepsByStepIdDecisionResponses, PostAutomationsByIdPublishData, PostAutomationsByIdPublishErrors, PostAutomationsByIdPublishResponses, PostAutomationsByIdTriggerData, PostAutomationsByIdTriggerErrors, PostAutomationsByIdTriggerResponses, PostAutomationsByIdUnpublishData, PostAutomationsByIdUnpublishErrors, PostAutomationsByIdUnpublishResponses, PostAutomationsData, PostAutomationsErrors, PostAutomationsResponses, PostConnectionsData, PostConnectionsErrors, PostConnectionsResponses, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackData, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses, PostWorkspacesByIdGroupsData, PostWorkspacesByIdGroupsErrors, PostWorkspacesByIdGroupsResponses, PostWorkspacesData, PostWorkspacesErrors, PostWorkspacesResponses, PutAutomationsByIdData, PutAutomationsByIdErrors, PutAutomationsByIdResponses, PutConnectionsByIdData, PutConnectionsByIdErrors, PutConnectionsByIdResponses, PutWorkspacesByIdData, PutWorkspacesByIdErrors, PutWorkspacesByIdGroupsByGroupIdData, PutWorkspacesByIdGroupsByGroupIdErrors, PutWorkspacesByIdGroupsByGroupIdResponses, PutWorkspacesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -17,6 +17,38 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: Record<string, unknown>;
 };
+
+export class ApprovalsService {
+    public static postApprovalsByRunIdStepsByStepIdDecision<ThrowOnError extends boolean = false>(options: Options<PostApprovalsByRunIdStepsByStepIdDecisionData, ThrowOnError>) {
+        return (options.client ?? client).post<PostApprovalsByRunIdStepsByStepIdDecisionResponses, PostApprovalsByRunIdStepsByStepIdDecisionErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/approvals/{runId}/steps/{stepId}/decision',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    public static getApprovalsPending<ThrowOnError extends boolean = false>(options?: Options<GetApprovalsPendingData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetApprovalsPendingResponses, GetApprovalsPendingErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/approvals/pending',
+            ...options
+        });
+    }
+}
 
 export class AutomationsService {
     public static getAutomations<ThrowOnError extends boolean = false>(options?: Options<GetAutomationsData, ThrowOnError>) {
@@ -172,6 +204,19 @@ export class CatalogueService {
         });
     }
     
+    public static getCatalogueNotificationChannels<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueNotificationChannelsData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetCatalogueNotificationChannelsResponses, GetCatalogueNotificationChannelsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/catalogue/notification-channels',
+            ...options
+        });
+    }
+    
     public static getCatalogueTriggers<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueTriggersData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueTriggersResponses, GetCatalogueTriggersErrors, ThrowOnError>({
             security: [
@@ -261,6 +306,34 @@ export class ConnectionsService {
     }
 }
 
+export class MetricsService {
+    public static getMetrics<ThrowOnError extends boolean = false>(options?: Options<GetMetricsData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetMetricsResponses, GetMetricsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/metrics',
+            ...options
+        });
+    }
+    
+    public static getMetricsByAutomation<ThrowOnError extends boolean = false>(options?: Options<GetMetricsByAutomationData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetMetricsByAutomationResponses, GetMetricsByAutomationErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/metrics/by-automation',
+            ...options
+        });
+    }
+}
+
 export class RunsService {
     public static getRunsById<ThrowOnError extends boolean = false>(options: Options<GetRunsByIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetRunsByIdResponses, GetRunsByIdErrors, ThrowOnError>({
@@ -271,6 +344,73 @@ export class RunsService {
                 }
             ],
             url: '/umbraco/automate/management/api/v1/runs/{id}',
+            ...options
+        });
+    }
+}
+
+export class VersionHistoryService {
+    public static getVersionHistoryByEntityTypeByEntityId<ThrowOnError extends boolean = false>(options: Options<GetVersionHistoryByEntityTypeByEntityIdData, ThrowOnError>) {
+        return (options.client ?? client).get<GetVersionHistoryByEntityTypeByEntityIdResponses, GetVersionHistoryByEntityTypeByEntityIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}',
+            ...options
+        });
+    }
+    
+    public static getVersionHistoryByEntityTypeByEntityIdByEntityVersion<ThrowOnError extends boolean = false>(options: Options<GetVersionHistoryByEntityTypeByEntityIdByEntityVersionData, ThrowOnError>) {
+        return (options.client ?? client).get<GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{entityVersion}',
+            ...options
+        });
+    }
+    
+    public static postVersionHistoryByEntityTypeByEntityIdByEntityVersionRollback<ThrowOnError extends boolean = false>(options: Options<PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackData, ThrowOnError>) {
+        return (options.client ?? client).post<PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{entityVersion}/rollback',
+            ...options
+        });
+    }
+    
+    public static getVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersion<ThrowOnError extends boolean = false>(options: Options<GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionData, ThrowOnError>) {
+        return (options.client ?? client).get<GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{fromEntityVersion}/compare/{toEntityVersion}',
+            ...options
+        });
+    }
+    
+    public static getVersionHistorySupportedTypes<ThrowOnError extends boolean = false>(options?: Options<GetVersionHistorySupportedTypesData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetVersionHistorySupportedTypesResponses, GetVersionHistorySupportedTypesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/version-history/supported-types',
             ...options
         });
     }
@@ -342,6 +482,79 @@ export class WorkspacesService {
                 }
             ],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    public static getWorkspacesByIdGroups<ThrowOnError extends boolean = false>(options: Options<GetWorkspacesByIdGroupsData, ThrowOnError>) {
+        return (options.client ?? client).get<GetWorkspacesByIdGroupsResponses, GetWorkspacesByIdGroupsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups',
+            ...options
+        });
+    }
+    
+    public static postWorkspacesByIdGroups<ThrowOnError extends boolean = false>(options: Options<PostWorkspacesByIdGroupsData, ThrowOnError>) {
+        return (options.client ?? client).post<PostWorkspacesByIdGroupsResponses, PostWorkspacesByIdGroupsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    public static deleteWorkspacesByIdGroupsByGroupId<ThrowOnError extends boolean = false>(options: Options<DeleteWorkspacesByIdGroupsByGroupIdData, ThrowOnError>) {
+        return (options.client ?? client).delete<DeleteWorkspacesByIdGroupsByGroupIdResponses, DeleteWorkspacesByIdGroupsByGroupIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}',
+            ...options
+        });
+    }
+    
+    public static getWorkspacesByIdGroupsByGroupId<ThrowOnError extends boolean = false>(options: Options<GetWorkspacesByIdGroupsByGroupIdData, ThrowOnError>) {
+        return (options.client ?? client).get<GetWorkspacesByIdGroupsByGroupIdResponses, GetWorkspacesByIdGroupsByGroupIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}',
+            ...options
+        });
+    }
+    
+    public static putWorkspacesByIdGroupsByGroupId<ThrowOnError extends boolean = false>(options: Options<PutWorkspacesByIdGroupsByGroupIdData, ThrowOnError>) {
+        return (options.client ?? client).put<PutWorkspacesByIdGroupsByGroupIdResponses, PutWorkspacesByIdGroupsByGroupIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

@@ -1,5 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Triggers;
+
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 
 /// <summary>
@@ -25,8 +28,8 @@ public sealed class TriggerItemResponseModel
     public string? Icon { get; set; }
 
     /// <summary>The settings schema, or null if no settings.</summary>
-    public EditableModelSchemaResponseModel? SettingsSchema { get; set; }
+    public EditableModelSchema? SettingsSchema { get; set; }
 
     /// <summary>The output properties available for expressions.</summary>
-    public IReadOnlyList<TriggerOutputPropertyResponseModel> OutputProperties { get; set; } = [];
+    public IReadOnlyList<TriggerOutputProperty> OutputProperties { get; set; } = [];
 }

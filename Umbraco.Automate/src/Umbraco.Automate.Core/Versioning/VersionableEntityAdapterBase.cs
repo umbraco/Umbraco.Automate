@@ -57,26 +57,6 @@ public abstract class VersionableEntityAdapterBase<TEntity> : IVersionableEntity
     }
 
     /// <inheritdoc />
-    public virtual void HydrateIdentity(object entity, Guid entityId)
-    {
-        ArgumentNullException.ThrowIfNull(entity);
-        if (entity is not TEntity typed)
-        {
-            throw new ArgumentException(
-                $"Expected entity of type {typeof(TEntity).Name} but got {entity.GetType().Name}",
-                nameof(entity));
-        }
-
-        HydrateIdentity(typed, entityId);
-    }
-
-    /// <summary>
-    /// Restores identity fields lost during JSON round-trip.
-    /// Override in derived classes to set additional fields.
-    /// </summary>
-    protected abstract void HydrateIdentity(TEntity entity, Guid entityId);
-
-    /// <inheritdoc />
     async Task<object?> IVersionableEntityAdapter.GetEntityAsync(Guid entityId, CancellationToken cancellationToken)
         => await GetEntityAsync(entityId, cancellationToken);
 

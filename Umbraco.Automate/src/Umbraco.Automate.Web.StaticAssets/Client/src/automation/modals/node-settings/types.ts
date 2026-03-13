@@ -1,10 +1,10 @@
-import type { EditableModelSchemaResponseModel } from "../../../api/types.gen.js";
+import type { EditableModelSchemaModel } from "../../../api/types.gen.js";
 
 export interface UaNodeSettingsModalData {
     stepId: string;
     actionAlias: string;
     settings: Record<string, unknown>;
-    schema: EditableModelSchemaResponseModel;
+    schema: EditableModelSchemaModel;
 }
 
 export interface UaNodeSettingsModalValue {

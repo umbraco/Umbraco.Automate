@@ -12,7 +12,7 @@ import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/n
 import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-settings-modal.token.js";
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import type { EditableModelSchemaResponseModel } from "../../../../api/types.gen.js";
+import type { EditableModelSchemaModel } from "../../../../api/types.gen.js";
 import "../canvas/ua-automation-canvas.element.js";
 
 @customElement("ua-automation-workflow-workspace-view")
@@ -148,13 +148,13 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
     }
 
-    async #getTriggerSchema(alias: string): Promise<EditableModelSchemaResponseModel | null> {
+    async #getTriggerSchema(alias: string): Promise<EditableModelSchemaModel | null> {
         const { data } = await this.#catalogueRepository.requestTriggers();
         const trigger = data?.find((t) => t.alias === alias);
         return trigger?.settingsSchema ?? null;
     }
 
-    async #getActionSchema(alias: string): Promise<EditableModelSchemaResponseModel | null> {
+    async #getActionSchema(alias: string): Promise<EditableModelSchemaModel | null> {
         const { data } = await this.#catalogueRepository.requestActions();
         const action = data?.find((a) => a.alias === alias);
         return action?.settingsSchema ?? null;

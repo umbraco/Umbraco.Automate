@@ -10,8 +10,15 @@ export type ActionItemResponseModel = {
     description?: string | null;
     group?: string | null;
     icon?: string | null;
-    settingsSchema?: EditableModelSchemaResponseModel | null;
+    settingsSchema?: EditableModelSchemaModel | null;
 };
+
+export type ApprovalDecisionRequestModel = {
+    outcome: ApprovalOutcomeModel;
+    comment?: string | null;
+};
+
+export type ApprovalOutcomeModel = 'Approved' | 'Rejected';
 
 export type AutomationItemResponseModel = {
     id: string;
@@ -19,11 +26,17 @@ export type AutomationItemResponseModel = {
     name: string;
     description?: string | null;
     isEnabled: boolean;
-    workspaceId?: string | null;
+    workspaceId: string;
+    groupId?: string | null;
     status: AutomationStatusModel;
     version: number;
     dateCreated: string;
     dateModified: string;
+};
+
+export type AutomationNotificationSettingsModel = {
+    notifyOn: NotifyOnModel;
+    channels: Array<ChannelConfigurationModel>;
 };
 
 export type AutomationResponseModel = {
@@ -35,6 +48,7 @@ export type AutomationResponseModel = {
     status: AutomationStatusModel;
     publishedVersion?: number | null;
     workspaceId: string;
+    groupId?: string | null;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
     connections: Array<StepConnectionModel>;
@@ -42,6 +56,15 @@ export type AutomationResponseModel = {
     version: number;
     dateCreated: string;
     dateModified: string;
+    notificationSettings?: AutomationNotificationSettingsModel | null;
+};
+
+export type AutomationRunCountModel = {
+    automationId: string;
+    automationName: string;
+    totalRuns: number;
+    successCount: number;
+    failCount: number;
 };
 
 export type AutomationRunResponseModel = {
@@ -60,6 +83,14 @@ export type AutomationRunResponseModel = {
 export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Suspended' | 'Cancelled';
 
 export type AutomationStatusModel = 'Draft' | 'Published' | 'Inactive';
+
+export type ChannelConfigurationModel = {
+    channelAlias: string;
+    settings: {
+        [key: string]: unknown;
+    };
+    isEnabled: boolean;
+};
 
 export type ConnectionItemResponseModel = {
     id: string;
@@ -90,7 +121,7 @@ export type ConnectionTypeItemResponseModel = {
     description?: string | null;
     group?: string | null;
     icon?: string | null;
-    settingsSchema?: EditableModelSchemaResponseModel | null;
+    settingsSchema?: EditableModelSchemaModel | null;
 };
 
 export type CreateAutomationRequestModel = {
@@ -99,10 +130,12 @@ export type CreateAutomationRequestModel = {
     description?: string | null;
     workspaceId: string;
     isEnabled: boolean;
+    groupId?: string | null;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
     connections: Array<StepConnectionModel>;
     canvasState?: string | null;
+    notificationSettings?: AutomationNotificationSettingsModel | null;
 };
 
 export type CreateConnectionRequestModel = {
@@ -114,6 +147,11 @@ export type CreateConnectionRequestModel = {
     };
 };
 
+export type CreateWorkspaceGroupRequestModel = {
+    name: string;
+    parentId?: string | null;
+};
+
 export type CreateWorkspaceRequestModel = {
     alias: string;
     name: string;
@@ -122,22 +160,53 @@ export type CreateWorkspaceRequestModel = {
     allowedConnections: Array<string>;
 };
 
-export type EditableModelFieldDescriptorResponseModel = {
-    propertyName: string;
+export type EditableModelFieldDescriptorModel = {
     label: string;
-    propertyType: string;
     description?: string | null;
     editorUiAlias?: string | null;
     editorConfig?: string | null;
     sortOrder: number;
     isSensitive: boolean;
     group?: string | null;
-    isRequired: boolean;
+    supportsExpressions: boolean;
 };
 
-export type EditableModelSchemaResponseModel = {
-    fields: Array<EditableModelFieldDescriptorResponseModel>;
+export type EditableModelSchemaModel = {
+    fields: Array<EditableModelFieldDescriptorModel>;
 };
+
+export type EntityVersionComparisonResponseModel = {
+    fromVersion: number;
+    toVersion: number;
+    changes: Array<ValueChangeModel>;
+};
+
+export type EntityVersionHistoryResponseModel = {
+    currentVersion: number;
+    totalVersions: number;
+    publishedVersion?: number | null;
+    versions: Array<EntityVersionResponseModel>;
+};
+
+export type EntityVersionResponseModel = {
+    id: string;
+    entityId: string;
+    version: number;
+    dateCreated: string;
+    createdByUserId?: string | null;
+    changeDescription?: string | null;
+    isPublished: boolean;
+};
+
+export type NotificationChannelItemResponseModel = {
+    alias: string;
+    name: string;
+    description?: string | null;
+    icon?: string | null;
+    settingsSchema?: EditableModelSchemaModel | null;
+};
+
+export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered';
 
 export type PagedAutomationItemResponseModel = {
     total: number;
@@ -159,6 +228,15 @@ export type PagedWorkspaceItemResponseModel = {
     items: Array<WorkspaceItemResponseModel>;
 };
 
+export type PendingApprovalResponseModel = {
+    runId: string;
+    stepId: string;
+    automationId: string;
+    automationName: string;
+    prompt?: string | null;
+    requestedUtc?: string | null;
+};
+
 export type ProblemDetails = {
     type?: string | null;
     title?: string | null;
@@ -166,6 +244,19 @@ export type ProblemDetails = {
     detail?: string | null;
     instance?: string | null;
     [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
+};
+
+export type RunSummaryModel = {
+    totalRuns: number;
+    byStatus: {
+        Pending: number;
+        Running: number;
+        Completed: number;
+        Failed: number;
+        Suspended: number;
+        Cancelled: number;
+    };
+    successRate: number;
 };
 
 export type StepConfigurationModel = {
@@ -227,11 +318,11 @@ export type TriggerItemResponseModel = {
     description?: string | null;
     group?: string | null;
     icon?: string | null;
-    settingsSchema?: EditableModelSchemaResponseModel | null;
-    outputProperties: Array<TriggerOutputPropertyResponseModel>;
+    settingsSchema?: EditableModelSchemaModel | null;
+    outputProperties: Array<TriggerOutputPropertyModel>;
 };
 
-export type TriggerOutputPropertyResponseModel = {
+export type TriggerOutputPropertyModel = {
     name: string;
     type: string;
     description?: string | null;
@@ -242,10 +333,12 @@ export type UpdateAutomationRequestModel = {
     name: string;
     description?: string | null;
     isEnabled: boolean;
+    groupId?: string | null;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
     connections: Array<StepConnectionModel>;
     canvasState?: string | null;
+    notificationSettings?: AutomationNotificationSettingsModel | null;
 };
 
 export type UpdateConnectionRequestModel = {
@@ -257,12 +350,30 @@ export type UpdateConnectionRequestModel = {
     };
 };
 
+export type UpdateWorkspaceGroupRequestModel = {
+    name: string;
+    parentId?: string | null;
+};
+
 export type UpdateWorkspaceRequestModel = {
     alias: string;
     name: string;
     serviceAccountKey: string;
     userGroups: Array<string>;
     allowedConnections: Array<string>;
+};
+
+export type ValueChangeModel = {
+    path: string;
+    oldValue?: string | null;
+    newValue?: string | null;
+};
+
+export type WorkspaceGroupResponseModel = {
+    id: string;
+    name: string;
+    parentId?: string | null;
+    dateCreated: string;
 };
 
 export type WorkspaceItemResponseModel = {
@@ -287,11 +398,63 @@ export type WorkspaceResponseModel = {
     dateModified: string;
 };
 
+export type PostApprovalsByRunIdStepsByStepIdDecisionData = {
+    body?: ApprovalDecisionRequestModel;
+    path: {
+        runId: string;
+        stepId: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/approvals/{runId}/steps/{stepId}/decision';
+};
+
+export type PostApprovalsByRunIdStepsByStepIdDecisionErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type PostApprovalsByRunIdStepsByStepIdDecisionResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetApprovalsPendingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/approvals/pending';
+};
+
+export type GetApprovalsPendingErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetApprovalsPendingResponses = {
+    /**
+     * OK
+     */
+    200: Array<PendingApprovalResponseModel>;
+};
+
+export type GetApprovalsPendingResponse = GetApprovalsPendingResponses[keyof GetApprovalsPendingResponses];
+
 export type GetAutomationsData = {
     body?: never;
     path?: never;
     query?: {
         filter?: string;
+        groupId?: string;
         skip?: number;
         take?: number;
     };
@@ -605,6 +768,29 @@ export type GetCatalogueConnectionTypesResponses = {
 
 export type GetCatalogueConnectionTypesResponse = GetCatalogueConnectionTypesResponses[keyof GetCatalogueConnectionTypesResponses];
 
+export type GetCatalogueNotificationChannelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/catalogue/notification-channels';
+};
+
+export type GetCatalogueNotificationChannelsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetCatalogueNotificationChannelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<NotificationChannelItemResponseModel>;
+};
+
+export type GetCatalogueNotificationChannelsResponse = GetCatalogueNotificationChannelsResponses[keyof GetCatalogueNotificationChannelsResponses];
+
 export type GetCatalogueTriggersData = {
     body?: never;
     path?: never;
@@ -771,6 +957,61 @@ export type PutConnectionsByIdResponses = {
     200: unknown;
 };
 
+export type GetMetricsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: string;
+        from?: string;
+        to?: string;
+    };
+    url: '/umbraco/automate/management/api/v1/metrics';
+};
+
+export type GetMetricsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetMetricsResponses = {
+    /**
+     * OK
+     */
+    200: RunSummaryModel;
+};
+
+export type GetMetricsResponse = GetMetricsResponses[keyof GetMetricsResponses];
+
+export type GetMetricsByAutomationData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: string;
+        from?: string;
+        to?: string;
+        take?: number;
+    };
+    url: '/umbraco/automate/management/api/v1/metrics/by-automation';
+};
+
+export type GetMetricsByAutomationErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetMetricsByAutomationResponses = {
+    /**
+     * OK
+     */
+    200: Array<AutomationRunCountModel>;
+};
+
+export type GetMetricsByAutomationResponse = GetMetricsByAutomationResponses[keyof GetMetricsByAutomationResponses];
+
 export type GetRunsByIdData = {
     body?: never;
     path: {
@@ -801,6 +1042,180 @@ export type GetRunsByIdResponses = {
 };
 
 export type GetRunsByIdResponse = GetRunsByIdResponses[keyof GetRunsByIdResponses];
+
+export type GetVersionHistoryByEntityTypeByEntityIdData = {
+    body?: never;
+    path: {
+        entityType: string;
+        entityId: string;
+    };
+    query?: {
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}';
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdError = GetVersionHistoryByEntityTypeByEntityIdErrors[keyof GetVersionHistoryByEntityTypeByEntityIdErrors];
+
+export type GetVersionHistoryByEntityTypeByEntityIdResponses = {
+    /**
+     * OK
+     */
+    200: EntityVersionHistoryResponseModel;
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdResponse = GetVersionHistoryByEntityTypeByEntityIdResponses[keyof GetVersionHistoryByEntityTypeByEntityIdResponses];
+
+export type GetVersionHistoryByEntityTypeByEntityIdByEntityVersionData = {
+    body?: never;
+    path: {
+        entityType: string;
+        entityId: string;
+        entityVersion: number;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{entityVersion}';
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdByEntityVersionError = GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors[keyof GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors];
+
+export type GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses = {
+    /**
+     * OK
+     */
+    200: EntityVersionResponseModel;
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponse = GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses[keyof GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses];
+
+export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackData = {
+    body?: never;
+    path: {
+        entityType: string;
+        entityId: string;
+        entityVersion: number;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{entityVersion}/rollback';
+};
+
+export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackError = PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors[keyof PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors];
+
+export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponse = PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses[keyof PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses];
+
+export type GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionData = {
+    body?: never;
+    path: {
+        entityType: string;
+        entityId: string;
+        fromEntityVersion: number;
+        toEntityVersion: number;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{fromEntityVersion}/compare/{toEntityVersion}';
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionError = GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors[keyof GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors];
+
+export type GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses = {
+    /**
+     * OK
+     */
+    200: EntityVersionComparisonResponseModel;
+};
+
+export type GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponse = GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses[keyof GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses];
+
+export type GetVersionHistorySupportedTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/version-history/supported-types';
+};
+
+export type GetVersionHistorySupportedTypesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetVersionHistorySupportedTypesResponses = {
+    /**
+     * OK
+     */
+    200: Array<string>;
+};
+
+export type GetVersionHistorySupportedTypesResponse = GetVersionHistorySupportedTypesResponses[keyof GetVersionHistorySupportedTypesResponses];
 
 export type GetWorkspacesData = {
     body?: never;
@@ -939,6 +1354,158 @@ export type PutWorkspacesByIdErrors = {
 export type PutWorkspacesByIdError = PutWorkspacesByIdErrors[keyof PutWorkspacesByIdErrors];
 
 export type PutWorkspacesByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetWorkspacesByIdGroupsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        parentGroupId?: string;
+    };
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups';
+};
+
+export type GetWorkspacesByIdGroupsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetWorkspacesByIdGroupsResponses = {
+    /**
+     * OK
+     */
+    200: Array<WorkspaceGroupResponseModel>;
+};
+
+export type GetWorkspacesByIdGroupsResponse = GetWorkspacesByIdGroupsResponses[keyof GetWorkspacesByIdGroupsResponses];
+
+export type PostWorkspacesByIdGroupsData = {
+    body?: CreateWorkspaceGroupRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups';
+};
+
+export type PostWorkspacesByIdGroupsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type PostWorkspacesByIdGroupsError = PostWorkspacesByIdGroupsErrors[keyof PostWorkspacesByIdGroupsErrors];
+
+export type PostWorkspacesByIdGroupsResponses = {
+    /**
+     * Created
+     */
+    201: unknown;
+};
+
+export type DeleteWorkspacesByIdGroupsByGroupIdData = {
+    body?: never;
+    path: {
+        id: string;
+        groupId: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}';
+};
+
+export type DeleteWorkspacesByIdGroupsByGroupIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DeleteWorkspacesByIdGroupsByGroupIdError = DeleteWorkspacesByIdGroupsByGroupIdErrors[keyof DeleteWorkspacesByIdGroupsByGroupIdErrors];
+
+export type DeleteWorkspacesByIdGroupsByGroupIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetWorkspacesByIdGroupsByGroupIdData = {
+    body?: never;
+    path: {
+        id: string;
+        groupId: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}';
+};
+
+export type GetWorkspacesByIdGroupsByGroupIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetWorkspacesByIdGroupsByGroupIdError = GetWorkspacesByIdGroupsByGroupIdErrors[keyof GetWorkspacesByIdGroupsByGroupIdErrors];
+
+export type GetWorkspacesByIdGroupsByGroupIdResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceGroupResponseModel;
+};
+
+export type GetWorkspacesByIdGroupsByGroupIdResponse = GetWorkspacesByIdGroupsByGroupIdResponses[keyof GetWorkspacesByIdGroupsByGroupIdResponses];
+
+export type PutWorkspacesByIdGroupsByGroupIdData = {
+    body?: UpdateWorkspaceGroupRequestModel;
+    path: {
+        id: string;
+        groupId: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}';
+};
+
+export type PutWorkspacesByIdGroupsByGroupIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PutWorkspacesByIdGroupsByGroupIdError = PutWorkspacesByIdGroupsByGroupIdErrors[keyof PutWorkspacesByIdGroupsByGroupIdErrors];
+
+export type PutWorkspacesByIdGroupsByGroupIdResponses = {
     /**
      * OK
      */

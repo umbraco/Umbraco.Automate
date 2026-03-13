@@ -91,6 +91,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Name = source.Name;
         target.Description = source.Description;
         target.IsEnabled = source.IsEnabled;
+        target.WorkspaceId = source.WorkspaceId;
         target.GroupId = source.GroupId;
         target.Status = source.Status;
         target.Version = source.Version;
