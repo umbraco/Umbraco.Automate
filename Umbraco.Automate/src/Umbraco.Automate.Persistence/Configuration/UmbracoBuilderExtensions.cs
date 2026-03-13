@@ -59,7 +59,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
 
         // Run pending EF Core migrations on startup.
-        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();
+        builder.AddNotificationAsyncHandler<UmbracoApplicationStartingNotification, RunAutomateMigrationNotificationHandler>();
 
         // Recover runs stuck in Running/Pending from the previous process.
         // Registered after migrations so the schema is up-to-date.
