@@ -88,7 +88,16 @@ internal sealed class EntityVersionService : IEntityVersionService
         var versionRecord = await _repository.GetVersionAsync(entityId, adapter.EntityTypeName, version, cancellationToken);
         if (versionRecord is not null)
         {
-            return adapter.RestoreFromSnapshot(versionRecord.Snapshot) as TEntity;
+            var restored = adapter.RestoreFromSnapshot(versionRecord.Snapshot);
+
+            // JSON round-trip loses internal-set properties (e.g. Id).
+            // Re-stamp identity from the known entityId.
+            if (restored is not null)
+            {
+                adapter.HydrateIdentity(restored, entityId);
+            }
+
+            return restored as TEntity;
         }
 
         // If not found in repository, check if it's the current version.

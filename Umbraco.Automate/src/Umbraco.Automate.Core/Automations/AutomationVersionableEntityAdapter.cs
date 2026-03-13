@@ -50,6 +50,10 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
     }
 
     /// <inheritdoc />
+    protected override void HydrateIdentity(Automation entity, Guid entityId)
+        => entity.Id = entityId;
+
+    /// <inheritdoc />
     protected override IReadOnlyList<ValueChange> CompareVersions(Automation from, Automation to)
     {
         var changes = new List<ValueChange>();

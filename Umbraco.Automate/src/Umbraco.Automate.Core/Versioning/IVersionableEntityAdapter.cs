@@ -39,6 +39,14 @@ public interface IVersionableEntityAdapter
     object? RestoreFromSnapshot(string json);
 
     /// <summary>
+    /// Restores identity fields (e.g. Id) that are lost during JSON round-trip
+    /// because they use non-public setters.
+    /// </summary>
+    /// <param name="entity">The deserialized entity.</param>
+    /// <param name="entityId">The known entity identifier.</param>
+    void HydrateIdentity(object entity, Guid entityId);
+
+    /// <summary>
     /// Compares two entity versions and returns the list of value changes.
     /// </summary>
     /// <param name="from">The older entity version.</param>
