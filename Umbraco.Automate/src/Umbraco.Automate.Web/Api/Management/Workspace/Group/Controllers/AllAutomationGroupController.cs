@@ -38,16 +38,16 @@ public sealed class AllAutomationGroupController : AutomationGroupControllerBase
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(IEnumerable<AutomationGroupResponseModel>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllAutomationGroups(
-        Guid workspaceId,
+        Guid id,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
         if (forbidden is not null)
         {
             return forbidden;
         }
 
-        var groups = await _groupService.GetGroupsByWorkspaceAsync(workspaceId, cancellationToken);
+        var groups = await _groupService.GetGroupsByWorkspaceAsync(id, cancellationToken);
 
         return Ok(_mapper.MapEnumerable<AutomationGroup, AutomationGroupResponseModel>(groups));
     }

@@ -10,7 +10,7 @@ namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Controllers;
 /// Base controller for automation group endpoints, nested under workspaces.
 /// Route: /workspaces/{workspaceId}/groups/...
 /// </summary>
-[ApiExplorerSettings(GroupName = Constants.ManagementApi.Feature.Group.GroupName)]
+[ApiExplorerSettings(GroupName = Constants.ManagementApi.Feature.Workspace.GroupName)]
 [UmbracoAutomateVersionedManagementApiRoute(Constants.ManagementApi.Feature.Group.RouteSegment)]
 public abstract class AutomationGroupControllerBase : UmbracoAutomateManagementControllerBase
 {

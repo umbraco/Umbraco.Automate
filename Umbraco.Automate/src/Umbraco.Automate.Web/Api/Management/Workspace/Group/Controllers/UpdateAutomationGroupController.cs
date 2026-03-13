@@ -34,31 +34,31 @@ public sealed class UpdateAutomationGroupController : AutomationGroupControllerB
     /// <summary>
     /// Updates an automation group (rename or move).
     /// </summary>
-    [HttpPut("{id:guid}")]
+    [HttpPut("{groupId:guid}")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateAutomationGroup(
-        Guid workspaceId,
         Guid id,
+        Guid groupId,
         UpdateAutomationGroupRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
         if (forbidden is not null)
         {
             return forbidden;
         }
 
-        var existing = await _groupService.GetGroupAsync(id, cancellationToken);
-        if (existing is null || existing.WorkspaceId != workspaceId)
+        var existing = await _groupService.GetGroupAsync(groupId, cancellationToken);
+        if (existing is null || existing.WorkspaceId != id)
         {
             return GroupNotFound();
         }
 
         var group = _mapper.Map<AutomationGroup>(requestModel)!;
-        group.Id = id;
+        group.Id = groupId;
 
         try
         {

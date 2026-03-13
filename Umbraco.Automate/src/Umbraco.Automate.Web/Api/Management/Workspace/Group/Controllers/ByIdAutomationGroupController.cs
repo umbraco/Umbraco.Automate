@@ -34,23 +34,23 @@ public sealed class ByIdAutomationGroupController : AutomationGroupControllerBas
     /// <summary>
     /// Gets an automation group by its unique ID.
     /// </summary>
-    [HttpGet("{id:guid}")]
+    [HttpGet("{groupId:guid}")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(AutomationGroupResponseModel), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAutomationGroupById(
-        Guid workspaceId,
         Guid id,
+        Guid groupId,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
         if (forbidden is not null)
         {
             return forbidden;
         }
 
-        var group = await _groupService.GetGroupAsync(id, cancellationToken);
-        if (group is null || group.WorkspaceId != workspaceId)
+        var group = await _groupService.GetGroupAsync(groupId, cancellationToken);
+        if (group is null || group.WorkspaceId != id)
         {
             return GroupNotFound();
         }

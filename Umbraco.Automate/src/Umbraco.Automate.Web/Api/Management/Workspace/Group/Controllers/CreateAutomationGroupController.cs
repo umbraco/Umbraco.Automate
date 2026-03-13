@@ -39,18 +39,18 @@ public sealed class CreateAutomationGroupController : AutomationGroupControllerB
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateAutomationGroup(
-        Guid workspaceId,
+        Guid id,
         CreateAutomationGroupRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
         if (forbidden is not null)
         {
             return forbidden;
         }
 
         var group = _mapper.Map<AutomationGroup>(requestModel)!;
-        group.WorkspaceId = workspaceId;
+        group.WorkspaceId = id;
 
         try
         {
@@ -59,7 +59,7 @@ public sealed class CreateAutomationGroupController : AutomationGroupControllerB
             return CreatedAtAction(
                 nameof(ByIdAutomationGroupController.GetAutomationGroupById),
                 nameof(ByIdAutomationGroupController).Replace("Controller", string.Empty),
-                new { workspaceId, id = created.Id },
+                new { id, groupId = created.Id },
                 created.Id.ToString());
         }
         catch (InvalidOperationException ex)

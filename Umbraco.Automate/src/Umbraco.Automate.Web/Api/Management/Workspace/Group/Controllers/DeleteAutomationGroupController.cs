@@ -29,28 +29,28 @@ public sealed class DeleteAutomationGroupController : AutomationGroupControllerB
     /// <summary>
     /// Deletes an automation group and cascade-deletes all child groups and automations.
     /// </summary>
-    [HttpDelete("{id:guid}")]
+    [HttpDelete("{groupId:guid}")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteAutomationGroup(
-        Guid workspaceId,
         Guid id,
+        Guid groupId,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
         if (forbidden is not null)
         {
             return forbidden;
         }
 
-        var group = await _groupService.GetGroupAsync(id, cancellationToken);
-        if (group is null || group.WorkspaceId != workspaceId)
+        var group = await _groupService.GetGroupAsync(groupId, cancellationToken);
+        if (group is null || group.WorkspaceId != id)
         {
             return GroupNotFound();
         }
 
-        await _groupService.DeleteGroupAsync(id, cancellationToken);
+        await _groupService.DeleteGroupAsync(groupId, cancellationToken);
 
         return Ok();
     }
