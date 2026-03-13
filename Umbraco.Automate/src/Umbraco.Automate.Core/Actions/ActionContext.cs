@@ -62,4 +62,9 @@ public sealed class ActionContext
     /// Contains the resolved connection type and decrypted settings, ready for runtime use.
     /// </summary>
     public ConfiguredConnection? Connection { get; init; }
+
+    /// <summary>
+    /// Gets the action instance being executed. Set by the pipeline for middleware inspection.
+    /// </summary>
+    public IAction? Action { get; init; }
 }

@@ -89,6 +89,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             CancellationToken = cancellationToken,
             ExecutionContext = data.ExecutionContext,
             Connection = connection,
+            Action = _action,
         };
 
         // Create and persist step run.

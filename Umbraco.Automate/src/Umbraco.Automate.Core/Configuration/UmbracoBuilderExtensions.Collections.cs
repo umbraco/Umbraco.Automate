@@ -61,7 +61,8 @@ public static partial class UmbracoBuilderExtensions
         // Action middleware — ordered pipeline
         builder.AutomateActionMiddleware()
             .Append<ErrorHandlingMiddleware>()
-            .Append<StepRunLoggingMiddleware>();
+            .Append<StepRunLoggingMiddleware>()
+            .Append<AuditTrailMiddleware>();
 
         // Security
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
