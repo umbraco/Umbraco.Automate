@@ -59,13 +59,17 @@ public class EntityVersionHistoryController : VersioningControllerBase
             return EntityNotFound(entityType, entityId);
         }
 
+        var currentVersion = currentEntity is IVersionableEntity versionable ? versionable.Version : 1;
+        var publishedVersion = currentEntity is IPublishableEntity publishable ? publishable.PublishedVersion : null;
+
         var currentVersionModel = new EntityVersionResponseModel
         {
             Id = auditable.Id,
             EntityId = entityId,
-            Version = currentEntity is IVersionableEntity versionable ? versionable.Version : 1,
+            Version = currentVersion,
             DateCreated = auditable.DateModified,
             CreatedByUserId = auditable.ModifiedByUserId,
+            IsPublished = publishedVersion == currentVersion,
         };
 
         // Current version occupies position 0, so adjust skip/take for historical query.
@@ -87,13 +91,19 @@ public class EntityVersionHistoryController : VersioningControllerBase
             pagedVersions.Add(currentVersionModel);
         }
 
-        pagedVersions.AddRange(historicalVersions.Select(v => _umbracoMapper.Map<EntityVersionResponseModel>(v)!));
+        pagedVersions.AddRange(historicalVersions.Select(v =>
+        {
+            var model = _umbracoMapper.Map<EntityVersionResponseModel>(v)!;
+            model.IsPublished = publishedVersion == model.Version;
+            return model;
+        }));
 
         var totalVersions = historicalTotal + 1;
 
         return Ok(new EntityVersionHistoryResponseModel
         {
             CurrentVersion = currentVersionModel.Version,
+            PublishedVersion = publishedVersion,
             TotalVersions = totalVersions,
             Versions = pagedVersions,
         });

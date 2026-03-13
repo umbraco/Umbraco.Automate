@@ -20,6 +20,12 @@ public class EntityVersionHistoryResponseModel
     public int TotalVersions { get; set; }
 
     /// <summary>
+    /// The currently published version number, or null if the entity type does not support publishing
+    /// or the entity has never been published.
+    /// </summary>
+    public int? PublishedVersion { get; set; }
+
+    /// <summary>
     /// The list of version entries.
     /// </summary>
     [Required]

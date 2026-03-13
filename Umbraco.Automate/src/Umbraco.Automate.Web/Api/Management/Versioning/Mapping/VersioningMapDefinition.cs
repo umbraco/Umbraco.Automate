@@ -24,5 +24,6 @@ public class VersioningMapDefinition : IMapDefinition
         target.DateCreated = source.DateCreated;
         target.CreatedByUserId = source.CreatedByUserId;
         target.ChangeDescription = source.ChangeDescription;
+        target.IsPublished = false; // Set by the controller based on the entity's PublishedVersion.
     }
 }

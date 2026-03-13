@@ -40,4 +40,11 @@ public class EntityVersionResponseModel
     /// Optional description of what changed in this version.
     /// </summary>
     public string? ChangeDescription { get; set; }
+
+    /// <summary>
+    /// Whether this version is the currently published version.
+    /// Always false for non-publishable entity types.
+    /// </summary>
+    [Required]
+    public bool IsPublished { get; set; }
 }

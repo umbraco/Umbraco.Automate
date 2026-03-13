@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.Automations;
 /// <summary>
 /// An automation definition — a trigger plus a sequence of steps built visually on a canvas.
 /// </summary>
-public sealed class Automation : IVersionableEntity
+public sealed class Automation : IPublishableEntity
 {
     /// <inheritdoc />
     public Guid Id { get; internal set; }
