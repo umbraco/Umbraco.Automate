@@ -26,6 +26,9 @@ public sealed class AutomationItemResponseModel
     /// <summary>Whether triggers are active.</summary>
     public bool IsEnabled { get; set; }
 
+    /// <summary>The workspace this automation belongs to.</summary>
+    public Guid? WorkspaceId { get; set; }
+
     /// <summary>The lifecycle status.</summary>
     [Required]
     public AutomationStatus Status { get; set; }
