@@ -4,12 +4,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Triggers.Scheduling;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Connections;
 using Umbraco.Automate.Persistence.Notifications;
+using Umbraco.Automate.Persistence.Triggers;
 using Umbraco.Automate.Persistence;
 using Umbraco.Automate.Persistence.Workspaces;
 using Umbraco.Automate.Persistence.Outbox;
@@ -50,6 +52,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IPersistenceProvider, EFCoreWorkflowPersistenceProvider>();
         builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
+        builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
 
         // Run pending EF Core migrations on startup.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();

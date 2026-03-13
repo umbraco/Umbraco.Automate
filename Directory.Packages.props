@@ -28,6 +28,11 @@
     <PackageVersion Include="WorkflowCore" Version="3.9.0" />
   </ItemGroup>
 
+  <!-- CRON parsing -->
+  <ItemGroup>
+    <PackageVersion Include="Cronos" Version="0.9.0" />
+  </ItemGroup>
+
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
     <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.2.0, 7.999.999)" />

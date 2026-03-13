@@ -13,6 +13,7 @@ using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Scheduling;
 using Umbraco.Automate.Core.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -43,6 +44,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:RunCleanup"));
         builder.Services.Configure<WebhookOptions>(
             builder.Config.GetSection("Umbraco:Automate:Webhook"));
+        builder.Services.Configure<ScheduledTriggerOptions>(
+            builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -78,6 +81,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEntityVersionService, EntityVersionService>();
         builder.Services.AddHostedService<VersionCleanupBackgroundJob>();
         builder.Services.AddHostedService<RunCleanupBackgroundJob>();
+        builder.Services.AddHostedService<ScheduledTriggerBackgroundJob>();
 
         // Diagnostics / metrics
         builder.Services.AddSingleton<AutomateMetrics>();

@@ -5,6 +5,7 @@ using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Persistence.Versioning;
 using Umbraco.Automate.Persistence.Workflows;
+using Umbraco.Automate.Persistence.Triggers;
 using Umbraco.Automate.Persistence.Workspaces;
 
 namespace Umbraco.Automate.Persistence;
@@ -35,6 +36,8 @@ public class UmbracoAutomateDbContext : DbContext
     internal DbSet<WorkspaceEntity> Workspaces { get; set; } = null!;
 
     internal DbSet<ConnectionEntity> Connections { get; set; } = null!;
+
+    internal DbSet<ScheduledTriggerStateEntity> ScheduledTriggerStates { get; set; } = null!;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UmbracoAutomateDbContext"/> class.
@@ -246,6 +249,17 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.DateModified).IsRequired();
 
             entity.HasIndex(e => e.Alias).IsUnique();
+        });
+
+        // Scheduled trigger state table
+
+        modelBuilder.Entity<ScheduledTriggerStateEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateScheduledTriggerState");
+            entity.HasKey(e => e.AutomationId);
+
+            entity.Property(e => e.AutomationId).IsRequired();
+            entity.Property(e => e.LastFiredUtc).IsRequired();
         });
 
         // Outbox message table
