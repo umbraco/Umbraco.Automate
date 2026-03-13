@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Versioning;
+using static Umbraco.Automate.Core.Versioning.VersionComparer;
 
 namespace Umbraco.Automate.Core.Automations;
 
@@ -79,14 +80,6 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
         return changes;
     }
 
-    private static void CompareScalar(List<ValueChange> changes, string path, string? oldValue, string? newValue)
-    {
-        if (oldValue != newValue)
-        {
-            changes.Add(new ValueChange(path, oldValue, newValue));
-        }
-    }
-
     private static void CompareTrigger(List<ValueChange> changes, TriggerConfiguration? from, TriggerConfiguration? to)
     {
         CompareScalar(changes, "Trigger.TriggerAlias", from?.TriggerAlias, to?.TriggerAlias);
@@ -134,18 +127,7 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
     {
         static string Key(StepConnection c) => $"{c.SourceStepId}:{c.SourceHandle}->{c.TargetStepId}:{c.TargetHandle}";
 
-        var fromSet = fromConns.Select(Key).ToHashSet();
-        var toSet = toConns.Select(Key).ToHashSet();
-
-        foreach (var added in toSet.Except(fromSet))
-        {
-            changes.Add(new ValueChange("Connections", null, added));
-        }
-
-        foreach (var removed in fromSet.Except(toSet))
-        {
-            changes.Add(new ValueChange("Connections", removed, null));
-        }
+        CompareStringSets(changes, "Connections", fromConns.Select(Key), toConns.Select(Key));
     }
 
     private static void CompareNotificationSettings(
@@ -186,52 +168,6 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
             CompareObjectDictionary(changes, $"{prefix}.Settings", fromChannels[i].Settings, toChannels[i].Settings);
         }
     }
-
-    private static void CompareObjectDictionary(
-        List<ValueChange> changes,
-        string prefix,
-        IDictionary<string, object?>? from,
-        IDictionary<string, object?>? to)
-    {
-        from ??= new Dictionary<string, object?>();
-        to ??= new Dictionary<string, object?>();
-
-        var allKeys = from.Keys.Union(to.Keys);
-
-        foreach (var key in allKeys)
-        {
-            from.TryGetValue(key, out var oldVal);
-            to.TryGetValue(key, out var newVal);
-            CompareScalar(changes, $"{prefix}.{key}", Stringify(oldVal), Stringify(newVal));
-        }
-    }
-
-    private static void CompareStringDictionary(
-        List<ValueChange> changes,
-        string prefix,
-        IDictionary<string, string>? from,
-        IDictionary<string, string>? to)
-    {
-        from ??= new Dictionary<string, string>();
-        to ??= new Dictionary<string, string>();
-
-        var allKeys = from.Keys.Union(to.Keys);
-
-        foreach (var key in allKeys)
-        {
-            from.TryGetValue(key, out var oldVal);
-            to.TryGetValue(key, out var newVal);
-            CompareScalar(changes, $"{prefix}.{key}", oldVal, newVal);
-        }
-    }
-
-    private static string? Stringify(object? value) => value switch
-    {
-        null => null,
-        string s => s,
-        JsonElement je => je.ToString(),
-        _ => value.ToString(),
-    };
 
     /// <inheritdoc />
     public override Task RollbackAsync(Guid entityId, int version, CancellationToken cancellationToken = default)

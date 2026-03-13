@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Versioning;
+using static Umbraco.Automate.Core.Versioning.VersionComparer;
 
 namespace Umbraco.Automate.Core.Workspaces;
 
@@ -57,9 +58,8 @@ internal sealed class WorkspaceVersionableEntityAdapter : VersionableEntityAdapt
         CompareScalar(changes, "Alias", from.Alias, to.Alias);
         CompareScalar(changes, "Name", from.Name, to.Name);
         CompareScalar(changes, "ServiceAccountKey", from.ServiceAccountKey.ToString(), to.ServiceAccountKey.ToString());
-
-        CompareGuidList(changes, "UserGroups", from.UserGroups, to.UserGroups);
-        CompareGuidList(changes, "AllowedConnections", from.AllowedConnections, to.AllowedConnections);
+        CompareGuidSets(changes, "UserGroups", from.UserGroups, to.UserGroups);
+        CompareGuidSets(changes, "AllowedConnections", from.AllowedConnections, to.AllowedConnections);
 
         return changes;
     }
@@ -75,28 +75,4 @@ internal sealed class WorkspaceVersionableEntityAdapter : VersionableEntityAdapt
     /// <inheritdoc />
     public override Task<IReadOnlyCollection<ProtectedVersion>> GetProtectedVersionsAsync(CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyCollection<ProtectedVersion>>([]);
-
-    private static void CompareScalar(List<ValueChange> changes, string path, string? oldValue, string? newValue)
-    {
-        if (oldValue != newValue)
-        {
-            changes.Add(new ValueChange(path, oldValue, newValue));
-        }
-    }
-
-    private static void CompareGuidList(List<ValueChange> changes, string path, IList<Guid> from, IList<Guid> to)
-    {
-        var fromSet = from.ToHashSet();
-        var toSet = to.ToHashSet();
-
-        foreach (var added in toSet.Except(fromSet))
-        {
-            changes.Add(new ValueChange(path, null, added.ToString()));
-        }
-
-        foreach (var removed in fromSet.Except(toSet))
-        {
-            changes.Add(new ValueChange(path, removed.ToString(), null));
-        }
-    }
 }
