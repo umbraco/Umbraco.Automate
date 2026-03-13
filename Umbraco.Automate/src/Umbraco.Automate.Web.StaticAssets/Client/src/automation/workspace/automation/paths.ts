@@ -8,10 +8,10 @@ export const UA_AUTOMATION_WORKSPACE_PATH = UMB_WORKSPACE_PATH_PATTERN.generateA
     entityType: UA_AUTOMATION_ENTITY_TYPE,
 });
 
-export const UA_CREATE_AUTOMATION_WORKSPACE_PATH_PATTERN = new UmbPathPattern<Record<string, never>>(
-    "create",
-    UA_AUTOMATION_WORKSPACE_PATH,
-);
+export const UA_CREATE_AUTOMATION_WORKSPACE_PATH_PATTERN = new UmbPathPattern<{
+    parentEntityType: string;
+    parentUnique: string;
+}>("create/:parentEntityType/:parentUnique", UA_AUTOMATION_WORKSPACE_PATH);
 
 export const UA_EDIT_AUTOMATION_WORKSPACE_PATH_PATTERN = new UmbPathPattern<{ unique: string }>(
     "edit/:unique",

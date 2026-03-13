@@ -1,4 +1,4 @@
-import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_ROOT_ENTITY_TYPE } from "../constants.js";
+import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_ROOT_ENTITY_TYPE, UA_AUTOMATION_WORKSPACE_ENTITY_TYPE } from "../constants.js";
 
 export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
     {
@@ -8,7 +8,7 @@ export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
         name: "Create Automation Entity Action",
         weight: 1200,
         api: () => import("./automation-create.action.js"),
-        forEntityTypes: [UA_AUTOMATION_ROOT_ENTITY_TYPE],
+        forEntityTypes: [UA_AUTOMATION_ROOT_ENTITY_TYPE, UA_AUTOMATION_WORKSPACE_ENTITY_TYPE],
         meta: {
             icon: "icon-add",
             label: "#uaGeneral_create",

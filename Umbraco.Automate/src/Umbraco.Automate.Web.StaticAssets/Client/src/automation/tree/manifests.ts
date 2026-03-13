@@ -3,7 +3,7 @@ import {
     UA_AUTOMATION_TREE_REPOSITORY_ALIAS,
     UA_AUTOMATION_TREE_STORE_ALIAS,
 } from "./constants.js";
-import { UA_AUTOMATION_ENTITY_TYPE } from "../entity.js";
+import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_WORKSPACE_ENTITY_TYPE } from "../entity.js";
 
 export const automationTreeManifests: Array<UmbExtensionManifest> = [
     {
@@ -32,9 +32,15 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
     {
         type: "treeItem",
         alias: "UmbracoAutomate.TreeItem.Automation",
+        kind: "default",
         name: "Automation Tree Item",
         forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
-        api: () => import("./tree-item/automation-tree-item.context.js"),
-        element: () => import("./tree-item/automation-tree-item.element.js"),
+    },
+    {
+        type: "treeItem",
+        alias: "UmbracoAutomate.TreeItem.AutomationWorkspace",
+        kind: "default",
+        name: "Automation Workspace Tree Item",
+        forEntityTypes: [UA_AUTOMATION_WORKSPACE_ENTITY_TYPE],
     },
 ];

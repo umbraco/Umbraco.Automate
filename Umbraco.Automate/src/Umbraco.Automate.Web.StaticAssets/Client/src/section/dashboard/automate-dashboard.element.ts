@@ -21,9 +21,6 @@ export class UaAutomateDashboardElement extends UmbLitElement {
     @state()
     private _loading = true;
 
-    @state()
-    private _automationCount = 0;
-
     override connectedCallback() {
         super.connectedCallback();
         this.#loadData();
@@ -42,8 +39,6 @@ export class UaAutomateDashboardElement extends UmbLitElement {
             this._loading = false;
             return;
         }
-
-        this._automationCount = automationsData.total;
 
         const published = automationsData.items.filter((a) => a.status === "Published").length;
         const draft = automationsData.items.filter((a) => a.status === "Draft").length;
@@ -88,7 +83,7 @@ export class UaAutomateDashboardElement extends UmbLitElement {
             { label: "Draft", count: draft, color: "warning", icon: "icon-edit" },
             { label: "Inactive", count: inactive, color: "danger", icon: "icon-block" },
             { label: "Failed Runs", count: failedRuns, color: "danger", icon: "icon-alert" },
-            { label: "In Progress", count: runningRuns, color: "warning", icon: "icon-traffic" },
+            { label: "In Progress", count: runningRuns, color: "warning", icon: "icon-nodes" },
         ];
 
         this._activity = allRuns.slice(0, 15).map((r) => ({
@@ -108,11 +103,6 @@ export class UaAutomateDashboardElement extends UmbLitElement {
 
         return html`
             <div class="uui-text">
-                <div class="header">
-                    <h1 class="uui-h3" style="margin: 0;">Overview</h1>
-                    <span class="subtitle">${this._automationCount} automation(s)</span>
-                </div>
-
                 <ua-status-cards .cards=${this._cards}></ua-status-cards>
 
                 <uui-box headline="Recent Activity" class="activity-box">

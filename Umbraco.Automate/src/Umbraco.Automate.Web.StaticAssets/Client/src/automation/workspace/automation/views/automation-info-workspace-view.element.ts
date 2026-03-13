@@ -14,7 +14,7 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
         super();
         this.consumeContext(UA_AUTOMATION_WORKSPACE_CONTEXT, (context) => {
             if (context) {
-                this.observe(context.model, (model) => {
+                this.observe(context.data, (model) => {
                     this._model = model;
                 });
             }

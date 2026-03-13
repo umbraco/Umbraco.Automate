@@ -12,6 +12,7 @@ import {
     type Node,
     type Edge,
     type ReactFlowInstance,
+    type ColorMode,
 } from "@xyflow/react";
 import { nodeTypes } from "./nodes/node-types.js";
 import AutomationEdge from "./edges/AutomationEdge.js";
@@ -30,6 +31,7 @@ interface AutomationCanvasProps {
     nodes: Node[];
     edges: Edge[];
     viewport?: Viewport;
+    colorMode?: ColorMode;
     onCanvasChange?: (detail: CanvasChangeDetail) => void;
     onAddNodeRequest?: (detail: AddNodeRequestDetail) => void;
 }
@@ -38,6 +40,7 @@ export default function AutomationCanvas({
     nodes: externalNodes,
     edges: externalEdges,
     viewport,
+    colorMode = "light",
     onCanvasChange,
     onAddNodeRequest,
 }: AutomationCanvasProps) {
@@ -143,6 +146,7 @@ export default function AutomationCanvas({
             defaultEdgeOptions={defaultEdgeOptions}
             defaultViewport={viewport}
             fitView={!viewport}
+            colorMode={colorMode}
             deleteKeyCode={["Backspace", "Delete"]}
             proOptions={{ hideAttribution: true }}
         >

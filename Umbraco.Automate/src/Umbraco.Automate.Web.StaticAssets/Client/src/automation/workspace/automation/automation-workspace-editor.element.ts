@@ -27,7 +27,7 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         this.consumeContext(UA_AUTOMATION_WORKSPACE_CONTEXT, (context) => {
             if (!context) return;
             this.#workspaceContext = context;
-            this.observe(context.model, (model) => {
+            this.observe(context.data, (model) => {
                 this._model = model;
             });
             this.observe(context.isNew, (isNew) => {
@@ -119,15 +119,6 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
                     () =>
                         html`<umb-workspace-entity-action-menu slot="action-menu"></umb-workspace-entity-action-menu>`,
                 )}
-
-                <div slot="footer-info" id="footer">
-                    <uui-breadcrumbs>
-                        <uui-breadcrumb-item href=${UA_AUTOMATION_ROOT_WORKSPACE_PATH}>${this.localize.term("uaMenu_automations")}</uui-breadcrumb-item>
-                        <uui-breadcrumb-item last-item>
-                            ${this._model.name || this.localize.term("uaPlaceholders_enterName")}
-                        </uui-breadcrumb-item>
-                    </uui-breadcrumbs>
-                </div>
             </umb-workspace-editor>
         `;
     }

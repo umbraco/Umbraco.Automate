@@ -15,4 +15,6 @@ export interface UaTriggerCatalogueItemModel extends UaCatalogueItemModel {
 
 export interface UaActionCatalogueItemModel extends UaCatalogueItemModel {}
 
+export interface UaConnectionTypeCatalogueItemModel extends UaCatalogueItemModel {}
+
 export type UaCatalogueMode = "trigger" | "action";

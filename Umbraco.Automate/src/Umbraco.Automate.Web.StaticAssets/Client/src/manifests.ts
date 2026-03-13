@@ -15,6 +15,8 @@ import { manifests as coreManifests } from "./core/manifests.js";
 import { automationManifests } from "./automation/manifests.js";
 import { catalogueManifests } from "./catalogue/manifests.js";
 import { runManifests } from "./run/manifests.js";
+import { workspaceManagementManifests } from "./workspace-management/manifests.js";
+import { connectionManifests } from "./connection/manifests.js";
 
 export const manifests: Array<UmbExtensionManifest> = [
     ...sectionManifests,
@@ -23,4 +25,6 @@ export const manifests: Array<UmbExtensionManifest> = [
     ...automationManifests,
     ...catalogueManifests,
     ...runManifests,
+    ...workspaceManagementManifests,
+    ...connectionManifests,
 ];

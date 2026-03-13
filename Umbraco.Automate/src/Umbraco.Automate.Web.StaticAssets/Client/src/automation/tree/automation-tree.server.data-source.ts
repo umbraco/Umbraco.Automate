@@ -7,9 +7,9 @@ import type {
 } from "@umbraco-cms/backoffice/tree";
 import { UmbControllerBase } from "@umbraco-cms/backoffice/class-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { AutomationsService } from "../../api/sdk.gen.js";
-import type { AutomationItemResponseModel } from "../../api/types.gen.js";
-import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_ROOT_ENTITY_TYPE } from "../entity.js";
+import { AutomationsService, WorkspacesService } from "../../api/sdk.gen.js";
+import type { AutomationItemResponseModel, WorkspaceItemResponseModel } from "../../api/types.gen.js";
+import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_ROOT_ENTITY_TYPE, UA_AUTOMATION_WORKSPACE_ENTITY_TYPE } from "../entity.js";
 import type { UaAutomationTreeItemModel } from "./types.js";
 
 export class UaAutomationTreeServerDataSource
@@ -26,7 +26,7 @@ export class UaAutomationTreeServerDataSource
 
         const { data, error } = await tryExecute(
             this,
-            AutomationsService.getAutomations({
+            WorkspacesService.getWorkspaces({
                 query: { skip, take },
             }),
         );
@@ -38,31 +38,95 @@ export class UaAutomationTreeServerDataSource
         return {
             data: {
                 total: data.total,
-                items: data.items.map((item) => this.#mapItem(item)),
+                items: data.items.map((item) => this.#mapWorkspaceItem(item)),
             },
         };
     }
 
-    async getChildrenOf(_args: UmbTreeChildrenOfRequestArgs) {
-        // Flat list for now — folders will add hierarchy later.
+    async getChildrenOf(args: UmbTreeChildrenOfRequestArgs) {
+        if (!args.parent?.unique) {
+            return {
+                data: {
+                    total: 0,
+                    items: [] as UaAutomationTreeItemModel[],
+                },
+            };
+        }
+
+        const workspaceId = args.parent.unique;
+
+        // Fetch all automations — API handles workspace scoping server-side.
+        // Client-side filter by workspaceId to group under the correct parent.
+        const { data, error } = await tryExecute(
+            this,
+            AutomationsService.getAutomations({
+                query: { skip: 0, take: 1000 },
+            }),
+        );
+
+        if (error || !data) {
+            return { error };
+        }
+
+        const filtered = data.items.filter((item) => item.workspaceId === workspaceId);
+
         return {
             data: {
-                total: 0,
-                items: [] as UaAutomationTreeItemModel[],
+                total: filtered.length,
+                items: filtered.map((item) => this.#mapAutomationItem(item, workspaceId)),
             },
         };
     }
 
-    async getAncestorsOf(_args: UmbTreeAncestorsOfRequestArgs) {
-        // No ancestors for flat items.
-        return { data: [] as UaAutomationTreeItemModel[] };
+    async getAncestorsOf(args: UmbTreeAncestorsOfRequestArgs) {
+        if (!args.treeItem.unique) return { data: [] as UaAutomationTreeItemModel[] };
+
+        // Workspace nodes sit directly under the root — no ancestors needed.
+        if (args.treeItem.entityType === UA_AUTOMATION_WORKSPACE_ENTITY_TYPE) {
+            return { data: [] as UaAutomationTreeItemModel[] };
+        }
+
+        // For automation nodes, the ancestor is the parent workspace.
+        const { data: automation, error } = await tryExecute(
+            this,
+            AutomationsService.getAutomationsById({ path: { id: args.treeItem.unique } }),
+        );
+
+        if (error || !automation?.workspaceId) {
+            return { error, data: [] as UaAutomationTreeItemModel[] };
+        }
+
+        const { data: workspace, error: wsError } = await tryExecute(
+            this,
+            WorkspacesService.getWorkspacesById({ path: { id: automation.workspaceId } }),
+        );
+
+        if (wsError || !workspace) {
+            return { error: wsError, data: [] as UaAutomationTreeItemModel[] };
+        }
+
+        return {
+            data: [this.#mapWorkspaceItem(workspace)],
+        };
     }
 
-    #mapItem(item: AutomationItemResponseModel): UaAutomationTreeItemModel {
+    #mapWorkspaceItem(item: Pick<WorkspaceItemResponseModel, "id" | "name">): UaAutomationTreeItemModel {
+        return {
+            unique: item.id,
+            entityType: UA_AUTOMATION_WORKSPACE_ENTITY_TYPE,
+            parent: { unique: null, entityType: UA_AUTOMATION_ROOT_ENTITY_TYPE },
+            name: item.name,
+            hasChildren: true,
+            isFolder: true,
+            icon: "icon-folder",
+        };
+    }
+
+    #mapAutomationItem(item: AutomationItemResponseModel, workspaceId: string): UaAutomationTreeItemModel {
         return {
             unique: item.id,
             entityType: UA_AUTOMATION_ENTITY_TYPE,
-            parent: { unique: null, entityType: UA_AUTOMATION_ROOT_ENTITY_TYPE },
+            parent: { unique: workspaceId, entityType: UA_AUTOMATION_WORKSPACE_ENTITY_TYPE },
             name: item.name,
             hasChildren: false,
             isFolder: false,

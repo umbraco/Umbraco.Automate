@@ -1,12 +1,13 @@
 import { UmbRepositoryBase } from "@umbraco-cms/backoffice/repository";
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { UaCatalogueServerDataSource } from "./catalogue.server.data-source.js";
-import type { UaActionCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
+import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
 
 export class UaCatalogueRepository extends UmbRepositoryBase {
     #dataSource: UaCatalogueServerDataSource;
     #actionsCache: UaActionCatalogueItemModel[] | undefined;
     #triggersCache: UaTriggerCatalogueItemModel[] | undefined;
+    #connectionTypesCache: UaConnectionTypeCatalogueItemModel[] | undefined;
 
     constructor(host: UmbControllerHost) {
         super(host);
@@ -37,9 +38,22 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
         return result;
     }
 
+    async requestConnectionTypes(): Promise<{ data?: UaConnectionTypeCatalogueItemModel[]; error?: unknown }> {
+        if (this.#connectionTypesCache) {
+            return { data: this.#connectionTypesCache };
+        }
+
+        const result = await this.#dataSource.getConnectionTypes();
+        if (result.data) {
+            this.#connectionTypesCache = result.data;
+        }
+        return result;
+    }
+
     clearCache() {
         this.#actionsCache = undefined;
         this.#triggersCache = undefined;
+        this.#connectionTypesCache = undefined;
     }
 }
 

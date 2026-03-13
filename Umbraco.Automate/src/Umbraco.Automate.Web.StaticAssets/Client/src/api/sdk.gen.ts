@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteAutomationsByIdData, DeleteAutomationsByIdErrors, DeleteAutomationsByIdResponses, GetAutomationsByIdData, GetAutomationsByIdErrors, GetAutomationsByIdResponses, GetAutomationsByIdRunsData, GetAutomationsByIdRunsErrors, GetAutomationsByIdRunsResponses, GetAutomationsData, GetAutomationsErrors, GetAutomationsResponses, GetCatalogueActionsData, GetCatalogueActionsErrors, GetCatalogueActionsResponses, GetCatalogueTriggersData, GetCatalogueTriggersErrors, GetCatalogueTriggersResponses, GetRunsByIdData, GetRunsByIdErrors, GetRunsByIdResponses, PostAutomationsByIdPublishData, PostAutomationsByIdPublishErrors, PostAutomationsByIdPublishResponses, PostAutomationsByIdTriggerData, PostAutomationsByIdTriggerErrors, PostAutomationsByIdTriggerResponses, PostAutomationsByIdUnpublishData, PostAutomationsByIdUnpublishErrors, PostAutomationsByIdUnpublishResponses, PostAutomationsData, PostAutomationsErrors, PostAutomationsResponses, PutAutomationsByIdData, PutAutomationsByIdErrors, PutAutomationsByIdResponses } from './types.gen';
+import type { DeleteAutomationsByIdData, DeleteAutomationsByIdErrors, DeleteAutomationsByIdResponses, DeleteConnectionsByIdData, DeleteConnectionsByIdErrors, DeleteConnectionsByIdResponses, DeleteWorkspacesByIdData, DeleteWorkspacesByIdErrors, DeleteWorkspacesByIdResponses, GetAutomationsByIdData, GetAutomationsByIdErrors, GetAutomationsByIdResponses, GetAutomationsByIdRunsData, GetAutomationsByIdRunsErrors, GetAutomationsByIdRunsResponses, GetAutomationsData, GetAutomationsErrors, GetAutomationsResponses, GetCatalogueActionsData, GetCatalogueActionsErrors, GetCatalogueActionsResponses, GetCatalogueConnectionTypesData, GetCatalogueConnectionTypesErrors, GetCatalogueConnectionTypesResponses, GetCatalogueTriggersData, GetCatalogueTriggersErrors, GetCatalogueTriggersResponses, GetConnectionsByIdData, GetConnectionsByIdErrors, GetConnectionsByIdResponses, GetConnectionsData, GetConnectionsErrors, GetConnectionsResponses, GetRunsByIdData, GetRunsByIdErrors, GetRunsByIdResponses, GetWorkspacesByIdData, GetWorkspacesByIdErrors, GetWorkspacesByIdResponses, GetWorkspacesData, GetWorkspacesErrors, GetWorkspacesResponses, PostAutomationsByIdPublishData, PostAutomationsByIdPublishErrors, PostAutomationsByIdPublishResponses, PostAutomationsByIdTriggerData, PostAutomationsByIdTriggerErrors, PostAutomationsByIdTriggerResponses, PostAutomationsByIdUnpublishData, PostAutomationsByIdUnpublishErrors, PostAutomationsByIdUnpublishResponses, PostAutomationsData, PostAutomationsErrors, PostAutomationsResponses, PostConnectionsData, PostConnectionsErrors, PostConnectionsResponses, PostWorkspacesData, PostWorkspacesErrors, PostWorkspacesResponses, PutAutomationsByIdData, PutAutomationsByIdErrors, PutAutomationsByIdResponses, PutConnectionsByIdData, PutConnectionsByIdErrors, PutConnectionsByIdResponses, PutWorkspacesByIdData, PutWorkspacesByIdErrors, PutWorkspacesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -159,6 +159,19 @@ export class CatalogueService {
         });
     }
     
+    public static getCatalogueConnectionTypes<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueConnectionTypesData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetCatalogueConnectionTypesResponses, GetCatalogueConnectionTypesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/catalogue/connection-types',
+            ...options
+        });
+    }
+    
     public static getCatalogueTriggers<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueTriggersData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueTriggersResponses, GetCatalogueTriggersErrors, ThrowOnError>({
             security: [
@@ -169,6 +182,81 @@ export class CatalogueService {
             ],
             url: '/umbraco/automate/management/api/v1/catalogue/triggers',
             ...options
+        });
+    }
+}
+
+export class ConnectionsService {
+    public static getConnections<ThrowOnError extends boolean = false>(options?: Options<GetConnectionsData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetConnectionsResponses, GetConnectionsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/connections',
+            ...options
+        });
+    }
+    
+    public static postConnections<ThrowOnError extends boolean = false>(options?: Options<PostConnectionsData, ThrowOnError>) {
+        return (options?.client ?? client).post<PostConnectionsResponses, PostConnectionsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/connections',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static deleteConnectionsById<ThrowOnError extends boolean = false>(options: Options<DeleteConnectionsByIdData, ThrowOnError>) {
+        return (options.client ?? client).delete<DeleteConnectionsByIdResponses, DeleteConnectionsByIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/connections/{id}',
+            ...options
+        });
+    }
+    
+    public static getConnectionsById<ThrowOnError extends boolean = false>(options: Options<GetConnectionsByIdData, ThrowOnError>) {
+        return (options.client ?? client).get<GetConnectionsByIdResponses, GetConnectionsByIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/connections/{id}',
+            ...options
+        });
+    }
+    
+    public static putConnectionsById<ThrowOnError extends boolean = false>(options: Options<PutConnectionsByIdData, ThrowOnError>) {
+        return (options.client ?? client).put<PutConnectionsByIdResponses, PutConnectionsByIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/connections/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
         });
     }
 }
@@ -184,6 +272,81 @@ export class RunsService {
             ],
             url: '/umbraco/automate/management/api/v1/runs/{id}',
             ...options
+        });
+    }
+}
+
+export class WorkspacesService {
+    public static getWorkspaces<ThrowOnError extends boolean = false>(options?: Options<GetWorkspacesData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetWorkspacesResponses, GetWorkspacesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces',
+            ...options
+        });
+    }
+    
+    public static postWorkspaces<ThrowOnError extends boolean = false>(options?: Options<PostWorkspacesData, ThrowOnError>) {
+        return (options?.client ?? client).post<PostWorkspacesResponses, PostWorkspacesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static deleteWorkspacesById<ThrowOnError extends boolean = false>(options: Options<DeleteWorkspacesByIdData, ThrowOnError>) {
+        return (options.client ?? client).delete<DeleteWorkspacesByIdResponses, DeleteWorkspacesByIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}',
+            ...options
+        });
+    }
+    
+    public static getWorkspacesById<ThrowOnError extends boolean = false>(options: Options<GetWorkspacesByIdData, ThrowOnError>) {
+        return (options.client ?? client).get<GetWorkspacesByIdResponses, GetWorkspacesByIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}',
+            ...options
+        });
+    }
+    
+    public static putWorkspacesById<ThrowOnError extends boolean = false>(options: Options<PutWorkspacesByIdData, ThrowOnError>) {
+        return (options.client ?? client).put<PutWorkspacesByIdResponses, PutWorkspacesByIdErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/workspaces/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
         });
     }
 }

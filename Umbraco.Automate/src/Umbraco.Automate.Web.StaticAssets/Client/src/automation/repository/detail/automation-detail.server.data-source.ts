@@ -22,6 +22,7 @@ export class UaAutomationDetailServerDataSource implements UmbDetailDataSource<U
             name: "",
             description: null,
             isEnabled: false,
+            workspaceId: UA_EMPTY_GUID,
             status: "Draft",
             publishedVersion: null,
             draftVersion: 0,

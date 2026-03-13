@@ -19,6 +19,7 @@ export type AutomationItemResponseModel = {
     name: string;
     description?: string | null;
     isEnabled: boolean;
+    workspaceId?: string | null;
     status: AutomationStatusModel;
     version: number;
     dateCreated: string;
@@ -33,7 +34,7 @@ export type AutomationResponseModel = {
     isEnabled: boolean;
     status: AutomationStatusModel;
     publishedVersion?: number | null;
-    draftVersion: number;
+    workspaceId: string;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
     connections: Array<StepConnectionModel>;
@@ -60,15 +61,65 @@ export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Fa
 
 export type AutomationStatusModel = 'Draft' | 'Published' | 'Inactive';
 
+export type ConnectionItemResponseModel = {
+    id: string;
+    alias: string;
+    name: string;
+    type: string;
+    version: number;
+    dateCreated: string;
+    dateModified: string;
+};
+
+export type ConnectionResponseModel = {
+    id: string;
+    alias: string;
+    name: string;
+    type: string;
+    settings: {
+        [key: string]: unknown;
+    };
+    version: number;
+    dateCreated: string;
+    dateModified: string;
+};
+
+export type ConnectionTypeItemResponseModel = {
+    alias: string;
+    name: string;
+    description?: string | null;
+    group?: string | null;
+    icon?: string | null;
+    settingsSchema?: EditableModelSchemaResponseModel | null;
+};
+
 export type CreateAutomationRequestModel = {
     alias: string;
     name: string;
     description?: string | null;
+    workspaceId: string;
     isEnabled: boolean;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
     connections: Array<StepConnectionModel>;
     canvasState?: string | null;
+};
+
+export type CreateConnectionRequestModel = {
+    alias: string;
+    name: string;
+    type: string;
+    settings: {
+        [key: string]: unknown;
+    };
+};
+
+export type CreateWorkspaceRequestModel = {
+    alias: string;
+    name: string;
+    serviceAccountKey: string;
+    userGroups: Array<string>;
+    allowedConnections: Array<string>;
 };
 
 export type EditableModelFieldDescriptorResponseModel = {
@@ -96,6 +147,16 @@ export type PagedAutomationItemResponseModel = {
 export type PagedAutomationRunResponseModel = {
     total: number;
     items: Array<AutomationRunResponseModel>;
+};
+
+export type PagedConnectionItemResponseModel = {
+    total: number;
+    items: Array<ConnectionItemResponseModel>;
+};
+
+export type PagedWorkspaceItemResponseModel = {
+    total: number;
+    items: Array<WorkspaceItemResponseModel>;
 };
 
 export type ProblemDetails = {
@@ -185,6 +246,45 @@ export type UpdateAutomationRequestModel = {
     steps: Array<StepConfigurationModel>;
     connections: Array<StepConnectionModel>;
     canvasState?: string | null;
+};
+
+export type UpdateConnectionRequestModel = {
+    alias: string;
+    name: string;
+    type: string;
+    settings: {
+        [key: string]: unknown;
+    };
+};
+
+export type UpdateWorkspaceRequestModel = {
+    alias: string;
+    name: string;
+    serviceAccountKey: string;
+    userGroups: Array<string>;
+    allowedConnections: Array<string>;
+};
+
+export type WorkspaceItemResponseModel = {
+    id: string;
+    alias: string;
+    name: string;
+    serviceAccountKey: string;
+    version: number;
+    dateCreated: string;
+    dateModified: string;
+};
+
+export type WorkspaceResponseModel = {
+    id: string;
+    alias: string;
+    name: string;
+    serviceAccountKey: string;
+    userGroups: Array<string>;
+    allowedConnections: Array<string>;
+    version: number;
+    dateCreated: string;
+    dateModified: string;
 };
 
 export type GetAutomationsData = {
@@ -348,6 +448,10 @@ export type PostAutomationsByIdPublishErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsByIdPublishError = PostAutomationsByIdPublishErrors[keyof PostAutomationsByIdPublishErrors];
@@ -376,7 +480,13 @@ export type GetAutomationsByIdRunsErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
 };
+
+export type GetAutomationsByIdRunsError = GetAutomationsByIdRunsErrors[keyof GetAutomationsByIdRunsErrors];
 
 export type GetAutomationsByIdRunsResponses = {
     /**
@@ -472,6 +582,29 @@ export type GetCatalogueActionsResponses = {
 
 export type GetCatalogueActionsResponse = GetCatalogueActionsResponses[keyof GetCatalogueActionsResponses];
 
+export type GetCatalogueConnectionTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/catalogue/connection-types';
+};
+
+export type GetCatalogueConnectionTypesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetCatalogueConnectionTypesResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConnectionTypeItemResponseModel>;
+};
+
+export type GetCatalogueConnectionTypesResponse = GetCatalogueConnectionTypesResponses[keyof GetCatalogueConnectionTypesResponses];
+
 export type GetCatalogueTriggersData = {
     body?: never;
     path?: never;
@@ -494,6 +627,149 @@ export type GetCatalogueTriggersResponses = {
 };
 
 export type GetCatalogueTriggersResponse = GetCatalogueTriggersResponses[keyof GetCatalogueTriggersResponses];
+
+export type GetConnectionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        filter?: string;
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/automate/management/api/v1/connections';
+};
+
+export type GetConnectionsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetConnectionsResponses = {
+    /**
+     * OK
+     */
+    200: PagedConnectionItemResponseModel;
+};
+
+export type GetConnectionsResponse = GetConnectionsResponses[keyof GetConnectionsResponses];
+
+export type PostConnectionsData = {
+    body?: CreateConnectionRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/connections';
+};
+
+export type PostConnectionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type PostConnectionsError = PostConnectionsErrors[keyof PostConnectionsErrors];
+
+export type PostConnectionsResponses = {
+    /**
+     * Created
+     */
+    201: unknown;
+};
+
+export type DeleteConnectionsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/connections/{id}';
+};
+
+export type DeleteConnectionsByIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DeleteConnectionsByIdError = DeleteConnectionsByIdErrors[keyof DeleteConnectionsByIdErrors];
+
+export type DeleteConnectionsByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetConnectionsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/connections/{id}';
+};
+
+export type GetConnectionsByIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetConnectionsByIdError = GetConnectionsByIdErrors[keyof GetConnectionsByIdErrors];
+
+export type GetConnectionsByIdResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionResponseModel;
+};
+
+export type GetConnectionsByIdResponse = GetConnectionsByIdResponses[keyof GetConnectionsByIdResponses];
+
+export type PutConnectionsByIdData = {
+    body?: UpdateConnectionRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/connections/{id}';
+};
+
+export type PutConnectionsByIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PutConnectionsByIdError = PutConnectionsByIdErrors[keyof PutConnectionsByIdErrors];
+
+export type PutConnectionsByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetRunsByIdData = {
     body?: never;
@@ -525,3 +801,146 @@ export type GetRunsByIdResponses = {
 };
 
 export type GetRunsByIdResponse = GetRunsByIdResponses[keyof GetRunsByIdResponses];
+
+export type GetWorkspacesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        filter?: string;
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/automate/management/api/v1/workspaces';
+};
+
+export type GetWorkspacesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetWorkspacesResponses = {
+    /**
+     * OK
+     */
+    200: PagedWorkspaceItemResponseModel;
+};
+
+export type GetWorkspacesResponse = GetWorkspacesResponses[keyof GetWorkspacesResponses];
+
+export type PostWorkspacesData = {
+    body?: CreateWorkspaceRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces';
+};
+
+export type PostWorkspacesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type PostWorkspacesError = PostWorkspacesErrors[keyof PostWorkspacesErrors];
+
+export type PostWorkspacesResponses = {
+    /**
+     * Created
+     */
+    201: unknown;
+};
+
+export type DeleteWorkspacesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}';
+};
+
+export type DeleteWorkspacesByIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DeleteWorkspacesByIdError = DeleteWorkspacesByIdErrors[keyof DeleteWorkspacesByIdErrors];
+
+export type DeleteWorkspacesByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetWorkspacesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}';
+};
+
+export type GetWorkspacesByIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetWorkspacesByIdError = GetWorkspacesByIdErrors[keyof GetWorkspacesByIdErrors];
+
+export type GetWorkspacesByIdResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceResponseModel;
+};
+
+export type GetWorkspacesByIdResponse = GetWorkspacesByIdResponses[keyof GetWorkspacesByIdResponses];
+
+export type PutWorkspacesByIdData = {
+    body?: UpdateWorkspaceRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/workspaces/{id}';
+};
+
+export type PutWorkspacesByIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PutWorkspacesByIdError = PutWorkspacesByIdErrors[keyof PutWorkspacesByIdErrors];
+
+export type PutWorkspacesByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};

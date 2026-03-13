@@ -105,10 +105,19 @@
 .react-flow__handle {
     width: 10px;
     height: 10px;
-    border: 2px solid #fff;
+    border: 2px solid var(--uui-color-surface, #fff);
     background: #94a3b8;
 }
 
 .react-flow__handle:hover {
     background: #3b82f6;
+}
+
+/* Dark mode: ensure node shadows work on dark backgrounds */
+.dark .ua-node {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.dark .ua-node:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }

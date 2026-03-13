@@ -1,5 +1,5 @@
-import type { ActionItemResponseModel, TriggerItemResponseModel } from "../api/types.gen.js";
-import type { UaActionCatalogueItemModel, UaTriggerCatalogueItemModel } from "./types.js";
+import type { ActionItemResponseModel, ConnectionTypeItemResponseModel, TriggerItemResponseModel } from "../api/types.gen.js";
+import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaTriggerCatalogueItemModel } from "./types.js";
 
 export const UaCatalogueTypeMapper = {
     toActionModel(response: ActionItemResponseModel): UaActionCatalogueItemModel {
@@ -22,6 +22,17 @@ export const UaCatalogueTypeMapper = {
             icon: response.icon ?? null,
             settingsSchema: response.settingsSchema ?? null,
             outputProperties: response.outputProperties,
+        };
+    },
+
+    toConnectionTypeModel(response: ConnectionTypeItemResponseModel): UaConnectionTypeCatalogueItemModel {
+        return {
+            alias: response.alias,
+            name: response.name,
+            description: response.description ?? null,
+            group: response.group ?? null,
+            icon: response.icon ?? null,
+            settingsSchema: response.settingsSchema ?? null,
         };
     },
 };

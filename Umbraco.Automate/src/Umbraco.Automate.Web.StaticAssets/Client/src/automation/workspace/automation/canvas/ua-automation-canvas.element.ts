@@ -2,9 +2,10 @@ import { css, html, customElement, property, state } from "@umbraco-cms/backoffi
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
-import type { Node, Edge, Viewport } from "@xyflow/react";
+import type { Node, Edge, Viewport, ColorMode } from "@xyflow/react";
 import AutomationCanvas from "./AutomationCanvas.js";
 import type { CanvasChangeDetail, AddNodeRequestDetail } from "./types.js";
+import { UMB_THEME_CONTEXT } from "@umbraco-cms/backoffice/themes";
 
 // Import CSS as strings (Vite ?inline) so we can inject into shadow DOM.
 import reactFlowCss from "@xyflow/react/dist/style.css?inline";
@@ -24,8 +25,24 @@ export class UaAutomationCanvasElement extends UmbLitElement {
     @state()
     private _mounted = false;
 
+    @state()
+    private _colorMode: ColorMode = "light";
+
     #root: Root | null = null;
     #container: HTMLDivElement | null = null;
+
+    constructor() {
+        super();
+        this.consumeContext(UMB_THEME_CONTEXT, (context) => {
+            if (!context) return;
+            this.observe(context.theme, (themeAlias) => {
+                this._colorMode = themeAlias?.includes("dark") ? "dark" : "light";
+                if (this._mounted) {
+                    this.#renderReact();
+                }
+            });
+        });
+    }
 
     override firstUpdated() {
         // Inject React Flow + custom styles into the shadow root
@@ -63,6 +80,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 nodes: this.nodes,
                 edges: this.edges,
                 viewport: this.viewport,
+                colorMode: this._colorMode,
                 onCanvasChange: this.#onCanvasChange,
                 onAddNodeRequest: this.#onAddNodeRequest,
             }),

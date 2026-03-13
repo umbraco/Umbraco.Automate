@@ -4,4 +4,4 @@ export type { UaRunEntityType } from "./entity.js";
 export * from "./workspace/constants.js";
 export * from "./repository/constants.js";
 
-export const UA_RUN_ICON = "icon-traffic";
+export const UA_RUN_ICON = "icon-nodes";

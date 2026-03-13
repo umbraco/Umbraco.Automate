@@ -3,7 +3,10 @@ import { UA_CREATE_AUTOMATION_WORKSPACE_PATH_PATTERN } from "../workspace/automa
 
 export class UaAutomationCreateEntityAction extends UmbEntityActionBase<never> {
     override async execute() {
-        const path = UA_CREATE_AUTOMATION_WORKSPACE_PATH_PATTERN.generateAbsolute({});
+        const path = UA_CREATE_AUTOMATION_WORKSPACE_PATH_PATTERN.generateAbsolute({
+            parentEntityType: this.args.entityType,
+            parentUnique: this.args.unique ?? "null",
+        });
         history.pushState(null, "", path);
     }
 }

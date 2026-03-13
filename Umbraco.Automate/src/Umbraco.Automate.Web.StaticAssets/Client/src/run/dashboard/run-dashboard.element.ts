@@ -120,7 +120,7 @@ export class UaRunDashboardElement extends UmbLitElement {
     #createTableItems(items: UaRunItemModel[]) {
         this._items = items.map((item) => ({
             id: item.unique,
-            icon: "icon-traffic",
+            icon: "icon-nodes",
             data: [
                 {
                     columnAlias: "automationName",

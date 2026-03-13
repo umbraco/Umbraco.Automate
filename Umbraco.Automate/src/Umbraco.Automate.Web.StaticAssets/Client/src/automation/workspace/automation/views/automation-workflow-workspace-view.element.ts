@@ -39,7 +39,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         this.consumeContext(UA_AUTOMATION_WORKSPACE_CONTEXT, (context) => {
             if (!context) return;
             this.#workspaceContext = context;
-            this.observe(context.model, (model) => {
+            this.observe(context.data, (model) => {
                 if (!model) return;
                 this._model = model;
                 this.#syncFromModel(model);

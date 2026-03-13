@@ -29,6 +29,9 @@ export default {
     },
     uaMenu: {
         automations: "Automations",
+        settings: "Settings",
+        workspaces: "Workspaces",
+        connections: "Connections",
     },
     uaAutomation: {
         deleteConfirm: "Are you sure you want to delete this automation?",
@@ -50,6 +53,24 @@ export default {
         noRuns: "No runs found.",
         noStepRuns: "No step runs recorded for this execution.",
         noRecentActivity: "No recent activity.",
+    },
+    uaWorkspace: {
+        deleteConfirm: "Are you sure you want to delete this workspace?",
+        bulkDeleteConfirm: (count: number) =>
+            `Are you sure you want to delete ${count} workspace(s)?`,
+        serviceAccountKey: "Service Account Key",
+        userGroups: "User Groups",
+        allowedConnections: "Allowed Connections",
+    },
+    uaConnection: {
+        deleteConfirm: "Are you sure you want to delete this connection?",
+        bulkDeleteConfirm: (count: number) =>
+            `Are you sure you want to delete ${count} connection(s)?`,
+        type: "Type",
+        settings: "Settings",
+        addSetting: "Add Setting",
+        key: "Key",
+        value: "Value",
     },
     uaDashboard: {
         overview: "Overview",
