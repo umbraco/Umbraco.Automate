@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
@@ -11,15 +12,18 @@ namespace Umbraco.Automate.Core.Workspaces;
 internal sealed class WorkspaceService : IWorkspaceService
 {
     private readonly IWorkspaceRepository _workspaceRepository;
+    private readonly IAutomationGroupRepository _groupRepository;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
 
     public WorkspaceService(
         IWorkspaceRepository workspaceRepository,
+        IAutomationGroupRepository groupRepository,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory)
     {
         _workspaceRepository = workspaceRepository;
+        _groupRepository = groupRepository;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
     }
@@ -102,6 +106,8 @@ internal sealed class WorkspaceService : IWorkspaceService
         {
             throw new OperationCanceledException("Workspace deletion was cancelled by a notification handler.");
         }
+
+        await _groupRepository.DeleteByWorkspaceAsync(id, cancellationToken);
 
         var deleted = await _workspaceRepository.DeleteAsync(id, cancellationToken);
 

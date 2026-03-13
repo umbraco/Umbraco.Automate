@@ -46,6 +46,8 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<AutomationFactory>();
         builder.Services.AddSingleton<ConnectionFactory>();
         builder.Services.AddSingleton<IAutomationRepository, EFCoreAutomationRepository>();
+        builder.Services.AddSingleton<AutomationGroupFactory>();
+        builder.Services.AddSingleton<IAutomationGroupRepository, EFCoreAutomationGroupRepository>();
         builder.Services.AddSingleton<IWorkspaceRepository, EFCoreWorkspaceRepository>();
         builder.Services.AddSingleton<IConnectionRepository, EFCoreConnectionRepository>();
         builder.Services.AddSingleton<IAutomationRunRepository, EFCoreAutomationRunRepository>();

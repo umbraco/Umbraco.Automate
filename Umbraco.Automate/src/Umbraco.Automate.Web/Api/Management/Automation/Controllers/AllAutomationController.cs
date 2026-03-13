@@ -46,6 +46,7 @@ public sealed class AllAutomationController : AutomationControllerBase
     [ProducesResponseType(typeof(PagedViewModel<AutomationItemResponseModel>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedViewModel<AutomationItemResponseModel>>> GetAllAutomations(
         string? filter = null,
+        Guid? groupId = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
@@ -60,7 +61,7 @@ public sealed class AllAutomationController : AutomationControllerBase
             workspaceIds = await _workspaceService.GetAccessibleWorkspaceIdsAsync(userGroupKeys, cancellationToken);
         }
 
-        var (items, total) = await _automationService.GetAutomationsPagedAsync(filter, workspaceIds, skip, take, cancellationToken);
+        var (items, total) = await _automationService.GetAutomationsPagedAsync(filter, workspaceIds, groupId, skip, take, cancellationToken);
 
         return Ok(new PagedViewModel<AutomationItemResponseModel>
         {

@@ -38,6 +38,9 @@ public sealed class AutomationResponseModel
     [Required]
     public Guid WorkspaceId { get; set; }
 
+    /// <summary>The group (folder) this automation belongs to, or null.</summary>
+    public Guid? GroupId { get; set; }
+
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; set; }
 

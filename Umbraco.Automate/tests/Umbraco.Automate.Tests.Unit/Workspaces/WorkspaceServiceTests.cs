@@ -1,4 +1,5 @@
 using System.Data;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core.Events;
@@ -29,6 +30,7 @@ public class WorkspaceServiceTests
 
         _service = new WorkspaceService(
             _repo.Object,
+            Mock.Of<IAutomationGroupRepository>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
     }

@@ -59,6 +59,7 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
     public async Task<(IEnumerable<Automation> Items, int Total)> GetPagedAsync(
         string? filter = null,
         IReadOnlySet<Guid>? workspaceIds = null,
+        Guid? groupId = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
@@ -72,6 +73,14 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
             if (workspaceIds is not null)
             {
                 query = query.Where(a => workspaceIds.Contains(a.WorkspaceId));
+            }
+
+            if (groupId is not null)
+            {
+                // Guid.Empty means "root level" (no group).
+                query = groupId.Value == Guid.Empty
+                    ? query.Where(a => a.GroupId == null)
+                    : query.Where(a => a.GroupId == groupId.Value);
             }
 
             if (!string.IsNullOrWhiteSpace(filter))

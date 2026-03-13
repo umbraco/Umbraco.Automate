@@ -23,9 +23,14 @@ internal interface IAutomationRepository
     /// <summary>
     /// Gets a paged list of automations, optionally scoped to specific workspace IDs.
     /// </summary>
+    /// <param name="groupId">
+    /// When not null, filters by group.
+    /// Pass <see cref="Guid.Empty"/> to get root-level automations (those with no group).
+    /// </param>
     Task<(IEnumerable<Automation> Items, int Total)> GetPagedAsync(
         string? filter = null,
         IReadOnlySet<Guid>? workspaceIds = null,
+        Guid? groupId = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default);

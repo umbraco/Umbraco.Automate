@@ -23,6 +23,9 @@ public sealed class CreateAutomationRequestModel
     /// <summary>Whether triggers are active.</summary>
     public bool IsEnabled { get; init; }
 
+    /// <summary>The group (folder) to place this automation in, or null for root.</summary>
+    public Guid? GroupId { get; init; }
+
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; init; }
 

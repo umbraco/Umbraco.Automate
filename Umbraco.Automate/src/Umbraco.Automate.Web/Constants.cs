@@ -89,6 +89,18 @@ public class Constants
             }
 
             /// <summary>
+            /// Automation group feature constants.
+            /// </summary>
+            public static class Group
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "groups";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Groups";
+            }
+
+            /// <summary>
             /// Approval feature constants.
             /// </summary>
             public static class Approval

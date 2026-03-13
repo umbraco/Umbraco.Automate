@@ -33,11 +33,12 @@ public class AutomationMapDefinition : IMapDefinition
         };
     }
 
-    // Umbraco.Code.MapAll -Alias -Name -Id -WorkspaceId -Status -PublishedVersion -GroupId -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
+    // Umbraco.Code.MapAll -Alias -Name -Id -WorkspaceId -Status -PublishedVersion -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
     private static void MapFromCreateRequest(CreateAutomationRequestModel source, Core.Automations.Automation target, MapperContext context)
     {
         target.Description = source.Description;
         target.IsEnabled = source.IsEnabled;
+        target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
         target.Connections = source.Connections;
@@ -45,13 +46,14 @@ public class AutomationMapDefinition : IMapDefinition
         target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll -Id -WorkspaceId -Status -PublishedVersion -GroupId -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
+    // Umbraco.Code.MapAll -Id -WorkspaceId -Status -PublishedVersion -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
     private static void MapFromUpdateRequest(UpdateAutomationRequestModel source, Core.Automations.Automation target, MapperContext context)
     {
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
         target.IsEnabled = source.IsEnabled;
+        target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
         target.Connections = source.Connections;
@@ -70,6 +72,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Status = source.Status;
         target.PublishedVersion = source.PublishedVersion;
         target.WorkspaceId = source.WorkspaceId;
+        target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
         target.Connections = source.Connections;
@@ -88,6 +91,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Name = source.Name;
         target.Description = source.Description;
         target.IsEnabled = source.IsEnabled;
+        target.GroupId = source.GroupId;
         target.Status = source.Status;
         target.Version = source.Version;
         target.DateCreated = source.DateCreated;
