@@ -8,16 +8,18 @@ namespace Umbraco.Automate.Persistence.Triggers;
 /// </summary>
 internal sealed class ScheduledTriggerStateStore : IScheduledTriggerStateStore
 {
-    private readonly UmbracoAutomateDbContext _dbContext;
+    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
 
-    public ScheduledTriggerStateStore(UmbracoAutomateDbContext dbContext)
+    public ScheduledTriggerStateStore(IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory)
     {
-        _dbContext = dbContext;
+        _dbContextFactory = dbContextFactory;
     }
 
     public async Task<DateTime?> GetLastFiredAsync(Guid automationId, CancellationToken cancellationToken)
     {
-        var entity = await _dbContext.ScheduledTriggerStates
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var entity = await db.ScheduledTriggerStates
             .FirstOrDefaultAsync(e => e.AutomationId == automationId, cancellationToken);
 
         return entity?.LastFiredUtc;
@@ -25,7 +27,9 @@ internal sealed class ScheduledTriggerStateStore : IScheduledTriggerStateStore
 
     public async Task SetLastFiredAsync(Guid automationId, DateTime firedUtc, CancellationToken cancellationToken)
     {
-        var entity = await _dbContext.ScheduledTriggerStates
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var entity = await db.ScheduledTriggerStates
             .FirstOrDefaultAsync(e => e.AutomationId == automationId, cancellationToken);
 
         if (entity is null)
@@ -35,13 +39,13 @@ internal sealed class ScheduledTriggerStateStore : IScheduledTriggerStateStore
                 AutomationId = automationId,
                 LastFiredUtc = firedUtc,
             };
-            _dbContext.ScheduledTriggerStates.Add(entity);
+            db.ScheduledTriggerStates.Add(entity);
         }
         else
         {
             entity.LastFiredUtc = firedUtc;
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

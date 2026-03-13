@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Core.Workspaces;
-using Umbraco.Cms.Persistence.EFCore.Scoping;
 
 namespace Umbraco.Automate.Persistence.Workspaces;
 
@@ -9,140 +8,109 @@ namespace Umbraco.Automate.Persistence.Workspaces;
 /// </summary>
 internal sealed class EFCoreWorkspaceGroupRepository : IWorkspaceGroupRepository
 {
-    private readonly IEFCoreScopeProvider<UmbracoAutomateDbContext> _scopeProvider;
+    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly WorkspaceGroupFactory _factory;
 
     public EFCoreWorkspaceGroupRepository(
-        IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider,
+        IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
         WorkspaceGroupFactory factory)
     {
-        _scopeProvider = scopeProvider;
+        _dbContextFactory = dbContextFactory;
         _factory = factory;
     }
 
     public async Task<WorkspaceGroup?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        WorkspaceGroupEntity? entity = await scope.ExecuteWithContextAsync(async db =>
-            await db.WorkspaceGroups.FirstOrDefaultAsync(g => g.Id == id, cancellationToken));
+        WorkspaceGroupEntity? entity = await db.WorkspaceGroups
+            .FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
 
-        scope.Complete();
         return entity is null ? null : _factory.BuildDomain(entity);
     }
 
     public async Task<IEnumerable<WorkspaceGroup>> GetByWorkspaceAsync(Guid workspaceId, Guid? parentId, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var entities = await scope.ExecuteWithContextAsync(async db =>
-            await db.WorkspaceGroups
-                .Where(g => g.WorkspaceId == workspaceId && g.ParentId == parentId)
-                .OrderBy(g => g.Name)
-                .ToListAsync(cancellationToken));
+        var entities = await db.WorkspaceGroups
+            .Where(g => g.WorkspaceId == workspaceId && g.ParentId == parentId)
+            .OrderBy(g => g.Name)
+            .ToListAsync(cancellationToken);
 
-        scope.Complete();
         return entities.Select(_factory.BuildDomain);
     }
 
     public async Task<WorkspaceGroup> SaveAsync(WorkspaceGroup group, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync(async db =>
+        WorkspaceGroupEntity? existing = await db.WorkspaceGroups.FindAsync([group.Id], cancellationToken);
+
+        if (existing is null)
         {
-            WorkspaceGroupEntity? existing = await db.WorkspaceGroups.FindAsync([group.Id], cancellationToken);
+            WorkspaceGroupEntity newEntity = _factory.BuildEntity(group);
+            db.WorkspaceGroups.Add(newEntity);
+        }
+        else
+        {
+            _factory.UpdateEntity(existing, group);
+        }
 
-            if (existing is null)
-            {
-                WorkspaceGroupEntity newEntity = _factory.BuildEntity(group);
-                db.WorkspaceGroups.Add(newEntity);
-            }
-            else
-            {
-                _factory.UpdateEntity(existing, group);
-            }
-
-            await db.SaveChangesAsync(cancellationToken);
-            return true;
-        });
-
-        scope.Complete();
+        await db.SaveChangesAsync(cancellationToken);
         return group;
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var deleted = await scope.ExecuteWithContextAsync(async db =>
+        WorkspaceGroupEntity? entity = await db.WorkspaceGroups.FindAsync([id], cancellationToken);
+        if (entity is null)
         {
-            WorkspaceGroupEntity? entity = await db.WorkspaceGroups.FindAsync([id], cancellationToken);
-            if (entity is null)
-            {
-                return false;
-            }
+            return false;
+        }
 
-            db.WorkspaceGroups.Remove(entity);
-            await db.SaveChangesAsync(cancellationToken);
-            return true;
-        });
-
-        scope.Complete();
-        return deleted;
+        db.WorkspaceGroups.Remove(entity);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<IEnumerable<Guid>> GetChildIdsAsync(Guid parentId, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var ids = await scope.ExecuteWithContextAsync(async db =>
-            await db.WorkspaceGroups
-                .Where(g => g.ParentId == parentId)
-                .Select(g => g.Id)
-                .ToListAsync(cancellationToken));
-
-        scope.Complete();
-        return ids;
+        return await db.WorkspaceGroups
+            .Where(g => g.ParentId == parentId)
+            .Select(g => g.Id)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<bool> NameExistsAsync(Guid workspaceId, Guid? parentId, string name, Guid? excludeId = null, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var exists = await scope.ExecuteWithContextAsync(async db =>
+        var query = db.WorkspaceGroups
+            .Where(g => g.WorkspaceId == workspaceId && g.ParentId == parentId && g.Name == name);
+
+        if (excludeId.HasValue)
         {
-            var query = db.WorkspaceGroups
-                .Where(g => g.WorkspaceId == workspaceId && g.ParentId == parentId && g.Name == name);
+            query = query.Where(g => g.Id != excludeId.Value);
+        }
 
-            if (excludeId.HasValue)
-            {
-                query = query.Where(g => g.Id != excludeId.Value);
-            }
-
-            return await query.AnyAsync(cancellationToken);
-        });
-
-        scope.Complete();
-        return exists;
+        return await query.AnyAsync(cancellationToken);
     }
 
     public async Task<int> DeleteByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var count = await scope.ExecuteWithContextAsync(async db =>
-        {
-            var entities = await db.WorkspaceGroups
-                .Where(g => g.WorkspaceId == workspaceId)
-                .ToListAsync(cancellationToken);
+        var entities = await db.WorkspaceGroups
+            .Where(g => g.WorkspaceId == workspaceId)
+            .ToListAsync(cancellationToken);
 
-            db.WorkspaceGroups.RemoveRange(entities);
-            await db.SaveChangesAsync(cancellationToken);
-            return entities.Count;
-        });
-
-        scope.Complete();
-        return count;
+        db.WorkspaceGroups.RemoveRange(entities);
+        await db.SaveChangesAsync(cancellationToken);
+        return entities.Count;
     }
 }

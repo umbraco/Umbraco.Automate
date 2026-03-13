@@ -45,7 +45,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _fixture = new EfCoreTestFixture();
-        var scopeProvider = new TestEfCoreScopeProvider(_fixture.CreateContext);
+        var dbContextFactory = new TestDbContextFactory(_fixture.CreateContext);
         var configuration = new ConfigurationBuilder().Build();
 
         // Collections — manually constructed without Umbraco TypeLoader.
@@ -74,7 +74,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddWorkflow();
 
         // Repositories (real EF Core with in-memory SQLite).
-        _runRepository = new EFCoreAutomationRunRepository(scopeProvider);
+        _runRepository = new EFCoreAutomationRunRepository(dbContextFactory);
         services.AddSingleton(_runRepository);
 
         // Collections.

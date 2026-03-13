@@ -9,6 +9,11 @@ public sealed class AutomateReadinessSignal
     private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
+    /// Gets whether the database is ready.
+    /// </summary>
+    public bool IsReady => _tcs.Task.IsCompletedSuccessfully;
+
+    /// <summary>
     /// Signals that the Automate database is ready for use.
     /// </summary>
     public void Signal() => _tcs.TrySetResult();

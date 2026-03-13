@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Persistence;
 using Umbraco.Cms.Core.Events;
@@ -15,16 +16,19 @@ public class RunAutomateMigrationNotificationHandler
 {
     private readonly IConfiguration _configuration;
     private readonly AutomateReadinessSignal _readinessSignal;
+    private readonly ILogger<RunAutomateMigrationNotificationHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of <see cref="RunAutomateMigrationNotificationHandler"/>.
     /// </summary>
     public RunAutomateMigrationNotificationHandler(
         IConfiguration configuration,
-        AutomateReadinessSignal readinessSignal)
+        AutomateReadinessSignal readinessSignal,
+        ILogger<RunAutomateMigrationNotificationHandler> logger)
     {
         _configuration = configuration;
         _readinessSignal = readinessSignal;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -47,7 +51,9 @@ public class RunAutomateMigrationNotificationHandler
         IEnumerable<string> pending = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
         if (pending.Any())
         {
+            _logger.LogInformation("Running {Count} pending Automate migrations", pending.Count());
             await dbContext.Database.MigrateAsync(cancellationToken);
+            _logger.LogInformation("Automate migrations completed successfully");
         }
 
         _readinessSignal.Signal();

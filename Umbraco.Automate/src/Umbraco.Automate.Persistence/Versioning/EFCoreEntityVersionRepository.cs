@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Core.Versioning;
-using Umbraco.Cms.Persistence.EFCore.Scoping;
 
 namespace Umbraco.Automate.Persistence.Versioning;
 
@@ -9,11 +8,11 @@ namespace Umbraco.Automate.Persistence.Versioning;
 /// </summary>
 internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
 {
-    private readonly IEFCoreScopeProvider<UmbracoAutomateDbContext> _scopeProvider;
+    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
 
-    public EFCoreEntityVersionRepository(IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider)
+    public EFCoreEntityVersionRepository(IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory)
     {
-        _scopeProvider = scopeProvider;
+        _dbContextFactory = dbContextFactory;
     }
 
     public async Task<IEnumerable<EntityVersion>> GetVersionHistoryAsync(
@@ -23,17 +22,15 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         int take,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var entities = await scope.ExecuteWithContextAsync(async db =>
-            await db.EntityVersions
-                .Where(v => v.EntityId == entityId && v.EntityType == entityType)
-                .OrderByDescending(v => v.Version)
-                .Skip(skip)
-                .Take(take)
-                .ToListAsync(cancellationToken));
+        var entities = await db.EntityVersions
+            .Where(v => v.EntityId == entityId && v.EntityType == entityType)
+            .OrderByDescending(v => v.Version)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
 
-        scope.Complete();
         return entities.Select(MapToDomain);
     }
 
@@ -42,14 +39,10 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         string entityType,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var count = await scope.ExecuteWithContextAsync(async db =>
-            await db.EntityVersions
-                .CountAsync(v => v.EntityId == entityId && v.EntityType == entityType, cancellationToken));
-
-        scope.Complete();
-        return count;
+        return await db.EntityVersions
+            .CountAsync(v => v.EntityId == entityId && v.EntityType == entityType, cancellationToken);
     }
 
     public async Task<EntityVersion?> GetVersionAsync(
@@ -58,17 +51,15 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         int version,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var entity = await scope.ExecuteWithContextAsync(async db =>
-            await db.EntityVersions
-                .FirstOrDefaultAsync(v =>
-                    v.EntityId == entityId &&
-                    v.EntityType == entityType &&
-                    v.Version == version,
-                    cancellationToken));
+        var entity = await db.EntityVersions
+            .FirstOrDefaultAsync(v =>
+                v.EntityId == entityId &&
+                v.EntityType == entityType &&
+                v.Version == version,
+                cancellationToken);
 
-        scope.Complete();
         return entity is null ? null : MapToDomain(entity);
     }
 
@@ -81,26 +72,21 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         string? changeDescription,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
+        db.EntityVersions.Add(new EntityVersionEntity
         {
-            db.EntityVersions.Add(new EntityVersionEntity
-            {
-                Id = Guid.NewGuid(),
-                EntityId = entityId,
-                EntityType = entityType,
-                Version = version,
-                Snapshot = snapshot,
-                DateCreated = DateTime.UtcNow,
-                CreatedByUserId = userId,
-                ChangeDescription = changeDescription,
-            });
-
-            await db.SaveChangesAsync(cancellationToken);
+            Id = Guid.NewGuid(),
+            EntityId = entityId,
+            EntityType = entityType,
+            Version = version,
+            Snapshot = snapshot,
+            DateCreated = DateTime.UtcNow,
+            CreatedByUserId = userId,
+            ChangeDescription = changeDescription,
         });
 
-        scope.Complete();
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task DeleteVersionsAsync(
@@ -108,16 +94,11 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         string entityType,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<UmbracoAutomateDbContext>(async db =>
-        {
-            await db.EntityVersions
-                .Where(v => v.EntityId == entityId && v.EntityType == entityType)
-                .ExecuteDeleteAsync(cancellationToken);
-        });
-
-        scope.Complete();
+        await db.EntityVersions
+            .Where(v => v.EntityId == entityId && v.EntityType == entityType)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task<int> DeleteVersionsOlderThanAsync(
@@ -125,41 +106,35 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         IReadOnlyCollection<ProtectedVersion> protectedVersions,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var deleted = await scope.ExecuteWithContextAsync(async db =>
+        if (protectedVersions.Count == 0)
         {
-            if (protectedVersions.Count == 0)
-            {
-                return await db.EntityVersions
-                    .Where(v => v.DateCreated < threshold)
-                    .ExecuteDeleteAsync(cancellationToken);
-            }
-
-            // Materialize candidates, filter out protected versions in memory, delete by ID.
-            var protectedSet = protectedVersions.ToHashSet();
-            var candidates = await db.EntityVersions
-                .Where(v => v.DateCreated < threshold)
-                .Select(v => new { v.Id, v.EntityId, v.Version })
-                .ToListAsync(cancellationToken);
-
-            var idsToDelete = candidates
-                .Where(v => !protectedSet.Contains(new ProtectedVersion(v.EntityId, v.Version)))
-                .Select(v => v.Id)
-                .ToList();
-
-            if (idsToDelete.Count == 0)
-            {
-                return 0;
-            }
-
             return await db.EntityVersions
-                .Where(v => idsToDelete.Contains(v.Id))
+                .Where(v => v.DateCreated < threshold)
                 .ExecuteDeleteAsync(cancellationToken);
-        });
+        }
 
-        scope.Complete();
-        return deleted;
+        // Materialize candidates, filter out protected versions in memory, delete by ID.
+        var protectedSet = protectedVersions.ToHashSet();
+        var candidates = await db.EntityVersions
+            .Where(v => v.DateCreated < threshold)
+            .Select(v => new { v.Id, v.EntityId, v.Version })
+            .ToListAsync(cancellationToken);
+
+        var idsToDelete = candidates
+            .Where(v => !protectedSet.Contains(new ProtectedVersion(v.EntityId, v.Version)))
+            .Select(v => v.Id)
+            .ToList();
+
+        if (idsToDelete.Count == 0)
+        {
+            return 0;
+        }
+
+        return await db.EntityVersions
+            .Where(v => idsToDelete.Contains(v.Id))
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task<int> DeleteExcessVersionsAsync(
@@ -167,57 +142,46 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         IReadOnlyCollection<ProtectedVersion> protectedVersions,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         // Get all entity/type combinations that exceed the limit.
-        var totalDeleted = await scope.ExecuteWithContextAsync(async db =>
+        var groups = await db.EntityVersions
+            .GroupBy(v => new { v.EntityId, v.EntityType })
+            .Where(g => g.Count() > maxVersionsPerEntity)
+            .Select(g => new { g.Key.EntityId, g.Key.EntityType, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var protectedSet = protectedVersions.ToHashSet();
+
+        var deleted = 0;
+        foreach (var group in groups)
         {
-            var groups = await db.EntityVersions
-                .GroupBy(v => new { v.EntityId, v.EntityType })
-                .Where(g => g.Count() > maxVersionsPerEntity)
-                .Select(g => new { g.Key.EntityId, g.Key.EntityType, Count = g.Count() })
+            var candidates = await db.EntityVersions
+                .Where(v => v.EntityId == group.EntityId && v.EntityType == group.EntityType)
+                .OrderByDescending(v => v.Version)
+                .Skip(maxVersionsPerEntity)
                 .ToListAsync(cancellationToken);
 
-            var protectedSet = protectedVersions.ToHashSet();
+            var idsToDelete = candidates
+                .Where(v => !protectedSet.Contains(new ProtectedVersion(v.EntityId, v.Version)))
+                .Select(v => v.Id)
+                .ToList();
 
-            var deleted = 0;
-            foreach (var group in groups)
+            if (idsToDelete.Count > 0)
             {
-                var candidates = await db.EntityVersions
-                    .Where(v => v.EntityId == group.EntityId && v.EntityType == group.EntityType)
-                    .OrderByDescending(v => v.Version)
-                    .Skip(maxVersionsPerEntity)
-                    .ToListAsync(cancellationToken);
-
-                var idsToDelete = candidates
-                    .Where(v => !protectedSet.Contains(new ProtectedVersion(v.EntityId, v.Version)))
-                    .Select(v => v.Id)
-                    .ToList();
-
-                if (idsToDelete.Count > 0)
-                {
-                    deleted += await db.EntityVersions
-                        .Where(v => idsToDelete.Contains(v.Id))
-                        .ExecuteDeleteAsync(cancellationToken);
-                }
+                deleted += await db.EntityVersions
+                    .Where(v => idsToDelete.Contains(v.Id))
+                    .ExecuteDeleteAsync(cancellationToken);
             }
+        }
 
-            return deleted;
-        });
-
-        scope.Complete();
-        return totalDeleted;
+        return deleted;
     }
 
     public async Task<int> GetVersionCountAsync(CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
-
-        var count = await scope.ExecuteWithContextAsync(async db =>
-            await db.EntityVersions.CountAsync(cancellationToken));
-
-        scope.Complete();
-        return count;
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.EntityVersions.CountAsync(cancellationToken);
     }
 
     private static EntityVersion MapToDomain(EntityVersionEntity entity) => new()
