@@ -305,6 +305,20 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.ToTable("umbracoAutomateStepRun", (string)null);
                 });
 
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Triggers.ScheduledTriggerStateEntity", b =>
+                {
+                    b.Property<Guid>("AutomationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("LastFiredUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("AutomationId");
+
+                    b.ToTable("umbracoAutomateScheduledTriggerState", (string)null);
+                });
+
             modelBuilder.Entity("Umbraco.Automate.Persistence.Versioning.EntityVersionEntity", b =>
                 {
                     b.Property<Guid>("Id")
