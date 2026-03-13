@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Notifications.Channels;
+
 namespace Umbraco.Automate.Core.Configuration;
 
 /// <summary>
@@ -109,6 +111,11 @@ public sealed class GovernanceOptions
     /// Gets or sets whether sensitive data is masked in run logs.
     /// </summary>
     public bool SensitiveDataMasking { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the default notification policy for new automations.
+    /// </summary>
+    public NotifyOn DefaultNotifyOn { get; set; } = NotifyOn.Failed;
 }
 
 /// <summary>

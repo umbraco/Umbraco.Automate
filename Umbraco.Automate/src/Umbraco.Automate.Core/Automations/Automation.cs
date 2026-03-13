@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Models;
+using Umbraco.Automate.Core.Notifications.Channels;
 
 namespace Umbraco.Automate.Core.Automations;
 
@@ -64,6 +65,11 @@ public sealed class Automation : IVersionableEntity
     /// Gets or sets the connections between steps.
     /// </summary>
     public IList<StepConnection> Connections { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the notification settings for failure alerting.
+    /// </summary>
+    public AutomationNotificationSettings? NotificationSettings { get; set; }
 
     /// <summary>
     /// Gets or sets the serialised canvas state (viewport, layout).

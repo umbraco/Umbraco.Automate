@@ -8,6 +8,7 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Workspaces;
@@ -54,12 +55,17 @@ public static partial class UmbracoBuilderExtensions
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAction, ActionAttribute>(cache: true));
         builder.AutomateConnectionTypes()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IConnectionType, ConnectionTypeAttribute>(cache: true));
+        builder.AutomateNotificationChannels()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<INotificationChannel, NotificationChannelAttribute>(cache: true));
         builder.AutomateExpressionFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>();
 
         // Wire notification triggers → TriggerNotificationHandler<T> for each notification type
         builder.RegisterTriggerNotificationHandlers();
+
+        // Wire run-completed notification → notification channel dispatcher
+        builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
 
         // Action middleware — ordered pipeline
         builder.AutomateActionMiddleware()
@@ -76,6 +82,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ActionInfrastructure>();
         builder.Services.AddSingleton<TriggerInfrastructure>();
         builder.Services.AddSingleton<ConnectionTypeInfrastructure>();
+        builder.Services.AddSingleton<NotificationChannelInfrastructure>();
 
         // Versioning
         builder.Services.AddSingleton<IEntityVersionService, EntityVersionService>();
@@ -154,6 +161,12 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static ConnectionTypeCollectionBuilder AutomateConnectionTypes(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<ConnectionTypeCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the notification channel collection builder. Channels are auto-discovered.
+    /// </summary>
+    public static NotificationChannelCollectionBuilder AutomateNotificationChannels(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<NotificationChannelCollectionBuilder>();
 
     /// <summary>
     /// Gets the versionable entity adapter collection builder.
