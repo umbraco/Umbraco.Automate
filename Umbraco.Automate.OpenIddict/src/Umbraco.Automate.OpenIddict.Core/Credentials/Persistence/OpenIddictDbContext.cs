@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Umbraco.Automate.Core.Persistence;
 
 namespace Umbraco.Automate.OpenIddict.Credentials.Persistence;
 
@@ -16,6 +17,39 @@ public class OpenIddictDbContext : DbContext
     public OpenIddictDbContext(DbContextOptions<OpenIddictDbContext> options)
         : base(options)
     {
+    }
+
+    /// <summary>
+    /// Configures the EF Core database provider with the correct migrations assembly.
+    /// </summary>
+    internal static void ConfigureProvider(
+        DbContextOptionsBuilder options,
+        string connectionString,
+        string providerName)
+    {
+        switch (providerName)
+        {
+            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
+                options.UseSqlServer(connectionString, x =>
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.SqlServer");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
+                break;
+
+            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
+            case "Microsoft.Data.SQLite":
+                options.UseSqlite(connectionString, x =>
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.Sqlite");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
+        }
     }
 
     /// <inheritdoc />

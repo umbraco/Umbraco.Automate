@@ -2,8 +2,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Diagnostics;
-using Umbraco.Cms.Core;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Messaging;
 
@@ -15,7 +13,7 @@ internal sealed class OutboxDispatcher : BackgroundService
 {
     private readonly IOutboxStore _store;
     private readonly IEnumerable<IMessageHandler> _handlers;
-    private readonly IRuntimeState _runtimeState;
+    private readonly AutomateReadinessSignal _readinessSignal;
     private readonly IOptions<OutboxOptions> _options;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<OutboxDispatcher> _logger;
@@ -33,14 +31,14 @@ internal sealed class OutboxDispatcher : BackgroundService
     public OutboxDispatcher(
         IOutboxStore store,
         IEnumerable<IMessageHandler> handlers,
-        IRuntimeState runtimeState,
+        AutomateReadinessSignal readinessSignal,
         IOptions<OutboxOptions> options,
         AutomateMetrics metrics,
         ILogger<OutboxDispatcher> logger)
     {
         _store = store;
         _handlers = handlers;
-        _runtimeState = runtimeState;
+        _readinessSignal = readinessSignal;
         _options = options;
         _metrics = metrics;
         _logger = logger;
@@ -48,11 +46,8 @@ internal sealed class OutboxDispatcher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Wait for Umbraco to finish booting (migrations must complete first).
-        while (_runtimeState.Level != RuntimeLevel.Run && !stoppingToken.IsCancellationRequested)
-        {
-            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-        }
+        // Wait for Automate migrations to complete before accessing the database.
+        await _readinessSignal.WaitAsync(stoppingToken);
 
         var handlersByTopic = _handlers.ToDictionary(h => h.Topic, h => h);
         var topics = handlersByTopic.Keys.ToList();

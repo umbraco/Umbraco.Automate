@@ -39,7 +39,7 @@ public sealed class AllWorkspaceGroupController : WorkspaceGroupControllerBase
     [ProducesResponseType(typeof(IEnumerable<WorkspaceGroupResponseModel>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllWorkspaceGroups(
         Guid id,
-        [FromQuery] Guid? parentId = null,
+        [FromQuery] Guid? parentGroupId = null,
         CancellationToken cancellationToken = default)
     {
         var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
@@ -48,7 +48,7 @@ public sealed class AllWorkspaceGroupController : WorkspaceGroupControllerBase
             return forbidden;
         }
 
-        var groups = await _groupService.GetGroupsByWorkspaceAsync(id, parentId, cancellationToken);
+        var groups = await _groupService.GetGroupsByWorkspaceAsync(id, parentGroupId, cancellationToken);
 
         return Ok(_mapper.MapEnumerable<WorkspaceGroup, WorkspaceGroupResponseModel>(groups));
     }

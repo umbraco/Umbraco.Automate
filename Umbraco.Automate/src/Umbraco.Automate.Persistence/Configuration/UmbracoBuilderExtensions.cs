@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Automate.Core.Automations;
@@ -40,7 +39,7 @@ public static partial class UmbracoBuilderExtensions
 
         builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>((_, options, _, _) =>
         {
-            ConfigureDatabaseProvider(options, connectionString, providerName);
+            UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
         });
 
         builder.Services.AddSingleton<AutomationFactory>();
@@ -64,35 +63,5 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, StuckRunRecoveryNotificationHandler>();
 
         return builder;
-    }
-
-    private static void ConfigureDatabaseProvider(
-        DbContextOptionsBuilder options,
-        string connectionString,
-        string providerName)
-    {
-        switch (providerName)
-        {
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
-                options.UseSqlServer(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                options.UseSqlite(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
-        }
     }
 }

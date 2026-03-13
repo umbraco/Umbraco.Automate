@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
@@ -95,6 +96,9 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddHostedService<VersionCleanupBackgroundJob>();
         builder.Services.AddHostedService<RunCleanupBackgroundJob>();
         builder.Services.AddHostedService<ScheduledTriggerBackgroundJob>();
+
+        // Readiness signal — set by migration handler, awaited by background services
+        builder.Services.AddSingleton<AutomateReadinessSignal>();
 
         // Diagnostics / metrics
         builder.Services.AddSingleton<AutomateMetrics>();

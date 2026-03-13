@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -87,7 +86,7 @@ public static class UmbracoBuilderExtensions
 
         builder.Services.AddUmbracoDbContext<OpenIddictDbContext>((_, options, _, _) =>
         {
-            ConfigureDatabaseProvider(options, connectionString, providerName);
+            OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
         });
 
         builder.Services.AddSingleton<OAuthCredentialsFactory>();
@@ -95,35 +94,5 @@ public static class UmbracoBuilderExtensions
 
         // Run pending migrations on startup.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunOpenIddictMigrationNotificationHandler>();
-    }
-
-    private static void ConfigureDatabaseProvider(
-        DbContextOptionsBuilder options,
-        string connectionString,
-        string providerName)
-    {
-        switch (providerName)
-        {
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
-                options.UseSqlServer(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.SqlServer");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                options.UseSqlite(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.Sqlite");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
-        }
     }
 }
