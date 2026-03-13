@@ -110,12 +110,17 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
-        // WorkflowCore engine with outbox-backed queue
+        // WorkflowCore engine with outbox-backed queue.
+        // AddWorkflow() registers its own default IQueueProvider, so we must override AFTER.
+        builder.Services.AddWorkflow();
         builder.Services.AddSingleton<OutboxQueueProvider>();
         builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<OutboxQueueProvider>());
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
         builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
-        builder.Services.AddWorkflow();
+
+        // WorkflowCore does not register IWorkflowHost as IHostedService.
+        // Start it ourselves after Umbraco has finished booting.
+        builder.Services.AddHostedService<WorkflowHostLifecycle>();
 
         return builder;
     }
