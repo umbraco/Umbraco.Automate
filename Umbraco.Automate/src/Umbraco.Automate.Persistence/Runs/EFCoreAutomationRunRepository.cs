@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Cms.Persistence.EFCore.Scoping;
 
 namespace Umbraco.Automate.Persistence.Runs;
@@ -298,5 +299,146 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
 
         scope.Complete();
         return result;
+    }
+
+    public async Task<Dictionary<AutomationRunStatus, int>> GetRunCountsByStatusAsync(
+        Guid? workspaceId = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var result = await scope.ExecuteWithContextAsync(async db =>
+        {
+            IQueryable<AutomationRunEntity> query = db.AutomationRuns;
+
+            if (workspaceId.HasValue)
+            {
+                query = query.Where(r => r.WorkspaceId == workspaceId.Value);
+            }
+
+            if (from.HasValue)
+            {
+                query = query.Where(r => r.StartedUtc >= from.Value);
+            }
+
+            if (to.HasValue)
+            {
+                query = query.Where(r => r.StartedUtc <= to.Value);
+            }
+
+            var groups = await query
+                .GroupBy(r => r.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken);
+
+            return groups.ToDictionary(
+                g => (AutomationRunStatus)g.Status,
+                g => g.Count);
+        });
+
+        scope.Complete();
+        return result;
+    }
+
+    public async Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
+        Guid? workspaceId = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        int take = 10,
+        CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var result = await scope.ExecuteWithContextAsync(async db =>
+        {
+            IQueryable<AutomationRunEntity> query = db.AutomationRuns;
+
+            if (workspaceId.HasValue)
+            {
+                query = query.Where(r => r.WorkspaceId == workspaceId.Value);
+            }
+
+            if (from.HasValue)
+            {
+                query = query.Where(r => r.StartedUtc >= from.Value);
+            }
+
+            if (to.HasValue)
+            {
+                query = query.Where(r => r.StartedUtc <= to.Value);
+            }
+
+            var completedStatus = (int)AutomationRunStatus.Completed;
+            var failedStatus = (int)AutomationRunStatus.Failed;
+
+            var groups = await query
+                .GroupBy(r => r.AutomationId)
+                .Select(g => new
+                {
+                    AutomationId = g.Key,
+                    TotalRuns = g.Count(),
+                    SuccessCount = g.Count(r => r.Status == completedStatus),
+                    FailCount = g.Count(r => r.Status == failedStatus),
+                })
+                .OrderByDescending(g => g.TotalRuns)
+                .Take(take)
+                .ToListAsync(cancellationToken);
+
+            // Resolve automation names
+            var automationIds = groups.Select(g => g.AutomationId).ToList();
+            var automationNames = await db.Automations
+                .Where(a => automationIds.Contains(a.Id))
+                .Select(a => new { a.Id, a.Name })
+                .ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken);
+
+            return groups.Select(g => new AutomationRunCount
+            {
+                AutomationId = g.AutomationId,
+                AutomationName = automationNames.GetValueOrDefault(g.AutomationId, "Unknown"),
+                TotalRuns = g.TotalRuns,
+                SuccessCount = g.SuccessCount,
+                FailCount = g.FailCount,
+            }).ToList();
+        });
+
+        scope.Complete();
+        return result;
+    }
+
+    public async Task<int> GetRecentRunCountAsync(
+        Guid automationId,
+        DateTime since,
+        CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var count = await scope.ExecuteWithContextAsync(async db =>
+            await db.AutomationRuns
+                .CountAsync(r => r.AutomationId == automationId && r.StartedUtc >= since, cancellationToken));
+
+        scope.Complete();
+        return count;
+    }
+
+    public async Task<int> GetConcurrentRunCountAsync(
+        Guid automationId,
+        CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var runningStatuses = new[]
+        {
+            (int)AutomationRunStatus.Running,
+            (int)AutomationRunStatus.Pending,
+        };
+
+        var count = await scope.ExecuteWithContextAsync(async db =>
+            await db.AutomationRuns
+                .CountAsync(r => r.AutomationId == automationId && runningStatuses.Contains(r.Status), cancellationToken));
+
+        scope.Complete();
+        return count;
     }
 }

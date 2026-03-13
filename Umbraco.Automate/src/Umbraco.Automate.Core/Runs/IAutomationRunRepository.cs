@@ -63,4 +63,38 @@ internal interface IAutomationRunRepository
         string actionAlias,
         StepRunStatus status,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets run counts grouped by status within the specified filters.
+    /// </summary>
+    Task<Dictionary<AutomationRunStatus, int>> GetRunCountsByStatusAsync(
+        Guid? workspaceId = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets run counts grouped by automation within the specified filters.
+    /// </summary>
+    Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
+        Guid? workspaceId = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        int take = 10,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the number of runs started since the specified time for an automation.
+    /// </summary>
+    Task<int> GetRecentRunCountAsync(
+        Guid automationId,
+        DateTime since,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the number of currently running or pending runs for an automation.
+    /// </summary>
+    Task<int> GetConcurrentRunCountAsync(
+        Guid automationId,
+        CancellationToken cancellationToken = default);
 }

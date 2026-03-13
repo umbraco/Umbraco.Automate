@@ -11,28 +11,28 @@ using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 
-public class ContentPublishedTriggerTests
+public class ContentUnpublishedTriggerTests
 {
-    private readonly ContentPublishedTrigger _trigger = new(
+    private readonly ContentUnpublishedTrigger _trigger = new(
         new TriggerInfrastructure(
             Mock.Of<IEditableModelResolver>(),
             Options.Create(new DeduplicationOptions { WindowMinutes = 5 })));
 
     [Fact]
     public void HasCorrectAlias()
-        => _trigger.Alias.ShouldBe("umbracoAutomate.contentPublished");
+        => _trigger.Alias.ShouldBe("umbracoAutomate.contentUnpublished");
 
     [Fact]
     public void HasCorrectName()
-        => _trigger.Name.ShouldBe("Content Published");
+        => _trigger.Name.ShouldBe("Content Unpublished");
 
     [Fact]
     public void HasSettingsType()
-        => _trigger.SettingsType.ShouldBe(typeof(ContentPublishedTriggerSettings));
+        => _trigger.SettingsType.ShouldBe(typeof(ContentUnpublishedTriggerSettings));
 
     [Fact]
     public void HasOutputType()
-        => _trigger.OutputType.ShouldBe(typeof(ContentPublishedTriggerOutput));
+        => _trigger.OutputType.ShouldBe(typeof(ContentUnpublishedTriggerOutput));
 
     [Fact]
     public void HasSettingsSchema()
@@ -53,12 +53,12 @@ public class ContentPublishedTriggerTests
     }
 
     [Fact]
-    public void MapEvent_ProducesEventPerPublishedItem()
+    public void MapEvent_ProducesEventPerUnpublishedItem()
     {
         var content1 = CreateContent(Guid.NewGuid(), "Page One", "blogPost");
         var content2 = CreateContent(Guid.NewGuid(), "Page Two", "article");
 
-        var notification = new ContentPublishedNotification(
+        var notification = new ContentUnpublishedNotification(
             new[] { content1, content2 },
             new EventMessages());
 
@@ -66,24 +66,41 @@ public class ContentPublishedTriggerTests
 
         events.Count.ShouldBe(2);
 
-        var first = events[0].ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>();
-        first.TriggerAlias.ShouldBe("umbracoAutomate.contentPublished");
+        var first = events[0].ShouldBeOfType<TriggerEvent<ContentUnpublishedTriggerOutput>>();
+        first.TriggerAlias.ShouldBe("umbracoAutomate.contentUnpublished");
         first.Output.ContentName.ShouldBe("Page One");
         first.Output.ContentTypeAlias.ShouldBe("blogPost");
 
-        var second = events[1].ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>();
+        var second = events[1].ShouldBeOfType<TriggerEvent<ContentUnpublishedTriggerOutput>>();
         second.Output.ContentName.ShouldBe("Page Two");
     }
 
     [Fact]
     public void MapEvent_EmptyNotification_ProducesNoEvents()
     {
-        var notification = new ContentPublishedNotification(
+        var notification = new ContentUnpublishedNotification(
             Array.Empty<IContent>(),
             new EventMessages());
 
         var events = _trigger.MapEvent(notification).ToList();
         events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MapEvent_SetsIdempotencyKey()
+    {
+        var contentKey = Guid.NewGuid();
+        var content = CreateContent(contentKey, "Page", "blogPost");
+
+        var notification = new ContentUnpublishedNotification(
+            new[] { content },
+            new EventMessages());
+
+        var events = _trigger.MapEvent(notification).ToList();
+
+        events.Count.ShouldBe(1);
+        events[0].IdempotencyKey.ShouldNotBeNullOrWhiteSpace();
+        events[0].IdempotencyKey.ShouldStartWith($"umbracoAutomate.contentUnpublished:{contentKey}:");
     }
 
     private static IContent CreateContent(Guid key, string name, string contentTypeAlias)

@@ -48,6 +48,10 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:Webhook"));
         builder.Services.Configure<ScheduledTriggerOptions>(
             builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
+        builder.Services.Configure<RateLimitingOptions>(
+            builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
+        builder.Services.Configure<DeduplicationOptions>(
+            builder.Config.GetSection("Umbraco:Automate:Deduplication"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -119,6 +123,9 @@ public static partial class UmbracoBuilderExtensions
         // Trigger dispatch via outbox
         builder.Services.AddSingleton<ITriggerDispatcher, OutboxTriggerDispatcher>();
         builder.Services.AddSingleton<IMessageHandler, TriggerEventHandler>();
+
+        // Rate limiting
+        builder.Services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Automation execution
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();

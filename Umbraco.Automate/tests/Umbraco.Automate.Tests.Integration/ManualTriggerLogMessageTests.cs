@@ -62,7 +62,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
 
         var triggers = new TriggerCollection(() =>
         {
-            var deps = new TriggerInfrastructure(modelResolver);
+            var deps = new TriggerInfrastructure(modelResolver, Options.Create(new DeduplicationOptions()));
             return new ITrigger[] { new ManualTrigger(deps) };
         });
 
@@ -94,6 +94,10 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(workspaceService.Object);
 
         services.AddSingleton(Mock.Of<IConnectionService>());
+
+        // Rate limiting — disabled for tests.
+        services.Configure<RateLimitingOptions>(o => o.Enabled = false);
+        services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Execution.
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();

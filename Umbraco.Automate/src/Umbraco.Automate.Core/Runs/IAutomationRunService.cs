@@ -37,4 +37,23 @@ public interface IAutomationRunService
         string actionAlias,
         StepRunStatus status,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a summary of run statistics.
+    /// </summary>
+    Task<RunSummary> GetRunSummaryAsync(
+        Guid? workspaceId = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets run counts grouped by automation, ordered by total runs descending.
+    /// </summary>
+    Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
+        Guid? workspaceId = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        int take = 10,
+        CancellationToken cancellationToken = default);
 }

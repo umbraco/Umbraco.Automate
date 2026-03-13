@@ -110,6 +110,30 @@ public class Constants
             }
 
             /// <summary>
+            /// Version history feature constants.
+            /// </summary>
+            public static class Versioning
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "version-history";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Version History";
+            }
+
+            /// <summary>
+            /// Metrics feature constants.
+            /// </summary>
+            public static class Metrics
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "metrics";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Metrics";
+            }
+
+            /// <summary>
             /// Catalogue feature constants (triggers + actions registry).
             /// </summary>
             public static class Catalogue

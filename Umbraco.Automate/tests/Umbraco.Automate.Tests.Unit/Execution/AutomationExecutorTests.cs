@@ -62,6 +62,7 @@ public class AutomationExecutorTests
             _runRepo.Object,
             Mock.Of<IConnectionService>(),
             _workspaceService.Object,
+            Mock.Of<IRateLimitService>(),
             sp,
             Mock.Of<ILogger<AutomationExecutor>>());
     }

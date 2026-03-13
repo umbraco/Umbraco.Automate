@@ -28,6 +28,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
     private readonly IWorkspaceService _workspaceService;
+    private readonly IRateLimitService _rateLimitService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AutomationExecutor> _logger;
 
@@ -41,6 +42,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
         IWorkspaceService workspaceService,
+        IRateLimitService rateLimitService,
         IServiceProvider serviceProvider,
         ILogger<AutomationExecutor> logger)
     {
@@ -53,6 +55,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _runRepository = runRepository;
         _connectionService = connectionService;
         _workspaceService = workspaceService;
+        _rateLimitService = rateLimitService;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -64,6 +67,9 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         Dictionary<string, object?>? triggerOutputData,
         CancellationToken cancellationToken)
     {
+        // Check rate limits before creating the run record.
+        await _rateLimitService.CheckRateLimitAsync(automation.Id, cancellationToken);
+
         // Resolve workspace and service account.
         var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{automation.WorkspaceId}' not found for automation '{automation.Name}'.");
