@@ -5,6 +5,7 @@ using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
@@ -25,6 +26,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly SettingsExpressionResolver _settingsExpressionResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
+    private readonly AutomateMetrics _metrics;
     private readonly ILogger<ActionStepBody> _logger;
 
     public ActionStepBody(
@@ -35,6 +37,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         SettingsExpressionResolver settingsExpressionResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
+        AutomateMetrics metrics,
         ILogger<ActionStepBody> logger)
     {
         _stepConfig = stepConfig;
@@ -44,6 +47,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _settingsExpressionResolver = settingsExpressionResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -150,12 +154,14 @@ internal sealed class ActionStepBody : StepBodyAsync
             case ActionResultStatus.Success:
                 stepRun.Status = StepRunStatus.Completed;
                 StoreOutputData(result.OutputData, stepRun, data);
+                _metrics.StepExecuted(_action.Alias);
                 break;
 
             case ActionResultStatus.Failed:
                 stepRun.Status = StepRunStatus.Failed;
                 stepRun.Error = result.Exception?.Message;
                 stepRun.ErrorCategory = result.ErrorCategory;
+                _metrics.StepFailed(_action.Alias);
                 break;
 
             case ActionResultStatus.Skipped:
@@ -224,11 +230,13 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             stepRun.Status = StepRunStatus.Completed;
             await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+            _metrics.StepExecuted(_action.Alias);
             return ExecutionResult.Next();
         }
 
         // Rejected or no decision — fail the step.
         stepRun.Status = StepRunStatus.Failed;
+        _metrics.StepFailed(_action.Alias);
         stepRun.Error = decision is not null
             ? $"Approval rejected: {decision.Comment ?? "No reason provided"}"
             : "Approval step resumed without a valid decision";

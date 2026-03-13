@@ -84,6 +84,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(new ExpressionEvaluator(Array.Empty<IExpressionFilter>()));
         services.AddSingleton<SettingsExpressionResolver>();
         services.AddSingleton<ActionMiddlewarePipeline>();
+        services.AddMetrics();
         services.AddSingleton<AutomateMetrics>();
 
         // Workspace service — returns a known workspace so we can verify execution context.

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using Umbraco.Automate.Core.Diagnostics;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Cms.Persistence.EFCore.Scoping;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -13,6 +15,7 @@ namespace Umbraco.Automate.Persistence.Workflows;
 internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 {
     private readonly IEFCoreScopeProvider<UmbracoAutomateDbContext> _scopeProvider;
+    private readonly AutomateMetrics _metrics;
 
     private static readonly JsonSerializerSettings JsonSettings = new()
     {
@@ -20,9 +23,12 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
     };
 
-    public EFCoreWorkflowPersistenceProvider(IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider)
+    public EFCoreWorkflowPersistenceProvider(
+        IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider,
+        AutomateMetrics metrics)
     {
         _scopeProvider = scopeProvider;
+        _metrics = metrics;
     }
 
     // === IPersistenceProvider ===
@@ -75,6 +81,8 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         });
 
         scope.Complete();
+
+        RecordRunTerminalMetrics(workflow);
     }
 
     public async Task PersistWorkflow(WorkflowInstance workflow, List<EventSubscription> subscriptions, CancellationToken cancellationToken)
@@ -103,6 +111,8 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         });
 
         scope.Complete();
+
+        RecordRunTerminalMetrics(workflow);
     }
 
     public async Task<WorkflowInstance> GetWorkflowInstance(string id, CancellationToken cancellationToken)
@@ -494,6 +504,28 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         });
 
         scope.Complete();
+    }
+
+    /// <summary>
+    /// Records run-level metrics when the workflow reaches a terminal state.
+    /// </summary>
+    private void RecordRunTerminalMetrics(WorkflowInstance workflow)
+    {
+        if (workflow.Status is not (WorkflowStatus.Complete or WorkflowStatus.Terminated))
+        {
+            return;
+        }
+
+        var alias = (workflow.Data as AutomationWorkflowData)?.AutomationAlias ?? "unknown";
+
+        if (workflow.Status == WorkflowStatus.Complete)
+        {
+            _metrics.RunCompleted(alias);
+        }
+        else
+        {
+            _metrics.RunFailed(alias);
+        }
     }
 
     // === Entity mapping ===

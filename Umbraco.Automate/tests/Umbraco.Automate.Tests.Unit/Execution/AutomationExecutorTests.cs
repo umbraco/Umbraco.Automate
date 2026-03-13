@@ -1,9 +1,11 @@
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
@@ -52,6 +54,10 @@ public class AutomationExecutorTests
         _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
 
+        var meterFactory = new Mock<IMeterFactory>();
+        meterFactory.Setup(f => f.Create(It.IsAny<MeterOptions>()))
+            .Returns((MeterOptions opts) => new Meter(opts.Name));
+
         _executor = new AutomationExecutor(
             _workflowHost.Object,
             _workflowRegistry.Object,
@@ -63,6 +69,7 @@ public class AutomationExecutorTests
             Mock.Of<IConnectionService>(),
             _workspaceService.Object,
             Mock.Of<IRateLimitService>(),
+            new AutomateMetrics(meterFactory.Object),
             sp,
             Mock.Of<ILogger<AutomationExecutor>>());
     }

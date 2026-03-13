@@ -5,6 +5,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
@@ -29,6 +30,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IConnectionService _connectionService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IRateLimitService _rateLimitService;
+    private readonly AutomateMetrics _metrics;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AutomationExecutor> _logger;
 
@@ -43,6 +45,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IConnectionService connectionService,
         IWorkspaceService workspaceService,
         IRateLimitService rateLimitService,
+        AutomateMetrics metrics,
         IServiceProvider serviceProvider,
         ILogger<AutomationExecutor> logger)
     {
@@ -56,6 +59,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _connectionService = connectionService;
         _workspaceService = workspaceService;
         _rateLimitService = rateLimitService;
+        _metrics = metrics;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -93,6 +97,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 
         await _runRepository.SaveAsync(run, cancellationToken);
 
+        _metrics.RunStarted(automation.Alias);
+
         // Set the execution context for the current async flow.
         var executionContext = new AutomationExecutionContext
         {
@@ -123,6 +129,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         {
             RunId = run.Id,
             AutomationId = automation.Id,
+            AutomationAlias = automation.Alias,
             TriggerOutput = triggerOutputData ?? [],
             ExecutionContext = executionContext,
         };
@@ -166,6 +173,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
                 _settingsExpressionResolver,
                 _runRepository,
                 _connectionService,
+                _metrics,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
             var workflowStep = new ActionWorkflowStep(stepBody)
