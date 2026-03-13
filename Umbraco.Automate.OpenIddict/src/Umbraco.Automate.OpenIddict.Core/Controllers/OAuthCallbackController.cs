@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Client.AspNetCore;
 using Umbraco.Automate.OpenIddict.Credentials;
+using Umbraco.Cms.Api.Common.Attributes;
 
 namespace Umbraco.Automate.OpenIddict.Controllers;
 
@@ -12,6 +13,8 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 /// </summary>
 [ApiController]
 [Route("automate/oauth")]
+[MapToApi(Constants.OAuthApi.ApiName)]
+[ApiExplorerSettings(GroupName = "OAuth")]
 public sealed class OAuthCallbackController : ControllerBase
 {
     private readonly IOAuthCredentialsService _credentialsService;

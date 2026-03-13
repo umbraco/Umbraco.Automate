@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
 using OpenIddict.Client;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Automate.OpenIddict;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Automate.OpenIddict.Credentials.Persistence;
 using Umbraco.Automate.OpenIddict.Providers;
@@ -33,6 +36,22 @@ public static class UmbracoBuilderExtensions
         // Persistence
         AddPersistence(builder);
 
+        // OAuth API swagger doc
+        builder.Services.Configure<SwaggerGenOptions>(options =>
+        {
+            if (options.SwaggerGeneratorOptions.SwaggerDocs.ContainsKey(Constants.OAuthApi.ApiName))
+                return;
+
+            options.SwaggerDoc(
+                Constants.OAuthApi.ApiName,
+                new OpenApiInfo
+                {
+                    Title = Constants.OAuthApi.ApiTitle,
+                    Version = "Latest",
+                    Description = "OAuth endpoints for Umbraco Automate provider connections.",
+                });
+        });
+
         // Services
         builder.Services.AddSingleton<IOAuthProviderConfigurationSource, ConfigurationOAuthProviderConfigurationSource>();
         builder.Services.AddSingleton<IOAuthCredentialsService, OAuthCredentialsService>();
@@ -47,6 +66,11 @@ public static class UmbracoBuilderExtensions
             .AddClient(options =>
             {
                 options.AllowAuthorizationCodeFlow();
+
+                options.SetRedirectionEndpointUris("automate/oauth/callback");
+
+                options.AddEphemeralEncryptionKey()
+                    .AddEphemeralSigningKey();
 
                 options.UseAspNetCore()
                     .EnableRedirectionEndpointPassthrough();

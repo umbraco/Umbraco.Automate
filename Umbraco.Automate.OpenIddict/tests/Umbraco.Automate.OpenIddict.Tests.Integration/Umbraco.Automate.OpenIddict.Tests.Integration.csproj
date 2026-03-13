@@ -16,7 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Umbraco.Automate.OpenIddict\Umbraco.Automate.OpenIddict.csproj" />
+        <ProjectReference Include="..\..\src\Umbraco.Automate.OpenIddict.Core\Umbraco.Automate.OpenIddict.Core.csproj" />
     </ItemGroup>
 
     <ItemGroup>

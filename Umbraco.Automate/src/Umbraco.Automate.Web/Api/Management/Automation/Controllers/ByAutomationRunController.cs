@@ -4,12 +4,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Runs;
-using Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 using Umbraco.Automate.Web.Api.Management.Run.Models;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
 using Umbraco.Cms.Core.Mapping;
 
-namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
+namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
 /// <summary>
 /// Gets runs for a specific automation.

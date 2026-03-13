@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.csproj" />
+    <Project Path="src/Umbraco.Automate.OpenIddict.Core/Umbraco.Automate.OpenIddict.Core.csproj" />
     <Project Path="src/Umbraco.Automate.OpenIddict.Persistence.SqlServer/Umbraco.Automate.OpenIddict.Persistence.SqlServer.csproj" />
     <Project Path="src/Umbraco.Automate.OpenIddict.Persistence.Sqlite/Umbraco.Automate.OpenIddict.Persistence.Sqlite.csproj" />
   </Folder>

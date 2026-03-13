@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Client.AspNetCore;
+using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Web.Common.Authorization;
 
 namespace Umbraco.Automate.OpenIddict.Controllers;
@@ -12,6 +13,8 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 /// </summary>
 [ApiController]
 [Route("automate/oauth")]
+[MapToApi(Constants.OAuthApi.ApiName)]
+[ApiExplorerSettings(GroupName = "OAuth")]
 [Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
 public sealed class OAuthChallengeController : ControllerBase
 {
