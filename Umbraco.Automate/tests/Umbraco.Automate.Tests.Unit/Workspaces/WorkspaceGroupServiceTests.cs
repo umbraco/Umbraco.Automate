@@ -2,23 +2,23 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Tests.Common.Builders;
 
-namespace Umbraco.Automate.Tests.Unit.Automations;
+namespace Umbraco.Automate.Tests.Unit.Workspaces;
 
-public class AutomationGroupServiceTests
+public class WorkspaceGroupServiceTests
 {
-    private readonly Mock<IAutomationGroupRepository> _groupRepo = new();
+    private readonly Mock<IWorkspaceGroupRepository> _groupRepo = new();
     private readonly Mock<IAutomationService> _automationService = new();
     private readonly Mock<IAutomationRepository> _automationRepo = new();
     private readonly Mock<IWorkspaceService> _workspaceService = new();
-    private readonly AutomationGroupService _service;
+    private readonly WorkspaceGroupService _service;
 
-    public AutomationGroupServiceTests()
+    public WorkspaceGroupServiceTests()
     {
         // Default workspace mock — returns a valid workspace for any ID.
         _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceBuilder().Build());
 
-        _service = new AutomationGroupService(
+        _service = new WorkspaceGroupService(
             _groupRepo.Object,
             _automationService.Object,
             _automationRepo.Object,
@@ -29,12 +29,12 @@ public class AutomationGroupServiceTests
     public async Task CreateGroupAsync_Success()
     {
         var workspaceId = Guid.NewGuid();
-        var group = new AutomationGroup { Name = "My Group", WorkspaceId = workspaceId };
+        var group = new WorkspaceGroup { Name = "My Group", WorkspaceId = workspaceId };
 
         _groupRepo.Setup(r => r.NameExistsAsync(workspaceId, null, "My Group", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        _groupRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationGroup>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AutomationGroup g, CancellationToken _) => g);
+        _groupRepo.Setup(r => r.SaveAsync(It.IsAny<WorkspaceGroup>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((WorkspaceGroup g, CancellationToken _) => g);
 
         var result = await _service.CreateGroupAsync(group);
 
@@ -48,7 +48,7 @@ public class AutomationGroupServiceTests
         _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Workspace?)null);
 
-        var group = new AutomationGroup { Name = "Test", WorkspaceId = Guid.NewGuid() };
+        var group = new WorkspaceGroup { Name = "Test", WorkspaceId = Guid.NewGuid() };
 
         var ex = await Should.ThrowAsync<InvalidOperationException>(
             () => _service.CreateGroupAsync(group));
@@ -60,10 +60,10 @@ public class AutomationGroupServiceTests
     public async Task CreateGroupAsync_ParentNotFound_Throws()
     {
         var parentId = Guid.NewGuid();
-        var group = new AutomationGroup { Name = "Test", WorkspaceId = Guid.NewGuid(), ParentId = parentId };
+        var group = new WorkspaceGroup { Name = "Test", WorkspaceId = Guid.NewGuid(), ParentId = parentId };
 
         _groupRepo.Setup(r => r.GetAsync(parentId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AutomationGroup?)null);
+            .ReturnsAsync((WorkspaceGroup?)null);
 
         var ex = await Should.ThrowAsync<InvalidOperationException>(
             () => _service.CreateGroupAsync(group));
@@ -75,7 +75,7 @@ public class AutomationGroupServiceTests
     public async Task CreateGroupAsync_DuplicateName_Throws()
     {
         var workspaceId = Guid.NewGuid();
-        var group = new AutomationGroup { Name = "Existing", WorkspaceId = workspaceId };
+        var group = new WorkspaceGroup { Name = "Existing", WorkspaceId = workspaceId };
 
         _groupRepo.Setup(r => r.NameExistsAsync(workspaceId, null, "Existing", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -91,9 +91,9 @@ public class AutomationGroupServiceTests
     {
         var workspaceId = Guid.NewGuid();
         var parentId = Guid.NewGuid();
-        var group = new AutomationGroup { Name = "Test", WorkspaceId = workspaceId, ParentId = parentId };
+        var group = new WorkspaceGroup { Name = "Test", WorkspaceId = workspaceId, ParentId = parentId };
 
-        var parentInOtherWorkspace = new AutomationGroup { Id = parentId, Name = "Parent", WorkspaceId = Guid.NewGuid() };
+        var parentInOtherWorkspace = new WorkspaceGroup { Id = parentId, Name = "Parent", WorkspaceId = Guid.NewGuid() };
         _groupRepo.Setup(r => r.GetAsync(parentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(parentInOtherWorkspace);
 
@@ -108,16 +108,16 @@ public class AutomationGroupServiceTests
     {
         var groupId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
-        var existing = new AutomationGroup { Id = groupId, Name = "Old Name", WorkspaceId = workspaceId };
+        var existing = new WorkspaceGroup { Id = groupId, Name = "Old Name", WorkspaceId = workspaceId };
 
         _groupRepo.Setup(r => r.GetAsync(groupId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
         _groupRepo.Setup(r => r.NameExistsAsync(workspaceId, null, "New Name", groupId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        _groupRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationGroup>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AutomationGroup g, CancellationToken _) => g);
+        _groupRepo.Setup(r => r.SaveAsync(It.IsAny<WorkspaceGroup>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((WorkspaceGroup g, CancellationToken _) => g);
 
-        var update = new AutomationGroup { Id = groupId, Name = "New Name" };
+        var update = new WorkspaceGroup { Id = groupId, Name = "New Name" };
         var result = await _service.UpdateGroupAsync(update);
 
         result.Name.ShouldBe("New Name");
@@ -127,9 +127,9 @@ public class AutomationGroupServiceTests
     public async Task UpdateGroupAsync_NotFound_Throws()
     {
         _groupRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AutomationGroup?)null);
+            .ReturnsAsync((WorkspaceGroup?)null);
 
-        var update = new AutomationGroup { Id = Guid.NewGuid(), Name = "Test" };
+        var update = new WorkspaceGroup { Id = Guid.NewGuid(), Name = "Test" };
 
         await Should.ThrowAsync<InvalidOperationException>(
             () => _service.UpdateGroupAsync(update));
@@ -139,7 +139,7 @@ public class AutomationGroupServiceTests
     public async Task DeleteGroupAsync_EmptyGroup_Success()
     {
         var groupId = Guid.NewGuid();
-        var group = new AutomationGroup { Id = groupId, Name = "Test", WorkspaceId = Guid.NewGuid() };
+        var group = new WorkspaceGroup { Id = groupId, Name = "Test", WorkspaceId = Guid.NewGuid() };
 
         _groupRepo.Setup(r => r.GetAsync(groupId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(group);
@@ -161,7 +161,7 @@ public class AutomationGroupServiceTests
     {
         var groupId = Guid.NewGuid();
         var automationId = Guid.NewGuid();
-        var group = new AutomationGroup { Id = groupId, Name = "Test", WorkspaceId = Guid.NewGuid() };
+        var group = new WorkspaceGroup { Id = groupId, Name = "Test", WorkspaceId = Guid.NewGuid() };
         var automation = new AutomationBuilder().WithId(automationId).Build();
 
         _groupRepo.Setup(r => r.GetAsync(groupId, It.IsAny<CancellationToken>()))
@@ -183,7 +183,7 @@ public class AutomationGroupServiceTests
     {
         var parentId = Guid.NewGuid();
         var childId = Guid.NewGuid();
-        var parent = new AutomationGroup { Id = parentId, Name = "Parent", WorkspaceId = Guid.NewGuid() };
+        var parent = new WorkspaceGroup { Id = parentId, Name = "Parent", WorkspaceId = Guid.NewGuid() };
 
         _groupRepo.Setup(r => r.GetAsync(parentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(parent);
@@ -208,7 +208,7 @@ public class AutomationGroupServiceTests
     public async Task DeleteGroupAsync_NotFound_ReturnsFalse()
     {
         _groupRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AutomationGroup?)null);
+            .ReturnsAsync((WorkspaceGroup?)null);
 
         var result = await _service.DeleteGroupAsync(Guid.NewGuid());
 

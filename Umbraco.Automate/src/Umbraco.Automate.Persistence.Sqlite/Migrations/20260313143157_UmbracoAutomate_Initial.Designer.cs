@@ -11,7 +11,7 @@ using Umbraco.Automate.Persistence;
 namespace Umbraco.Automate.Persistence.Sqlite.Migrations
 {
     [DbContext(typeof(UmbracoAutomateDbContext))]
-    [Migration("20260313112743_UmbracoAutomate_Initial")]
+    [Migration("20260313143157_UmbracoAutomate_Initial")]
     partial class UmbracoAutomate_Initial
     {
         /// <inheritdoc />
@@ -87,35 +87,6 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.HasIndex("WorkspaceId");
 
                     b.ToTable("umbracoAutomateAutomation", (string)null);
-                });
-
-            modelBuilder.Entity("Umbraco.Automate.Persistence.Automations.AutomationGroupEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("DateCreated")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ParentId");
-
-                    b.HasIndex("WorkspaceId");
-
-                    b.ToTable("umbracoAutomateAutomationGroup", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Connections.ConnectionEntity", b =>
@@ -601,6 +572,35 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .IsUnique();
 
                     b.ToTable("umbracoAutomateWorkspace", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceGroupEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("umbracoAutomateWorkspaceGroup", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceUserGroupEntity", b =>

@@ -1,15 +1,15 @@
-using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Workspaces;
 
-namespace Umbraco.Automate.Persistence.Automations;
+namespace Umbraco.Automate.Persistence.Workspaces;
 
 /// <summary>
-/// Maps between <see cref="AutomationGroup"/> domain model and <see cref="AutomationGroupEntity"/> EF entity.
+/// Maps between <see cref="WorkspaceGroup"/> domain model and <see cref="WorkspaceGroupEntity"/> EF entity.
 /// </summary>
-internal sealed class AutomationGroupFactory
+internal sealed class WorkspaceGroupFactory
 {
-    public AutomationGroup BuildDomain(AutomationGroupEntity entity)
+    public WorkspaceGroup BuildDomain(WorkspaceGroupEntity entity)
     {
-        return new AutomationGroup
+        return new WorkspaceGroup
         {
             Id = entity.Id,
             Name = entity.Name,
@@ -19,9 +19,9 @@ internal sealed class AutomationGroupFactory
         };
     }
 
-    public AutomationGroupEntity BuildEntity(AutomationGroup group)
+    public WorkspaceGroupEntity BuildEntity(WorkspaceGroup group)
     {
-        return new AutomationGroupEntity
+        return new WorkspaceGroupEntity
         {
             Id = group.Id,
             Name = group.Name,
@@ -31,7 +31,7 @@ internal sealed class AutomationGroupFactory
         };
     }
 
-    public void UpdateEntity(AutomationGroupEntity entity, AutomationGroup group)
+    public void UpdateEntity(WorkspaceGroupEntity entity, WorkspaceGroup group)
     {
         entity.Name = group.Name;
         entity.ParentId = group.ParentId;

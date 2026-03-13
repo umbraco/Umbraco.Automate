@@ -3,9 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
 
 /// <summary>
-/// Request model for creating a new automation group.
+/// Request model for creating a new workspace group.
 /// </summary>
-public sealed class CreateAutomationGroupRequestModel
+public sealed class CreateWorkspaceGroupRequestModel
 {
     /// <summary>The display name.</summary>
     [Required]

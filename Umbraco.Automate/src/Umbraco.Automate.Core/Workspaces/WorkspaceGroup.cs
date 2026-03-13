@@ -1,9 +1,9 @@
-namespace Umbraco.Automate.Core.Automations;
+namespace Umbraco.Automate.Core.Workspaces;
 
 /// <summary>
 /// A group (folder) that organizes automations within a workspace.
 /// </summary>
-public sealed class AutomationGroup
+public sealed class WorkspaceGroup
 {
     /// <summary>
     /// Gets or sets the unique ID.

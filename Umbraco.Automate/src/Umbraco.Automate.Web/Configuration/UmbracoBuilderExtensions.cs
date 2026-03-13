@@ -50,7 +50,7 @@ public static partial class UmbracoBuilderExtensions
             .Add<CatalogueMapDefinition>()
             .Add<WorkspaceMapDefinition>()
             .Add<ConnectionMapDefinition>()
-            .Add<AutomationGroupMapDefinition>()
+            .Add<WorkspaceGroupMapDefinition>()
             .Add<VersioningMapDefinition>();
 
         return builder;

@@ -1,19 +1,19 @@
-using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Automate.Core.Automations;
 
-namespace Umbraco.Automate.Core.Automations;
+namespace Umbraco.Automate.Core.Workspaces;
 
 /// <summary>
-/// Default implementation of <see cref="IAutomationGroupService"/>.
+/// Default implementation of <see cref="IWorkspaceGroupService"/>.
 /// </summary>
-internal sealed class AutomationGroupService : IAutomationGroupService
+internal sealed class WorkspaceGroupService : IWorkspaceGroupService
 {
-    private readonly IAutomationGroupRepository _groupRepository;
+    private readonly IWorkspaceGroupRepository _groupRepository;
     private readonly IAutomationService _automationService;
     private readonly IAutomationRepository _automationRepository;
     private readonly IWorkspaceService _workspaceService;
 
-    public AutomationGroupService(
-        IAutomationGroupRepository groupRepository,
+    public WorkspaceGroupService(
+        IWorkspaceGroupRepository groupRepository,
         IAutomationService automationService,
         IAutomationRepository automationRepository,
         IWorkspaceService workspaceService)
@@ -24,13 +24,13 @@ internal sealed class AutomationGroupService : IAutomationGroupService
         _workspaceService = workspaceService;
     }
 
-    public Task<AutomationGroup?> GetGroupAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<WorkspaceGroup?> GetGroupAsync(Guid id, CancellationToken cancellationToken = default)
         => _groupRepository.GetAsync(id, cancellationToken);
 
-    public Task<IEnumerable<AutomationGroup>> GetGroupsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+    public Task<IEnumerable<WorkspaceGroup>> GetGroupsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
         => _groupRepository.GetByWorkspaceAsync(workspaceId, cancellationToken);
 
-    public async Task<AutomationGroup> CreateGroupAsync(AutomationGroup group, CancellationToken cancellationToken = default)
+    public async Task<WorkspaceGroup> CreateGroupAsync(WorkspaceGroup group, CancellationToken cancellationToken = default)
     {
         if (group.Id == Guid.Empty)
         {
@@ -44,10 +44,10 @@ internal sealed class AutomationGroupService : IAutomationGroupService
         return await _groupRepository.SaveAsync(group, cancellationToken);
     }
 
-    public async Task<AutomationGroup> UpdateGroupAsync(AutomationGroup group, CancellationToken cancellationToken = default)
+    public async Task<WorkspaceGroup> UpdateGroupAsync(WorkspaceGroup group, CancellationToken cancellationToken = default)
     {
         var existing = await _groupRepository.GetAsync(group.Id, cancellationToken)
-            ?? throw new InvalidOperationException($"Automation group '{group.Id}' not found.");
+            ?? throw new InvalidOperationException($"Workspace group '{group.Id}' not found.");
 
         await ValidateParentAsync(group.ParentId, existing.WorkspaceId, cancellationToken);
         await ValidateUniqueNameAsync(existing.WorkspaceId, group.ParentId, group.Name, group.Id, cancellationToken);

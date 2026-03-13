@@ -1,24 +1,24 @@
-namespace Umbraco.Automate.Core.Automations;
+namespace Umbraco.Automate.Core.Workspaces;
 
 /// <summary>
-/// Repository for automation group persistence. Internal implementation detail of <c>IAutomationGroupService</c>.
+/// Repository for workspace group persistence. Internal implementation detail of <c>IWorkspaceGroupService</c>.
 /// </summary>
-internal interface IAutomationGroupRepository
+internal interface IWorkspaceGroupRepository
 {
     /// <summary>
     /// Gets a group by its unique ID.
     /// </summary>
-    Task<AutomationGroup?> GetAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<WorkspaceGroup?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets all groups for a workspace.
     /// </summary>
-    Task<IEnumerable<AutomationGroup>> GetByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<WorkspaceGroup>> GetByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Saves a group (insert or update).
     /// </summary>
-    Task<AutomationGroup> SaveAsync(AutomationGroup group, CancellationToken cancellationToken = default);
+    Task<WorkspaceGroup> SaveAsync(WorkspaceGroup group, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes a group by its ID.

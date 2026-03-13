@@ -1,4 +1,3 @@
-using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Cms.Core.Events;
@@ -15,14 +14,14 @@ internal sealed class WorkspaceService : IWorkspaceService
     private const string EntityTypeName = "Workspace";
 
     private readonly IWorkspaceRepository _workspaceRepository;
-    private readonly IAutomationGroupRepository _groupRepository;
+    private readonly IWorkspaceGroupRepository _groupRepository;
     private readonly IEntityVersionService _versionService;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
 
     public WorkspaceService(
         IWorkspaceRepository workspaceRepository,
-        IAutomationGroupRepository groupRepository,
+        IWorkspaceGroupRepository groupRepository,
         IEntityVersionService versionService,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory)

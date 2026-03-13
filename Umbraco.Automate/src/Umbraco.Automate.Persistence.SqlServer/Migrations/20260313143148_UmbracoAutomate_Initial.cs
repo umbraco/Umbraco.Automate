@@ -37,21 +37,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "umbracoAutomateAutomationGroup",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
-                    ParentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    WorkspaceId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    DateCreated = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_umbracoAutomateAutomationGroup", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "umbracoAutomateConnection",
                 columns: table => new
                 {
@@ -260,6 +245,21 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "umbracoAutomateWorkspaceGroup",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
+                    ParentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    WorkspaceId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    DateCreated = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_umbracoAutomateWorkspaceGroup", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "umbracoAutomateWorkspaceConnection",
                 columns: table => new
                 {
@@ -314,16 +314,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_umbracoAutomateAutomation_WorkspaceId",
                 table: "umbracoAutomateAutomation",
-                column: "WorkspaceId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_umbracoAutomateAutomationGroup_ParentId",
-                table: "umbracoAutomateAutomationGroup",
-                column: "ParentId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_umbracoAutomateAutomationGroup_WorkspaceId",
-                table: "umbracoAutomateAutomationGroup",
                 column: "WorkspaceId");
 
             migrationBuilder.CreateIndex(
@@ -423,6 +413,16 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                 table: "umbracoAutomateWorkspace",
                 column: "Alias",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_umbracoAutomateWorkspaceGroup_ParentId",
+                table: "umbracoAutomateWorkspaceGroup",
+                column: "ParentId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_umbracoAutomateWorkspaceGroup_WorkspaceId",
+                table: "umbracoAutomateWorkspaceGroup",
+                column: "WorkspaceId");
         }
 
         /// <inheritdoc />
@@ -430,9 +430,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
         {
             migrationBuilder.DropTable(
                 name: "umbracoAutomateAutomation");
-
-            migrationBuilder.DropTable(
-                name: "umbracoAutomateAutomationGroup");
 
             migrationBuilder.DropTable(
                 name: "umbracoAutomateConnection");
@@ -466,6 +463,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 
             migrationBuilder.DropTable(
                 name: "umbracoAutomateWorkspaceConnection");
+
+            migrationBuilder.DropTable(
+                name: "umbracoAutomateWorkspaceGroup");
 
             migrationBuilder.DropTable(
                 name: "umbracoAutomateWorkspaceUserGroup");

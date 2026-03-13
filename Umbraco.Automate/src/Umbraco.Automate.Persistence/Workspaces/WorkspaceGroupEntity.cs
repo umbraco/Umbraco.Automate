@@ -1,9 +1,9 @@
-namespace Umbraco.Automate.Persistence.Automations;
+namespace Umbraco.Automate.Persistence.Workspaces;
 
 /// <summary>
-/// EF Core entity for the automation group table.
+/// EF Core entity for the workspace group table.
 /// </summary>
-internal sealed class AutomationGroupEntity
+internal sealed class WorkspaceGroupEntity
 {
     public Guid Id { get; set; }
 

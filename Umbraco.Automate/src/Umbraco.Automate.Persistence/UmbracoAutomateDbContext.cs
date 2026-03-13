@@ -39,7 +39,7 @@ public class UmbracoAutomateDbContext : DbContext
 
     internal DbSet<ScheduledTriggerStateEntity> ScheduledTriggerStates { get; set; } = null!;
 
-    internal DbSet<AutomationGroupEntity> AutomationGroups { get; set; } = null!;
+    internal DbSet<WorkspaceGroupEntity> WorkspaceGroups { get; set; } = null!;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UmbracoAutomateDbContext"/> class.
@@ -264,11 +264,11 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.LastFiredUtc).IsRequired();
         });
 
-        // Automation group table
+        // Workspace group table
 
-        modelBuilder.Entity<AutomationGroupEntity>(entity =>
+        modelBuilder.Entity<WorkspaceGroupEntity>(entity =>
         {
-            entity.ToTable("umbracoAutomateAutomationGroup");
+            entity.ToTable("umbracoAutomateWorkspaceGroup");
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Name).HasMaxLength(255).IsRequired();

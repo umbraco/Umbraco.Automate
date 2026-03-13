@@ -103,7 +103,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
         builder.Services.AddSingleton<IConnectionService, ConnectionService>();
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
-        builder.Services.AddSingleton<IAutomationGroupService, AutomationGroupService>();
+        builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<ExpressionEvaluator>();

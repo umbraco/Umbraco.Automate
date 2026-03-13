@@ -2,27 +2,27 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
 using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Controllers;
 
 /// <summary>
-/// Creates a new automation group within a workspace.
+/// Updates an existing workspace group.
 /// </summary>
 [ApiVersion("1.0")]
-public sealed class CreateAutomationGroupController : AutomationGroupControllerBase
+public sealed class UpdateWorkspaceGroupController : WorkspaceGroupControllerBase
 {
-    private readonly IAutomationGroupService _groupService;
+    private readonly IWorkspaceGroupService _groupService;
     private readonly IAuthorizationService _authorizationService;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="CreateAutomationGroupController"/> class.
+    /// Initializes a new instance of the <see cref="UpdateWorkspaceGroupController"/> class.
     /// </summary>
-    public CreateAutomationGroupController(
-        IAutomationGroupService groupService,
+    public UpdateWorkspaceGroupController(
+        IWorkspaceGroupService groupService,
         IAuthorizationService authorizationService,
         IUmbracoMapper mapper)
     {
@@ -32,15 +32,17 @@ public sealed class CreateAutomationGroupController : AutomationGroupControllerB
     }
 
     /// <summary>
-    /// Creates a new automation group within a workspace.
+    /// Updates a workspace group (rename or move).
     /// </summary>
-    [HttpPost]
+    [HttpPut("{groupId:guid}")]
     [MapToApiVersion("1.0")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateAutomationGroup(
+    public async Task<IActionResult> UpdateWorkspaceGroup(
         Guid id,
-        CreateAutomationGroupRequestModel requestModel,
+        Guid groupId,
+        UpdateWorkspaceGroupRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
         var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
@@ -49,18 +51,19 @@ public sealed class CreateAutomationGroupController : AutomationGroupControllerB
             return forbidden;
         }
 
-        var group = _mapper.Map<AutomationGroup>(requestModel)!;
-        group.WorkspaceId = id;
+        var existing = await _groupService.GetGroupAsync(groupId, cancellationToken);
+        if (existing is null || existing.WorkspaceId != id)
+        {
+            return GroupNotFound();
+        }
+
+        var group = _mapper.Map<WorkspaceGroup>(requestModel)!;
+        group.Id = groupId;
 
         try
         {
-            var created = await _groupService.CreateGroupAsync(group, cancellationToken);
-
-            return CreatedAtAction(
-                nameof(ByIdAutomationGroupController.GetAutomationGroupById),
-                nameof(ByIdAutomationGroupController).Replace("Controller", string.Empty),
-                new { id, groupId = created.Id },
-                created.Id.ToString());
+            await _groupService.UpdateGroupAsync(group, cancellationToken);
+            return Ok();
         }
         catch (InvalidOperationException ex)
         {

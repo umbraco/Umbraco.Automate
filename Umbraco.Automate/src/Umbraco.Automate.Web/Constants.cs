@@ -89,7 +89,7 @@ public class Constants
             }
 
             /// <summary>
-            /// Automation group feature constants.
+            /// Workspace group feature constants.
             /// </summary>
             public static class Group
             {

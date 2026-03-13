@@ -2,27 +2,27 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
 using Umbraco.Cms.Core.Mapping;
 
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Controllers;
 
 /// <summary>
-/// Gets a single automation group by ID.
+/// Gets all workspace groups for a workspace.
 /// </summary>
 [ApiVersion("1.0")]
-public sealed class ByIdAutomationGroupController : AutomationGroupControllerBase
+public sealed class AllWorkspaceGroupController : WorkspaceGroupControllerBase
 {
-    private readonly IAutomationGroupService _groupService;
+    private readonly IWorkspaceGroupService _groupService;
     private readonly IAuthorizationService _authorizationService;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ByIdAutomationGroupController"/> class.
+    /// Initializes a new instance of the <see cref="AllWorkspaceGroupController"/> class.
     /// </summary>
-    public ByIdAutomationGroupController(
-        IAutomationGroupService groupService,
+    public AllWorkspaceGroupController(
+        IWorkspaceGroupService groupService,
         IAuthorizationService authorizationService,
         IUmbracoMapper mapper)
     {
@@ -32,15 +32,13 @@ public sealed class ByIdAutomationGroupController : AutomationGroupControllerBas
     }
 
     /// <summary>
-    /// Gets an automation group by its unique ID.
+    /// Gets all workspace groups for a workspace.
     /// </summary>
-    [HttpGet("{groupId:guid}")]
+    [HttpGet]
     [MapToApiVersion("1.0")]
-    [ProducesResponseType(typeof(AutomationGroupResponseModel), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAutomationGroupById(
+    [ProducesResponseType(typeof(IEnumerable<WorkspaceGroupResponseModel>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllWorkspaceGroups(
         Guid id,
-        Guid groupId,
         CancellationToken cancellationToken = default)
     {
         var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
@@ -49,12 +47,8 @@ public sealed class ByIdAutomationGroupController : AutomationGroupControllerBas
             return forbidden;
         }
 
-        var group = await _groupService.GetGroupAsync(groupId, cancellationToken);
-        if (group is null || group.WorkspaceId != id)
-        {
-            return GroupNotFound();
-        }
+        var groups = await _groupService.GetGroupsByWorkspaceAsync(id, cancellationToken);
 
-        return Ok(_mapper.Map<AutomationGroupResponseModel>(group));
+        return Ok(_mapper.MapEnumerable<WorkspaceGroup, WorkspaceGroupResponseModel>(groups));
     }
 }

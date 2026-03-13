@@ -3,9 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
 
 /// <summary>
-/// Response model for an automation group.
+/// Response model for a workspace group.
 /// </summary>
-public sealed class AutomationGroupResponseModel
+public sealed class WorkspaceGroupResponseModel
 {
     /// <summary>The group ID.</summary>
     [Required]
