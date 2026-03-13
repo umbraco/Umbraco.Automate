@@ -64,7 +64,8 @@ public static partial class UmbracoBuilderExtensions
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<INotificationChannel, NotificationChannelAttribute>(cache: true));
         builder.AutomateExpressionFilters();
         builder.AutomateVersionableEntityAdapters()
-            .Add<AutomationVersionableEntityAdapter>();
+            .Add<AutomationVersionableEntityAdapter>()
+            .Add<WorkspaceVersionableEntityAdapter>();
 
         // Wire notification triggers → TriggerNotificationHandler<T> for each notification type
         builder.RegisterTriggerNotificationHandlers();

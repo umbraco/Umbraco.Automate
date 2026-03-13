@@ -45,6 +45,15 @@ public interface IWorkspaceService
     Task<bool> DeleteWorkspaceAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Rolls back a workspace to a previous version snapshot.
+    /// </summary>
+    Task<Workspace> RollbackWorkspaceAsync(
+        Guid workspaceId,
+        int targetVersion,
+        Guid? userId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the IDs of workspaces accessible to any of the given user group keys.
     /// </summary>
     Task<IReadOnlySet<Guid>> GetAccessibleWorkspaceIdsAsync(
