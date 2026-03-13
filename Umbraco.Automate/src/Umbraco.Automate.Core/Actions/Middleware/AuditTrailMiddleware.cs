@@ -9,12 +9,12 @@ namespace Umbraco.Automate.Core.Actions.Middleware;
 /// </summary>
 internal sealed class AuditTrailMiddleware : IActionMiddleware
 {
-    private readonly IAuditService _auditService;
+    private readonly IAuditEntryService _auditEntryService;
     private readonly ILogger<AuditTrailMiddleware> _logger;
 
-    public AuditTrailMiddleware(IAuditService auditService, ILogger<AuditTrailMiddleware> logger)
+    public AuditTrailMiddleware(IAuditEntryService auditEntryService, ILogger<AuditTrailMiddleware> logger)
     {
-        _auditService = auditService;
+        _auditEntryService = auditEntryService;
         _logger = logger;
     }
 
@@ -42,13 +42,14 @@ internal sealed class AuditTrailMiddleware : IActionMiddleware
         {
             var performingDetails = context.ExecutionContext.FormatPerformingDetails();
             var eventDetails = context.ExecutionContext.FormatEventDetails(context.StepId);
+            var serviceAccountKey = context.ExecutionContext.ServiceAccountKey;
 
-            _auditService.Write(
-                performingUserId: -1,
+            await _auditEntryService.WriteAsync(
+                performingUserKey: serviceAccountKey,
                 performingDetails: performingDetails,
                 performingIp: "127.0.0.1",
                 eventDateUtc: DateTime.UtcNow,
-                affectedUserId: -1,
+                affectedUserKey: null,
                 affectedDetails: $"Action: {context.ActionAlias}",
                 eventType: $"umbraco/automate/{context.ActionAlias}",
                 eventDetails: eventDetails);

@@ -17,8 +17,10 @@ namespace Umbraco.Automate.Tests.Unit.Triggers;
 
 public class ScheduledTriggerBackgroundJobTests
 {
+    private const string ScheduledTriggerAlias = "umbracoAutomate.scheduled";
+
     private readonly Mock<IAutomationService> _automationService = new();
-    private readonly Mock<TriggerCollection> _triggerCollection;
+    private readonly Mock<ITrigger> _mockTrigger = new();
     private readonly Mock<IScheduledTriggerStateStore> _stateStore = new();
     private readonly Mock<ITriggerDispatcher> _dispatcher = new();
     private readonly Mock<IRuntimeState> _runtimeState = new();
@@ -28,11 +30,13 @@ public class ScheduledTriggerBackgroundJobTests
 
     public ScheduledTriggerBackgroundJobTests()
     {
-        _triggerCollection = new Mock<TriggerCollection>((Func<IEnumerable<ITrigger>>)(() => []));
+        _mockTrigger.Setup(t => t.Alias).Returns(ScheduledTriggerAlias);
+
+        var triggerCollection = new TriggerCollection(() => [_mockTrigger.Object]);
 
         var services = new ServiceCollection();
         services.AddSingleton(_automationService.Object);
-        services.AddSingleton(_triggerCollection.Object);
+        services.AddSingleton(triggerCollection);
         services.AddSingleton(_stateStore.Object);
         services.AddSingleton(_dispatcher.Object);
         var sp = services.BuildServiceProvider();
@@ -87,7 +91,6 @@ public class ScheduledTriggerBackgroundJobTests
     public async Task PerformExecuteAsync_ScheduledTriggerDue_Dispatches()
     {
         var automationId = Guid.NewGuid();
-        var triggerAlias = "umbracoAutomate.scheduled";
 
         _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
@@ -100,23 +103,17 @@ public class ScheduledTriggerBackgroundJobTests
             Status = AutomationStatus.Published,
             Trigger = new TriggerConfiguration
             {
-                TriggerAlias = triggerAlias,
+                TriggerAlias = ScheduledTriggerAlias,
                 Settings = [],
             },
         };
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
-        var mockTrigger = new Mock<ITrigger>();
-        mockTrigger.Setup(t => t.Alias).Returns(triggerAlias);
-        mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
-        mockTrigger.As<IScheduledTrigger>()
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        _mockTrigger.As<IScheduledTrigger>()
             .Setup(t => t.GetCronExpression(It.IsAny<object?>()))
             .Returns("* * * * *"); // Every minute
-
-        _triggerCollection
-            .Setup(c => c.GetByAlias(triggerAlias))
-            .Returns(mockTrigger.Object);
 
         // Last fired 2 minutes ago — next occurrence should be in the past.
         _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
@@ -126,7 +123,7 @@ public class ScheduledTriggerBackgroundJobTests
 
         _dispatcher.Verify(
             d => d.DispatchAsync(
-                It.Is<TriggerEvent>(e => e.TriggerAlias == triggerAlias && e.InitiatorType == "scheduled"),
+                It.Is<TriggerEvent>(e => e.TriggerAlias == ScheduledTriggerAlias && e.InitiatorType == "scheduled"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -139,7 +136,6 @@ public class ScheduledTriggerBackgroundJobTests
     public async Task PerformExecuteAsync_TriggerNotDueYet_DoesNotDispatch()
     {
         var automationId = Guid.NewGuid();
-        var triggerAlias = "umbracoAutomate.scheduled";
 
         _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
@@ -152,23 +148,17 @@ public class ScheduledTriggerBackgroundJobTests
             Status = AutomationStatus.Published,
             Trigger = new TriggerConfiguration
             {
-                TriggerAlias = triggerAlias,
+                TriggerAlias = ScheduledTriggerAlias,
                 Settings = [],
             },
         };
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
-        var mockTrigger = new Mock<ITrigger>();
-        mockTrigger.Setup(t => t.Alias).Returns(triggerAlias);
-        mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
-        mockTrigger.As<IScheduledTrigger>()
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        _mockTrigger.As<IScheduledTrigger>()
             .Setup(t => t.GetCronExpression(It.IsAny<object?>()))
             .Returns("0 0 1 1 *"); // Once a year — Jan 1 at midnight
-
-        _triggerCollection
-            .Setup(c => c.GetByAlias(triggerAlias))
-            .Returns(mockTrigger.Object);
 
         // Last fired recently.
         _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
@@ -194,7 +184,7 @@ public class ScheduledTriggerBackgroundJobTests
             Alias = "test",
             Name = "Test",
             IsEnabled = false,
-            Trigger = new TriggerConfiguration { TriggerAlias = "umbracoAutomate.scheduled", Settings = [] },
+            Trigger = new TriggerConfiguration { TriggerAlias = ScheduledTriggerAlias, Settings = [] },
         };
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);

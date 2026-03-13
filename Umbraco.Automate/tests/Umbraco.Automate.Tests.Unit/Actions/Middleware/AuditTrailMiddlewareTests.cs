@@ -4,19 +4,20 @@ using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.Middleware;
 
 public class AuditTrailMiddlewareTests
 {
-    private readonly Mock<IAuditService> _auditService = new();
+    private readonly Mock<IAuditEntryService> _auditEntryService = new();
     private readonly AuditTrailMiddleware _middleware;
 
     public AuditTrailMiddlewareTests()
     {
         _middleware = new AuditTrailMiddleware(
-            _auditService.Object,
+            _auditEntryService.Object,
             Mock.Of<ILogger<AuditTrailMiddleware>>());
     }
 
@@ -50,20 +51,32 @@ public class AuditTrailMiddlewareTests
         var ctx = CreateContext(cmsAction.Object, CreateExecutionContext());
         var successResult = ActionResult.Success(new { Key = "value" });
 
+        _auditEntryService
+            .Setup(a => a.WriteAsync(
+                It.IsAny<Guid?>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<string?>(),
+                It.Is<string>(t => t.Contains("publishContent")),
+                It.IsAny<string>()))
+            .ReturnsAsync(Mock.Of<IAuditEntry>());
+
         var result = await _middleware.ApplyAsync(
             ctx,
             (_, _) => Task.FromResult(successResult),
             CancellationToken.None);
 
         result.ShouldBeSameAs(successResult);
-        _auditService.Verify(
-            a => a.Write(
-                It.IsAny<int>(),
+        _auditEntryService.Verify(
+            a => a.WriteAsync(
+                It.IsAny<Guid?>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<DateTime>(),
-                It.IsAny<int>(),
-                It.IsAny<string>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<string?>(),
                 It.Is<string>(t => t.Contains("publishContent")),
                 It.IsAny<string>()),
             Times.Once);
@@ -82,7 +95,7 @@ public class AuditTrailMiddlewareTests
             CancellationToken.None);
 
         result.ShouldBeSameAs(successResult);
-        _auditService.VerifyNoOtherCalls();
+        _auditEntryService.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -100,7 +113,7 @@ public class AuditTrailMiddlewareTests
             CancellationToken.None);
 
         result.ShouldBeSameAs(failedResult);
-        _auditService.VerifyNoOtherCalls();
+        _auditEntryService.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -118,7 +131,7 @@ public class AuditTrailMiddlewareTests
             CancellationToken.None);
 
         result.ShouldBeSameAs(successResult);
-        _auditService.VerifyNoOtherCalls();
+        _auditEntryService.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -130,12 +143,12 @@ public class AuditTrailMiddlewareTests
         var ctx = CreateContext(cmsAction.Object, CreateExecutionContext());
         var successResult = ActionResult.Success();
 
-        _auditService
-            .Setup(a => a.Write(
-                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<string>(),
+        _auditEntryService
+            .Setup(a => a.WriteAsync(
+                It.IsAny<Guid?>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<DateTime>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
                 It.IsAny<string>(), It.IsAny<string>()))
-            .Throws(new InvalidOperationException("audit failed"));
+            .ThrowsAsync(new InvalidOperationException("audit failed"));
 
         var result = await _middleware.ApplyAsync(
             ctx,

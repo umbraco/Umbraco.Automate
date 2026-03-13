@@ -42,6 +42,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Steps = source.Steps;
         target.Connections = source.Connections;
         target.CanvasState = source.CanvasState;
+        target.NotificationSettings = source.NotificationSettings;
     }
 
     // Umbraco.Code.MapAll -Id -WorkspaceId -Status -PublishedVersion -GroupId -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
@@ -55,6 +56,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Steps = source.Steps;
         target.Connections = source.Connections;
         target.CanvasState = source.CanvasState;
+        target.NotificationSettings = source.NotificationSettings;
     }
 
     // Umbraco.Code.MapAll
@@ -75,9 +77,10 @@ public class AutomationMapDefinition : IMapDefinition
         target.Version = source.Version;
         target.DateCreated = source.DateCreated;
         target.DateModified = source.DateModified;
+        target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll
+    // Umbraco.Code.MapAll -NotificationSettings
     private static void MapToItemResponse(Core.Automations.Automation source, AutomationItemResponseModel target, MapperContext context)
     {
         target.Id = source.Id;

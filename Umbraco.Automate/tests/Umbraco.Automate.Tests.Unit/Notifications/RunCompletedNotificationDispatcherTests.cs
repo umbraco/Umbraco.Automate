@@ -12,19 +12,17 @@ namespace Umbraco.Automate.Tests.Unit.Notifications;
 public class RunCompletedNotificationDispatcherTests
 {
     private readonly Mock<INotificationChannel> _channel = new();
-    private readonly Mock<NotificationChannelCollection> _channelCollection;
     private readonly Mock<IAutomationService> _automationService = new();
     private readonly RunCompletedNotificationDispatcher _dispatcher;
 
     public RunCompletedNotificationDispatcherTests()
     {
-        _channelCollection = new Mock<NotificationChannelCollection>(
-            (Func<IEnumerable<INotificationChannel>>)(() => [_channel.Object]));
-
         _channel.Setup(c => c.Alias).Returns("umbracoAutomate.webhook");
 
+        var channelCollection = new NotificationChannelCollection(() => [_channel.Object]);
+
         _dispatcher = new RunCompletedNotificationDispatcher(
-            _channelCollection.Object,
+            channelCollection,
             _automationService.Object,
             Mock.Of<ILogger<RunCompletedNotificationDispatcher>>());
     }
@@ -84,9 +82,6 @@ public class RunCompletedNotificationDispatcherTests
 
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
-
-        _channelCollection.Setup(c => c.GetByAlias("umbracoAutomate.webhook"))
-            .Returns(_channel.Object);
 
         _channel.Setup(c => c.ResolveSettings(It.IsAny<Dictionary<string, object?>>()))
             .Returns(new object());
@@ -182,9 +177,6 @@ public class RunCompletedNotificationDispatcherTests
 
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
-
-        _channelCollection.Setup(c => c.GetByAlias("umbracoAutomate.webhook"))
-            .Returns(_channel.Object);
 
         _channel.Setup(c => c.NotifyAsync(It.IsAny<RunFailureNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Network error"));

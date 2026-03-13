@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications.Channels;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Models;
 
@@ -33,4 +34,7 @@ public sealed class CreateAutomationRequestModel
 
     /// <summary>The serialised canvas state.</summary>
     public string? CanvasState { get; init; }
+
+    /// <summary>Notification channel settings.</summary>
+    public AutomationNotificationSettings? NotificationSettings { get; init; }
 }

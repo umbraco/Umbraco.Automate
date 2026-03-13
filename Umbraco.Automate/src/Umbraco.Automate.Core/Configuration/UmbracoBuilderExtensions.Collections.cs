@@ -8,6 +8,7 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;

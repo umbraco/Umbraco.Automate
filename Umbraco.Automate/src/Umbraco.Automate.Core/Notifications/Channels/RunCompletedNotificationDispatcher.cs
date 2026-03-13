@@ -29,7 +29,7 @@ internal sealed class RunCompletedNotificationDispatcher
 
     public async Task HandleAsync(AutomationRunCompletedNotification notification, CancellationToken cancellationToken)
     {
-        var run = notification.Target;
+        var run = notification.Run;
 
         if (!ShouldNotify(run.Status))
         {
