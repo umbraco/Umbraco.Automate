@@ -8,6 +8,7 @@ using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
@@ -81,6 +82,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(triggers);
         services.AddSingleton(middlewareCollection);
         services.AddSingleton(new ExpressionEvaluator(Array.Empty<IExpressionFilter>()));
+        services.AddSingleton<SettingsExpressionResolver>();
         services.AddSingleton<ActionMiddlewarePipeline>();
         services.AddSingleton<AutomateMetrics>();
 
@@ -90,6 +92,8 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
+
+        services.AddSingleton(Mock.Of<IConnectionService>());
 
         // Execution.
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();

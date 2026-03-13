@@ -54,6 +54,21 @@ public class EditableModelSchemaBuilderTests
     }
 
     [Fact]
+    public void Build_PropagatesSupportsExpressions()
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(ExpressionSettings))!;
+
+        var markedField = schema.Fields.First(f => f.PropertyName == "Marked");
+        markedField.SupportsExpressions.ShouldBeTrue();
+
+        var unmarkedField = schema.Fields.First(f => f.PropertyName == "Unmarked");
+        unmarkedField.SupportsExpressions.ShouldBeFalse();
+
+        var noAttrField = schema.Fields.First(f => f.PropertyName == "NoAttribute");
+        noAttrField.SupportsExpressions.ShouldBeFalse();
+    }
+
+    [Fact]
     public void HumanizePropertyName_ConvertsCorrectly()
     {
         EditableModelSchemaBuilder.HumanizePropertyName("ContentName").ShouldBe("Content Name");
@@ -73,5 +88,16 @@ public class EditableModelSchemaBuilderTests
 
         [Field(SortOrder = 2)]
         public int Timeout { get; set; }
+    }
+
+    private class ExpressionSettings
+    {
+        [Field(SupportsExpressions = true)]
+        public string Marked { get; set; } = string.Empty;
+
+        [Field]
+        public string Unmarked { get; set; } = string.Empty;
+
+        public string NoAttribute { get; set; } = string.Empty;
     }
 }

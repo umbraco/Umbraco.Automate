@@ -4,11 +4,12 @@
     "private": true,
     "description": "Root package for Umbraco.Automate frontend development",
     "workspaces": [
-        "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Client"
+        "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Client",
+        "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Client"
     ],
     "scripts": {
-        "build": "npm run build -w @umbraco-automate/core",
-        "watch": "npm run watch -w @umbraco-automate/core",
+        "build": "npm run build --workspaces",
+        "watch": "npm run watch --workspaces",
         "changelog": "node scripts/generate-changelog.js",
         "changelog:list": "node scripts/generate-changelog.js --list",
         "commit-options": "node scripts/list-commit-options.js",

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
@@ -57,7 +58,9 @@ public class AutomationExecutorTests
             actions,
             pipeline,
             evaluator,
+            new SettingsExpressionResolver(evaluator),
             _runRepo.Object,
+            Mock.Of<IConnectionService>(),
             _workspaceService.Object,
             sp,
             Mock.Of<ILogger<AutomationExecutor>>());

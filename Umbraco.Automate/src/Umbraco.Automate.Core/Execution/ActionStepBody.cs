@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
@@ -20,7 +21,9 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly IAction _action;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly ExpressionEvaluator _expressionEvaluator;
+    private readonly SettingsExpressionResolver _settingsExpressionResolver;
     private readonly IAutomationRunRepository _runRepository;
+    private readonly IConnectionService _connectionService;
     private readonly ILogger<ActionStepBody> _logger;
 
     public ActionStepBody(
@@ -28,14 +31,18 @@ internal sealed class ActionStepBody : StepBodyAsync
         IAction action,
         ActionMiddlewarePipeline pipeline,
         ExpressionEvaluator expressionEvaluator,
+        SettingsExpressionResolver settingsExpressionResolver,
         IAutomationRunRepository runRepository,
+        IConnectionService connectionService,
         ILogger<ActionStepBody> logger)
     {
         _stepConfig = stepConfig;
         _action = action;
         _pipeline = pipeline;
         _expressionEvaluator = expressionEvaluator;
+        _settingsExpressionResolver = settingsExpressionResolver;
         _runRepository = runRepository;
+        _connectionService = connectionService;
         _logger = logger;
     }
 
@@ -57,6 +64,19 @@ internal sealed class ActionStepBody : StepBodyAsync
             settings = _action.ResolveSettings(_stepConfig.Settings);
         }
 
+        // Evaluate ${ } expressions in settings properties marked with SupportsExpressions.
+        if (settings is not null)
+        {
+            _settingsExpressionResolver.ResolveExpressions(settings, expressionData);
+        }
+
+        // Resolve connection for this step (if configured).
+        ConfiguredConnection? connection = null;
+        if (_stepConfig.ConnectionId is { } connectionId)
+        {
+            connection = await _connectionService.GetConfiguredConnectionAsync(connectionId, cancellationToken);
+        }
+
         // Create action context.
         var actionContext = new ActionContext
         {
@@ -68,6 +88,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             InputData = resolvedInputs,
             CancellationToken = cancellationToken,
             ExecutionContext = data.ExecutionContext,
+            Connection = connection,
         };
 
         // Create and persist step run.

@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Execution;
 
 namespace Umbraco.Automate.Core.Actions;
@@ -55,4 +56,10 @@ public sealed class ActionContext
     /// Available for CMS-modifying actions that need to execute as the workspace's service account.
     /// </summary>
     public AutomationExecutionContext? ExecutionContext { get; init; }
+
+    /// <summary>
+    /// Gets the configured connection for this step, or null if no connection is configured.
+    /// Contains the resolved connection type and decrypted settings, ready for runtime use.
+    /// </summary>
+    public ConfiguredConnection? Connection { get; init; }
 }
