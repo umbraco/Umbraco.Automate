@@ -34,14 +34,14 @@ public sealed class AllAutomationGroupController : AutomationGroupControllerBase
     /// <summary>
     /// Gets all automation groups for a workspace.
     /// </summary>
-    [HttpGet("workspace/{workspaceId:guid}")]
+    [HttpGet]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(IEnumerable<AutomationGroupResponseModel>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllAutomationGroups(
         Guid workspaceId,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, workspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
         if (forbidden is not null)
         {
             return forbidden;

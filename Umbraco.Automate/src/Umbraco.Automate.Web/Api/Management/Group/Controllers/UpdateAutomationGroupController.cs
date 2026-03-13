@@ -40,20 +40,21 @@ public sealed class UpdateAutomationGroupController : AutomationGroupControllerB
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateAutomationGroup(
+        Guid workspaceId,
         Guid id,
         UpdateAutomationGroupRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
-        var existing = await _groupService.GetGroupAsync(id, cancellationToken);
-        if (existing is null)
-        {
-            return GroupNotFound();
-        }
-
-        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, existing.WorkspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
         if (forbidden is not null)
         {
             return forbidden;
+        }
+
+        var existing = await _groupService.GetGroupAsync(id, cancellationToken);
+        if (existing is null || existing.WorkspaceId != workspaceId)
+        {
+            return GroupNotFound();
         }
 
         var group = _mapper.Map<AutomationGroup>(requestModel)!;

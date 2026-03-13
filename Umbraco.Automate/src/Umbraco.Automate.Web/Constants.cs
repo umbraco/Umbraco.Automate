@@ -93,8 +93,8 @@ public class Constants
             /// </summary>
             public static class Group
             {
-                /// <summary>The route segment.</summary>
-                public const string RouteSegment = "groups";
+                /// <summary>The route segment, nested under workspaces.</summary>
+                public const string RouteSegment = "workspaces/{workspaceId:guid}/groups";
 
                 /// <summary>The Swagger group name.</summary>
                 public const string GroupName = "Groups";

@@ -34,17 +34,16 @@ public sealed class CreateAutomationGroupController : AutomationGroupControllerB
     /// <summary>
     /// Creates a new automation group within a workspace.
     /// </summary>
-    [HttpPost("workspace/{workspaceId:guid}")]
+    [HttpPost]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CreateAutomationGroup(
         Guid workspaceId,
         CreateAutomationGroupRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, workspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
         if (forbidden is not null)
         {
             return forbidden;
@@ -60,7 +59,7 @@ public sealed class CreateAutomationGroupController : AutomationGroupControllerB
             return CreatedAtAction(
                 nameof(ByIdAutomationGroupController.GetAutomationGroupById),
                 nameof(ByIdAutomationGroupController).Replace("Controller", string.Empty),
-                new { id = created.Id },
+                new { workspaceId, id = created.Id },
                 created.Id.ToString());
         }
         catch (InvalidOperationException ex)

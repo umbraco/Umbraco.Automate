@@ -39,19 +39,20 @@ public sealed class ByIdAutomationGroupController : AutomationGroupControllerBas
     [ProducesResponseType(typeof(AutomationGroupResponseModel), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAutomationGroupById(
+        Guid workspaceId,
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var group = await _groupService.GetGroupAsync(id, cancellationToken);
-        if (group is null)
-        {
-            return GroupNotFound();
-        }
-
-        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, group.WorkspaceId);
+        var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, workspaceId);
         if (forbidden is not null)
         {
             return forbidden;
+        }
+
+        var group = await _groupService.GetGroupAsync(id, cancellationToken);
+        if (group is null || group.WorkspaceId != workspaceId)
+        {
+            return GroupNotFound();
         }
 
         return Ok(_mapper.Map<AutomationGroupResponseModel>(group));
