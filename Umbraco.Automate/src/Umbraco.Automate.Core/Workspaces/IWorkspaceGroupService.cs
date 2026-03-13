@@ -11,9 +11,12 @@ public interface IWorkspaceGroupService
     Task<WorkspaceGroup?> GetGroupAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets all groups for a workspace.
+    /// Gets groups for a workspace at a specific level.
     /// </summary>
-    Task<IEnumerable<WorkspaceGroup>> GetGroupsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default);
+    /// <param name="workspaceId">The workspace ID.</param>
+    /// <param name="parentId">The parent group ID, or <c>null</c> for root-level groups.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<IEnumerable<WorkspaceGroup>> GetGroupsByWorkspaceAsync(Guid workspaceId, Guid? parentId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates a new group.

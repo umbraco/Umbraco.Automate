@@ -31,13 +31,13 @@ internal sealed class EFCoreWorkspaceGroupRepository : IWorkspaceGroupRepository
         return entity is null ? null : _factory.BuildDomain(entity);
     }
 
-    public async Task<IEnumerable<WorkspaceGroup>> GetByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<WorkspaceGroup>> GetByWorkspaceAsync(Guid workspaceId, Guid? parentId, CancellationToken cancellationToken = default)
     {
         using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
 
         var entities = await scope.ExecuteWithContextAsync(async db =>
             await db.WorkspaceGroups
-                .Where(g => g.WorkspaceId == workspaceId)
+                .Where(g => g.WorkspaceId == workspaceId && g.ParentId == parentId)
                 .OrderBy(g => g.Name)
                 .ToListAsync(cancellationToken));
 

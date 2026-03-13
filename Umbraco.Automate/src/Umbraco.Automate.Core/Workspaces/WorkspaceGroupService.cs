@@ -27,8 +27,8 @@ internal sealed class WorkspaceGroupService : IWorkspaceGroupService
     public Task<WorkspaceGroup?> GetGroupAsync(Guid id, CancellationToken cancellationToken = default)
         => _groupRepository.GetAsync(id, cancellationToken);
 
-    public Task<IEnumerable<WorkspaceGroup>> GetGroupsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
-        => _groupRepository.GetByWorkspaceAsync(workspaceId, cancellationToken);
+    public Task<IEnumerable<WorkspaceGroup>> GetGroupsByWorkspaceAsync(Guid workspaceId, Guid? parentId, CancellationToken cancellationToken = default)
+        => _groupRepository.GetByWorkspaceAsync(workspaceId, parentId, cancellationToken);
 
     public async Task<WorkspaceGroup> CreateGroupAsync(WorkspaceGroup group, CancellationToken cancellationToken = default)
     {

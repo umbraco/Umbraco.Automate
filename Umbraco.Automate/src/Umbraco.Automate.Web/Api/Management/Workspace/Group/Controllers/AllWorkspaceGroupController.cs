@@ -9,7 +9,7 @@ using Umbraco.Cms.Core.Mapping;
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Controllers;
 
 /// <summary>
-/// Gets all workspace groups for a workspace.
+/// Gets workspace groups for a workspace at a specific level.
 /// </summary>
 [ApiVersion("1.0")]
 public sealed class AllWorkspaceGroupController : WorkspaceGroupControllerBase
@@ -32,13 +32,14 @@ public sealed class AllWorkspaceGroupController : WorkspaceGroupControllerBase
     }
 
     /// <summary>
-    /// Gets all workspace groups for a workspace.
+    /// Gets workspace groups for a workspace at a specific level.
     /// </summary>
     [HttpGet]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(IEnumerable<WorkspaceGroupResponseModel>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllWorkspaceGroups(
         Guid id,
+        [FromQuery] Guid? parentId = null,
         CancellationToken cancellationToken = default)
     {
         var forbidden = await AuthorizeWorkspaceAsync(_authorizationService, id);
@@ -47,7 +48,7 @@ public sealed class AllWorkspaceGroupController : WorkspaceGroupControllerBase
             return forbidden;
         }
 
-        var groups = await _groupService.GetGroupsByWorkspaceAsync(id, cancellationToken);
+        var groups = await _groupService.GetGroupsByWorkspaceAsync(id, parentId, cancellationToken);
 
         return Ok(_mapper.MapEnumerable<WorkspaceGroup, WorkspaceGroupResponseModel>(groups));
     }
