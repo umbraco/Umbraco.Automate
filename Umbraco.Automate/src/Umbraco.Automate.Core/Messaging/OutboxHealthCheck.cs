@@ -1,7 +1,4 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Umbraco.Automate.Core.Persistence;
-using Umbraco.Cms.Core;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Messaging;
 
@@ -15,29 +12,16 @@ internal sealed class OutboxHealthCheck : IHealthCheck
     private const int UnhealthyPendingThreshold = 1000;
 
     private readonly IOutboxStore _store;
-    private readonly IRuntimeState _runtimeState;
 
-    /// <summary>
-    /// Set to <c>true</c> once Automate EF Core migrations have completed successfully.
-    /// Used to prevent health check queries before the outbox table exists.
-    /// </summary>
-    internal static volatile bool MigrationsComplete;
-
-    public OutboxHealthCheck(IOutboxStore store, IRuntimeState runtimeState)
+    public OutboxHealthCheck(IOutboxStore store)
     {
         _store = store;
-        _runtimeState = runtimeState;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        if (_runtimeState.Level < RuntimeLevel.Run || !MigrationsComplete)
-        {
-            return HealthCheckResult.Degraded("Automate migrations have not yet completed");
-        }
-
         var stats = await _store.GetStatsAsync(cancellationToken);
 
         var data = new Dictionary<string, object>

@@ -84,7 +84,7 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
     {
         var sensitiveKeys = schema.Fields
             .Where(f => f.IsSensitive)
-            .Select(f => ToCamelCase(f.PropertyName))
+            .Select(f => f.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var property in jsonObject.ToList())
@@ -135,6 +135,4 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
         }
     }
 
-    private static string ToCamelCase(string name)
-        => string.IsNullOrEmpty(name) ? name : char.ToLowerInvariant(name[0]) + name[1..];
 }

@@ -10,6 +10,11 @@ namespace Umbraco.Automate.Core.Settings;
 public sealed class EditableModelSchema
 {
     /// <summary>
+    /// The type of the editable model.
+    /// </summary>
+    public Type? Type { get; set; }
+
+    /// <summary>
     /// Gets the ordered list of field descriptors in this schema.
     /// </summary>
     public required IReadOnlyList<EditableModelFieldDescriptor> Fields { get; init; }
@@ -21,10 +26,10 @@ public sealed class EditableModelSchema
 public sealed class EditableModelFieldDescriptor
 {
     /// <summary>
-    /// Gets the property name on the settings POCO.
+    /// The unique key identifying the setting.
     /// </summary>
-    [JsonIgnore]
-    public required string PropertyName { get; init; }
+    [Required]
+    public string Key { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets the display label.
@@ -32,15 +37,21 @@ public sealed class EditableModelFieldDescriptor
     public required string Label { get; init; }
 
     /// <summary>
-    /// Gets the CLR type of the property.
-    /// </summary>
-    [JsonIgnore]
-    public required Type PropertyType { get; init; }
-
-    /// <summary>
     /// Gets an optional description.
     /// </summary>
     public string? Description { get; init; }
+
+    /// <summary>
+    /// The name of the property associated with the field.
+    /// </summary>
+    [JsonIgnore]
+    public string? PropertyName { get; set; }
+
+    /// <summary>
+    /// The type of the property associated with the field.
+    /// </summary>
+    [JsonIgnore]
+    public Type? PropertyType { get; set; }
 
     /// <summary>
     /// Gets the Umbraco editor UI alias, or null to infer from the property type.
@@ -53,6 +64,11 @@ public sealed class EditableModelFieldDescriptor
     public string? EditorConfig { get; init; }
 
     /// <summary>
+    /// Gets the default value of the property from the model's initializer.
+    /// </summary>
+    public object? DefaultValue { get; init; }
+
+    /// <summary>
     /// Gets the sort order for display.
     /// </summary>
     public int SortOrder { get; init; }
@@ -61,6 +77,11 @@ public sealed class EditableModelFieldDescriptor
     /// Gets whether this field contains sensitive data.
     /// </summary>
     public bool IsSensitive { get; init; }
+
+    /// <summary>
+    /// Whether this setting is required.
+    /// </summary>
+    public bool IsRequired { get; set; }
 
     /// <summary>
     /// Gets the UI group name, or null for the default group.

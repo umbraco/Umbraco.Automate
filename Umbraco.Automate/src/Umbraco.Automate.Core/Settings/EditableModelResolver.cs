@@ -185,12 +185,12 @@ internal sealed class EditableModelResolver : IEditableModelResolver
 
         foreach (var field in schema.Fields)
         {
-            if (string.IsNullOrEmpty(field.PropertyName))
+            if (string.IsNullOrEmpty(field.Key))
             {
                 continue;
             }
 
-            var property = modelType.GetProperty(field.PropertyName);
+            var property = modelType.GetProperty(field.Key);
             if (property is null)
             {
                 continue;
@@ -202,7 +202,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             {
                 var validationContext = new ValidationContext(model)
                 {
-                    MemberName = field.PropertyName,
+                    MemberName = field.Key,
                     DisplayName = field.Label,
                 };
 

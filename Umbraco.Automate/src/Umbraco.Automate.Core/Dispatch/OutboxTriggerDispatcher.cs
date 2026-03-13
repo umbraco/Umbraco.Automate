@@ -54,15 +54,6 @@ internal sealed class OutboxTriggerDispatcher : ITriggerDispatcher
             _metrics.OutboxBackpressureRejection();
             throw;
         }
-        catch (Exception ex) when (DatabaseExceptions.IsMissingTable(ex))
-        {
-            // Outbox table may not exist yet if migrations haven't completed.
-            // Silently drop the trigger event — the system isn't ready to process automations.
-            _logger.LogDebug(
-                "Outbox table not yet available, dropping trigger event for {TriggerAlias}",
-                triggerEvent.TriggerAlias);
-            return;
-        }
 
         _metrics.TriggerDispatched(triggerEvent.TriggerAlias);
         _metrics.OutboxMessagePublished(TopicName);

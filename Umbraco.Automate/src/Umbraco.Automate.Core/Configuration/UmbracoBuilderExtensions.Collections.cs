@@ -54,7 +54,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.Configure<DeduplicationOptions>(
             builder.Config.GetSection("Umbraco:Automate:Deduplication"));
 
-        // Collection builders — triggers, actions, connections, filters (auto-discovered via TypeLoader)
+        // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<ITrigger, TriggerAttribute>(cache: true));
         builder.AutomateActions()
@@ -137,16 +137,11 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         // WorkflowCore engine with outbox-backed queue.
-        // AddWorkflow() registers its own default IQueueProvider, so we must override AFTER.
-        builder.Services.AddWorkflow();
         builder.Services.AddSingleton<OutboxQueueProvider>();
         builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<OutboxQueueProvider>());
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
         builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
-
-        // WorkflowCore does not register IWorkflowHost as IHostedService.
-        // Start it ourselves after Umbraco has finished booting.
-        builder.Services.AddHostedService<WorkflowHostLifecycle>();
+        builder.Services.AddWorkflow();
 
         return builder;
     }

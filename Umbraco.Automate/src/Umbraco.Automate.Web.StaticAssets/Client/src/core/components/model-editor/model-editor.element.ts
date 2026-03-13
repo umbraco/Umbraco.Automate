@@ -118,8 +118,8 @@ export class UaModelEditorElement extends UmbLitElement {
             return;
         }
         this._propertyValues = this.schema.fields.map((field) => ({
-            alias: field.propertyName,
-            value: this.model?.[field.propertyName],
+            alias: field.key,
+            value: this.model?.[field.key],
         }));
     }
 
@@ -175,10 +175,10 @@ export class UaModelEditorElement extends UmbLitElement {
      * followed by named groups in declaration order.
      */
     #groupFields(
-        fields: EditableModelFieldDescriptorResponseModel[],
-    ): Array<[string, EditableModelFieldDescriptorResponseModel[]]> {
+        fields: EditableModelFieldDescriptorModel[],
+    ): Array<[string, EditableModelFieldDescriptorModel[]]> {
         const generalKey = this.defaultGroup ?? "Settings";
-        const groups = new Map<string, EditableModelFieldDescriptorResponseModel[]>();
+        const groups = new Map<string, EditableModelFieldDescriptorModel[]>();
         groups.set(generalKey, []);
 
         for (const field of fields) {
@@ -197,17 +197,19 @@ export class UaModelEditorElement extends UmbLitElement {
         return Array.from(groups.entries());
     }
 
-    #renderField(field: EditableModelFieldDescriptorResponseModel) {
+    #renderField(field: EditableModelFieldDescriptorModel) {
         return html`
             <umb-property
-                label=${field.label}
-                description=${field.description ?? ""}
-                alias=${field.propertyName}
+                label=${this.localize.string(field.label)}
+                description=${this.localize.string(field.description ?? "")}
+                alias=${field.key}
                 property-editor-ui-alias=${field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox"}
                 .config=${field.editorConfig ? this.#toPropertyConfig(field.editorConfig) : []}
                 .validation=${{
                     mandatory: field.isRequired,
-                    mandatoryMessage: field.isRequired ? "This field is required" : undefined,
+                    mandatoryMessage: field.isRequired
+                        ? this.localize.string("This field is required")
+                        : undefined,
                 }}
             >
             </umb-property>
@@ -229,7 +231,7 @@ export class UaModelEditorElement extends UmbLitElement {
             <umb-property-dataset .value=${this._propertyValues} @change=${this.#onChange}>
                 ${this.#groupFields(this.schema.fields).map(
                     ([groupKey, fields]) =>
-                        html`<uui-box headline=${groupKey}>
+                        html`<uui-box headline=${this.localize.string(groupKey)}>
                             ${fields.map((f) => this.#renderField(f))}
                         </uui-box>`,
                 )}

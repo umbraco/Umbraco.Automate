@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
+using Umbraco.Automate.Extensions;
+
 namespace Umbraco.Automate.Core.Settings;
 
 /// <summary>
@@ -28,7 +30,7 @@ public static class EditableModelSchemaBuilder
         var fields = properties
             .Select(BuildFieldDescriptor)
             .OrderBy(f => f.SortOrder)
-            .ThenBy(f => f.PropertyName)
+            .ThenBy(f => f.Key)
             .ToList();
 
         return new EditableModelSchema { Fields = fields };
@@ -37,9 +39,12 @@ public static class EditableModelSchemaBuilder
     private static EditableModelFieldDescriptor BuildFieldDescriptor(PropertyInfo property)
     {
         var attr = property.GetCustomAttribute<EditableModelFieldAttribute>();
+        var key = property.Name.ToCamelCase();
+        var validationRules = InferValidationAttributes(property);
 
         return new EditableModelFieldDescriptor
         {
+            Key = key,
             PropertyName = property.Name,
             Label = attr?.Label ?? HumanizePropertyName(property.Name),
             PropertyType = property.PropertyType,
@@ -48,9 +53,10 @@ public static class EditableModelSchemaBuilder
             EditorConfig = attr?.EditorConfig,
             SortOrder = attr?.SortOrder ?? 0,
             IsSensitive = attr?.IsSensitive ?? false,
+            IsRequired = validationRules.OfType<RequiredAttribute>().Any(),
             Group = attr?.Group,
             SupportsExpressions = attr?.SupportsExpressions ?? false,
-            ValidationRules = InferValidationAttributes(property),
+            ValidationRules = validationRules,
         };
     }
 

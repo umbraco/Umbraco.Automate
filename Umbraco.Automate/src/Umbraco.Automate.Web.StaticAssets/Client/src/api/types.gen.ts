@@ -161,17 +161,21 @@ export type CreateWorkspaceRequestModel = {
 };
 
 export type EditableModelFieldDescriptorModel = {
+    key: string;
     label: string;
     description?: string | null;
     editorUiAlias?: string | null;
     editorConfig?: string | null;
+    defaultValue?: unknown;
     sortOrder: number;
     isSensitive: boolean;
+    isRequired: boolean;
     group?: string | null;
     supportsExpressions: boolean;
 };
 
 export type EditableModelSchemaModel = {
+    type?: string | null;
     fields: Array<EditableModelFieldDescriptorModel>;
 };
 

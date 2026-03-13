@@ -2,7 +2,6 @@ import { css, html, customElement, property } from "@umbraco-cms/backoffice/exte
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.js";
-import { resolveEditorType, type FieldEditorType } from "./field-mapper.js";
 
 export interface SettingsChangeDetail {
     settings: Record<string, unknown>;
@@ -36,98 +35,32 @@ export class UaSettingsFormElement extends UmbLitElement {
         return Array.from(groups.entries()).map(([group, fields]) => ({ group, fields }));
     }
 
-    #onFieldChange(propertyName: string, value: unknown) {
-        const updated = { ...this.values, [propertyName]: value };
-        this.dispatchEvent(
-            new CustomEvent<SettingsChangeDetail>("ua:settings-change", {
-                bubbles: true,
-                composed: true,
-                detail: { settings: updated },
-            }),
-        );
+    #toPropertyConfig(config: unknown): Array<{ alias: string; value: unknown }> {
+        if (!config) return [];
+        // If it's already an array of alias-value pairs, return as is
+        if (Array.isArray(config)) return config as Array<{ alias: string; value: unknown }>;
+        // If it's an object, convert its entries to alias-value pairs
+        if (typeof config !== "object") return [];
+        return Object.entries(config).map(([alias, value]) => ({ alias, value }));
     }
 
     #renderField(field: EditableModelFieldDescriptorModel) {
-        const editorType = resolveEditorType(field.editorUiAlias, field.propertyType, field.isSensitive);
-        const value = this.values[field.propertyName];
-
         return html`
-            <umb-property-layout
-                label=${field.label}
-                orientation="vertical"
-                ?mandatory=${field.isRequired}
+            <umb-property
+                label=${this.localize.string(field.label)}
+                description=${this.localize.string(field.description ?? "")}
+                alias=${field.key}
+                property-editor-ui-alias=${field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox"}
+                .config=${field.editorConfig ? this.#toPropertyConfig(field.editorConfig) : []}
+                .validation=${{
+                mandatory: field.isRequired,
+                mandatoryMessage: field.isRequired
+                    ? this.localize.string("This field is required")
+                    : undefined,
+            }}
             >
-                ${field.description
-                    ? html`<small slot="description">${field.description}</small>`
-                    : ""}
-                <div slot="editor">
-                    ${this.#renderEditor(field, editorType, value)}
-                </div>
-            </umb-property-layout>
+            </umb-property>
         `;
-    }
-
-    #renderEditor(
-        field: EditableModelFieldDescriptorModel,
-        editorType: FieldEditorType,
-        value: unknown,
-    ) {
-        switch (editorType) {
-            case "toggle":
-                return html`
-                    <uui-toggle
-                        .checked=${Boolean(value)}
-                        label=${field.label}
-                        @change=${(e: Event) =>
-                            this.#onFieldChange(field.propertyName, (e.target as HTMLInputElement).checked)}
-                    ></uui-toggle>
-                `;
-            case "textarea":
-                return html`
-                    <uui-textarea
-                        .value=${String(value ?? "")}
-                        ?required=${field.isRequired}
-                        label=${field.label}
-                        auto-height
-                        @input=${(e: Event) =>
-                            this.#onFieldChange(field.propertyName, (e.target as HTMLTextAreaElement).value)}
-                    ></uui-textarea>
-                `;
-            case "number":
-                return html`
-                    <uui-input
-                        type="number"
-                        .value=${value != null ? String(value) : ""}
-                        ?required=${field.isRequired}
-                        label=${field.label}
-                        @input=${(e: Event) => {
-                            const raw = (e.target as HTMLInputElement).value;
-                            this.#onFieldChange(field.propertyName, raw === "" ? null : Number(raw));
-                        }}
-                    ></uui-input>
-                `;
-            case "password":
-                return html`
-                    <uui-input
-                        type="password"
-                        .value=${String(value ?? "")}
-                        ?required=${field.isRequired}
-                        label=${field.label}
-                        @input=${(e: Event) =>
-                            this.#onFieldChange(field.propertyName, (e.target as HTMLInputElement).value)}
-                    ></uui-input>
-                `;
-            default:
-                return html`
-                    <uui-input
-                        .value=${String(value ?? "")}
-                        ?required=${field.isRequired}
-                        label=${field.label}
-                        @input=${(e: Event) =>
-                            this.#onFieldChange(field.propertyName, (e.target as HTMLInputElement).value)}
-                    ></uui-input>
-                `;
-        }
     }
 
     override render() {
