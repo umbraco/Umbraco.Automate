@@ -1,8 +1,8 @@
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Web.Api.Management.Group.Models;
+using Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
 using Umbraco.Cms.Core.Mapping;
 
-namespace Umbraco.Automate.Web.Api.Management.Group.Mapping;
+namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Mapping;
 
 /// <summary>
 /// Map definitions for AutomationGroup models.

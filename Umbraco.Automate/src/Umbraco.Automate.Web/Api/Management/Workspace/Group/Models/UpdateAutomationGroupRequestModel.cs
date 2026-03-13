@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Umbraco.Automate.Web.Api.Management.Group.Models;
+namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
 
 /// <summary>
 /// Request model for updating an automation group.

@@ -4,7 +4,7 @@ using Umbraco.Automate.Web.Api.Management.Common.Controllers;
 using Umbraco.Automate.Web.Api.Management.Common.Routing;
 using Umbraco.Cms.Api.Common.Builders;
 
-namespace Umbraco.Automate.Web.Api.Management.Group.Controllers;
+namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Controllers;
 
 /// <summary>
 /// Base controller for automation group endpoints, nested under workspaces.

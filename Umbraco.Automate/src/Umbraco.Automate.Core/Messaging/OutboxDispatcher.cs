@@ -69,6 +69,12 @@ internal sealed class OutboxDispatcher : BackgroundService
         // stoppingToken stops the polling loop; drainCts cancels after DrainTimeout.
         using var drainCts = new CancellationTokenSource();
 
+        // Suppress execution context flow so that Umbraco's ambient scope (AsyncLocal)
+        // from the hosting thread does not leak into this background loop. Without this,
+        // scopes created by IOutboxStore clash with the ambient scope from the request
+        // pipeline, causing "Scope being disposed is not the Ambient Scope" errors.
+        using var _ = ExecutionContext.SuppressFlow();
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try

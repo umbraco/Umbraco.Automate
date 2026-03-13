@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Web.Api.Management.Group.Models;
+using Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
 using Umbraco.Cms.Core.Mapping;
 
-namespace Umbraco.Automate.Web.Api.Management.Group.Controllers;
+namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Controllers;
 
 /// <summary>
 /// Updates an existing automation group.

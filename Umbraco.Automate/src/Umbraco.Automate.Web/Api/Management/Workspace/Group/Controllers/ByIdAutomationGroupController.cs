@@ -3,37 +3,42 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Web.Api.Management.Workspace.Group.Models;
+using Umbraco.Cms.Core.Mapping;
 
-namespace Umbraco.Automate.Web.Api.Management.Group.Controllers;
+namespace Umbraco.Automate.Web.Api.Management.Workspace.Group.Controllers;
 
 /// <summary>
-/// Deletes an automation group and all its contents (cascade).
+/// Gets a single automation group by ID.
 /// </summary>
 [ApiVersion("1.0")]
-public sealed class DeleteAutomationGroupController : AutomationGroupControllerBase
+public sealed class ByIdAutomationGroupController : AutomationGroupControllerBase
 {
     private readonly IAutomationGroupService _groupService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly IUmbracoMapper _mapper;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="DeleteAutomationGroupController"/> class.
+    /// Initializes a new instance of the <see cref="ByIdAutomationGroupController"/> class.
     /// </summary>
-    public DeleteAutomationGroupController(
+    public ByIdAutomationGroupController(
         IAutomationGroupService groupService,
-        IAuthorizationService authorizationService)
+        IAuthorizationService authorizationService,
+        IUmbracoMapper mapper)
     {
         _groupService = groupService;
         _authorizationService = authorizationService;
+        _mapper = mapper;
     }
 
     /// <summary>
-    /// Deletes an automation group and cascade-deletes all child groups and automations.
+    /// Gets an automation group by its unique ID.
     /// </summary>
-    [HttpDelete("{id:guid}")]
+    [HttpGet("{id:guid}")]
     [MapToApiVersion("1.0")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AutomationGroupResponseModel), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteAutomationGroup(
+    public async Task<IActionResult> GetAutomationGroupById(
         Guid workspaceId,
         Guid id,
         CancellationToken cancellationToken = default)
@@ -50,8 +55,6 @@ public sealed class DeleteAutomationGroupController : AutomationGroupControllerB
             return GroupNotFound();
         }
 
-        await _groupService.DeleteGroupAsync(id, cancellationToken);
-
-        return Ok();
+        return Ok(_mapper.Map<AutomationGroupResponseModel>(group));
     }
 }
