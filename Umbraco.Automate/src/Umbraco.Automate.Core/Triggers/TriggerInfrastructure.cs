@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Triggers;
@@ -11,10 +13,13 @@ public sealed class TriggerInfrastructure
     /// <summary>
     /// Initializes a new instance of the <see cref="TriggerInfrastructure"/> class.
     /// </summary>
-    public TriggerInfrastructure(IEditableModelResolver modelResolver)
+    public TriggerInfrastructure(IEditableModelResolver modelResolver, IOptions<DeduplicationOptions> deduplicationOptions)
     {
         ModelResolver = modelResolver;
+        DeduplicationOptions = deduplicationOptions.Value;
     }
 
     internal IEditableModelResolver ModelResolver { get; }
+
+    internal DeduplicationOptions DeduplicationOptions { get; }
 }

@@ -1,0 +1,22 @@
+namespace Umbraco.Automate.Core.Triggers.BuiltIn;
+
+/// <summary>
+/// Output produced by the <see cref="ContentUnpublishedTrigger"/> for each unpublished content item.
+/// </summary>
+public sealed class ContentUnpublishedTriggerOutput
+{
+    /// <summary>
+    /// Gets the content item's unique key.
+    /// </summary>
+    public Guid ContentKey { get; init; }
+
+    /// <summary>
+    /// Gets the content item's name.
+    /// </summary>
+    public string? ContentName { get; init; }
+
+    /// <summary>
+    /// Gets the content type alias.
+    /// </summary>
+    public string? ContentTypeAlias { get; init; }
+}

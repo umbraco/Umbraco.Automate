@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Connections;
 using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Persistence.Versioning;
 using Umbraco.Automate.Persistence.Workflows;
+using Umbraco.Automate.Persistence.Triggers;
 using Umbraco.Automate.Persistence.Workspaces;
 
 namespace Umbraco.Automate.Persistence;
@@ -36,6 +38,10 @@ public class UmbracoAutomateDbContext : DbContext
 
     internal DbSet<ConnectionEntity> Connections { get; set; } = null!;
 
+    internal DbSet<ScheduledTriggerStateEntity> ScheduledTriggerStates { get; set; } = null!;
+
+    internal DbSet<WorkspaceGroupEntity> WorkspaceGroups { get; set; } = null!;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="UmbracoAutomateDbContext"/> class.
     /// </summary>
@@ -43,6 +49,39 @@ public class UmbracoAutomateDbContext : DbContext
     public UmbracoAutomateDbContext(DbContextOptions<UmbracoAutomateDbContext> options)
         : base(options)
     {
+    }
+
+    /// <summary>
+    /// Configures the EF Core database provider with the correct migrations assembly.
+    /// </summary>
+    internal static void ConfigureProvider(
+        DbContextOptionsBuilder options,
+        string connectionString,
+        string providerName)
+    {
+        switch (providerName)
+        {
+            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
+                options.UseSqlServer(connectionString, x =>
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
+                break;
+
+            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
+            case "Microsoft.Data.SQLite":
+                options.UseSqlite(connectionString, x =>
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
+        }
     }
 
     /// <inheritdoc />
@@ -246,6 +285,31 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.DateModified).IsRequired();
 
             entity.HasIndex(e => e.Alias).IsUnique();
+        });
+
+        // Scheduled trigger state table
+
+        modelBuilder.Entity<ScheduledTriggerStateEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateScheduledTriggerState");
+            entity.HasKey(e => e.AutomationId);
+
+            entity.Property(e => e.AutomationId).IsRequired();
+            entity.Property(e => e.LastFiredUtc).IsRequired();
+        });
+
+        // Workspace group table
+
+        modelBuilder.Entity<WorkspaceGroupEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkspaceGroup");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.DateCreated).IsRequired();
+
+            entity.HasIndex(e => e.WorkspaceId);
+            entity.HasIndex(e => e.ParentId);
         });
 
         // Outbox message table

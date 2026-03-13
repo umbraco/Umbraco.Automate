@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications.Channels;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Models;
 
@@ -22,6 +23,9 @@ public sealed class UpdateAutomationRequestModel
     /// <summary>Whether triggers are active.</summary>
     public bool IsEnabled { get; init; }
 
+    /// <summary>The group (folder) to place this automation in, or null for root.</summary>
+    public Guid? GroupId { get; init; }
+
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; init; }
 
@@ -33,4 +37,7 @@ public sealed class UpdateAutomationRequestModel
 
     /// <summary>The serialised canvas state.</summary>
     public string? CanvasState { get; init; }
+
+    /// <summary>Notification channel settings.</summary>
+    public AutomationNotificationSettings? NotificationSettings { get; init; }
 }

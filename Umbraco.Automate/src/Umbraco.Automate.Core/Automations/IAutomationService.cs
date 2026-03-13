@@ -30,9 +30,14 @@ public interface IAutomationService
     /// <param name="skip">Number of items to skip.</param>
     /// <param name="take">Maximum number of items to return.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="groupId">
+    /// When not null, filters by group.
+    /// Pass <see cref="Guid.Empty"/> to get root-level automations (those with no group).
+    /// </param>
     Task<(IEnumerable<Automation> Items, int Total)> GetAutomationsPagedAsync(
         string? filter = null,
         IReadOnlySet<Guid>? workspaceIds = null,
+        Guid? groupId = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default);

@@ -45,7 +45,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _fixture = new EfCoreTestFixture();
-        var scopeProvider = new TestEfCoreScopeProvider(_fixture.CreateContext);
+        var dbContextFactory = new TestDbContextFactory(_fixture.CreateContext);
         var configuration = new ConfigurationBuilder().Build();
 
         // Collections — manually constructed without Umbraco TypeLoader.
@@ -62,7 +62,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
 
         var triggers = new TriggerCollection(() =>
         {
-            var deps = new TriggerInfrastructure(modelResolver);
+            var deps = new TriggerInfrastructure(modelResolver, Options.Create(new DeduplicationOptions()));
             return new ITrigger[] { new ManualTrigger(deps) };
         });
 
@@ -74,7 +74,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddWorkflow();
 
         // Repositories (real EF Core with in-memory SQLite).
-        _runRepository = new EFCoreAutomationRunRepository(scopeProvider);
+        _runRepository = new EFCoreAutomationRunRepository(dbContextFactory);
         services.AddSingleton(_runRepository);
 
         // Collections.
@@ -84,6 +84,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(new ExpressionEvaluator(Array.Empty<IExpressionFilter>()));
         services.AddSingleton<SettingsExpressionResolver>();
         services.AddSingleton<ActionMiddlewarePipeline>();
+        services.AddMetrics();
         services.AddSingleton<AutomateMetrics>();
 
         // Workspace service — returns a known workspace so we can verify execution context.
@@ -94,6 +95,10 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(workspaceService.Object);
 
         services.AddSingleton(Mock.Of<IConnectionService>());
+
+        // Rate limiting — disabled for tests.
+        services.Configure<RateLimitingOptions>(o => o.Enabled = false);
+        services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Execution.
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();

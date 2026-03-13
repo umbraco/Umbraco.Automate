@@ -16,8 +16,8 @@ public class WorkspacePersistenceTests : IDisposable
     public WorkspacePersistenceTests()
     {
         _fixture = new EfCoreTestFixture();
-        var scopeProvider = new TestEfCoreScopeProvider(_fixture.CreateContext);
-        _repository = new EFCoreWorkspaceRepository(scopeProvider);
+        var dbContextFactory = new TestDbContextFactory(_fixture.CreateContext);
+        _repository = new EFCoreWorkspaceRepository(dbContextFactory);
     }
 
     [Fact]

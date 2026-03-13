@@ -63,7 +63,13 @@ public sealed class AutomationRunStartingNotification(AutomationRun target, Even
 /// Notification fired after an automation run has completed (any status).
 /// </summary>
 public sealed class AutomationRunCompletedNotification(AutomationRun target, EventMessages messages)
-    : ObjectNotification<AutomationRun>(target, messages);
+    : ObjectNotification<AutomationRun>(target, messages)
+{
+    /// <summary>
+    /// Gets the completed automation run.
+    /// </summary>
+    public AutomationRun Run { get; } = target;
+}
 
 /// <summary>
 /// Notification fired after a step run has completed (any status).

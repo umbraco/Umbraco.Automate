@@ -5,8 +5,7 @@ namespace Umbraco.Automate.Core.Persistence;
 
 /// <summary>
 /// Resolves the database connection string and provider name for Automate packages.
-/// Checks for a dedicated <c>umbracoAutomateDbDSN</c> connection string first,
-/// then falls back to the main Umbraco connection string (<c>umbracoDbDSN</c>).
+/// Requires a dedicated <c>umbracoAutomateDbDSN</c> connection string to be configured.
 /// </summary>
 public static class DatabaseConnectionInfo
 {
@@ -16,15 +15,24 @@ public static class DatabaseConnectionInfo
     public const string ConnectionStringName = "umbracoAutomateDbDSN";
 
     /// <summary>
-    /// Resolves the connection string and provider name from configuration.
+    /// The custom migrations history table name used by Automate's EF Core migrations.
     /// </summary>
-    public static (string? ConnectionString, string? ProviderName) Resolve(IConfiguration config)
+    public const string MigrationsHistoryTable = "__UmbracoAutomate_MigrationsHistory";
+
+    /// <summary>
+    /// Resolves the connection string and provider name from configuration.
+    /// Throws <see cref="InvalidOperationException"/> if not configured.
+    /// </summary>
+    public static (string ConnectionString, string ProviderName) Resolve(IConfiguration config)
     {
         var connectionString = config.GetUmbracoConnectionString(ConnectionStringName, out var providerName);
 
-        if (string.IsNullOrEmpty(connectionString))
+        if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(providerName))
         {
-            connectionString = config.GetUmbracoConnectionString(out providerName);
+            throw new InvalidOperationException(
+                $"Umbraco Automate requires a dedicated connection string. " +
+                $"Please configure '{ConnectionStringName}' and " +
+                $"'{ConnectionStringName}_ProviderName' in your connection strings.");
         }
 
         return (connectionString, providerName);

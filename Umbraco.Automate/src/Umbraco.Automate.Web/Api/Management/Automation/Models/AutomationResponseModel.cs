@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications.Channels;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Models;
 
@@ -37,6 +38,9 @@ public sealed class AutomationResponseModel
     [Required]
     public Guid WorkspaceId { get; set; }
 
+    /// <summary>The group (folder) this automation belongs to, or null.</summary>
+    public Guid? GroupId { get; set; }
+
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; set; }
 
@@ -57,4 +61,7 @@ public sealed class AutomationResponseModel
 
     /// <summary>When the automation was last modified.</summary>
     public DateTime DateModified { get; set; }
+
+    /// <summary>Notification channel settings.</summary>
+    public AutomationNotificationSettings? NotificationSettings { get; set; }
 }

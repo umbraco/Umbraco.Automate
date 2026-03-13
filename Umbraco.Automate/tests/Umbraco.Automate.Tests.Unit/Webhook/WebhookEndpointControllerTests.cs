@@ -26,7 +26,7 @@ public class WebhookEndpointControllerTests
         var modelResolver = new EditableModelResolver(configuration);
         var triggers = new TriggerCollection(() =>
         {
-            var deps = new TriggerInfrastructure(modelResolver);
+            var deps = new TriggerInfrastructure(modelResolver, Options.Create(new DeduplicationOptions()));
             return new ITrigger[] { new WebhookTrigger(deps) };
         });
 

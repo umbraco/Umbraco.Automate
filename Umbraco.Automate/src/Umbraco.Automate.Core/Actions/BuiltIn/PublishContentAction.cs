@@ -9,10 +9,8 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// A built-in action that publishes a content item in Umbraco CMS.
 /// </summary>
 [Action("umbracoAutomate.publishContent", "Publish Content")]
-public sealed class PublishContentAction : ActionBase<PublishContentActionSettings>
+public sealed class PublishContentAction : ActionBase<PublishContentActionSettings>, ICmsAction
 {
-    private static readonly Guid AutomateUserKey = Guid.Parse("00000000-0000-0000-0000-000000000001");
-
     private readonly IContentPublishingService _contentPublishingService;
     private readonly ILogger<PublishContentAction> _logger;
 
@@ -57,7 +55,10 @@ public sealed class PublishContentAction : ActionBase<PublishContentActionSettin
             context.AutomationId, context.RunId, contentKey,
             culturesToPublish.Count == 0 ? "invariant" : string.Join(", ", culturesToPublish.Select(c => c.Culture ?? "*")));
 
-        var result = await _contentPublishingService.PublishAsync(contentKey, culturesToPublish, AutomateUserKey);
+        var userKey = context.ExecutionContext?.ServiceAccountKey
+            ?? Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+        var result = await _contentPublishingService.PublishAsync(contentKey, culturesToPublish, userKey);
 
         if (result.Success)
         {

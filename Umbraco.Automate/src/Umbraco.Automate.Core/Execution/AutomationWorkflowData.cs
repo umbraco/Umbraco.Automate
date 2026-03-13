@@ -17,6 +17,11 @@ public sealed class AutomationWorkflowData
     public Guid AutomationId { get; set; }
 
     /// <summary>
+    /// Gets or sets the automation alias (used for metrics tagging).
+    /// </summary>
+    public string AutomationAlias { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the trigger output data (flattened key-value pairs).
     /// </summary>
     public Dictionary<string, object?> TriggerOutput { get; set; } = [];

@@ -2,9 +2,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Diagnostics;
-using Umbraco.Automate.Core.Persistence;
-using Umbraco.Cms.Core;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Messaging;
 
@@ -16,7 +13,7 @@ internal sealed class OutboxDispatcher : BackgroundService
 {
     private readonly IOutboxStore _store;
     private readonly IEnumerable<IMessageHandler> _handlers;
-    private readonly IRuntimeState _runtimeState;
+    private readonly AutomateReadinessSignal _readinessSignal;
     private readonly IOptions<OutboxOptions> _options;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<OutboxDispatcher> _logger;
@@ -28,17 +25,20 @@ internal sealed class OutboxDispatcher : BackgroundService
     /// </summary>
     private Task? _activeDispatch;
 
+    private DateTime _lastDepthUpdate = DateTime.MinValue;
+    private static readonly TimeSpan DepthUpdateInterval = TimeSpan.FromSeconds(30);
+
     public OutboxDispatcher(
         IOutboxStore store,
         IEnumerable<IMessageHandler> handlers,
-        IRuntimeState runtimeState,
+        AutomateReadinessSignal readinessSignal,
         IOptions<OutboxOptions> options,
         AutomateMetrics metrics,
         ILogger<OutboxDispatcher> logger)
     {
         _store = store;
         _handlers = handlers;
-        _runtimeState = runtimeState;
+        _readinessSignal = readinessSignal;
         _options = options;
         _metrics = metrics;
         _logger = logger;
@@ -46,11 +46,8 @@ internal sealed class OutboxDispatcher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Wait for Umbraco to finish booting (migrations must complete first).
-        while (_runtimeState.Level != RuntimeLevel.Run && !stoppingToken.IsCancellationRequested)
-        {
-            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-        }
+        // Wait for Automate migrations to complete before accessing the database.
+        await _readinessSignal.WaitAsync(stoppingToken);
 
         var handlersByTopic = _handlers.ToDictionary(h => h.Topic, h => h);
         var topics = handlersByTopic.Keys.ToList();
@@ -70,10 +67,18 @@ internal sealed class OutboxDispatcher : BackgroundService
         // stoppingToken stops the polling loop; drainCts cancels after DrainTimeout.
         using var drainCts = new CancellationTokenSource();
 
+        // Suppress execution context flow so that Umbraco's ambient scope (AsyncLocal)
+        // from the hosting thread does not leak into this background loop. Without this,
+        // scopes created by IOutboxStore clash with the ambient scope from the request
+        // pipeline, causing "Scope being disposed is not the Ambient Scope" errors.
+        using var _ = ExecutionContext.SuppressFlow();
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                await UpdateOutboxDepthAsync(stoppingToken);
+
                 var message = await _store.ClaimNextAsync(topics, _instanceId, stoppingToken);
 
                 if (message is null)
@@ -89,20 +94,6 @@ internal sealed class OutboxDispatcher : BackgroundService
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
-            }
-            catch (Exception ex) when (DatabaseExceptions.IsMissingTable(ex))
-            {
-                _logger.LogDebug("Outbox table not yet created, waiting for migrations to complete");
-                _activeDispatch = null;
-
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-                }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                {
-                    break;
-                }
             }
             catch (Exception ex)
             {
@@ -176,6 +167,26 @@ internal sealed class OutboxDispatcher : BackgroundService
                 var nextRetry = DateTime.UtcNow.Add(delay);
                 await _store.MarkFailedAsync(message.Id, ex.Message, nextRetry, cancellationToken);
             }
+        }
+    }
+
+    private async Task UpdateOutboxDepthAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastDepthUpdate < DepthUpdateInterval)
+        {
+            return;
+        }
+
+        try
+        {
+            var stats = await _store.GetStatsAsync(cancellationToken);
+            _metrics.UpdateOutboxDepth(stats.Pending, stats.Processing);
+            _lastDepthUpdate = now;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to update outbox depth metrics");
         }
     }
 }

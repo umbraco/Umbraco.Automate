@@ -35,6 +35,7 @@ public sealed class ContentPublishedTrigger
             {
                 TriggerAlias = Alias,
                 InitiatorType = "system",
+                IdempotencyKey = GenerateIdempotencyKey(content.Key),
                 Output = new ContentPublishedTriggerOutput
                 {
                     ContentKey = content.Key,

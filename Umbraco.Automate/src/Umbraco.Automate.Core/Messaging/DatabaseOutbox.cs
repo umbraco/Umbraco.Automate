@@ -11,15 +11,24 @@ internal sealed class DatabaseOutbox : IOutbox
 {
     private readonly IOutboxStore _store;
     private readonly IOptions<OutboxOptions> _options;
+    private readonly AutomateReadinessSignal _readinessSignal;
 
-    public DatabaseOutbox(IOutboxStore store, IOptions<OutboxOptions> options)
+    public DatabaseOutbox(IOutboxStore store, IOptions<OutboxOptions> options, AutomateReadinessSignal readinessSignal)
     {
         _store = store;
         _options = options;
+        _readinessSignal = readinessSignal;
     }
 
     public async Task PublishAsync(string topic, object message, CancellationToken cancellationToken, string? idempotencyKey = null)
     {
+        // Silently drop messages published before the database is ready (e.g. content
+        // published during Umbraco's own migration seeding, before Automate tables exist).
+        if (!_readinessSignal.IsReady)
+        {
+            return;
+        }
+
         var maxPending = _options.Value.MaxPendingMessages;
         if (maxPending > 0)
         {

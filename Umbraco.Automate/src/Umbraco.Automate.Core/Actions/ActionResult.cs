@@ -5,13 +5,22 @@ namespace Umbraco.Automate.Core.Actions;
 /// </summary>
 public sealed class ActionResult
 {
-    private ActionResult(ActionResultStatus status, object? outputData, Exception? exception, StepRunErrorCategory? errorCategory, string? reason)
+    private ActionResult(
+        ActionResultStatus status,
+        object? outputData,
+        Exception? exception,
+        StepRunErrorCategory? errorCategory,
+        string? reason,
+        string? waitEventName = null,
+        string? waitEventKey = null)
     {
         Status = status;
         OutputData = outputData;
         Exception = exception;
         ErrorCategory = errorCategory;
         Reason = reason;
+        WaitEventName = waitEventName;
+        WaitEventKey = waitEventKey;
     }
 
     /// <summary>
@@ -40,6 +49,16 @@ public sealed class ActionResult
     public string? Reason { get; }
 
     /// <summary>
+    /// Gets the event name to wait for (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/>).
+    /// </summary>
+    public string? WaitEventName { get; }
+
+    /// <summary>
+    /// Gets the event key to wait for (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/>).
+    /// </summary>
+    public string? WaitEventKey { get; }
+
+    /// <summary>
     /// Creates a successful result with optional output data.
     /// </summary>
     public static ActionResult Success(object? outputData = null)
@@ -56,6 +75,15 @@ public sealed class ActionResult
     /// </summary>
     public static ActionResult Skipped(string? reason = null)
         => new(ActionResultStatus.Skipped, null, null, null, reason);
+
+    /// <summary>
+    /// Creates a result that suspends the workflow until the specified event is received.
+    /// </summary>
+    /// <param name="eventName">The WorkflowCore event name to wait for.</param>
+    /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
+    /// <param name="outputData">Optional output data to store before waiting.</param>
+    public static ActionResult WaitForInput(string eventName, string eventKey, object? outputData = null)
+        => new(ActionResultStatus.WaitingForInput, outputData, null, null, null, eventName, eventKey);
 }
 
 /// <summary>
@@ -71,6 +99,9 @@ public enum ActionResultStatus
 
     /// <summary>The action was skipped.</summary>
     Skipped = 2,
+
+    /// <summary>The action is waiting for external input (e.g. approval).</summary>
+    WaitingForInput = 3,
 }
 
 /// <summary>

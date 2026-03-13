@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Notifications.Channels;
+
 namespace Umbraco.Automate.Core.Configuration;
 
 /// <summary>
@@ -109,4 +111,26 @@ public sealed class GovernanceOptions
     /// Gets or sets whether sensitive data is masked in run logs.
     /// </summary>
     public bool SensitiveDataMasking { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the default notification policy for new automations.
+    /// </summary>
+    public NotifyOn DefaultNotifyOn { get; set; } = NotifyOn.Failed;
+}
+
+/// <summary>
+/// Configuration options for the scheduled trigger background job.
+/// Bound to <c>Umbraco:Automate:ScheduledTrigger</c> in appsettings.json.
+/// </summary>
+public sealed class ScheduledTriggerOptions
+{
+    /// <summary>
+    /// Gets or sets the poll interval for checking scheduled triggers.
+    /// </summary>
+    public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Gets or sets the startup delay before the first poll.
+    /// </summary>
+    public TimeSpan StartupDelay { get; set; } = TimeSpan.FromMinutes(2);
 }

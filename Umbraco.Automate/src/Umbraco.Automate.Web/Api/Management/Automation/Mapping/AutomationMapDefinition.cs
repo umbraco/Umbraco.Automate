@@ -33,29 +33,32 @@ public class AutomationMapDefinition : IMapDefinition
         };
     }
 
-    // Umbraco.Code.MapAll -Alias -Name -Id -Status -PublishedVersion -GroupId -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
+    // Umbraco.Code.MapAll -Alias -Name -Id -WorkspaceId -Status -PublishedVersion -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
     private static void MapFromCreateRequest(CreateAutomationRequestModel source, Core.Automations.Automation target, MapperContext context)
     {
         target.Description = source.Description;
-        target.WorkspaceId = source.WorkspaceId;
         target.IsEnabled = source.IsEnabled;
+        target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
         target.Connections = source.Connections;
         target.CanvasState = source.CanvasState;
+        target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll -Id -WorkspaceId -Status -PublishedVersion -GroupId -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
+    // Umbraco.Code.MapAll -Id -WorkspaceId -Status -PublishedVersion -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
     private static void MapFromUpdateRequest(UpdateAutomationRequestModel source, Core.Automations.Automation target, MapperContext context)
     {
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
         target.IsEnabled = source.IsEnabled;
+        target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
         target.Connections = source.Connections;
         target.CanvasState = source.CanvasState;
+        target.NotificationSettings = source.NotificationSettings;
     }
 
     // Umbraco.Code.MapAll
@@ -69,6 +72,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Status = source.Status;
         target.PublishedVersion = source.PublishedVersion;
         target.WorkspaceId = source.WorkspaceId;
+        target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
         target.Connections = source.Connections;
@@ -76,17 +80,18 @@ public class AutomationMapDefinition : IMapDefinition
         target.Version = source.Version;
         target.DateCreated = source.DateCreated;
         target.DateModified = source.DateModified;
+        target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll
+    // Umbraco.Code.MapAll -NotificationSettings
     private static void MapToItemResponse(Core.Automations.Automation source, AutomationItemResponseModel target, MapperContext context)
     {
         target.Id = source.Id;
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
-        target.WorkspaceId = source.WorkspaceId;
         target.IsEnabled = source.IsEnabled;
+        target.GroupId = source.GroupId;
         target.Status = source.Status;
         target.Version = source.Version;
         target.DateCreated = source.DateCreated;

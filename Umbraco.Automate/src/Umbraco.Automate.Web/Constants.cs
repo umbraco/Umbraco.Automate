@@ -89,6 +89,51 @@ public class Constants
             }
 
             /// <summary>
+            /// Workspace group feature constants.
+            /// </summary>
+            public static class Group
+            {
+                /// <summary>The route segment, nested under workspaces.</summary>
+                public const string RouteSegment = "workspaces/{id:guid}/groups";
+            }
+
+            /// <summary>
+            /// Approval feature constants.
+            /// </summary>
+            public static class Approval
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "approvals";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Approvals";
+            }
+
+            /// <summary>
+            /// Version history feature constants.
+            /// </summary>
+            public static class Versioning
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "version-history";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Version History";
+            }
+
+            /// <summary>
+            /// Metrics feature constants.
+            /// </summary>
+            public static class Metrics
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "metrics";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Metrics";
+            }
+
+            /// <summary>
             /// Catalogue feature constants (triggers + actions registry).
             /// </summary>
             public static class Catalogue

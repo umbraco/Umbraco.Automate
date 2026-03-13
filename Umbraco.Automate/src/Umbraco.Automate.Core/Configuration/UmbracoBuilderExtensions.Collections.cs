@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
@@ -8,11 +9,14 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Scheduling;
 using Umbraco.Automate.Core.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -43,6 +47,12 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:RunCleanup"));
         builder.Services.Configure<WebhookOptions>(
             builder.Config.GetSection("Umbraco:Automate:Webhook"));
+        builder.Services.Configure<ScheduledTriggerOptions>(
+            builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
+        builder.Services.Configure<RateLimitingOptions>(
+            builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
+        builder.Services.Configure<DeduplicationOptions>(
+            builder.Config.GetSection("Umbraco:Automate:Deduplication"));
 
         // Collection builders — triggers, actions, connections, filters (auto-discovered via TypeLoader)
         builder.AutomateTriggers()
@@ -51,17 +61,24 @@ public static partial class UmbracoBuilderExtensions
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAction, ActionAttribute>(cache: true));
         builder.AutomateConnectionTypes()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IConnectionType, ConnectionTypeAttribute>(cache: true));
+        builder.AutomateNotificationChannels()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<INotificationChannel, NotificationChannelAttribute>(cache: true));
         builder.AutomateExpressionFilters();
         builder.AutomateVersionableEntityAdapters()
-            .Add<AutomationVersionableEntityAdapter>();
+            .Add<AutomationVersionableEntityAdapter>()
+            .Add<WorkspaceVersionableEntityAdapter>();
 
         // Wire notification triggers → TriggerNotificationHandler<T> for each notification type
         builder.RegisterTriggerNotificationHandlers();
 
+        // Wire run-completed notification → notification channel dispatcher
+        builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
+
         // Action middleware — ordered pipeline
         builder.AutomateActionMiddleware()
             .Append<ErrorHandlingMiddleware>()
-            .Append<StepRunLoggingMiddleware>();
+            .Append<StepRunLoggingMiddleware>()
+            .Append<AuditTrailMiddleware>();
 
         // Security
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
@@ -72,11 +89,16 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ActionInfrastructure>();
         builder.Services.AddSingleton<TriggerInfrastructure>();
         builder.Services.AddSingleton<ConnectionTypeInfrastructure>();
+        builder.Services.AddSingleton<NotificationChannelInfrastructure>();
 
         // Versioning
         builder.Services.AddSingleton<IEntityVersionService, EntityVersionService>();
         builder.Services.AddHostedService<VersionCleanupBackgroundJob>();
         builder.Services.AddHostedService<RunCleanupBackgroundJob>();
+        builder.Services.AddHostedService<ScheduledTriggerBackgroundJob>();
+
+        // Readiness signal — set by migration handler, awaited by background services
+        builder.Services.AddSingleton<AutomateReadinessSignal>();
 
         // Diagnostics / metrics
         builder.Services.AddSingleton<AutomateMetrics>();
@@ -85,6 +107,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
         builder.Services.AddSingleton<IConnectionService, ConnectionService>();
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
+        builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<ExpressionEvaluator>();
@@ -105,6 +128,9 @@ public static partial class UmbracoBuilderExtensions
         // Trigger dispatch via outbox
         builder.Services.AddSingleton<ITriggerDispatcher, OutboxTriggerDispatcher>();
         builder.Services.AddSingleton<IMessageHandler, TriggerEventHandler>();
+
+        // Rate limiting
+        builder.Services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Automation execution
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
@@ -154,6 +180,12 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static ConnectionTypeCollectionBuilder AutomateConnectionTypes(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<ConnectionTypeCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the notification channel collection builder. Channels are auto-discovered.
+    /// </summary>
+    public static NotificationChannelCollectionBuilder AutomateNotificationChannels(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<NotificationChannelCollectionBuilder>();
 
     /// <summary>
     /// Gets the versionable entity adapter collection builder.

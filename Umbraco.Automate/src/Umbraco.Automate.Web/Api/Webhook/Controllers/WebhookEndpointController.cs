@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -12,7 +11,6 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Cms.Api.Common.Attributes;
-using Umbraco.Cms.Api.Common.Filters;
 
 namespace Umbraco.Automate.Web.Api.Webhook.Controllers;
 
@@ -21,10 +19,8 @@ namespace Umbraco.Automate.Web.Api.Webhook.Controllers;
 /// Authenticated via a per-trigger secret (<c>X-Webhook-Secret</c> header or <c>secret</c> query param).
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
-[Route("/umbraco/automate/api/v{version:apiVersion}/webhook")]
+[Route("automate/webhook")]
 [MapToApi(Constants.WebhookApi.ApiName)]
-[JsonOptionsName(Constants.WebhookApi.ApiName)]
 [ApiExplorerSettings(GroupName = "Webhooks")]
 public sealed class WebhookEndpointController : ControllerBase
 {
@@ -60,7 +56,6 @@ public sealed class WebhookEndpointController : ControllerBase
     [HttpPut("{automationId:guid}")]
     [HttpPatch("{automationId:guid}")]
     [HttpDelete("{automationId:guid}")]
-    [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

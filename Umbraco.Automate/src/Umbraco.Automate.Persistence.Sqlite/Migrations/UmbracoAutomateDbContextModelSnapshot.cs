@@ -298,6 +298,20 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.ToTable("umbracoAutomateStepRun", (string)null);
                 });
 
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Triggers.ScheduledTriggerStateEntity", b =>
+                {
+                    b.Property<Guid>("AutomationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastFiredUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AutomationId");
+
+                    b.ToTable("umbracoAutomateScheduledTriggerState", (string)null);
+                });
+
             modelBuilder.Entity("Umbraco.Automate.Persistence.Versioning.EntityVersionEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -555,6 +569,35 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .IsUnique();
 
                     b.ToTable("umbracoAutomateWorkspace", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceGroupEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("umbracoAutomateWorkspaceGroup", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceUserGroupEntity", b =>
