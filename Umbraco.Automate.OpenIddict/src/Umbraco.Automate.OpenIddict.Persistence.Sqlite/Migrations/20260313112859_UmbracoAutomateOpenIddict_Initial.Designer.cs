@@ -11,7 +11,7 @@ using Umbraco.Automate.OpenIddict.Credentials.Persistence;
 namespace Umbraco.Automate.OpenIddict.Persistence.Sqlite.Migrations
 {
     [DbContext(typeof(OpenIddictDbContext))]
-    [Migration("20260312144006_UmbracoAutomateOpenIddict_Initial")]
+    [Migration("20260313112859_UmbracoAutomateOpenIddict_Initial")]
     partial class UmbracoAutomateOpenIddict_Initial
     {
         /// <inheritdoc />

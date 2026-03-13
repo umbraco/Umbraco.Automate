@@ -68,25 +68,26 @@ public static partial class UmbracoBuilderExtensions
 
     private static void ConfigureDatabaseProvider(
         DbContextOptionsBuilder options,
-        string? connectionString,
-        string? providerName)
+        string connectionString,
+        string providerName)
     {
-        if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(providerName))
-        {
-            return;
-        }
-
         switch (providerName)
         {
             case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
                 options.UseSqlServer(connectionString, x =>
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer"));
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
                 break;
 
             case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
             case "Microsoft.Data.SQLite":
                 options.UseSqlite(connectionString, x =>
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite"));
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
                 break;
 
             default:

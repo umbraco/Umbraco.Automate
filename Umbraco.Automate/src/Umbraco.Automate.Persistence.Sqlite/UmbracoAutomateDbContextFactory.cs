@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Umbraco.Automate.Core.Persistence;
 
 namespace Umbraco.Automate.Persistence.Sqlite;
 
@@ -14,7 +15,11 @@ public class UmbracoAutomateDbContextFactory : IDesignTimeDbContextFactory<Umbra
         var optionsBuilder = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
         optionsBuilder.UseSqlite(
             "Data Source=UmbracoAutomate.db",
-            x => x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite"));
+            x =>
+            {
+                x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
+                x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+            });
         return new UmbracoAutomateDbContext(optionsBuilder.Options);
     }
 }
