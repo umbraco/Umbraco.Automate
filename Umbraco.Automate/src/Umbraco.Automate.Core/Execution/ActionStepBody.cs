@@ -169,6 +169,11 @@ internal sealed class ActionStepBody : StepBodyAsync
                 break;
         }
 
+        if (stepRun.Duration.HasValue)
+        {
+            _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
+        }
+
         await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
         // If the step failed and error behavior is Terminate, throw to abort the workflow.
@@ -224,6 +229,11 @@ internal sealed class ActionStepBody : StepBodyAsync
                 decision.DecisionUtc,
             };
             StoreOutputData(outputData, stepRun, data);
+        }
+
+        if (stepRun.Duration.HasValue)
+        {
+            _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
         }
 
         if (decision?.Outcome == ApprovalOutcome.Approved)

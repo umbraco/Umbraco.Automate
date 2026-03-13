@@ -1,7 +1,9 @@
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
 
@@ -14,9 +16,14 @@ public class RateLimitServiceTests
     private RateLimitService CreateService(RateLimitingOptions? options = null)
     {
         options ??= new RateLimitingOptions();
+        var meterFactory = new Mock<IMeterFactory>();
+        meterFactory.Setup(f => f.Create(It.IsAny<MeterOptions>()))
+            .Returns((MeterOptions opts) => new Meter(opts.Name));
+
         return new RateLimitService(
             Options.Create(options),
-            _runRepository.Object);
+            _runRepository.Object,
+            new AutomateMetrics(meterFactory.Object));
     }
 
     [Fact]

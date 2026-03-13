@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Runs;
 
 namespace Umbraco.Automate.Core.Execution;
@@ -12,13 +13,16 @@ internal sealed class RateLimitService : IRateLimitService
 {
     private readonly IOptions<RateLimitingOptions> _options;
     private readonly IAutomationRunRepository _runRepository;
+    private readonly AutomateMetrics _metrics;
 
     public RateLimitService(
         IOptions<RateLimitingOptions> options,
-        IAutomationRunRepository runRepository)
+        IAutomationRunRepository runRepository,
+        AutomateMetrics metrics)
     {
         _options = options;
         _runRepository = runRepository;
+        _metrics = metrics;
     }
 
     public async Task CheckRateLimitAsync(Guid automationId, CancellationToken cancellationToken = default)
@@ -35,6 +39,7 @@ internal sealed class RateLimitService : IRateLimitService
 
         if (recentCount >= opts.MaxRunsPerAutomationPerMinute)
         {
+            _metrics.RateLimitRejected(automationId.ToString());
             throw new RateLimitExceededException(
                 automationId,
                 $"Automation '{automationId}' exceeded rate limit of {opts.MaxRunsPerAutomationPerMinute} runs per minute ({recentCount} recent runs).");
@@ -45,6 +50,7 @@ internal sealed class RateLimitService : IRateLimitService
 
         if (concurrentCount >= opts.MaxConcurrentRunsPerAutomation)
         {
+            _metrics.RateLimitRejected(automationId.ToString());
             throw new RateLimitExceededException(
                 automationId,
                 $"Automation '{automationId}' exceeded concurrent run limit of {opts.MaxConcurrentRunsPerAutomation} ({concurrentCount} running).");

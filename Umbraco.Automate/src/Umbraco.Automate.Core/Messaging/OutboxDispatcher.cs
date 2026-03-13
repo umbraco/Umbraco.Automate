@@ -27,6 +27,9 @@ internal sealed class OutboxDispatcher : BackgroundService
     /// </summary>
     private Task? _activeDispatch;
 
+    private DateTime _lastDepthUpdate = DateTime.MinValue;
+    private static readonly TimeSpan DepthUpdateInterval = TimeSpan.FromSeconds(30);
+
     public OutboxDispatcher(
         IOutboxStore store,
         IEnumerable<IMessageHandler> handlers,
@@ -79,6 +82,8 @@ internal sealed class OutboxDispatcher : BackgroundService
         {
             try
             {
+                await UpdateOutboxDepthAsync(stoppingToken);
+
                 var message = await _store.ClaimNextAsync(topics, _instanceId, stoppingToken);
 
                 if (message is null)
@@ -167,6 +172,26 @@ internal sealed class OutboxDispatcher : BackgroundService
                 var nextRetry = DateTime.UtcNow.Add(delay);
                 await _store.MarkFailedAsync(message.Id, ex.Message, nextRetry, cancellationToken);
             }
+        }
+    }
+
+    private async Task UpdateOutboxDepthAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastDepthUpdate < DepthUpdateInterval)
+        {
+            return;
+        }
+
+        try
+        {
+            var stats = await _store.GetStatsAsync(cancellationToken);
+            _metrics.UpdateOutboxDepth(stats.Pending, stats.Processing);
+            _lastDepthUpdate = now;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to update outbox depth metrics");
         }
     }
 }

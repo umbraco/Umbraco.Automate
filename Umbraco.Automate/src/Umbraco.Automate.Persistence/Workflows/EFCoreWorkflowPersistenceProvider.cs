@@ -526,6 +526,12 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         {
             _metrics.RunFailed(alias);
         }
+
+        if (workflow.CompleteTime.HasValue)
+        {
+            var durationMs = (workflow.CompleteTime.Value - workflow.CreateTime).TotalMilliseconds;
+            _metrics.RecordRunDuration(durationMs, alias);
+        }
     }
 
     // === Entity mapping ===
