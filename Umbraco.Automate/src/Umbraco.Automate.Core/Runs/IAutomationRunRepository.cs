@@ -47,4 +47,12 @@ internal interface IAutomationRunRepository
     /// </summary>
     /// <returns>The number of runs deleted.</returns>
     Task<int> DeleteExcessRunsAsync(int maxRunsPerAutomation, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets step runs matching the given action alias and status, along with their parent runs.
+    /// </summary>
+    Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByActionAndStatusAsync(
+        string actionAlias,
+        StepRunStatus status,
+        CancellationToken cancellationToken = default);
 }

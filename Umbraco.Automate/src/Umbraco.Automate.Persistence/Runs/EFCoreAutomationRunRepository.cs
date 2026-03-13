@@ -231,4 +231,47 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         scope.Complete();
         return totalDeleted;
     }
+
+    public async Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByActionAndStatusAsync(
+        string actionAlias,
+        StepRunStatus status,
+        CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var result = await scope.ExecuteWithContextAsync(async db =>
+        {
+            var statusInt = (int)status;
+
+            var stepEntities = await db.StepRuns
+                .Where(s => s.ActionAlias == actionAlias && s.Status == statusInt)
+                .ToListAsync(cancellationToken);
+
+            if (stepEntities.Count == 0)
+            {
+                return (IReadOnlyList<(AutomationRun, StepRun)>)[];
+            }
+
+            var runIds = stepEntities.Select(s => s.RunId).Distinct().ToList();
+            var runEntities = await db.AutomationRuns
+                .Where(r => runIds.Contains(r.Id))
+                .ToListAsync(cancellationToken);
+
+            var runLookup = runEntities.ToDictionary(r => r.Id);
+
+            var results = new List<(AutomationRun, StepRun)>();
+            foreach (var stepEntity in stepEntities)
+            {
+                if (runLookup.TryGetValue(stepEntity.RunId, out var runEntity))
+                {
+                    results.Add((AutomationRunFactory.BuildDomain(runEntity), StepRunFactory.BuildDomain(stepEntity)));
+                }
+            }
+
+            return (IReadOnlyList<(AutomationRun, StepRun)>)results;
+        });
+
+        scope.Complete();
+        return result;
+    }
 }

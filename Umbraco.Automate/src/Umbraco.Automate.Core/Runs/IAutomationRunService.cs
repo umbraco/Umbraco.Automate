@@ -18,4 +18,13 @@ public interface IAutomationRunService
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets step runs with a specific action alias and status, along with their parent runs.
+    /// Used to find pending approval steps across all automations.
+    /// </summary>
+    Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByStatusAsync(
+        string actionAlias,
+        StepRunStatus status,
+        CancellationToken cancellationToken = default);
 }
