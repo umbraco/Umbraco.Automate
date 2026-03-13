@@ -38,7 +38,7 @@ public sealed class EmailNotificationChannel : NotificationChannelBase<EmailNoti
 
     /// <inheritdoc />
     protected override async Task NotifyAsync(
-        RunFailureNotification notification,
+        RunNotification notification,
         EmailNotificationChannelSettings settings,
         CancellationToken cancellationToken)
     {
@@ -79,7 +79,7 @@ public sealed class EmailNotificationChannel : NotificationChannelBase<EmailNoti
         await _emailSender.SendAsync(message, EmailType, enableNotification: false, expires: null);
     }
 
-    private static string BuildSubject(string? template, RunFailureNotification notification)
+    private static string BuildSubject(string? template, RunNotification notification)
     {
         var subject = string.IsNullOrWhiteSpace(template) ? DefaultSubjectTemplate : template;
 
@@ -88,7 +88,7 @@ public sealed class EmailNotificationChannel : NotificationChannelBase<EmailNoti
             .Replace("${status}", notification.Status.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildBody(RunFailureNotification notification)
+    private static string BuildBody(RunNotification notification)
     {
         var sb = new StringBuilder();
         sb.Append("<h2>Automation Run ");

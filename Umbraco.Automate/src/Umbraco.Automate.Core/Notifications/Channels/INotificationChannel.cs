@@ -4,7 +4,7 @@ using Umbraco.Cms.Core.Composing;
 namespace Umbraco.Automate.Core.Notifications.Channels;
 
 /// <summary>
-/// Defines a notification channel that can deliver failure alerts when automation runs fail or suspend.
+/// Defines a notification channel that can deliver alerts when automation runs complete.
 /// Channels are discovered at startup via <see cref="NotificationChannelAttribute"/>.
 /// </summary>
 public interface INotificationChannel : IDiscoverable
@@ -47,5 +47,5 @@ public interface INotificationChannel : IDiscoverable
     /// <summary>
     /// Sends a notification through this channel.
     /// </summary>
-    Task NotifyAsync(RunFailureNotification notification, object? settings, CancellationToken cancellationToken);
+    Task NotifyAsync(RunNotification notification, object? settings, CancellationToken cancellationToken);
 }

@@ -232,6 +232,31 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         return totalDeleted;
     }
 
+    public async Task<AutomationRunStatus?> GetPreviousTerminalRunStatusAsync(
+        Guid automationId,
+        Guid currentRunId,
+        CancellationToken cancellationToken = default)
+    {
+        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+
+        var result = await scope.ExecuteWithContextAsync(async db =>
+        {
+            // Get the most recent terminal run before the current one.
+            var status = await db.AutomationRuns
+                .Where(r => r.AutomationId == automationId
+                    && r.Id != currentRunId
+                    && TerminalStatuses.Contains(r.Status))
+                .OrderByDescending(r => r.StartedUtc)
+                .Select(r => (int?)r.Status)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return status.HasValue ? (AutomationRunStatus?)status.Value : null;
+        });
+
+        scope.Complete();
+        return result;
+    }
+
     public async Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByActionAndStatusAsync(
         string actionAlias,
         StepRunStatus status,

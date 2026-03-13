@@ -26,7 +26,7 @@ public class EmailNotificationChannelTests
             Mock.Of<ILogger<EmailNotificationChannel>>());
     }
 
-    private static RunFailureNotification CreateNotification() => new()
+    private static RunNotification CreateNotification() => new()
     {
         AutomationId = Guid.NewGuid(),
         AutomationName = "Deploy to Production",

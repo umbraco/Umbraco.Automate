@@ -49,6 +49,14 @@ internal interface IAutomationRunRepository
     Task<int> DeleteExcessRunsAsync(int maxRunsPerAutomation, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the status of the most recent terminal run before the specified run for the same automation.
+    /// </summary>
+    Task<AutomationRunStatus?> GetPreviousTerminalRunStatusAsync(
+        Guid automationId,
+        Guid currentRunId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets step runs matching the given action alias and status, along with their parent runs.
     /// </summary>
     Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByActionAndStatusAsync(

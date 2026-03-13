@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
@@ -8,33 +9,31 @@ namespace Umbraco.Automate.Core.Notifications.Channels;
 
 /// <summary>
 /// Handles <see cref="AutomationRunCompletedNotification"/> and dispatches to configured
-/// notification channels when runs fail or suspend.
+/// notification channels based on run status and <see cref="NotifyOn"/> settings.
 /// </summary>
 internal sealed class RunCompletedNotificationDispatcher
     : INotificationAsyncHandler<AutomationRunCompletedNotification>
 {
     private readonly NotificationChannelCollection _channels;
     private readonly IAutomationService _automationService;
+    private readonly IAutomationRunService _runService;
     private readonly ILogger<RunCompletedNotificationDispatcher> _logger;
 
     public RunCompletedNotificationDispatcher(
         NotificationChannelCollection channels,
         IAutomationService automationService,
+        IAutomationRunService runService,
         ILogger<RunCompletedNotificationDispatcher> logger)
     {
         _channels = channels;
         _automationService = automationService;
+        _runService = runService;
         _logger = logger;
     }
 
     public async Task HandleAsync(AutomationRunCompletedNotification notification, CancellationToken cancellationToken)
     {
         var run = notification.Run;
-
-        if (!ShouldNotify(run.Status))
-        {
-            return;
-        }
 
         var automation = await _automationService.GetAutomationAsync(run.AutomationId, cancellationToken);
         if (automation is null)
@@ -48,12 +47,12 @@ internal sealed class RunCompletedNotificationDispatcher
             return;
         }
 
-        if (!MatchesNotifyOn(run.Status, settings.NotifyOn))
+        if (!await ShouldNotifyAsync(run, settings.NotifyOn, cancellationToken))
         {
             return;
         }
 
-        var payload = new RunFailureNotification
+        var payload = new RunNotification
         {
             AutomationId = automation.Id,
             AutomationName = automation.Name,
@@ -98,14 +97,44 @@ internal sealed class RunCompletedNotificationDispatcher
         }
     }
 
-    private static bool ShouldNotify(AutomationRunStatus status)
-        => status is AutomationRunStatus.Failed or AutomationRunStatus.Suspended;
+    private async Task<bool> ShouldNotifyAsync(
+        AutomationRun run,
+        NotifyOn notifyOn,
+        CancellationToken cancellationToken)
+    {
+        if (notifyOn == NotifyOn.Never)
+        {
+            return false;
+        }
 
-    private static bool MatchesNotifyOn(AutomationRunStatus status, NotifyOn notifyOn)
-        => status switch
+        return run.Status switch
         {
             AutomationRunStatus.Failed => notifyOn.HasFlag(NotifyOn.Failed),
             AutomationRunStatus.Suspended => notifyOn.HasFlag(NotifyOn.Suspended),
+            AutomationRunStatus.Completed => await ShouldNotifyCompletedAsync(run, notifyOn, cancellationToken),
             _ => false,
         };
+    }
+
+    private async Task<bool> ShouldNotifyCompletedAsync(
+        AutomationRun run,
+        NotifyOn notifyOn,
+        CancellationToken cancellationToken)
+    {
+        if (notifyOn.HasFlag(NotifyOn.Completed))
+        {
+            return true;
+        }
+
+        if (!notifyOn.HasFlag(NotifyOn.Recovered))
+        {
+            return false;
+        }
+
+        // Check if the previous terminal run was a failure or suspension.
+        var previousStatus = await _runService.GetPreviousTerminalRunStatusAsync(
+            run.AutomationId, run.Id, cancellationToken);
+
+        return previousStatus is AutomationRunStatus.Failed or AutomationRunStatus.Suspended;
+    }
 }

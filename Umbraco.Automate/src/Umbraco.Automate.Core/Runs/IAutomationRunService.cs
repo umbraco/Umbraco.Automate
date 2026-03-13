@@ -20,6 +20,16 @@ public interface IAutomationRunService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the status of the most recent terminal run before the specified run for the same automation.
+    /// Used to determine recovery notifications.
+    /// </summary>
+    /// <returns>The previous run status, or null if no prior terminal run exists.</returns>
+    Task<AutomationRunStatus?> GetPreviousTerminalRunStatusAsync(
+        Guid automationId,
+        Guid currentRunId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets step runs with a specific action alias and status, along with their parent runs.
     /// Used to find pending approval steps across all automations.
     /// </summary>

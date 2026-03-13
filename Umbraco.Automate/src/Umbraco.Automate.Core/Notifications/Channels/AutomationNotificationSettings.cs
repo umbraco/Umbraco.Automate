@@ -52,6 +52,12 @@ public enum NotifyOn
     /// <summary>Notify on suspension (waiting for input).</summary>
     Suspended = 2,
 
+    /// <summary>Notify on successful completion.</summary>
+    Completed = 4,
+
+    /// <summary>Notify when a run succeeds after the previous run failed or was suspended.</summary>
+    Recovered = 8,
+
     /// <summary>Notify on both failure and suspension.</summary>
     FailedOrSuspended = Failed | Suspended,
 }

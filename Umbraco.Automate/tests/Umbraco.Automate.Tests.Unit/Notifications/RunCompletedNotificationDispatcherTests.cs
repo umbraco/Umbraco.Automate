@@ -13,6 +13,7 @@ public class RunCompletedNotificationDispatcherTests
 {
     private readonly Mock<INotificationChannel> _channel = new();
     private readonly Mock<IAutomationService> _automationService = new();
+    private readonly Mock<IAutomationRunService> _runService = new();
     private readonly RunCompletedNotificationDispatcher _dispatcher;
 
     public RunCompletedNotificationDispatcherTests()
@@ -24,6 +25,7 @@ public class RunCompletedNotificationDispatcherTests
         _dispatcher = new RunCompletedNotificationDispatcher(
             channelCollection,
             _automationService.Object,
+            _runService.Object,
             Mock.Of<ILogger<RunCompletedNotificationDispatcher>>());
     }
 
@@ -41,25 +43,8 @@ public class RunCompletedNotificationDispatcherTests
         CompletedUtc = DateTime.UtcNow,
     };
 
-    [Fact]
-    public async Task HandleAsync_SuccessfulRun_DoesNotNotify()
+    private Automation SetupAutomation(Guid automationId, NotifyOn notifyOn, bool channelEnabled = true)
     {
-        var run = CreateRun(AutomationRunStatus.Completed);
-        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
-
-        await _dispatcher.HandleAsync(notification, CancellationToken.None);
-
-        _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunFailureNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task HandleAsync_FailedRun_WithChannelConfigured_Notifies()
-    {
-        var automationId = Guid.NewGuid();
-        var run = CreateRun(AutomationRunStatus.Failed, automationId);
-
         var automation = new Automation
         {
             Id = automationId,
@@ -67,13 +52,13 @@ public class RunCompletedNotificationDispatcherTests
             Name = "Test Automation",
             NotificationSettings = new AutomationNotificationSettings
             {
-                NotifyOn = NotifyOn.Failed,
+                NotifyOn = notifyOn,
                 Channels =
                 [
                     new ChannelConfiguration
                     {
                         ChannelAlias = "umbracoAutomate.webhook",
-                        IsEnabled = true,
+                        IsEnabled = channelEnabled,
                         Settings = new Dictionary<string, object?> { ["Url"] = "https://example.com/hook" },
                     }
                 ],
@@ -86,19 +71,128 @@ public class RunCompletedNotificationDispatcherTests
         _channel.Setup(c => c.ResolveSettings(It.IsAny<Dictionary<string, object?>>()))
             .Returns(new object());
 
+        return automation;
+    }
+
+    [Fact]
+    public async Task HandleAsync_FailedRun_NotifyOnFailed_Notifies()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Failed, automationId);
+        SetupAutomation(automationId, NotifyOn.Failed);
+
         var notification = new AutomationRunCompletedNotification(run, new EventMessages());
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
             c => c.NotifyAsync(
-                It.Is<RunFailureNotification>(n => n.RunId == run.Id && n.AutomationName == "Test Automation"),
+                It.Is<RunNotification>(n => n.RunId == run.Id && n.AutomationName == "Test Automation"),
                 It.IsAny<object?>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
-    public async Task HandleAsync_FailedRun_NoNotificationSettings_DoesNotNotify()
+    public async Task HandleAsync_CompletedRun_NotifyOnCompleted_Notifies()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Completed, automationId);
+        SetupAutomation(automationId, NotifyOn.Completed);
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await _dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        _channel.Verify(
+            c => c.NotifyAsync(It.Is<RunNotification>(n => n.RunId == run.Id), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CompletedRun_NotifyOnFailedOnly_DoesNotNotify()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Completed, automationId);
+        SetupAutomation(automationId, NotifyOn.Failed);
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await _dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        _channel.Verify(
+            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CompletedRun_Recovered_PreviousWasFailed_Notifies()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Completed, automationId);
+        SetupAutomation(automationId, NotifyOn.Recovered);
+
+        _runService.Setup(s => s.GetPreviousTerminalRunStatusAsync(automationId, run.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationRunStatus.Failed);
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await _dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        _channel.Verify(
+            c => c.NotifyAsync(It.Is<RunNotification>(n => n.RunId == run.Id), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CompletedRun_Recovered_PreviousWasCompleted_DoesNotNotify()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Completed, automationId);
+        SetupAutomation(automationId, NotifyOn.Recovered);
+
+        _runService.Setup(s => s.GetPreviousTerminalRunStatusAsync(automationId, run.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationRunStatus.Completed);
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await _dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        _channel.Verify(
+            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CompletedRun_Recovered_NoPreviousRun_DoesNotNotify()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Completed, automationId);
+        SetupAutomation(automationId, NotifyOn.Recovered);
+
+        _runService.Setup(s => s.GetPreviousTerminalRunStatusAsync(automationId, run.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AutomationRunStatus?)null);
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await _dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        _channel.Verify(
+            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SuspendedRun_NotifyOnFailed_DoesNotNotify()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Suspended, automationId);
+        SetupAutomation(automationId, NotifyOn.Failed);
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await _dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        _channel.Verify(
+            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoNotificationSettings_DoesNotNotify()
     {
         var automationId = Guid.NewGuid();
         var run = CreateRun(AutomationRunStatus.Failed, automationId);
@@ -118,39 +212,7 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunFailureNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task HandleAsync_SuspendedRun_NotifyOnFailed_DoesNotNotify()
-    {
-        var automationId = Guid.NewGuid();
-        var run = CreateRun(AutomationRunStatus.Suspended, automationId);
-
-        var automation = new Automation
-        {
-            Id = automationId,
-            Alias = "test",
-            Name = "Test",
-            NotificationSettings = new AutomationNotificationSettings
-            {
-                NotifyOn = NotifyOn.Failed,
-                Channels =
-                [
-                    new ChannelConfiguration { ChannelAlias = "umbracoAutomate.webhook", IsEnabled = true }
-                ],
-            },
-        };
-
-        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(automation);
-
-        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
-        await _dispatcher.HandleAsync(notification, CancellationToken.None);
-
-        _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunFailureNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -159,26 +221,9 @@ public class RunCompletedNotificationDispatcherTests
     {
         var automationId = Guid.NewGuid();
         var run = CreateRun(AutomationRunStatus.Failed, automationId);
+        SetupAutomation(automationId, NotifyOn.Failed);
 
-        var automation = new Automation
-        {
-            Id = automationId,
-            Alias = "test",
-            Name = "Test",
-            NotificationSettings = new AutomationNotificationSettings
-            {
-                NotifyOn = NotifyOn.Failed,
-                Channels =
-                [
-                    new ChannelConfiguration { ChannelAlias = "umbracoAutomate.webhook", IsEnabled = true }
-                ],
-            },
-        };
-
-        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(automation);
-
-        _channel.Setup(c => c.NotifyAsync(It.IsAny<RunFailureNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+        _channel.Setup(c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Network error"));
 
         var notification = new AutomationRunCompletedNotification(run, new EventMessages());
@@ -192,30 +237,13 @@ public class RunCompletedNotificationDispatcherTests
     {
         var automationId = Guid.NewGuid();
         var run = CreateRun(AutomationRunStatus.Failed, automationId);
-
-        var automation = new Automation
-        {
-            Id = automationId,
-            Alias = "test",
-            Name = "Test",
-            NotificationSettings = new AutomationNotificationSettings
-            {
-                NotifyOn = NotifyOn.Failed,
-                Channels =
-                [
-                    new ChannelConfiguration { ChannelAlias = "umbracoAutomate.webhook", IsEnabled = false }
-                ],
-            },
-        };
-
-        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(automation);
+        SetupAutomation(automationId, NotifyOn.Failed, channelEnabled: false);
 
         var notification = new AutomationRunCompletedNotification(run, new EventMessages());
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunFailureNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

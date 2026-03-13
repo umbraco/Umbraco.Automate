@@ -3,9 +3,9 @@ using Umbraco.Automate.Core.Runs;
 namespace Umbraco.Automate.Core.Notifications.Channels;
 
 /// <summary>
-/// Payload model sent to notification channels when a run fails or suspends.
+/// Payload model sent to notification channels when an automation run completes.
 /// </summary>
-public sealed class RunFailureNotification
+public sealed class RunNotification
 {
     /// <summary>
     /// Gets the automation ID.

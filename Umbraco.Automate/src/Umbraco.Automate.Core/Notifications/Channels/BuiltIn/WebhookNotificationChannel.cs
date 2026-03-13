@@ -37,7 +37,7 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
 
     /// <inheritdoc />
     protected override async Task NotifyAsync(
-        RunFailureNotification notification,
+        RunNotification notification,
         WebhookNotificationChannelSettings settings,
         CancellationToken cancellationToken)
     {
