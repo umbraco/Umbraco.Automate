@@ -1,11 +1,11 @@
 using System.Globalization;
 
-namespace Umbraco.Automate.Core.Expressions.Filters;
+namespace Umbraco.Automate.Core.Bindings.Filters;
 
 /// <summary>
 /// Formats a DateTime value. Usage: <c>| formatDate:yyyy-MM-dd</c>.
 /// </summary>
-internal sealed class FormatDateFilter : IExpressionFilter
+internal sealed class FormatDateFilter : IBindingFilter
 {
     public string Alias => "formatDate";
 

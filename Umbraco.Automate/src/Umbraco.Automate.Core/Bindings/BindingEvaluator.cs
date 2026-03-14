@@ -1,27 +1,27 @@
-namespace Umbraco.Automate.Core.Expressions;
+namespace Umbraco.Automate.Core.Bindings;
 
 /// <summary>
-/// Resolves <c>${ }</c> expressions against automation run data and applies filters.
+/// Resolves <c>${ }</c> bindings against automation run data and applies filters.
 /// </summary>
-public sealed class ExpressionEvaluator
+public sealed class BindingEvaluator
 {
-    private readonly IReadOnlyDictionary<string, IExpressionFilter> _filters;
+    private readonly IReadOnlyDictionary<string, IBindingFilter> _filters;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ExpressionEvaluator"/> class.
+    /// Initializes a new instance of the <see cref="BindingEvaluator"/> class.
     /// </summary>
-    /// <param name="filters">The available expression filters.</param>
-    public ExpressionEvaluator(IEnumerable<IExpressionFilter> filters)
+    /// <param name="filters">The available binding filters.</param>
+    public BindingEvaluator(IEnumerable<IBindingFilter> filters)
     {
         _filters = filters.ToDictionary(f => f.Alias, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// Evaluates a template string, replacing all <c>${ ... }</c> expressions with resolved values.
+    /// Evaluates a template string, replacing all <c>${ ... }</c> bindings with resolved values.
     /// </summary>
-    /// <param name="template">The template string containing expressions.</param>
+    /// <param name="template">The template string containing bindings.</param>
     /// <param name="data">The run data to resolve paths against.</param>
-    /// <returns>The evaluated string with all expressions resolved.</returns>
+    /// <returns>The evaluated string with all bindings resolved.</returns>
     public string Evaluate(string template, IReadOnlyDictionary<string, object?> data)
     {
         if (string.IsNullOrEmpty(template))
@@ -29,18 +29,18 @@ public sealed class ExpressionEvaluator
             return template;
         }
 
-        var expressions = ExpressionTokenizer.FindExpressions(template).ToList();
-        if (expressions.Count == 0)
+        var bindings = BindingTokenizer.FindBindings(template).ToList();
+        if (bindings.Count == 0)
         {
             return template;
         }
 
         // Process in reverse to preserve indices
         var result = template;
-        for (var i = expressions.Count - 1; i >= 0; i--)
+        for (var i = bindings.Count - 1; i >= 0; i--)
         {
-            var (start, length, content) = expressions[i];
-            var token = ExpressionTokenizer.Tokenize(content);
+            var (start, length, content) = bindings[i];
+            var token = BindingTokenizer.Tokenize(content);
             var value = ResolvePath(token.Path, data);
 
             foreach (var filter in token.Filters)

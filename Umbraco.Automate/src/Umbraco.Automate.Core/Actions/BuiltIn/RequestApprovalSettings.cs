@@ -10,7 +10,7 @@ public sealed class RequestApprovalSettings
     /// <summary>
     /// Gets or sets the approval prompt message shown to approvers.
     /// </summary>
-    [Field(Label = "Prompt", Description = "The message shown to approvers explaining what needs approval.", SupportsExpressions = true)]
+    [Field(Label = "Prompt", Description = "The message shown to approvers explaining what needs approval.", SupportsBindings = true)]
     public string? Prompt { get; set; }
 
     /// <summary>

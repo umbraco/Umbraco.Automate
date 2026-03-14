@@ -1,19 +1,19 @@
-namespace Umbraco.Automate.Core.Expressions;
+namespace Umbraco.Automate.Core.Bindings;
 
 /// <summary>
-/// Parses expression strings like <c>${ trigger.contentName | truncate:100 }</c>
-/// into structured <see cref="ExpressionToken"/> instances.
+/// Parses binding strings like <c>${ trigger.contentName | truncate:100 }</c>
+/// into structured <see cref="BindingToken"/> instances.
 /// </summary>
-internal static class ExpressionTokenizer
+internal static class BindingTokenizer
 {
     /// <summary>
-    /// Tokenizes a single expression (the content between <c>${</c> and <c>}</c>).
+    /// Tokenizes a single binding (the content between <c>${</c> and <c>}</c>).
     /// </summary>
-    /// <param name="expression">The expression content without the ${ } delimiters.</param>
+    /// <param name="binding">The binding content without the ${ } delimiters.</param>
     /// <returns>The parsed token.</returns>
-    public static ExpressionToken Tokenize(string expression)
+    public static BindingToken Tokenize(string binding)
     {
-        var parts = expression.Split('|');
+        var parts = binding.Split('|');
         var path = parts[0].Trim();
 
         var filters = new List<FilterToken>();
@@ -35,7 +35,7 @@ internal static class ExpressionTokenizer
             });
         }
 
-        return new ExpressionToken
+        return new BindingToken
         {
             Path = path,
             Filters = filters,
@@ -43,12 +43,12 @@ internal static class ExpressionTokenizer
     }
 
     /// <summary>
-    /// Finds all <c>${ ... }</c> expressions in a template string and returns
-    /// the raw expression content and its position.
+    /// Finds all <c>${ ... }</c> bindings in a template string and returns
+    /// the raw binding content and its position.
     /// </summary>
     /// <param name="template">The template string.</param>
-    /// <returns>Enumerable of (startIndex, length, expressionContent) tuples.</returns>
-    public static IEnumerable<(int Start, int Length, string Content)> FindExpressions(string template)
+    /// <returns>Enumerable of (startIndex, length, bindingContent) tuples.</returns>
+    public static IEnumerable<(int Start, int Length, string Content)> FindBindings(string template)
     {
         var i = 0;
         while (i < template.Length - 2)

@@ -1,9 +1,9 @@
-namespace Umbraco.Automate.Core.Expressions;
+namespace Umbraco.Automate.Core.Bindings;
 
 /// <summary>
-/// A parsed expression consisting of a data path and optional filter chain.
+/// A parsed binding consisting of a data path and optional filter chain.
 /// </summary>
-internal sealed class ExpressionToken
+internal sealed class BindingToken
 {
     /// <summary>
     /// Gets the dot-separated data path (e.g. "trigger.contentName", "steps.sendEmail.messageId").

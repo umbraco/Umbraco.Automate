@@ -1,11 +1,11 @@
 using System.Text.Json;
 
-namespace Umbraco.Automate.Core.Expressions.Filters;
+namespace Umbraco.Automate.Core.Bindings.Filters;
 
 /// <summary>
 /// Serializes the value to JSON. Usage: <c>| json</c>.
 /// </summary>
-internal sealed class JsonFilter : IExpressionFilter
+internal sealed class JsonFilter : IBindingFilter
 {
     public string Alias => "json";
 

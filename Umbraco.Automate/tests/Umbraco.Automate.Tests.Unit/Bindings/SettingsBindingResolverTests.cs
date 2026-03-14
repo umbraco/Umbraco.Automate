@@ -1,14 +1,14 @@
 using Shouldly;
-using Umbraco.Automate.Core.Expressions;
-using Umbraco.Automate.Core.Expressions.Filters;
+using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Bindings.Filters;
 using Umbraco.Automate.Core.Settings;
 
-namespace Umbraco.Automate.Tests.Unit.Expressions;
+namespace Umbraco.Automate.Tests.Unit.Bindings;
 
-public class SettingsExpressionResolverTests
+public class SettingsBindingResolverTests
 {
-    private readonly SettingsExpressionResolver _resolver = new(
-        new ExpressionEvaluator([new UppercaseFilter()]));
+    private readonly SettingsBindingResolver _resolver = new(
+        new BindingEvaluator([new UppercaseFilter()]));
 
     private readonly Dictionary<string, object?> _data = new()
     {
@@ -20,17 +20,17 @@ public class SettingsExpressionResolverTests
     };
 
     [Fact]
-    public void ResolveExpressions_ResolvesMarkedProperty()
+    public void ResolveBindings_ResolvesMarkedProperty()
     {
         var settings = new MarkedSettings { Message = "Published: ${ trigger.name }" };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Message.ShouldBe("Published: Hello World");
     }
 
     [Fact]
-    public void ResolveExpressions_SkipsUnmarkedProperty()
+    public void ResolveBindings_SkipsUnmarkedProperty()
     {
         var settings = new MixedSettings
         {
@@ -38,68 +38,68 @@ public class SettingsExpressionResolverTests
             Unmarked = "${ trigger.name }",
         };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Marked.ShouldBe("Hello World");
         settings.Unmarked.ShouldBe("${ trigger.name }");
     }
 
     [Fact]
-    public void ResolveExpressions_SkipsNullValues()
+    public void ResolveBindings_SkipsNullValues()
     {
         var settings = new MarkedSettings { Message = null! };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Message.ShouldBeNull();
     }
 
     [Fact]
-    public void ResolveExpressions_SkipsEmptyValues()
+    public void ResolveBindings_SkipsEmptyValues()
     {
         var settings = new MarkedSettings { Message = string.Empty };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Message.ShouldBe(string.Empty);
     }
 
     [Fact]
-    public void ResolveExpressions_SkipsNonStringProperties()
+    public void ResolveBindings_SkipsNonStringProperties()
     {
         var settings = new NonStringSettings { Count = 42 };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Count.ShouldBe(42);
     }
 
     [Fact]
-    public void ResolveExpressions_HandlesMultipleExpressionsInOneField()
+    public void ResolveBindings_HandlesMultipleBindingsInOneField()
     {
         var settings = new MarkedSettings { Message = "${ trigger.name } - ${ trigger.key }" };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Message.ShouldBe("Hello World - abc-123");
     }
 
     [Fact]
-    public void ResolveExpressions_SkipsPropertiesWithoutFieldAttribute()
+    public void ResolveBindings_SkipsPropertiesWithoutFieldAttribute()
     {
         var settings = new NoAttributeSettings { Value = "${ trigger.name }" };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Value.ShouldBe("${ trigger.name }");
     }
 
     [Fact]
-    public void ResolveExpressions_WorksWithFilters()
+    public void ResolveBindings_WorksWithFilters()
     {
         var settings = new MarkedSettings { Message = "${ trigger.name | uppercase }" };
 
-        _resolver.ResolveExpressions(settings, _data);
+        _resolver.ResolveBindings(settings, _data);
 
         settings.Message.ShouldBe("HELLO WORLD");
     }
@@ -108,13 +108,13 @@ public class SettingsExpressionResolverTests
 
     private sealed class MarkedSettings
     {
-        [Field(SupportsExpressions = true)]
+        [Field(SupportsBindings = true)]
         public string Message { get; set; } = string.Empty;
     }
 
     private sealed class MixedSettings
     {
-        [Field(SupportsExpressions = true)]
+        [Field(SupportsBindings = true)]
         public string Marked { get; set; } = string.Empty;
 
         [Field]
@@ -123,7 +123,7 @@ public class SettingsExpressionResolverTests
 
     private sealed class NonStringSettings
     {
-        [Field(SupportsExpressions = true)]
+        [Field(SupportsBindings = true)]
         public int Count { get; set; }
     }
 

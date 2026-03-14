@@ -1,9 +1,9 @@
-namespace Umbraco.Automate.Core.Expressions.Filters;
+namespace Umbraco.Automate.Core.Bindings.Filters;
 
 /// <summary>
 /// Truncates a string to a maximum length. Usage: <c>| truncate:100</c> or <c>| truncate:100:...</c>.
 /// </summary>
-internal sealed class TruncateFilter : IExpressionFilter
+internal sealed class TruncateFilter : IBindingFilter
 {
     public string Alias => "truncate";
 

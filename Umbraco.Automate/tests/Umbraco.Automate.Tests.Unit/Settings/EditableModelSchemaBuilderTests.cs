@@ -54,18 +54,18 @@ public class EditableModelSchemaBuilderTests
     }
 
     [Fact]
-    public void Build_PropagatesSupportsExpressions()
+    public void Build_PropagatesSupportsBindings()
     {
-        var schema = EditableModelSchemaBuilder.Build(typeof(ExpressionSettings))!;
+        var schema = EditableModelSchemaBuilder.Build(typeof(BindingSettings))!;
 
         var markedField = schema.Fields.First(f => f.PropertyName == "Marked");
-        markedField.SupportsExpressions.ShouldBeTrue();
+        markedField.SupportsBindings.ShouldBeTrue();
 
         var unmarkedField = schema.Fields.First(f => f.PropertyName == "Unmarked");
-        unmarkedField.SupportsExpressions.ShouldBeFalse();
+        unmarkedField.SupportsBindings.ShouldBeFalse();
 
         var noAttrField = schema.Fields.First(f => f.PropertyName == "NoAttribute");
-        noAttrField.SupportsExpressions.ShouldBeFalse();
+        noAttrField.SupportsBindings.ShouldBeFalse();
     }
 
     [Fact]
@@ -90,9 +90,9 @@ public class EditableModelSchemaBuilderTests
         public int Timeout { get; set; }
     }
 
-    private class ExpressionSettings
+    private class BindingSettings
     {
-        [Field(SupportsExpressions = true)]
+        [Field(SupportsBindings = true)]
         public string Marked { get; set; } = string.Empty;
 
         [Field]
