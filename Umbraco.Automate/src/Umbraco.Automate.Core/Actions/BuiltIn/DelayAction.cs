@@ -24,28 +24,26 @@ public sealed class DelayAction : ActionBase<DelayActionSettings>
     }
 
     /// <inheritdoc />
-    public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+    public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<DelayActionSettings>();
 
         if (!TimeSpan.TryParse(settings.Duration, out var duration) || duration < TimeSpan.Zero)
         {
-            return ActionResult.Failed(
+            return Task.FromResult(ActionResult.Failed(
                 new ArgumentException($"Invalid delay duration: '{settings.Duration}'. Expected a TimeSpan string (e.g. 00:05:00)."),
-                StepRunErrorCategory.Validation);
+                StepRunErrorCategory.Validation));
         }
 
         if (duration == TimeSpan.Zero)
         {
-            return ActionResult.Success(new { DelayedFor = "00:00:00" });
+            return Task.FromResult(ActionResult.Success(new { DelayedFor = "00:00:00" }));
         }
 
         _logger.LogDebug(
-            "Automation {AutomationId} / Run {RunId}: Delaying for {Duration}",
+            "Automation {AutomationId} / Run {RunId}: Sleeping for {Duration} (durable)",
             context.AutomationId, context.RunId, duration);
 
-        await Task.Delay(duration, cancellationToken);
-
-        return ActionResult.Success(new { DelayedFor = duration.ToString() });
+        return Task.FromResult(ActionResult.Sleep(duration, new { DelayedFor = duration.ToString() }));
     }
 }

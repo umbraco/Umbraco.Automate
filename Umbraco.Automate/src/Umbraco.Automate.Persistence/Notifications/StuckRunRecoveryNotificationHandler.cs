@@ -53,8 +53,22 @@ internal sealed class StuckRunRecoveryNotificationHandler
 
         var now = DateTime.UtcNow;
 
+        // Exclude runs that have steps in a durable status (Sleeping, WaitingForInput) —
+        // WorkflowCore will resume these naturally via its persistence mechanism.
+        var durableStepStatuses = new[]
+        {
+            (int)StepRunStatus.Sleeping,
+            (int)StepRunStatus.WaitingForInput,
+        };
+
+        var durableRunIds = await db.StepRuns
+            .Where(sr => durableStepStatuses.Contains(sr.Status))
+            .Select(sr => sr.RunId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
         var recovered = await db.AutomationRuns
-            .Where(r => NonTerminalStatuses.Contains(r.Status))
+            .Where(r => NonTerminalStatuses.Contains(r.Status) && !durableRunIds.Contains(r.Id))
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(r => r.Status, (int)AutomationRunStatus.Failed)
