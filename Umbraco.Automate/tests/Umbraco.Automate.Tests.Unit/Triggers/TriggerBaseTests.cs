@@ -51,10 +51,10 @@ public class TriggerBaseTests
     }
 
     [Fact]
-    public void GetOutputProperties_ReturnsCamelCasedNames()
+    public void GetOutputSchema_ReturnsCamelCasedNames()
     {
         var trigger = new TestTrigger(Dependencies);
-        var props = trigger.GetOutputProperties();
+        var props = trigger.GetOutputSchema();
 
         props.Count.ShouldBe(2);
         props[0].Name.ShouldBe("contentName");

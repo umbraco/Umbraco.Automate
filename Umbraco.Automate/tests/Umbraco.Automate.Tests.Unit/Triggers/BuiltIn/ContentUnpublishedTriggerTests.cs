@@ -45,7 +45,7 @@ public class ContentUnpublishedTriggerTests
     [Fact]
     public void HasOutputProperties()
     {
-        var props = _trigger.GetOutputProperties();
+        var props = _trigger.GetOutputSchema();
         props.Count.ShouldBeGreaterThan(0);
         props.ShouldContain(p => p.Name == "contentKey");
         props.ShouldContain(p => p.Name == "contentName");

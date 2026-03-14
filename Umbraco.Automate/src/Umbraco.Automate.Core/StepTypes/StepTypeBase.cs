@@ -5,13 +5,15 @@ namespace Umbraco.Automate.Core.StepTypes;
 
 /// <summary>
 /// Abstract base class implementing <see cref="IStepType"/>. Reads metadata from a
-/// <see cref="StepTypeAttribute"/> and auto-derives settings schema via <see cref="EditableModelSchemaBuilder"/>.
+/// <see cref="StepTypeAttribute"/>, auto-derives settings schema and output schema via reflection.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
+/// <typeparam name="TOutput">The output POCO type (use <see cref="object"/> if no output).</typeparam>
 /// <typeparam name="TAttribute">The attribute type deriving from <see cref="StepTypeAttribute"/> that provides metadata for this step type.</typeparam>
 /// <typeparam name="TInfrastructure">The infrastructure type providing access to shared services and concerns for this step type.</typeparam>
-public abstract class StepTypeBase<TSettings, TAttribute, TInfrastructure> : IStepType
+public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructure> : IStepType
     where TSettings : class, new()
+    where TOutput : class
     where TAttribute : StepTypeAttribute
     where TInfrastructure : StepTypeInfrastructure
 {
@@ -24,7 +26,7 @@ public abstract class StepTypeBase<TSettings, TAttribute, TInfrastructure> : ISt
     public TInfrastructure Infrastructure => _infrastructure;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="StepTypeBase{TSettings, TAttribute, TInfrastructure}"/> class.
+    /// Initializes a new instance of the <see cref="StepTypeBase{TSettings, TOutput, TAttribute, TInfrastructure}"/> class.
     /// </summary>
     protected StepTypeBase(TInfrastructure infrastructure)
     {
@@ -53,6 +55,9 @@ public abstract class StepTypeBase<TSettings, TAttribute, TInfrastructure> : ISt
     public Type? SettingsType => typeof(TSettings) == typeof(object) ? null : typeof(TSettings);
 
     /// <inheritdoc />
+    public Type? OutputType => typeof(TOutput) == typeof(object) ? null : typeof(TOutput);
+
+    /// <inheritdoc />
     public EditableModelSchema? GetSettingsSchema()
     {
         if (SettingsType is null)
@@ -61,6 +66,24 @@ public abstract class StepTypeBase<TSettings, TAttribute, TInfrastructure> : ISt
         }
 
         return EditableModelSchemaBuilder.Build(SettingsType);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<StepOutputProperty> GetOutputSchema()
+    {
+        if (OutputType is null)
+        {
+            return [];
+        }
+
+        return OutputType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => new StepOutputProperty
+            {
+                Name = char.ToLowerInvariant(p.Name[0]) + p.Name[1..],
+                Type = p.PropertyType,
+                Description = null,
+            })
+            .ToList();
     }
 
     /// <summary>

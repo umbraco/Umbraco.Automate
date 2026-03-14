@@ -1,13 +1,13 @@
-namespace Umbraco.Automate.Core.Triggers;
+namespace Umbraco.Automate.Core.StepTypes;
 
 /// <summary>
-/// Describes a single property in a trigger's output schema.
-/// Used for expression autocompletion and documentation in the canvas editor.
+/// Describes a single property in a step type's output schema.
+/// Used for binding expression autocompletion and documentation in the canvas editor.
 /// </summary>
-public sealed class TriggerOutputProperty
+public sealed class StepOutputProperty
 {
     /// <summary>
-    /// Gets or sets the property name as it appears in expressions (e.g. "contentName").
+    /// Gets or sets the property name as it appears in binding expressions (e.g. "contentName", "statusCode").
     /// </summary>
     public required string Name { get; init; }
 

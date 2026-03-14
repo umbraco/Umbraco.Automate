@@ -1,6 +1,7 @@
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications.Channels;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -31,6 +32,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
+        target.OutputSchema = NullIfEmpty(source.GetOutputSchema());
         target.Type = "action";
     }
 
@@ -43,8 +45,8 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
+        target.OutputSchema = NullIfEmpty(source.GetOutputSchema());
         target.Type = "trigger";
-        target.OutputProperties = source.GetOutputProperties();
     }
 
     // Umbraco.Code.MapAll
@@ -56,6 +58,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
+        target.OutputSchema = NullIfEmpty(source.GetOutputSchema());
         target.Type = "controlFlow";
     }
 
@@ -68,4 +71,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
     }
+
+    private static IReadOnlyList<StepOutputProperty>? NullIfEmpty(IReadOnlyList<StepOutputProperty> properties)
+        => properties.Count > 0 ? properties : null;
 }

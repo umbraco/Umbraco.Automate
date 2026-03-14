@@ -10,7 +10,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     Description = "Sends an HTTP request to an external URL.",
     Group = "Core",
     Icon = "icon-cloud-upload")]
-public sealed class HttpRequestAction : ActionBase<HttpRequestSettings>
+public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequestOutput>
 {
     private readonly IHttpClientFactory _httpClientFactory;
 

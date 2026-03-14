@@ -4,8 +4,8 @@ using Umbraco.Cms.Core.Composing;
 namespace Umbraco.Automate.Core.StepTypes;
 
 /// <summary>
-/// Base interface for all step types in the automation catalogue (actions, control flow, etc.).
-/// Provides shared metadata and settings resolution used for discovery and configuration UI.
+/// Base interface for all step types in the automation catalogue (actions, control flow, triggers).
+/// Provides shared metadata, settings resolution, and output schema used for discovery and configuration UI.
 /// </summary>
 public interface IStepType : IDiscoverable
 {
@@ -51,4 +51,14 @@ public interface IStepType : IDiscoverable
     /// <param name="settings">The raw settings dictionary from the step configuration.</param>
     /// <returns>The resolved settings object, or null if settings are empty or the step type has no settings type.</returns>
     object? ResolveSettings(Dictionary<string, object?> settings);
+
+    /// <summary>
+    /// Gets the output POCO type that describes the data produced by this step type, or null if no output.
+    /// </summary>
+    Type? OutputType { get; }
+
+    /// <summary>
+    /// Gets the output schema describing the properties available for binding expressions.
+    /// </summary>
+    IReadOnlyList<StepOutputProperty> GetOutputSchema();
 }

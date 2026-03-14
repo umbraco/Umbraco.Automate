@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 
@@ -27,6 +28,9 @@ public class StepTypeItemResponseModel
 
     /// <summary>The settings schema, or null if no settings.</summary>
     public EditableModelSchema? SettingsSchema { get; set; }
+
+    /// <summary>The output schema describing properties available for binding expressions, or null if no output.</summary>
+    public IReadOnlyList<StepOutputProperty>? OutputSchema { get; set; }
 
     /// <summary>The step type kind: "action", "controlFlow", or "trigger".</summary>
     [Required]
