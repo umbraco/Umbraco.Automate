@@ -28,7 +28,7 @@ public sealed class AllControlFlowController : CatalogueControllerBase
     /// <summary>
     /// Gets all registered control flow types with their metadata and schemas.
     /// </summary>
-    [HttpGet("control-flow")]
+    [HttpGet("control-flows")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(IEnumerable<ControlFlowItemResponseModel>), StatusCodes.Status200OK)]
     public ActionResult<IEnumerable<ControlFlowItemResponseModel>> GetAllControlFlow()
