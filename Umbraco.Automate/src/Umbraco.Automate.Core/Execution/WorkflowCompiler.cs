@@ -147,9 +147,25 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 return new ControlFlowWorkflowStep(new SwitchStepBody(settings, _conditionEvaluator));
             }
 
-            // ForEach, While, Parallel — container compilation will be added in Phase 6-8.
+            case ForEachControlFlow:
+            {
+                var settings = ResolveSettings<ForEachControlFlowSettings>(stepConfig, controlFlow) ?? new ForEachControlFlowSettings();
+                return new ControlFlowWorkflowStep(new ForEachContainerStepBody(settings, _bindingEvaluator));
+            }
+
+            case WhileControlFlow:
+            {
+                var settings = ResolveSettings<WhileControlFlowSettings>(stepConfig, controlFlow) ?? new WhileControlFlowSettings();
+                return new ControlFlowWorkflowStep(new WhileContainerStepBody(settings, _conditionEvaluator));
+            }
+
+            case ParallelControlFlow:
+            {
+                return new ControlFlowWorkflowStep(new ParallelContainerStepBody());
+            }
+
             default:
-                _logger.LogWarning("Control flow type '{Alias}' does not have a compiled step body yet, skipping step {StepId}",
+                _logger.LogWarning("Control flow type '{Alias}' does not have a compiled step body, skipping step {StepId}",
                     controlFlow.Alias, stepConfig.Id);
                 return null;
         }
