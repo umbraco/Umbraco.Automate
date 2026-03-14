@@ -12,7 +12,8 @@ public sealed class ActionResult
         StepRunErrorCategory? errorCategory,
         string? reason,
         string? waitEventName = null,
-        string? waitEventKey = null)
+        string? waitEventKey = null,
+        TimeSpan? sleepDuration = null)
     {
         Status = status;
         OutputData = outputData;
@@ -21,6 +22,7 @@ public sealed class ActionResult
         Reason = reason;
         WaitEventName = waitEventName;
         WaitEventKey = waitEventKey;
+        SleepDuration = sleepDuration;
     }
 
     /// <summary>
@@ -59,6 +61,11 @@ public sealed class ActionResult
     public string? WaitEventKey { get; }
 
     /// <summary>
+    /// Gets the duration to sleep for (only set when <see cref="Status"/> is <see cref="ActionResultStatus.Sleeping"/>).
+    /// </summary>
+    public TimeSpan? SleepDuration { get; }
+
+    /// <summary>
     /// Creates a successful result with optional output data.
     /// </summary>
     public static ActionResult Success(object? outputData = null)
@@ -84,6 +91,15 @@ public sealed class ActionResult
     /// <param name="outputData">Optional output data to store before waiting.</param>
     public static ActionResult WaitForInput(string eventName, string eventKey, object? outputData = null)
         => new(ActionResultStatus.WaitingForInput, outputData, null, null, null, eventName, eventKey);
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration.
+    /// WorkflowCore persists the resume time so the delay survives application restarts.
+    /// </summary>
+    /// <param name="duration">The duration to sleep for.</param>
+    /// <param name="outputData">Optional output data to store before sleeping.</param>
+    public static ActionResult Sleep(TimeSpan duration, object? outputData = null)
+        => new(ActionResultStatus.Sleeping, outputData, null, null, null, sleepDuration: duration);
 }
 
 /// <summary>
@@ -102,6 +118,9 @@ public enum ActionResultStatus
 
     /// <summary>The action is waiting for external input (e.g. approval).</summary>
     WaitingForInput = 3,
+
+    /// <summary>The action is durably sleeping for a configured duration.</summary>
+    Sleeping = 4,
 }
 
 /// <summary>
