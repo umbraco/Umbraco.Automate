@@ -1,3 +1,4 @@
+using Json.Schema;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -51,14 +52,16 @@ public class TriggerBaseTests
     }
 
     [Fact]
-    public void GetOutputSchema_ReturnsCamelCasedNames()
+    public void GetOutputSchema_ReturnsJsonSchemaWithProperties()
     {
         var trigger = new TestTrigger(Dependencies);
-        var props = trigger.GetOutputSchema();
+        var schema = trigger.GetOutputSchema();
 
-        props.Count.ShouldBe(2);
-        props[0].Name.ShouldBe("contentName");
-        props[1].Name.ShouldBe("contentKey");
+        schema.ShouldNotBeNull();
+        var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
+        properties.ShouldNotBeNull();
+        properties.Keys.ShouldContain("ContentName");
+        properties.Keys.ShouldContain("ContentKey");
     }
 
     [Fact]

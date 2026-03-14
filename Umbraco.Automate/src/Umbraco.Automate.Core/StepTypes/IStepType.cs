@@ -1,3 +1,4 @@
+using Json.Schema;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core.Composing;
 
@@ -58,7 +59,8 @@ public interface IStepType : IDiscoverable
     Type? OutputType { get; }
 
     /// <summary>
-    /// Gets the output schema describing the properties available for binding expressions.
+    /// Gets the JSON Schema describing the output data structure for binding expression autocomplete.
+    /// Returns null if the step type produces no output.
     /// </summary>
-    IReadOnlyList<StepOutputProperty> GetOutputSchema();
+    JsonSchema? GetOutputSchema();
 }

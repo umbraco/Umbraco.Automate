@@ -37,5 +37,5 @@ public class ManualTriggerTests
 
     [Fact]
     public void HasNoOutputProperties()
-        => _trigger.GetOutputSchema().ShouldBeEmpty();
+        => _trigger.GetOutputSchema().ShouldBeNull();
 }

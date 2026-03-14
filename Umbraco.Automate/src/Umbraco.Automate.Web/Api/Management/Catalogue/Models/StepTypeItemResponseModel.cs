@@ -1,11 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using Json.Schema;
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 
 /// <summary>
-/// Base response model for all registered step types (actions, control flow, triggers).
+/// Base response model for all registered step types (actions, control flows, triggers).
 /// </summary>
 public class StepTypeItemResponseModel
 {
@@ -29,8 +29,8 @@ public class StepTypeItemResponseModel
     /// <summary>The settings schema, or null if no settings.</summary>
     public EditableModelSchema? SettingsSchema { get; set; }
 
-    /// <summary>The output schema describing properties available for binding expressions, or null if no output.</summary>
-    public IReadOnlyList<StepOutputProperty>? OutputSchema { get; set; }
+    /// <summary>The JSON Schema describing output data, or null if no output.</summary>
+    public JsonSchema? OutputSchema { get; set; }
 
     /// <summary>The step type kind: "action", "controlFlow", or "trigger".</summary>
     [Required]

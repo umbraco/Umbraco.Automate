@@ -1,7 +1,6 @@
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications.Channels;
-using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -9,7 +8,7 @@ using Umbraco.Cms.Core.Mapping;
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 
 /// <summary>
-/// Map definitions for Catalogue models (actions, triggers, control flow, notification channels).
+/// Map definitions for Catalogue models (actions, triggers, control flows, notification channels).
 /// </summary>
 public class CatalogueMapDefinition : IMapDefinition
 {
@@ -32,7 +31,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = NullIfEmpty(source.GetOutputSchema());
+        target.OutputSchema = source.GetOutputSchema();
         target.Type = "action";
     }
 
@@ -45,7 +44,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = NullIfEmpty(source.GetOutputSchema());
+        target.OutputSchema = source.GetOutputSchema();
         target.Type = "trigger";
     }
 
@@ -58,7 +57,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = NullIfEmpty(source.GetOutputSchema());
+        target.OutputSchema = source.GetOutputSchema();
         target.Type = "controlFlow";
     }
 
@@ -71,7 +70,4 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
     }
-
-    private static IReadOnlyList<StepOutputProperty>? NullIfEmpty(IReadOnlyList<StepOutputProperty> properties)
-        => properties.Count > 0 ? properties : null;
 }

@@ -1,11 +1,13 @@
 using System.Reflection;
+using Json.Schema;
+using Json.Schema.Generation;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.StepTypes;
 
 /// <summary>
 /// Abstract base class implementing <see cref="IStepType"/>. Reads metadata from a
-/// <see cref="StepTypeAttribute"/>, auto-derives settings schema and output schema via reflection.
+/// <see cref="StepTypeAttribute"/>, auto-derives settings schema and output JSON Schema via reflection.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
 /// <typeparam name="TOutput">The output POCO type (use <see cref="object"/> if no output).</typeparam>
@@ -69,21 +71,14 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<StepOutputProperty> GetOutputSchema()
+    public JsonSchema? GetOutputSchema()
     {
         if (OutputType is null)
         {
-            return [];
+            return null;
         }
 
-        return OutputType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Select(p => new StepOutputProperty
-            {
-                Name = char.ToLowerInvariant(p.Name[0]) + p.Name[1..],
-                Type = p.PropertyType,
-                Description = null,
-            })
-            .ToList();
+        return new JsonSchemaBuilder().FromType(OutputType).Build();
     }
 
     /// <summary>
