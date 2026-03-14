@@ -1,4 +1,4 @@
-namespace Umbraco.Automate.Core.Notifications.Channels;
+namespace Umbraco.Automate.Core.Automations;
 
 /// <summary>
 /// Per-automation notification settings stored as part of the automation definition.

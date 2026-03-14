@@ -1,9 +1,10 @@
-using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Notifications.Channels;
 
-namespace Umbraco.Automate.Core.Notifications.Channels;
+namespace Umbraco.Automate.Core.Runs;
 
 /// <summary>
-/// Payload model sent to notification channels when an automation run completes.
+/// Structured data representing a completed automation run. Used by
+/// <see cref="RunCompletedNotificationDispatcher"/> to populate <see cref="NotificationMessage.Data"/>.
 /// </summary>
 public sealed class RunNotification
 {

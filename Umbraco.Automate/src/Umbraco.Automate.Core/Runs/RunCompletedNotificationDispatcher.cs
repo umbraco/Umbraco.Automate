@@ -1,11 +1,12 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
-using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
 
-namespace Umbraco.Automate.Core.Notifications.Channels;
+namespace Umbraco.Automate.Core.Runs;
 
 /// <summary>
 /// Handles <see cref="AutomationRunCompletedNotification"/> and dispatches to configured
@@ -52,7 +53,7 @@ internal sealed class RunCompletedNotificationDispatcher
             return;
         }
 
-        var payload = new RunNotification
+        var runData = new RunNotification
         {
             AutomationId = automation.Id,
             AutomationName = automation.Name,
@@ -61,6 +62,13 @@ internal sealed class RunCompletedNotificationDispatcher
             Error = run.Error,
             WorkspaceId = run.WorkspaceId,
             CompletedUtc = run.CompletedUtc,
+        };
+
+        var message = new NotificationMessage
+        {
+            Subject = BuildSubject(automation.Name, run.Status),
+            HtmlBody = BuildHtmlBody(runData),
+            Data = runData,
         };
 
         foreach (var channelConfig in settings.Channels)
@@ -85,7 +93,7 @@ internal sealed class RunCompletedNotificationDispatcher
                     ? channel.ResolveSettings(channelConfig.Settings)
                     : null;
 
-                await channel.NotifyAsync(payload, resolvedSettings, cancellationToken);
+                await channel.NotifyAsync(message, resolvedSettings, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -136,5 +144,42 @@ internal sealed class RunCompletedNotificationDispatcher
             run.AutomationId, run.Id, cancellationToken);
 
         return previousStatus is AutomationRunStatus.Failed or AutomationRunStatus.Suspended;
+    }
+
+    private static string BuildSubject(string automationName, AutomationRunStatus status)
+        => $"[Umbraco Automate] {automationName} \u2014 {status}";
+
+    private static string BuildHtmlBody(RunNotification notification)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<h2>Automation Run ");
+        sb.Append(notification.Status);
+        sb.Append("</h2>");
+        sb.Append("<table style=\"border-collapse:collapse;\">");
+        AppendRow(sb, "Automation", notification.AutomationName);
+        AppendRow(sb, "Run ID", notification.RunId.ToString());
+        AppendRow(sb, "Status", notification.Status.ToString());
+
+        if (!string.IsNullOrWhiteSpace(notification.Error))
+        {
+            AppendRow(sb, "Error", notification.Error);
+        }
+
+        if (notification.CompletedUtc.HasValue)
+        {
+            AppendRow(sb, "Completed (UTC)", notification.CompletedUtc.Value.ToString("u"));
+        }
+
+        sb.Append("</table>");
+        return sb.ToString();
+    }
+
+    private static void AppendRow(StringBuilder sb, string label, string value)
+    {
+        sb.Append("<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold;vertical-align:top;\">");
+        sb.Append(System.Net.WebUtility.HtmlEncode(label));
+        sb.Append("</td><td style=\"padding:4px 0;\">");
+        sb.Append(System.Net.WebUtility.HtmlEncode(value));
+        sb.Append("</td></tr>");
     }
 }

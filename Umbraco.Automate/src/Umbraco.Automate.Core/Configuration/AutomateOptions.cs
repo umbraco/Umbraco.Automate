@@ -1,4 +1,4 @@
-using Umbraco.Automate.Core.Notifications.Channels;
+using Umbraco.Automate.Core.Automations;
 
 namespace Umbraco.Automate.Core.Configuration;
 

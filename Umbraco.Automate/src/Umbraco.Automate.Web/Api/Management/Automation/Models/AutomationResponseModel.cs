@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Core.Notifications.Channels;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Models;
 

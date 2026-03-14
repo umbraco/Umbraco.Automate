@@ -14,10 +14,4 @@ public sealed class EmailNotificationChannelSettings
     [Field(Label = "Recipients", Description = "Comma-separated email addresses.")]
     [Required]
     public string? Recipients { get; set; }
-
-    /// <summary>
-    /// Gets or sets an optional subject template. Supports <c>${automationName}</c> and <c>${status}</c> placeholders.
-    /// </summary>
-    [Field(Label = "Subject template", Description = "Optional. Supports ${automationName} and ${status} placeholders.", SortOrder = 1)]
-    public string? SubjectTemplate { get; set; }
 }
