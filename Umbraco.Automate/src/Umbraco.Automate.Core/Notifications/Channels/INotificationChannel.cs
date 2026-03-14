@@ -4,7 +4,7 @@ using Umbraco.Cms.Core.Composing;
 namespace Umbraco.Automate.Core.Notifications.Channels;
 
 /// <summary>
-/// Defines a notification channel that can deliver alerts when automation runs complete.
+/// Defines a notification channel that can deliver messages.
 /// Channels are discovered at startup via <see cref="NotificationChannelAttribute"/>.
 /// </summary>
 public interface INotificationChannel : IDiscoverable
@@ -45,7 +45,7 @@ public interface INotificationChannel : IDiscoverable
     object? ResolveSettings(Dictionary<string, object?> settings);
 
     /// <summary>
-    /// Sends a notification through this channel.
+    /// Sends a notification message through this channel.
     /// </summary>
-    Task NotifyAsync(RunNotification notification, object? settings, CancellationToken cancellationToken);
+    Task NotifyAsync(NotificationMessage message, object? settings, CancellationToken cancellationToken);
 }

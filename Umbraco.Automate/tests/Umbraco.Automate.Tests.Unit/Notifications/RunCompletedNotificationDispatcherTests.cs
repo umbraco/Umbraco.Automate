@@ -84,12 +84,46 @@ public class RunCompletedNotificationDispatcherTests
         var notification = new AutomationRunCompletedNotification(run, new EventMessages());
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
+        NotificationMessage? captured = null;
         _channel.Verify(
             c => c.NotifyAsync(
-                It.Is<RunNotification>(n => n.RunId == run.Id && n.AutomationName == "Test Automation"),
+                It.IsAny<NotificationMessage>(),
                 It.IsAny<object?>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+
+        captured = (NotificationMessage)_channel.Invocations
+            .First(i => i.Method.Name == nameof(INotificationChannel.NotifyAsync))
+            .Arguments[0];
+
+        captured.Subject.ShouldNotBeNull();
+        captured.Subject.ShouldContain("Test Automation");
+        captured.Subject.ShouldContain("Failed");
+        captured.HtmlBody.ShouldNotBeNull();
+        captured.Data.ShouldBeOfType<RunNotification>();
+        ((RunNotification)captured.Data!).RunId.ShouldBe(run.Id);
+    }
+
+    [Fact]
+    public async Task HandleAsync_FailedRun_MessageContainsErrorInHtmlBody()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Failed, automationId);
+        SetupAutomation(automationId, NotifyOn.Failed);
+
+        NotificationMessage? captured = null;
+        _channel
+            .Setup(c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+            .Callback<NotificationMessage, object?, CancellationToken>((m, _, _) => captured = m)
+            .Returns(Task.CompletedTask);
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await _dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        captured.ShouldNotBeNull();
+        captured.HtmlBody.ShouldNotBeNull();
+        captured.HtmlBody.ShouldContain("Something went wrong");
+        captured.HtmlBody.ShouldContain("Test Automation");
     }
 
     [Fact]
@@ -103,7 +137,10 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.Is<RunNotification>(n => n.RunId == run.Id), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(
+                It.IsAny<NotificationMessage>(),
+                It.IsAny<object?>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -118,7 +155,7 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -136,7 +173,10 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.Is<RunNotification>(n => n.RunId == run.Id), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(
+                It.IsAny<NotificationMessage>(),
+                It.IsAny<object?>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -154,7 +194,7 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -172,7 +212,7 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -187,7 +227,7 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -212,7 +252,7 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -223,7 +263,7 @@ public class RunCompletedNotificationDispatcherTests
         var run = CreateRun(AutomationRunStatus.Failed, automationId);
         SetupAutomation(automationId, NotifyOn.Failed);
 
-        _channel.Setup(c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
+        _channel.Setup(c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Network error"));
 
         var notification = new AutomationRunCompletedNotification(run, new EventMessages());
@@ -243,7 +283,7 @@ public class RunCompletedNotificationDispatcherTests
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
 
         _channel.Verify(
-            c => c.NotifyAsync(It.IsAny<RunNotification>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

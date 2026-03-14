@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -33,7 +32,7 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
 
     /// <inheritdoc />
     protected override async Task NotifyAsync(
-        RunNotification notification,
+        NotificationMessage message,
         WebhookNotificationChannelSettings settings,
         CancellationToken cancellationToken)
     {
@@ -44,7 +43,7 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
         }
 
         var client = _httpClientFactory.CreateClient("UmbracoAutomate");
-        var payload = JsonSerializer.Serialize(notification);
+        var payload = JsonSerializer.Serialize(message.Data ?? message);
 
         var request = new HttpRequestMessage(HttpMethod.Post, settings.Url)
         {
@@ -62,8 +61,8 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning(
-                "Webhook notification to {Url} returned {StatusCode} for run {RunId}",
-                settings.Url, response.StatusCode, notification.RunId);
+                "Webhook notification to {Url} returned {StatusCode}",
+                settings.Url, response.StatusCode);
         }
     }
 

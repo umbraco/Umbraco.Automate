@@ -3,7 +3,6 @@ using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Notifications.Channels.BuiltIn;
-using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core.Mail;
 using Umbraco.Cms.Core.Models.Email;
@@ -26,15 +25,10 @@ public class EmailNotificationChannelTests
             Mock.Of<ILogger<EmailNotificationChannel>>());
     }
 
-    private static RunNotification CreateNotification() => new()
+    private static NotificationMessage CreateMessage() => new()
     {
-        AutomationId = Guid.NewGuid(),
-        AutomationName = "Deploy to Production",
-        RunId = Guid.NewGuid(),
-        Status = AutomationRunStatus.Failed,
-        Error = "Connection timed out",
-        WorkspaceId = Guid.NewGuid(),
-        CompletedUtc = DateTime.UtcNow,
+        Subject = "[Umbraco Automate] Deploy to Production \u2014 Failed",
+        HtmlBody = "<h2>Automation Run Failed</h2><table><tr><td>Error</td><td>Connection timed out</td></tr></table>",
     };
 
     [Fact]
@@ -46,7 +40,7 @@ public class EmailNotificationChannelTests
     [Fact]
     public async Task NotifyAsync_SendsEmail_ToRecipients()
     {
-        var notification = CreateNotification();
+        var message = CreateMessage();
         var settings = new EmailNotificationChannelSettings
         {
             Recipients = "admin@example.com, ops@example.com",
@@ -58,7 +52,7 @@ public class EmailNotificationChannelTests
             .Callback<EmailMessage, string, bool, TimeSpan?>((msg, _, _, _) => sentMessage = msg)
             .Returns(Task.CompletedTask);
 
-        await ((INotificationChannel)_channel).NotifyAsync(notification, settings, CancellationToken.None);
+        await ((INotificationChannel)_channel).NotifyAsync(message, settings, CancellationToken.None);
 
         sentMessage.ShouldNotBeNull();
         sentMessage.To.Length.ShouldBe(2);
@@ -70,14 +64,14 @@ public class EmailNotificationChannelTests
     }
 
     [Fact]
-    public async Task NotifyAsync_CustomSubjectTemplate_AppliesPlaceholders()
+    public async Task NotifyAsync_UsesSubjectFromMessage()
     {
-        var notification = CreateNotification();
-        var settings = new EmailNotificationChannelSettings
+        var message = new NotificationMessage
         {
-            Recipients = "admin@example.com",
-            SubjectTemplate = "ALERT: ${automationName} is ${status}",
+            Subject = "Custom subject line",
+            HtmlBody = "<p>Body</p>",
         };
+        var settings = new EmailNotificationChannelSettings { Recipients = "admin@example.com" };
 
         EmailMessage? sentMessage = null;
         _emailSender
@@ -85,19 +79,42 @@ public class EmailNotificationChannelTests
             .Callback<EmailMessage, string, bool, TimeSpan?>((msg, _, _, _) => sentMessage = msg)
             .Returns(Task.CompletedTask);
 
-        await ((INotificationChannel)_channel).NotifyAsync(notification, settings, CancellationToken.None);
+        await ((INotificationChannel)_channel).NotifyAsync(message, settings, CancellationToken.None);
 
         sentMessage.ShouldNotBeNull();
-        sentMessage.Subject.ShouldBe("ALERT: Deploy to Production is Failed");
+        sentMessage.Subject.ShouldBe("Custom subject line");
+    }
+
+    [Fact]
+    public async Task NotifyAsync_FallsBackToTextBody_WhenNoHtmlBody()
+    {
+        var message = new NotificationMessage
+        {
+            Subject = "Subject",
+            TextBody = "Plain text body",
+        };
+        var settings = new EmailNotificationChannelSettings { Recipients = "admin@example.com" };
+
+        EmailMessage? sentMessage = null;
+        _emailSender
+            .Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<TimeSpan?>()))
+            .Callback<EmailMessage, string, bool, TimeSpan?>((msg, _, _, _) => sentMessage = msg)
+            .Returns(Task.CompletedTask);
+
+        await ((INotificationChannel)_channel).NotifyAsync(message, settings, CancellationToken.None);
+
+        sentMessage.ShouldNotBeNull();
+        sentMessage.Body.ShouldBe("Plain text body");
+        sentMessage.IsBodyHtml.ShouldBeFalse();
     }
 
     [Fact]
     public async Task NotifyAsync_NoRecipients_DoesNotSend()
     {
-        var notification = CreateNotification();
+        var message = CreateMessage();
         var settings = new EmailNotificationChannelSettings { Recipients = "" };
 
-        await ((INotificationChannel)_channel).NotifyAsync(notification, settings, CancellationToken.None);
+        await ((INotificationChannel)_channel).NotifyAsync(message, settings, CancellationToken.None);
 
         _emailSender.Verify(
             e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<TimeSpan?>()),
@@ -109,10 +126,10 @@ public class EmailNotificationChannelTests
     {
         _emailSender.Setup(e => e.CanSendRequiredEmail()).Returns(false);
 
-        var notification = CreateNotification();
+        var message = CreateMessage();
         var settings = new EmailNotificationChannelSettings { Recipients = "admin@example.com" };
 
-        await ((INotificationChannel)_channel).NotifyAsync(notification, settings, CancellationToken.None);
+        await ((INotificationChannel)_channel).NotifyAsync(message, settings, CancellationToken.None);
 
         _emailSender.Verify(
             e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<TimeSpan?>()),
@@ -122,7 +139,7 @@ public class EmailNotificationChannelTests
     [Fact]
     public async Task NotifyAsync_BodyContainsErrorDetails()
     {
-        var notification = CreateNotification();
+        var message = CreateMessage();
         var settings = new EmailNotificationChannelSettings { Recipients = "admin@example.com" };
 
         EmailMessage? sentMessage = null;
@@ -131,11 +148,10 @@ public class EmailNotificationChannelTests
             .Callback<EmailMessage, string, bool, TimeSpan?>((msg, _, _, _) => sentMessage = msg)
             .Returns(Task.CompletedTask);
 
-        await ((INotificationChannel)_channel).NotifyAsync(notification, settings, CancellationToken.None);
+        await ((INotificationChannel)_channel).NotifyAsync(message, settings, CancellationToken.None);
 
         sentMessage.ShouldNotBeNull();
         sentMessage.Body.ShouldNotBeNull();
         sentMessage.Body.ShouldContain("Connection timed out");
-        sentMessage.Body.ShouldContain("Deploy to Production");
     }
 }
