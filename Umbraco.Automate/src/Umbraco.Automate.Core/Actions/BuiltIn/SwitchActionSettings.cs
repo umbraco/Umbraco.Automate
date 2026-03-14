@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
@@ -8,19 +9,11 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class SwitchActionSettings
 {
     /// <summary>
-    /// Gets or sets the expression to evaluate and match against cases.
-    /// </summary>
-    [Field(Label = "Expression",
-        Description = "The value to match against cases.",
-        SupportsExpressions = true)]
-    public string Expression { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Gets or sets the comma-separated case values to match against.
+    /// Gets or sets the cases to evaluate. Cases are evaluated in order; the first match wins.
     /// A "default" outcome is used when no case matches.
     /// </summary>
     [Field(Label = "Cases",
-        Description = "Comma-separated case values to match against. A 'default' outcome is used when no case matches.",
-        SortOrder = 1)]
-    public string Cases { get; set; } = string.Empty;
+        Description = "Define named cases with conditions. Cases are evaluated in order; the first match wins. A 'default' outcome is used when no case matches.",
+        EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.SwitchCaseBuilder")]
+    public List<SwitchCase> Cases { get; set; } = [];
 }
