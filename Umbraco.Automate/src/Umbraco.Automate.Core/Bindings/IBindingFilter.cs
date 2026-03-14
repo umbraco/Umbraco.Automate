@@ -1,15 +1,15 @@
 using Umbraco.Cms.Core.Composing;
 
-namespace Umbraco.Automate.Core.Expressions;
+namespace Umbraco.Automate.Core.Bindings;
 
 /// <summary>
-/// A chainable filter that transforms values in expressions.
+/// A chainable filter that transforms values in bindings.
 /// Filters are applied via the pipe syntax: <c>${ path | filterAlias:arg1:arg2 }</c>.
 /// </summary>
-public interface IExpressionFilter : IDiscoverable
+public interface IBindingFilter : IDiscoverable
 {
     /// <summary>
-    /// Gets the alias used in expressions (e.g. "truncate", "lowercase").
+    /// Gets the alias used in bindings (e.g. "truncate", "lowercase").
     /// </summary>
     string Alias { get; }
 

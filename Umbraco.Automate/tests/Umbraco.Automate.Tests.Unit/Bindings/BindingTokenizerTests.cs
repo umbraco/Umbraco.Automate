@@ -1,14 +1,14 @@
 using Shouldly;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 
-namespace Umbraco.Automate.Tests.Unit.Expressions;
+namespace Umbraco.Automate.Tests.Unit.Bindings;
 
-public class ExpressionTokenizerTests
+public class BindingTokenizerTests
 {
     [Fact]
     public void Tokenize_SimplePath()
     {
-        var token = ExpressionTokenizer.Tokenize("trigger.contentName");
+        var token = BindingTokenizer.Tokenize("trigger.contentName");
 
         token.Path.ShouldBe("trigger.contentName");
         token.Filters.ShouldBeEmpty();
@@ -17,7 +17,7 @@ public class ExpressionTokenizerTests
     [Fact]
     public void Tokenize_PathWithFilter()
     {
-        var token = ExpressionTokenizer.Tokenize("trigger.body | truncate:100");
+        var token = BindingTokenizer.Tokenize("trigger.body | truncate:100");
 
         token.Path.ShouldBe("trigger.body");
         token.Filters.Count.ShouldBe(1);
@@ -28,7 +28,7 @@ public class ExpressionTokenizerTests
     [Fact]
     public void Tokenize_ChainedFilters()
     {
-        var token = ExpressionTokenizer.Tokenize("trigger.body | stripHtml | truncate:200:...");
+        var token = BindingTokenizer.Tokenize("trigger.body | stripHtml | truncate:200:...");
 
         token.Path.ShouldBe("trigger.body");
         token.Filters.Count.ShouldBe(2);
@@ -39,29 +39,29 @@ public class ExpressionTokenizerTests
     }
 
     [Fact]
-    public void FindExpressions_FindsMultiple()
+    public void FindBindings_FindsMultiple()
     {
         var template = "Hello ${ trigger.name }, your ID is ${ trigger.id }!";
-        var expressions = ExpressionTokenizer.FindExpressions(template).ToList();
+        var bindings = BindingTokenizer.FindBindings(template).ToList();
 
-        expressions.Count.ShouldBe(2);
-        expressions[0].Content.ShouldBe("trigger.name");
-        expressions[1].Content.ShouldBe("trigger.id");
+        bindings.Count.ShouldBe(2);
+        bindings[0].Content.ShouldBe("trigger.name");
+        bindings[1].Content.ShouldBe("trigger.id");
     }
 
     [Fact]
-    public void FindExpressions_ReturnsEmpty_ForNoExpressions()
+    public void FindBindings_ReturnsEmpty_ForNoBindings()
     {
-        var expressions = ExpressionTokenizer.FindExpressions("plain text").ToList();
+        var bindings = BindingTokenizer.FindBindings("plain text").ToList();
 
-        expressions.ShouldBeEmpty();
+        bindings.ShouldBeEmpty();
     }
 
     [Fact]
-    public void FindExpressions_HandlesUnclosed()
+    public void FindBindings_HandlesUnclosed()
     {
-        var expressions = ExpressionTokenizer.FindExpressions("Hello ${ unclosed").ToList();
+        var bindings = BindingTokenizer.FindBindings("Hello ${ unclosed").ToList();
 
-        expressions.ShouldBeEmpty();
+        bindings.ShouldBeEmpty();
     }
 }

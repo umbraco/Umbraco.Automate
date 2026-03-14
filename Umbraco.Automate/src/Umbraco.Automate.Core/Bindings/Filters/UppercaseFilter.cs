@@ -1,9 +1,9 @@
-namespace Umbraco.Automate.Core.Expressions.Filters;
+namespace Umbraco.Automate.Core.Bindings.Filters;
 
 /// <summary>
 /// Converts a string to uppercase. Usage: <c>| uppercase</c>.
 /// </summary>
-internal sealed class UppercaseFilter : IExpressionFilter
+internal sealed class UppercaseFilter : IBindingFilter
 {
     public string Alias => "uppercase";
 

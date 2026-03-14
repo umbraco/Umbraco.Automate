@@ -50,10 +50,10 @@ public class EditableModelFieldAttribute : Attribute
     public string? Group { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether <c>${ expression }</c> syntax is evaluated
+    /// Gets or sets a value indicating whether <c>${ binding }</c> syntax is evaluated
     /// at runtime against automation run data (trigger output, step outputs).
     /// </summary>
-    public bool SupportsExpressions { get; set; }
+    public bool SupportsBindings { get; set; }
 }
 
 /// <summary>
