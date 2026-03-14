@@ -5,6 +5,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that evaluates conditions and routes to the true or false branch.
 /// </summary>
+[Obsolete("Use IfControlFlow instead. This action will be removed in a future version.")]
 [Action("umbracoAutomate.if", "If",
     Description = "Evaluates conditions and routes to the true or false branch.",
     Group = "Flow Control",

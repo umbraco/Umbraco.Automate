@@ -5,6 +5,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that evaluates cases with conditions and routes to the first matching case branch.
 /// </summary>
+[Obsolete("Use SwitchControlFlow instead. This action will be removed in a future version.")]
 [Action("umbracoAutomate.switch", "Switch",
     Description = "Evaluates cases with conditions and routes to the first matching branch.",
     Group = "Flow Control",
