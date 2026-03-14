@@ -26,11 +26,11 @@ public sealed class SwitchAction : ActionBase<SwitchActionSettings>
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<SwitchActionSettings>();
-        var expressionData = context.ExpressionData ?? new Dictionary<string, object?>();
+        var bindingData = context.BindingData ?? new Dictionary<string, object?>();
 
         foreach (var switchCase in settings.Cases)
         {
-            if (_conditionEvaluator.Evaluate(switchCase.Conditions, expressionData))
+            if (_conditionEvaluator.Evaluate(switchCase.Conditions, bindingData))
             {
                 return Task.FromResult(ActionResult.SuccessWithOutcome(
                     switchCase.Name,

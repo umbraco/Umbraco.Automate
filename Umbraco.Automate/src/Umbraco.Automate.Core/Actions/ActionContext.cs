@@ -69,8 +69,8 @@ public sealed class ActionContext
     public IAction? Action { get; init; }
 
     /// <summary>
-    /// Gets the runtime expression data (trigger output + step outputs) for actions that
-    /// need to evaluate expressions directly (e.g. condition evaluation in the If action).
+    /// Gets the runtime binding data (trigger output + step outputs) for actions that
+    /// need to evaluate bindings directly (e.g. condition evaluation in the If action).
     /// </summary>
-    public IReadOnlyDictionary<string, object?>? ExpressionData { get; init; }
+    public IReadOnlyDictionary<string, object?>? BindingData { get; init; }
 }

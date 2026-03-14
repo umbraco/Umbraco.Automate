@@ -7,7 +7,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Tests.Common.Builders;
@@ -35,7 +35,7 @@ public class AutomationExecutorTests
 
         var actions = CreateActionCollection(action.Object);
         var pipeline = new ActionMiddlewarePipeline(new ActionMiddlewareCollection(Array.Empty<IActionMiddleware>));
-        var evaluator = new ExpressionEvaluator(new ExpressionFilterCollection(Array.Empty<IExpressionFilter>));
+        var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
 
         var services = new ServiceCollection();
         services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
@@ -64,7 +64,7 @@ public class AutomationExecutorTests
             actions,
             pipeline,
             evaluator,
-            new SettingsExpressionResolver(evaluator),
+            new SettingsBindingResolver(evaluator),
             _runRepo.Object,
             Mock.Of<IConnectionService>(),
             _workspaceService.Object,

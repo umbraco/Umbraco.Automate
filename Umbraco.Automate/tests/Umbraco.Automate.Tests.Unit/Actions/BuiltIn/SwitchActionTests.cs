@@ -3,7 +3,7 @@ using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Conditions;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
@@ -14,7 +14,7 @@ public class SwitchActionTests
 
     public SwitchActionTests()
     {
-        var evaluator = new ExpressionEvaluator(new ExpressionFilterCollection(Array.Empty<IExpressionFilter>));
+        var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
         var conditionEvaluator = new ConditionEvaluator(evaluator);
         _action = new SwitchAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
@@ -138,7 +138,7 @@ public class SwitchActionTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithExpressions_ResolvesAgainstData()
+    public async Task ExecuteAsync_WithBindings_ResolvesAgainstData()
     {
         var settings = new SwitchActionSettings
         {
@@ -152,12 +152,12 @@ public class SwitchActionTests
             ],
         };
 
-        var expressionData = new Dictionary<string, object?>
+        var bindingData = new Dictionary<string, object?>
         {
             ["trigger"] = new Dictionary<string, object?> { ["status"] = "published" },
         };
 
-        var context = CreateContext(settings, expressionData);
+        var context = CreateContext(settings, bindingData);
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
 
         result.Outcome.ShouldBe("published");
@@ -190,13 +190,13 @@ public class SwitchActionTests
         ],
     };
 
-    private static ActionContext CreateContext(SwitchActionSettings settings, Dictionary<string, object?>? expressionData = null) => new()
+    private static ActionContext CreateContext(SwitchActionSettings settings, Dictionary<string, object?>? bindingData = null) => new()
     {
         AutomationId = Guid.NewGuid(),
         RunId = Guid.NewGuid(),
         StepId = Guid.NewGuid(),
         ActionAlias = "umbracoAutomate.switch",
         Settings = settings,
-        ExpressionData = expressionData ?? new Dictionary<string, object?>(),
+        BindingData = bindingData ?? new Dictionary<string, object?>(),
     };
 }

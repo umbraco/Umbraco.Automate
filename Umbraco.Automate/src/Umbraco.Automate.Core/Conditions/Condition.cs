@@ -2,7 +2,7 @@ namespace Umbraco.Automate.Core.Conditions;
 
 /// <summary>
 /// A single condition comparing a left operand against a right operand using an operator.
-/// Operands support <c>${ expression }</c> syntax for runtime resolution.
+/// Operands support <c>${ binding }</c> syntax for runtime resolution.
 /// </summary>
 public sealed class Condition
 {

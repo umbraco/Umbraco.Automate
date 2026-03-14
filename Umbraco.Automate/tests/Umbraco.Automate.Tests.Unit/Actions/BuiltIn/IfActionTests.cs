@@ -3,7 +3,7 @@ using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Conditions;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
@@ -14,7 +14,7 @@ public class IfActionTests
 
     public IfActionTests()
     {
-        var evaluator = new ExpressionEvaluator(new ExpressionFilterCollection(Array.Empty<IExpressionFilter>));
+        var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
         var conditionEvaluator = new ConditionEvaluator(evaluator);
         _action = new IfAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
@@ -123,6 +123,6 @@ public class IfActionTests
         StepId = Guid.NewGuid(),
         ActionAlias = "umbracoAutomate.if",
         Settings = settings,
-        ExpressionData = new Dictionary<string, object?>(),
+        BindingData = new Dictionary<string, object?>(),
     };
 }

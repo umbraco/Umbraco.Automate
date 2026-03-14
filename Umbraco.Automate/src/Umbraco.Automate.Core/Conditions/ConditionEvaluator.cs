@@ -1,21 +1,21 @@
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 
 namespace Umbraco.Automate.Core.Conditions;
 
 /// <summary>
-/// Evaluates a <see cref="ConditionSet"/> against runtime expression data.
-/// Uses <see cref="ExpressionEvaluator"/> to resolve operands before comparison.
+/// Evaluates a <see cref="ConditionSet"/> against runtime binding data.
+/// Uses <see cref="BindingEvaluator"/> to resolve operands before comparison.
 /// </summary>
 public sealed class ConditionEvaluator
 {
-    private readonly ExpressionEvaluator _expressionEvaluator;
+    private readonly BindingEvaluator _bindingEvaluator;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ConditionEvaluator"/> class.
     /// </summary>
-    public ConditionEvaluator(ExpressionEvaluator expressionEvaluator)
+    public ConditionEvaluator(BindingEvaluator bindingEvaluator)
     {
-        _expressionEvaluator = expressionEvaluator;
+        _bindingEvaluator = bindingEvaluator;
     }
 
     /// <summary>
@@ -23,9 +23,9 @@ public sealed class ConditionEvaluator
     /// An empty set evaluates to true (vacuously true — no conditions means pass).
     /// </summary>
     /// <param name="conditionSet">The condition set to evaluate.</param>
-    /// <param name="expressionData">The runtime data for resolving <c>${ }</c> expressions in operands.</param>
+    /// <param name="bindingData">The runtime data for resolving <c>${ }</c> bindings in operands.</param>
     /// <returns>True if at least one group passes (all its conditions are true).</returns>
-    public bool Evaluate(ConditionSet conditionSet, IReadOnlyDictionary<string, object?> expressionData)
+    public bool Evaluate(ConditionSet conditionSet, IReadOnlyDictionary<string, object?> bindingData)
     {
         if (conditionSet.Groups.Count == 0)
         {
@@ -35,7 +35,7 @@ public sealed class ConditionEvaluator
         // OR across groups: at least one group must pass.
         foreach (var group in conditionSet.Groups)
         {
-            if (EvaluateGroup(group, expressionData))
+            if (EvaluateGroup(group, bindingData))
             {
                 return true;
             }
@@ -44,7 +44,7 @@ public sealed class ConditionEvaluator
         return false;
     }
 
-    private bool EvaluateGroup(ConditionGroup group, IReadOnlyDictionary<string, object?> expressionData)
+    private bool EvaluateGroup(ConditionGroup group, IReadOnlyDictionary<string, object?> bindingData)
     {
         if (group.Conditions.Count == 0)
         {
@@ -54,8 +54,8 @@ public sealed class ConditionEvaluator
         // AND within group: all conditions must pass.
         foreach (var condition in group.Conditions)
         {
-            var left = _expressionEvaluator.Evaluate(condition.LeftOperand, expressionData);
-            var right = _expressionEvaluator.Evaluate(condition.RightOperand, expressionData);
+            var left = _bindingEvaluator.Evaluate(condition.LeftOperand, bindingData);
+            var right = _bindingEvaluator.Evaluate(condition.RightOperand, bindingData);
 
             if (!EvaluateCondition(left, condition.Operator, right))
             {

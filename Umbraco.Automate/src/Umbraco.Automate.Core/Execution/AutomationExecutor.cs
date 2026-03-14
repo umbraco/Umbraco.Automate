@@ -7,7 +7,7 @@ using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
 using WorkflowCore.Interface;
@@ -25,8 +25,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IWorkflowRegistry _workflowRegistry;
     private readonly ActionCollection _actions;
     private readonly ActionMiddlewarePipeline _pipeline;
-    private readonly ExpressionEvaluator _expressionEvaluator;
-    private readonly SettingsExpressionResolver _settingsExpressionResolver;
+    private readonly BindingEvaluator _bindingEvaluator;
+    private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
     private readonly IWorkspaceService _workspaceService;
@@ -40,8 +40,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IWorkflowRegistry workflowRegistry,
         ActionCollection actions,
         ActionMiddlewarePipeline pipeline,
-        ExpressionEvaluator expressionEvaluator,
-        SettingsExpressionResolver settingsExpressionResolver,
+        BindingEvaluator bindingEvaluator,
+        SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
         IWorkspaceService workspaceService,
@@ -54,8 +54,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _workflowRegistry = workflowRegistry;
         _actions = actions;
         _pipeline = pipeline;
-        _expressionEvaluator = expressionEvaluator;
-        _settingsExpressionResolver = settingsExpressionResolver;
+        _bindingEvaluator = bindingEvaluator;
+        _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
         _workspaceService = workspaceService;
@@ -171,8 +171,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
                 stepConfig,
                 action,
                 _pipeline,
-                _expressionEvaluator,
-                _settingsExpressionResolver,
+                _bindingEvaluator,
+                _settingsBindingResolver,
                 _runRepository,
                 _connectionService,
                 _metrics,

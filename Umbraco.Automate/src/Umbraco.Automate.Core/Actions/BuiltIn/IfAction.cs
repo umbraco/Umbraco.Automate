@@ -26,9 +26,9 @@ public sealed class IfAction : ActionBase<IfActionSettings>
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<IfActionSettings>();
-        var expressionData = context.ExpressionData ?? new Dictionary<string, object?>();
+        var bindingData = context.BindingData ?? new Dictionary<string, object?>();
 
-        var result = _conditionEvaluator.Evaluate(settings.Conditions, expressionData);
+        var result = _conditionEvaluator.Evaluate(settings.Conditions, bindingData);
         var outcome = result ? "true" : "false";
 
         return Task.FromResult(ActionResult.SuccessWithOutcome(outcome, new { Result = result }));

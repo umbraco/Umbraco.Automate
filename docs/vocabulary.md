@@ -98,7 +98,7 @@ The runtime data produced by a step after execution. Outputs are made available 
 
 ### Filter
 
-Conditional logic that controls whether a step executes or which path an automation takes. Filters evaluate expressions against the current data context.
+Conditional logic that controls whether a step executes or which path an automation takes. Filters evaluate bindings against the current data context.
 
 - **Level:** Instance
 - **WorkflowCore mapping:** `If` / `Branch` / `Decision` control structures

@@ -49,7 +49,7 @@ public static class EditableModelSchemaBuilder
             SortOrder = attr?.SortOrder ?? 0,
             IsSensitive = attr?.IsSensitive ?? false,
             Group = attr?.Group,
-            SupportsExpressions = attr?.SupportsExpressions ?? false,
+            SupportsBindings = attr?.SupportsBindings ?? false,
             ValidationRules = InferValidationAttributes(property),
         };
     }

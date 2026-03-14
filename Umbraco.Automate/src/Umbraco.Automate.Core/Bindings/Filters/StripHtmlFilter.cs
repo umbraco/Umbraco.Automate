@@ -1,11 +1,11 @@
 using System.Text.RegularExpressions;
 
-namespace Umbraco.Automate.Core.Expressions.Filters;
+namespace Umbraco.Automate.Core.Bindings.Filters;
 
 /// <summary>
 /// Removes HTML tags from a string. Usage: <c>| stripHtml</c>.
 /// </summary>
-internal sealed partial class StripHtmlFilter : IExpressionFilter
+internal sealed partial class StripHtmlFilter : IBindingFilter
 {
     public string Alias => "stripHtml";
 

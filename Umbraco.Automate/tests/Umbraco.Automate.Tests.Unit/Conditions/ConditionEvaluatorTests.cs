@@ -1,13 +1,13 @@
 using Shouldly;
 using Umbraco.Automate.Core.Conditions;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 
 namespace Umbraco.Automate.Tests.Unit.Conditions;
 
 public class ConditionEvaluatorTests
 {
     private readonly ConditionEvaluator _evaluator = new(
-        new ExpressionEvaluator(new ExpressionFilterCollection(Array.Empty<IExpressionFilter>)));
+        new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
 
     private static readonly Dictionary<string, object?> EmptyData = new();
 
@@ -261,10 +261,10 @@ public class ConditionEvaluatorTests
 
     #endregion
 
-    #region Expression Resolution
+    #region Binding Resolution
 
     [Fact]
-    public void ExpressionResolution_ResolvesOperands()
+    public void BindingResolution_ResolvesOperands()
     {
         var data = new Dictionary<string, object?>
         {
@@ -276,7 +276,7 @@ public class ConditionEvaluatorTests
     }
 
     [Fact]
-    public void ExpressionResolution_BothOperands()
+    public void BindingResolution_BothOperands()
     {
         var data = new Dictionary<string, object?>
         {

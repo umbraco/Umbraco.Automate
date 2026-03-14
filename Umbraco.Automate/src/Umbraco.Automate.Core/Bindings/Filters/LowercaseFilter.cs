@@ -1,9 +1,9 @@
-namespace Umbraco.Automate.Core.Expressions.Filters;
+namespace Umbraco.Automate.Core.Bindings.Filters;
 
 /// <summary>
 /// Converts a string to lowercase. Usage: <c>| lowercase</c>.
 /// </summary>
-internal sealed class LowercaseFilter : IExpressionFilter
+internal sealed class LowercaseFilter : IBindingFilter
 {
     public string Alias => "lowercase";
 

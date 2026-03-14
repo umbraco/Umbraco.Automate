@@ -6,7 +6,7 @@ using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -22,8 +22,8 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly StepConfiguration _stepConfig;
     private readonly IAction _action;
     private readonly ActionMiddlewarePipeline _pipeline;
-    private readonly ExpressionEvaluator _expressionEvaluator;
-    private readonly SettingsExpressionResolver _settingsExpressionResolver;
+    private readonly BindingEvaluator _bindingEvaluator;
+    private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
     private readonly AutomateMetrics _metrics;
@@ -33,8 +33,8 @@ internal sealed class ActionStepBody : StepBodyAsync
         StepConfiguration stepConfig,
         IAction action,
         ActionMiddlewarePipeline pipeline,
-        ExpressionEvaluator expressionEvaluator,
-        SettingsExpressionResolver settingsExpressionResolver,
+        BindingEvaluator bindingEvaluator,
+        SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
         AutomateMetrics metrics,
@@ -43,8 +43,8 @@ internal sealed class ActionStepBody : StepBodyAsync
         _stepConfig = stepConfig;
         _action = action;
         _pipeline = pipeline;
-        _expressionEvaluator = expressionEvaluator;
-        _settingsExpressionResolver = settingsExpressionResolver;
+        _bindingEvaluator = bindingEvaluator;
+        _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
         _metrics = metrics;
@@ -77,11 +77,11 @@ internal sealed class ActionStepBody : StepBodyAsync
         AutomationWorkflowData data,
         CancellationToken cancellationToken)
     {
-        // Build expression data context: trigger output + all prior step outputs.
-        var expressionData = BuildExpressionData(data);
+        // Build binding data context: trigger output + all prior step outputs.
+        var bindingData = BuildBindingData(data);
 
-        // Resolve input mappings via expressions.
-        var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, expressionData);
+        // Resolve input mappings via bindings.
+        var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
 
         // Resolve settings for the action (deserialize, resolve $config refs, validate).
         object? settings = null;
@@ -90,10 +90,10 @@ internal sealed class ActionStepBody : StepBodyAsync
             settings = _action.ResolveSettings(_stepConfig.Settings);
         }
 
-        // Evaluate ${ } expressions in settings properties marked with SupportsExpressions.
+        // Evaluate ${ } bindings in settings properties marked with SupportsBindings.
         if (settings is not null)
         {
-            _settingsExpressionResolver.ResolveExpressions(settings, expressionData);
+            _settingsBindingResolver.ResolveBindings(settings, bindingData);
         }
 
         // Resolve connection for this step (if configured).
@@ -116,7 +116,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ExecutionContext = data.ExecutionContext,
             Connection = connection,
             Action = _action,
-            ExpressionData = expressionData,
+            BindingData = bindingData,
         };
 
         // Create and persist step run.
@@ -335,9 +335,9 @@ internal sealed class ActionStepBody : StepBodyAsync
         data.StepOutputs[_stepConfig.Id] = outputDict;
     }
 
-    private static Dictionary<string, object?> BuildExpressionData(AutomationWorkflowData data)
+    private static Dictionary<string, object?> BuildBindingData(AutomationWorkflowData data)
     {
-        var expressionData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["trigger"] = data.TriggerOutput,
         };
@@ -345,21 +345,21 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Add step outputs keyed by step ID.
         foreach (var (stepId, outputs) in data.StepOutputs)
         {
-            expressionData[$"steps.{stepId}"] = outputs;
+            bindingData[$"steps.{stepId}"] = outputs;
         }
 
-        return expressionData;
+        return bindingData;
     }
 
     private Dictionary<string, object?> ResolveInputMappings(
         Dictionary<string, string> inputMappings,
-        Dictionary<string, object?> expressionData)
+        Dictionary<string, object?> bindingData)
     {
         var resolved = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (key, expression) in inputMappings)
+        foreach (var (key, binding) in inputMappings)
         {
-            resolved[key] = _expressionEvaluator.Evaluate(expression, expressionData);
+            resolved[key] = _bindingEvaluator.Evaluate(binding, bindingData);
         }
 
         return resolved;

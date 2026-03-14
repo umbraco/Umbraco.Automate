@@ -1,27 +1,27 @@
 using System.Reflection;
 using Umbraco.Automate.Core.Settings;
 
-namespace Umbraco.Automate.Core.Expressions;
+namespace Umbraco.Automate.Core.Bindings;
 
 /// <summary>
-/// Evaluates <c>${ }</c> expressions in settings POCO string properties
-/// that are marked with <c>[Field(SupportsExpressions = true)]</c>.
+/// Evaluates <c>${ }</c> bindings in settings POCO string properties
+/// that are marked with <c>[Field(SupportsBindings = true)]</c>.
 /// </summary>
-internal sealed class SettingsExpressionResolver
+internal sealed class SettingsBindingResolver
 {
-    private readonly ExpressionEvaluator _expressionEvaluator;
+    private readonly BindingEvaluator _bindingEvaluator;
 
-    public SettingsExpressionResolver(ExpressionEvaluator expressionEvaluator)
+    public SettingsBindingResolver(BindingEvaluator bindingEvaluator)
     {
-        _expressionEvaluator = expressionEvaluator;
+        _bindingEvaluator = bindingEvaluator;
     }
 
     /// <summary>
     /// Walks the public string properties of <paramref name="settings"/> and evaluates
-    /// <c>${ }</c> expressions on those marked with <c>SupportsExpressions = true</c>.
+    /// <c>${ }</c> bindings on those marked with <c>SupportsBindings = true</c>.
     /// The settings object is mutated in-place.
     /// </summary>
-    public void ResolveExpressions(object settings, IReadOnlyDictionary<string, object?> expressionData)
+    public void ResolveBindings(object settings, IReadOnlyDictionary<string, object?> bindingData)
     {
         var properties = settings.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -33,7 +33,7 @@ internal sealed class SettingsExpressionResolver
             }
 
             var attr = property.GetCustomAttribute<EditableModelFieldAttribute>();
-            if (attr is not { SupportsExpressions: true })
+            if (attr is not { SupportsBindings: true })
             {
                 continue;
             }
@@ -44,7 +44,7 @@ internal sealed class SettingsExpressionResolver
                 continue;
             }
 
-            var resolved = _expressionEvaluator.Evaluate(value, expressionData);
+            var resolved = _bindingEvaluator.Evaluate(value, bindingData);
             property.SetValue(settings, resolved);
         }
     }

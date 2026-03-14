@@ -68,9 +68,9 @@ public sealed class EditableModelFieldDescriptor
     public string? Group { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether <c>${ expression }</c> syntax is evaluated at runtime.
+    /// Gets a value indicating whether <c>${ binding }</c> syntax is evaluated at runtime.
     /// </summary>
-    public bool SupportsExpressions { get; init; }
+    public bool SupportsBindings { get; init; }
 
     /// <summary>
     /// Gets the validation rules inferred from data annotation attributes on the property.

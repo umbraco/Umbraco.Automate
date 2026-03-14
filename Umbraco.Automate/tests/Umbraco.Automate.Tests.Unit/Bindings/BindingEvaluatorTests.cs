@@ -1,12 +1,12 @@
 using Shouldly;
-using Umbraco.Automate.Core.Expressions;
-using Umbraco.Automate.Core.Expressions.Filters;
+using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Bindings.Filters;
 
-namespace Umbraco.Automate.Tests.Unit.Expressions;
+namespace Umbraco.Automate.Tests.Unit.Bindings;
 
-public class ExpressionEvaluatorTests
+public class BindingEvaluatorTests
 {
-    private readonly ExpressionEvaluator _evaluator = new(
+    private readonly BindingEvaluator _evaluator = new(
     [
         new TruncateFilter(),
         new LowercaseFilter(),
@@ -90,7 +90,7 @@ public class ExpressionEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_MultipleExpressions()
+    public void Evaluate_MultipleBindings()
     {
         var result = _evaluator.Evaluate("${ trigger.contentName } (${ steps.sendEmail.messageId })", _data);
 
@@ -100,7 +100,7 @@ public class ExpressionEvaluatorTests
     [Fact]
     public void ResolvePath_HandlesNestedDictionaries()
     {
-        var result = ExpressionEvaluator.ResolvePath("steps.sendEmail.messageId", _data);
+        var result = BindingEvaluator.ResolvePath("steps.sendEmail.messageId", _data);
 
         result.ShouldBe("msg-123");
     }
@@ -108,7 +108,7 @@ public class ExpressionEvaluatorTests
     [Fact]
     public void ResolvePath_ReturnsNull_ForMissingKey()
     {
-        var result = ExpressionEvaluator.ResolvePath("trigger.missing", _data);
+        var result = BindingEvaluator.ResolvePath("trigger.missing", _data);
 
         result.ShouldBeNull();
     }
