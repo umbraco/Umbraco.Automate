@@ -4,9 +4,9 @@ using Umbraco.Automate.Core.Settings;
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 
 /// <summary>
-/// Response model for a registered step type (action or control flow).
+/// Base response model for all registered step types (actions, control flow, triggers).
 /// </summary>
-public sealed class StepTypeItemResponseModel
+public class StepTypeItemResponseModel
 {
     /// <summary>The step type alias.</summary>
     [Required]
@@ -28,7 +28,7 @@ public sealed class StepTypeItemResponseModel
     /// <summary>The settings schema, or null if no settings.</summary>
     public EditableModelSchema? SettingsSchema { get; set; }
 
-    /// <summary>The step type kind: "action" or "controlFlow".</summary>
+    /// <summary>The step type kind: "action", "controlFlow", or "trigger".</summary>
     [Required]
     public string Type { get; set; } = string.Empty;
 }
