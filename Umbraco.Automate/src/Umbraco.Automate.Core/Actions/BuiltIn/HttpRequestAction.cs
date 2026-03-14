@@ -6,7 +6,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that makes an HTTP request to an external URL.
 /// </summary>
-[Action("umbracoAutomate.httpRequest", "HTTP Request")]
+[Action("umbracoAutomate.httpRequest", "HTTP Request",
+    Description = "Sends an HTTP request to an external URL.",
+    Group = "Core",
+    Icon = "icon-cloud-upload")]
 public sealed class HttpRequestAction : ActionBase<HttpRequestSettings>
 {
     private readonly IHttpClientFactory _httpClientFactory;
@@ -19,15 +22,6 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings>
     {
         _httpClientFactory = httpClientFactory;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Sends an HTTP request to an external URL.";
-
-    /// <inheritdoc />
-    public override string? Group => "Core";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-cloud-upload";
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

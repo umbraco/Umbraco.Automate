@@ -6,7 +6,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// A built-in action that writes a message to the application log.
 /// Useful for debugging automations and as a minimal smoke-test action.
 /// </summary>
-[Action("umbracoAutomate.logMessage", "Log Message")]
+[Action("umbracoAutomate.logMessage", "Log Message",
+    Description = "Writes a message to the application log.",
+    Group = "Core",
+    Icon = "icon-notepad")]
 public sealed class LogMessageAction : ActionBase<LogMessageSettings>
 {
     private readonly ILogger<LogMessageAction> _logger;
@@ -19,15 +22,6 @@ public sealed class LogMessageAction : ActionBase<LogMessageSettings>
     {
         _logger = logger;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Writes a message to the application log.";
-
-    /// <inheritdoc />
-    public override string? Group => "Core";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-notepad";
 
     /// <inheritdoc />
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

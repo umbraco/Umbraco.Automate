@@ -8,7 +8,9 @@ namespace Umbraco.Automate.Core.Notifications.Channels.BuiltIn;
 /// <summary>
 /// Notification channel that sends an email via the CMS <see cref="IEmailSender"/> when a run fails or suspends.
 /// </summary>
-[NotificationChannel("umbracoAutomate.email", "Email")]
+[NotificationChannel("umbracoAutomate.email", "Email",
+    Description = "Sends an email notification when a run fails or suspends.",
+    Icon = "icon-message")]
 public sealed class EmailNotificationChannel : NotificationChannelBase<EmailNotificationChannelSettings>
 {
     private const string DefaultSubjectTemplate = "[Umbraco Automate] ${automationName} — ${status}";
@@ -29,12 +31,6 @@ public sealed class EmailNotificationChannel : NotificationChannelBase<EmailNoti
         _emailSender = emailSender;
         _logger = logger;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Sends an email notification when a run fails or suspends.";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-message";
 
     /// <inheritdoc />
     protected override async Task NotifyAsync(

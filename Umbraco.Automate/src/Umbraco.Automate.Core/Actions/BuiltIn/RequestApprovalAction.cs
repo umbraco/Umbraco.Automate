@@ -4,7 +4,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// A built-in action that suspends execution and waits for human approval.
 /// The workflow resumes when an approval decision is submitted via the API.
 /// </summary>
-[Action("umbracoAutomate.requestApproval", "Request Approval")]
+[Action("umbracoAutomate.requestApproval", "Request Approval",
+    Description = "Pauses the automation and waits for a human to approve or reject before continuing.",
+    Group = "Core",
+    Icon = "icon-operator")]
 public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings>
 {
     /// <summary>
@@ -24,15 +27,6 @@ public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings>
         : base(infrastructure)
     {
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Pauses the automation and waits for a human to approve or reject before continuing.";
-
-    /// <inheritdoc />
-    public override string? Group => "Core";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-operator";
 
     /// <inheritdoc />
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
