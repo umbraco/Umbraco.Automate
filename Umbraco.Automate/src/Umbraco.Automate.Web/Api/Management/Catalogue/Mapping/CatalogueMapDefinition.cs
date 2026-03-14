@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Json.Schema;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications.Channels;
@@ -31,7 +33,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = source.GetOutputSchema();
+        target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
         target.Type = "action";
     }
 
@@ -44,7 +46,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = source.GetOutputSchema();
+        target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
         target.Type = "trigger";
     }
 
@@ -57,7 +59,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = source.GetOutputSchema();
+        target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
         target.Type = "controlFlow";
     }
 
@@ -69,5 +71,23 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Description = source.Description;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
+    }
+
+    private static readonly JsonSerializerOptions JsonSchemaSerializerOptions = new()
+    {
+        Converters = { new Json.Schema.SchemaJsonConverter() },
+    };
+
+    private static JsonDocument? SerializeOutputSchema(JsonSchema? schema)
+    {
+        if (schema is null)
+        {
+            return null;
+        }
+
+        // Serialize via JsonSchema's own converter to get a proper JSON Schema document,
+        // then parse into JsonDocument for clean API serialization.
+        var json = JsonSerializer.Serialize(schema, JsonSchemaSerializerOptions);
+        return JsonDocument.Parse(json);
     }
 }

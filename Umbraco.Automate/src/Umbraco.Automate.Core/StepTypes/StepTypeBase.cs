@@ -78,7 +78,12 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
             return null;
         }
 
-        return new JsonSchemaBuilder().FromType(OutputType).Build();
+        var config = new SchemaGeneratorConfiguration
+        {
+            PropertyNameResolver = PropertyNameResolvers.CamelCase,
+        };
+
+        return new JsonSchemaBuilder().FromType(OutputType, config).Build();
     }
 
     /// <summary>

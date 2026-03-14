@@ -60,8 +60,8 @@ public class TriggerBaseTests
         schema.ShouldNotBeNull();
         var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
         properties.ShouldNotBeNull();
-        properties.Keys.ShouldContain("ContentName");
-        properties.Keys.ShouldContain("ContentKey");
+        properties.Keys.ShouldContain("contentName");
+        properties.Keys.ShouldContain("contentKey");
     }
 
     [Fact]

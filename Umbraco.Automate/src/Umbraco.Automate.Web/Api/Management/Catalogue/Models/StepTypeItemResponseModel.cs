@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using Json.Schema;
+using System.Text.Json;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Models;
@@ -30,7 +30,7 @@ public class StepTypeItemResponseModel
     public EditableModelSchema? SettingsSchema { get; set; }
 
     /// <summary>The JSON Schema describing output data, or null if no output.</summary>
-    public JsonSchema? OutputSchema { get; set; }
+    public JsonDocument? OutputSchema { get; set; }
 
     /// <summary>The step type kind: "action", "controlFlow", or "trigger".</summary>
     [Required]

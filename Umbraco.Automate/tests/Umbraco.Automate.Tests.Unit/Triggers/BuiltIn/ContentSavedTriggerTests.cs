@@ -50,9 +50,9 @@ public class ContentSavedTriggerTests
         schema.ShouldNotBeNull();
         var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
         properties.ShouldNotBeNull();
-        properties.Keys.ShouldContain("ContentKey");
-        properties.Keys.ShouldContain("ContentName");
-        properties.Keys.ShouldContain("ContentTypeAlias");
+        properties.Keys.ShouldContain("contentKey");
+        properties.Keys.ShouldContain("contentName");
+        properties.Keys.ShouldContain("contentTypeAlias");
     }
 
     [Fact]
