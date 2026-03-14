@@ -11,16 +11,14 @@ public sealed class ActionResult
         Exception? exception,
         StepRunErrorCategory? errorCategory,
         string? reason,
-        string? waitEventName = null,
-        string? waitEventKey = null)
+        ActionSuspension? suspension = null)
     {
         Status = status;
         OutputData = outputData;
         Exception = exception;
         ErrorCategory = errorCategory;
         Reason = reason;
-        WaitEventName = waitEventName;
-        WaitEventKey = waitEventKey;
+        Suspension = suspension;
     }
 
     /// <summary>
@@ -49,14 +47,10 @@ public sealed class ActionResult
     public string? Reason { get; }
 
     /// <summary>
-    /// Gets the event name to wait for (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/>).
+    /// Gets the suspension data when the action requires the workflow to pause
+    /// (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/> or <see cref="ActionResultStatus.Sleeping"/>).
     /// </summary>
-    public string? WaitEventName { get; }
-
-    /// <summary>
-    /// Gets the event key to wait for (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/>).
-    /// </summary>
-    public string? WaitEventKey { get; }
+    public ActionSuspension? Suspension { get; }
 
     /// <summary>
     /// Creates a successful result with optional output data.
@@ -83,7 +77,37 @@ public sealed class ActionResult
     /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
     /// <param name="outputData">Optional output data to store before waiting.</param>
     public static ActionResult WaitForInput(string eventName, string eventKey, object? outputData = null)
-        => new(ActionResultStatus.WaitingForInput, outputData, null, null, null, eventName, eventKey);
+        => new(ActionResultStatus.WaitingForInput, outputData, null, null, null,
+            new ActionSuspension.WaitForEvent(eventName, eventKey));
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration.
+    /// WorkflowCore persists the resume time so the delay survives application restarts.
+    /// </summary>
+    /// <param name="duration">The duration to sleep for.</param>
+    /// <param name="outputData">Optional output data to store before sleeping.</param>
+    public static ActionResult Sleep(TimeSpan duration, object? outputData = null)
+        => new(ActionResultStatus.Sleeping, outputData, null, null, null,
+            new ActionSuspension.Sleep(duration));
+}
+
+/// <summary>
+/// Describes how a workflow should be suspended when an action cannot complete immediately.
+/// </summary>
+public abstract record ActionSuspension
+{
+    /// <summary>
+    /// Suspend until an external event is published (e.g. approval decision).
+    /// </summary>
+    /// <param name="EventName">The WorkflowCore event name to wait for.</param>
+    /// <param name="EventKey">The WorkflowCore event key to wait for.</param>
+    public sealed record WaitForEvent(string EventName, string EventKey) : ActionSuspension;
+
+    /// <summary>
+    /// Suspend for a fixed duration. WorkflowCore persists the resume time in the database.
+    /// </summary>
+    /// <param name="Duration">The duration to sleep for.</param>
+    public sealed record Sleep(TimeSpan Duration) : ActionSuspension;
 }
 
 /// <summary>
@@ -102,6 +126,9 @@ public enum ActionResultStatus
 
     /// <summary>The action is waiting for external input (e.g. approval).</summary>
     WaitingForInput = 3,
+
+    /// <summary>The action is durably sleeping for a configured duration.</summary>
+    Sleeping = 4,
 }
 
 /// <summary>

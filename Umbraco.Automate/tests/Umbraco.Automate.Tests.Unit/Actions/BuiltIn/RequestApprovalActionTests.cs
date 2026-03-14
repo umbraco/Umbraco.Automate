@@ -46,8 +46,9 @@ public class RequestApprovalActionTests
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
 
         result.Status.ShouldBe(ActionResultStatus.WaitingForInput);
-        result.WaitEventName.ShouldBe("approval");
-        result.WaitEventKey.ShouldBe($"{runId}:{stepId}");
+        var suspension = result.Suspension.ShouldBeOfType<ActionSuspension.WaitForEvent>();
+        suspension.EventName.ShouldBe("approval");
+        suspension.EventKey.ShouldBe($"{runId}:{stepId}");
         result.OutputData.ShouldNotBeNull();
     }
 
