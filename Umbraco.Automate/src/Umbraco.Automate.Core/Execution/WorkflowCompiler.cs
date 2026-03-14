@@ -100,9 +100,10 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         }
 
         // Wire up step transitions (outcomes).
-        WireTransitions(definition, automation.Connections, stepIdToIndex);
+        // Container steps are excluded — their child relationships are handled via Children + Branch().
+        WireTransitions(definition, automation.Connections, stepIdToIndex, containerStepIds);
 
-        // Wire up container children — must happen after all steps are indexed.
+        // Wire up container children and convergence outcomes — must happen after all steps are indexed.
         WireContainerChildren(definition, containerScopes, stepIdToIndex);
 
         return definition;
@@ -163,25 +164,25 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             case IfControlFlow:
             {
                 var settings = ResolveSettings<IfControlFlowSettings>(stepConfig, controlFlow) ?? new IfControlFlowSettings();
-                return new ControlFlowWorkflowStep(new IfStepBody(settings, _conditionEvaluator));
+                return new ControlFlowWorkflowStep(new IfStepBody(stepConfig, settings, _conditionEvaluator, _runRepository));
             }
 
             case SwitchControlFlow:
             {
                 var settings = ResolveSettings<SwitchControlFlowSettings>(stepConfig, controlFlow) ?? new SwitchControlFlowSettings();
-                return new ControlFlowWorkflowStep(new SwitchStepBody(settings, _conditionEvaluator));
+                return new ControlFlowWorkflowStep(new SwitchStepBody(stepConfig, settings, _conditionEvaluator, _runRepository));
             }
 
             case ForEachControlFlow:
             {
                 var settings = ResolveSettings<ForEachControlFlowSettings>(stepConfig, controlFlow) ?? new ForEachControlFlowSettings();
-                return new ControlFlowWorkflowStep(new ForEachContainerStepBody(settings, _bindingEvaluator));
+                return new ControlFlowWorkflowStep(new ForEachContainerStepBody(stepConfig, settings, _bindingEvaluator, _runRepository));
             }
 
             case WhileControlFlow:
             {
                 var settings = ResolveSettings<WhileControlFlowSettings>(stepConfig, controlFlow) ?? new WhileControlFlowSettings();
-                return new ControlFlowWorkflowStep(new WhileContainerStepBody(settings, _conditionEvaluator));
+                return new ControlFlowWorkflowStep(new WhileContainerStepBody(stepConfig, settings, _conditionEvaluator, _runRepository));
             }
 
             case ParallelControlFlow:
@@ -210,13 +211,21 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     private static void WireTransitions(
         WorkflowDefinition definition,
         IList<StepConnection> connections,
-        Dictionary<Guid, int> stepIdToIndex)
+        Dictionary<Guid, int> stepIdToIndex,
+        IReadOnlySet<Guid> containerStepIds)
     {
         if (connections.Count > 0)
         {
             // Connection-aware wiring: use outcome values from connections.
             foreach (var connection in connections)
             {
+                // Skip connections originating from container steps — their transitions
+                // are handled by WireContainerChildren via Children + Branch().
+                if (containerStepIds.Contains(connection.SourceStepId))
+                {
+                    continue;
+                }
+
                 if (!stepIdToIndex.TryGetValue(connection.SourceStepId, out var sourceIndex) ||
                     !stepIdToIndex.TryGetValue(connection.TargetStepId, out var targetIndex))
                 {

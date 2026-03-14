@@ -1,5 +1,7 @@
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.ControlFlow.BuiltIn;
+using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -13,13 +15,21 @@ namespace Umbraco.Automate.Core.Execution.ControlFlow;
 /// </summary>
 internal sealed class SwitchStepBody : StepBody
 {
+    private readonly StepConfiguration _stepConfig;
     private readonly SwitchControlFlowSettings _settings;
     private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly IAutomationRunRepository _runRepository;
 
-    public SwitchStepBody(SwitchControlFlowSettings settings, ConditionEvaluator conditionEvaluator)
+    public SwitchStepBody(
+        StepConfiguration stepConfig,
+        SwitchControlFlowSettings settings,
+        ConditionEvaluator conditionEvaluator,
+        IAutomationRunRepository runRepository)
     {
+        _stepConfig = stepConfig;
         _settings = settings;
         _conditionEvaluator = conditionEvaluator;
+        _runRepository = runRepository;
     }
 
     public override ExecutionResult Run(IStepExecutionContext context)
@@ -27,14 +37,30 @@ internal sealed class SwitchStepBody : StepBody
         var data = (AutomationWorkflowData)context.Workflow.Data;
         var bindingData = BindingDataBuilder.Build(data);
 
+        string outcome = "default";
         foreach (var switchCase in _settings.Cases)
         {
             if (_conditionEvaluator.Evaluate(switchCase.Conditions, bindingData))
             {
-                return ExecutionResult.Outcome(switchCase.Name);
+                outcome = switchCase.Name;
+                break;
             }
         }
 
-        return ExecutionResult.Outcome("default");
+        // Track step execution.
+        var stepRun = new StepRun
+        {
+            Id = Guid.NewGuid(),
+            RunId = data.RunId,
+            StepId = _stepConfig.Id,
+            ActionAlias = _stepConfig.ActionAlias,
+            Status = StepRunStatus.Completed,
+            StartedUtc = DateTime.UtcNow,
+            CompletedUtc = DateTime.UtcNow,
+            BranchOutcome = outcome,
+        };
+        _runRepository.SaveStepRunAsync(stepRun, context.CancellationToken).GetAwaiter().GetResult();
+
+        return ExecutionResult.Outcome(outcome);
     }
 }

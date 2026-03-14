@@ -1,7 +1,8 @@
-using System.Collections;
 using System.Text.Json;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.ControlFlow.BuiltIn;
+using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -13,15 +14,21 @@ namespace Umbraco.Automate.Core.Execution.ControlFlow;
 /// </summary>
 internal sealed class ForEachContainerStepBody : StepBody
 {
+    private readonly StepConfiguration _stepConfig;
     private readonly ForEachControlFlowSettings _settings;
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly IAutomationRunRepository _runRepository;
 
     public ForEachContainerStepBody(
+        StepConfiguration stepConfig,
         ForEachControlFlowSettings settings,
-        BindingEvaluator bindingEvaluator)
+        BindingEvaluator bindingEvaluator,
+        IAutomationRunRepository runRepository)
     {
+        _stepConfig = stepConfig;
         _settings = settings;
         _bindingEvaluator = bindingEvaluator;
+        _runRepository = runRepository;
     }
 
     public override ExecutionResult Run(IStepExecutionContext context)
@@ -35,6 +42,7 @@ internal sealed class ForEachContainerStepBody : StepBody
         var items = ResolveCollection(collectionValue);
         if (items.Count == 0)
         {
+            TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: 0);
             return ExecutionResult.Next();
         }
 
@@ -43,13 +51,15 @@ internal sealed class ForEachContainerStepBody : StepBody
         {
             // Branch all items simultaneously.
             var branches = items.Select((item, index) => new ForEachIterationContext(item, index)).Cast<object>().ToList();
+            TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: items.Count);
             return ExecutionResult.Branch(branches, new ControlFlowPersistenceData(nameof(ForEachContainerStepBody)));
         }
 
         // Sequential: check if we're resuming from a previous iteration.
-        if (context.PersistenceData is ControlFlowPersistenceData persistence && persistence.Metadata is not null)
+        if (context.PersistenceData is ControlFlowPersistenceData persistence &&
+            persistence.Metadata is not null &&
+            int.TryParse(persistence.Metadata, out var currentIndex))
         {
-            var currentIndex = int.Parse(persistence.Metadata);
             var nextIndex = currentIndex + 1;
 
             if (nextIndex >= items.Count)
@@ -64,10 +74,28 @@ internal sealed class ForEachContainerStepBody : StepBody
         }
 
         // First iteration.
+        TrackStepRun(data, context.CancellationToken, iterationIndex: 0, iterationTotal: items.Count);
         var firstItem = new ForEachIterationContext(items[0], 0);
         return ExecutionResult.Branch(
             [firstItem],
             new ControlFlowPersistenceData(nameof(ForEachContainerStepBody)) { Metadata = "0" });
+    }
+
+    private void TrackStepRun(AutomationWorkflowData data, CancellationToken ct, int? iterationIndex, int iterationTotal)
+    {
+        var stepRun = new StepRun
+        {
+            Id = Guid.NewGuid(),
+            RunId = data.RunId,
+            StepId = _stepConfig.Id,
+            ActionAlias = _stepConfig.ActionAlias,
+            Status = StepRunStatus.Completed,
+            StartedUtc = DateTime.UtcNow,
+            CompletedUtc = DateTime.UtcNow,
+            IterationIndex = iterationIndex,
+            IterationTotal = iterationTotal,
+        };
+        _runRepository.SaveStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
     }
 
     private static List<object?> ResolveCollection(string value)
