@@ -40,12 +40,6 @@ public interface IAction : IDiscoverable
     Type? SettingsType { get; }
 
     /// <summary>
-    /// Gets the named outcomes this action can produce for branching, or null for sequential actions.
-    /// Branching actions (e.g. If, Switch) override this to declare their outcome handles.
-    /// </summary>
-    IReadOnlyList<string>? Outcomes => null;
-
-    /// <summary>
     /// Gets the settings schema used to render the configuration UI.
     /// </summary>
     EditableModelSchema? GetSettingsSchema();

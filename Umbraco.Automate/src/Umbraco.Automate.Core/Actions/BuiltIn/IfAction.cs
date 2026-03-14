@@ -23,9 +23,6 @@ public sealed class IfAction : ActionBase<IfActionSettings>
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<string> Outcomes => ["true", "false"];
-
-    /// <inheritdoc />
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<IfActionSettings>();

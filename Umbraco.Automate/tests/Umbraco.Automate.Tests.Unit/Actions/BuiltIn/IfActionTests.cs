@@ -34,13 +34,6 @@ public class IfActionTests
         => _action.SettingsType.ShouldBe(typeof(IfActionSettings));
 
     [Fact]
-    public void HasTrueFalseOutcomes()
-    {
-        _action.Outcomes.ShouldNotBeNull();
-        _action.Outcomes.ShouldBe(["true", "false"]);
-    }
-
-    [Fact]
     public async Task ExecuteAsync_ConditionsTrue_ReturnsTrueOutcome()
     {
         var settings = new IfActionSettings
