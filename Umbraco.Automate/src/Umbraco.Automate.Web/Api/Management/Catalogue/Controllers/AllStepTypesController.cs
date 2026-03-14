@@ -37,20 +37,24 @@ public sealed class AllStepTypesController : CatalogueControllerBase
 
     /// <summary>
     /// Gets all registered step types with their metadata, schemas, and type discriminator.
+    /// Optionally filter by type.
     /// </summary>
+    /// <param name="type">Optional filter: "action", "controlFlow", or "trigger".</param>
     [HttpGet("step-types")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(IEnumerable<StepTypeItemResponseModel>), StatusCodes.Status200OK)]
-    public ActionResult<IEnumerable<StepTypeItemResponseModel>> GetAllStepTypes()
+    public ActionResult<IEnumerable<StepTypeItemResponseModel>> GetAllStepTypes([FromQuery] string? type = null)
     {
-        var actions = _mapper.MapEnumerable<IAction, ActionItemResponseModel>(_actions);
-        var controlFlows = _mapper.MapEnumerable<IControlFlow, ControlFlowItemResponseModel>(_controlFlows);
-        var triggers = _mapper.MapEnumerable<ITrigger, TriggerItemResponseModel>(_triggers);
+        IEnumerable<StepTypeItemResponseModel> result = type?.ToLowerInvariant() switch
+        {
+            "action" => _mapper.MapEnumerable<IAction, ActionItemResponseModel>(_actions),
+            "controlflow" => _mapper.MapEnumerable<IControlFlow, ControlFlowItemResponseModel>(_controlFlows),
+            "trigger" => _mapper.MapEnumerable<ITrigger, TriggerItemResponseModel>(_triggers),
+            _ => _mapper.MapEnumerable<IAction, ActionItemResponseModel>(_actions)
+                .Concat<StepTypeItemResponseModel>(_mapper.MapEnumerable<IControlFlow, ControlFlowItemResponseModel>(_controlFlows))
+                .Concat(_mapper.MapEnumerable<ITrigger, TriggerItemResponseModel>(_triggers)),
+        };
 
-        IEnumerable<StepTypeItemResponseModel> all = actions
-            .Concat<StepTypeItemResponseModel>(controlFlows)
-            .Concat(triggers);
-
-        return Ok(all);
+        return Ok(result);
     }
 }
