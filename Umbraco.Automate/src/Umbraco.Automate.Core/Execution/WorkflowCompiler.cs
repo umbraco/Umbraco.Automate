@@ -71,6 +71,12 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             DataType = typeof(AutomationWorkflowData),
         };
 
+        // Identify which steps are container control flow types (ForEach, While, Parallel).
+        var containerStepIds = IdentifyContainerSteps(automation.Steps);
+
+        // Run graph analysis to determine children and convergence for containers.
+        var containerScopes = GraphAnalyzer.Analyze(automation.Connections, containerStepIds);
+
         // Sort steps by connections to determine execution order.
         var orderedSteps = TopologicalSort(automation.Steps, automation.Connections);
         var stepIndex = 0;
@@ -93,10 +99,29 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             definition.Steps.Add(workflowStep);
         }
 
-        // Wire up step transitions.
+        // Wire up step transitions (outcomes).
         WireTransitions(definition, automation.Connections, stepIdToIndex);
 
+        // Wire up container children — must happen after all steps are indexed.
+        WireContainerChildren(definition, containerScopes, stepIdToIndex);
+
         return definition;
+    }
+
+    private HashSet<Guid> IdentifyContainerSteps(IList<StepConfiguration> steps)
+    {
+        var containerIds = new HashSet<Guid>();
+
+        foreach (var step in steps)
+        {
+            var controlFlow = _controlFlows.GetByAlias(step.ActionAlias);
+            if (controlFlow is ForEachControlFlow or WhileControlFlow or ParallelControlFlow)
+            {
+                containerIds.Add(step.Id);
+            }
+        }
+
+        return containerIds;
     }
 
     private WorkflowStep? CompileStep(StepConfiguration stepConfig)
@@ -217,6 +242,45 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             for (var i = 0; i < definition.Steps.Count - 1; i++)
             {
                 definition.Steps.FindById(i).Outcomes.Add(new ValueOutcome { NextStep = i + 1 });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Populates <see cref="WorkflowStep.Children"/> for container control flow steps
+    /// using the graph analysis results. This is required for WorkflowCore's
+    /// <c>ExecutionResult.Branch()</c> to know which steps belong to the container body.
+    /// </summary>
+    private static void WireContainerChildren(
+        WorkflowDefinition definition,
+        Dictionary<Guid, ContainerScope> containerScopes,
+        Dictionary<Guid, int> stepIdToIndex)
+    {
+        foreach (var (containerStepId, scope) in containerScopes)
+        {
+            if (!stepIdToIndex.TryGetValue(containerStepId, out var containerIndex))
+            {
+                continue;
+            }
+
+            var containerStep = definition.Steps.FindById(containerIndex);
+
+            // Add child step indices.
+            foreach (var childStepId in scope.ChildStepIds)
+            {
+                if (stepIdToIndex.TryGetValue(childStepId, out var childIndex))
+                {
+                    containerStep.Children.Add(childIndex);
+                }
+            }
+
+            // Wire convergence: container's outcome points to the convergence step.
+            if (scope.ConvergenceStepId.HasValue &&
+                stepIdToIndex.TryGetValue(scope.ConvergenceStepId.Value, out var convergenceIndex))
+            {
+                // Add an outcome that routes to the convergence step after all branches complete.
+                // Null value = matches any outcome (default routing after Branch completes).
+                containerStep.Outcomes.Add(new ValueOutcome { NextStep = convergenceIndex });
             }
         }
     }
