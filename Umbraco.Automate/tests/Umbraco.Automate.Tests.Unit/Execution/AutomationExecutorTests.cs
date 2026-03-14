@@ -306,6 +306,145 @@ public class AutomationExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_BranchConvergence_BothBranchesPointToSharedStep()
+    {
+        // Arrange: If → true branch → shared end step
+        //          If → false branch → shared end step
+        //
+        //   If ──(true)──→ TrueStep ──→ SharedEnd
+        //    └──(false)──→ FalseStep ──↗
+        //
+        // With exclusive branching (If), only one branch runs, so SharedEnd
+        // should receive exactly one incoming outcome at runtime.
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+        StepConfiguration sharedEnd = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Shared End");
+
+        var automation = new AutomationBuilder()
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .AddStep(falseStep)
+            .AddStep(sharedEnd)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .WithConnection(trueStep.Id, sharedEnd.Id)
+            .WithConnection(falseStep.Id, sharedEnd.Id)
+            .Build();
+
+        // Act
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        // Assert
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(4);
+
+        // Topological order: If (0), then TrueStep/FalseStep (1,2) in some order, then SharedEnd (3)
+        def.Steps.FindById(0).Name.ShouldBe("If");
+        def.Steps.FindById(3).Name.ShouldBe("Shared End");
+
+        // If step has two outcome-based connections
+        var ifOutcomes = def.Steps.FindById(0).Outcomes;
+        ifOutcomes.Count.ShouldBe(2);
+        ifOutcomes.Cast<ValueOutcome>().Select(o => o.GetValue(null!)).ShouldBe(["true", "false"], ignoreOrder: true);
+
+        // Both branch steps should have an outcome pointing to SharedEnd (index 3)
+        var trueStepIndex = def.Steps.FindById(0).Outcomes.Cast<ValueOutcome>()
+            .First(o => (string)o.GetValue(null!)! == "true").NextStep;
+        var falseStepIndex = def.Steps.FindById(0).Outcomes.Cast<ValueOutcome>()
+            .First(o => (string)o.GetValue(null!)! == "false").NextStep;
+
+        var trueStepOutcomes = def.Steps.FindById(trueStepIndex).Outcomes;
+        trueStepOutcomes.Count.ShouldBe(1);
+        ((ValueOutcome)trueStepOutcomes[0]).NextStep.ShouldBe(3);
+
+        var falseStepOutcomes = def.Steps.FindById(falseStepIndex).Outcomes;
+        falseStepOutcomes.Count.ShouldBe(1);
+        ((ValueOutcome)falseStepOutcomes[0]).NextStep.ShouldBe(3);
+
+        // SharedEnd has no outgoing outcomes (terminal step)
+        def.Steps.FindById(3).Outcomes.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BranchConvergence_TopologicalOrder_ConvergenceStepIsLast()
+    {
+        // Arrange: Same diamond shape, but steps added in scrambled order
+        // to verify topological sort places the convergence step after both branches.
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+        StepConfiguration sharedEnd = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Shared End");
+
+        var automation = new AutomationBuilder()
+            .AddStep(sharedEnd)   // Deliberately add convergence step first
+            .AddStep(falseStep)
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .WithConnection(trueStep.Id, sharedEnd.Id)
+            .WithConnection(falseStep.Id, sharedEnd.Id)
+            .Build();
+
+        // Act
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        // Assert: Topological order should be If first, SharedEnd last
+        var def = _registeredDefinitions[0];
+        def.Steps.FindById(0).Name.ShouldBe("If");
+        def.Steps.FindById(3).Name.ShouldBe("Shared End");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BranchConvergence_WithTailSteps_WiresDiamondThenSequential()
+    {
+        // Arrange: Diamond convergence followed by additional sequential steps
+        //
+        //   If ──(true)──→ TrueStep ──→ SharedMerge → FinalStep
+        //    └──(false)──→ FalseStep ──↗
+        //
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+        StepConfiguration sharedMerge = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Shared Merge");
+        StepConfiguration finalStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Final Step");
+
+        var automation = new AutomationBuilder()
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .AddStep(falseStep)
+            .AddStep(sharedMerge)
+            .AddStep(finalStep)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .WithConnection(trueStep.Id, sharedMerge.Id)
+            .WithConnection(falseStep.Id, sharedMerge.Id)
+            .WithConnection(sharedMerge.Id, finalStep.Id)
+            .Build();
+
+        // Act
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        // Assert
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(5);
+
+        // SharedMerge should continue to FinalStep
+        var mergeIndex = Enumerable.Range(0, 5)
+            .First(i => def.Steps.FindById(i).Name == "Shared Merge");
+        var finalIndex = Enumerable.Range(0, 5)
+            .First(i => def.Steps.FindById(i).Name == "Final Step");
+
+        var mergeOutcomes = def.Steps.FindById(mergeIndex).Outcomes;
+        mergeOutcomes.Count.ShouldBe(1);
+        ((ValueOutcome)mergeOutcomes[0]).NextStep.ShouldBe(finalIndex);
+
+        // FinalStep is terminal
+        def.Steps.FindById(finalIndex).Outcomes.Count.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_NoConnections_FallsBackToSequential()
     {
         // This is the same as the existing MultipleSteps test but explicitly verifies fallback
