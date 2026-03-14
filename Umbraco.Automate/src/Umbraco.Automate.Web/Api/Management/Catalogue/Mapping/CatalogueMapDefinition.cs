@@ -78,7 +78,7 @@ public class CatalogueMapDefinition : IMapDefinition
         Converters = { new Json.Schema.SchemaJsonConverter() },
     };
 
-    private static JsonDocument? SerializeOutputSchema(JsonSchema? schema)
+    private static Dictionary<string, object?>? SerializeOutputSchema(JsonSchema? schema)
     {
         if (schema is null)
         {
@@ -86,8 +86,8 @@ public class CatalogueMapDefinition : IMapDefinition
         }
 
         // Serialize via JsonSchema's own converter to get a proper JSON Schema document,
-        // then parse into JsonDocument for clean API serialization.
+        // then deserialize into a dictionary for clean API serialization and Swagger rendering.
         var json = JsonSerializer.Serialize(schema, JsonSchemaSerializerOptions);
-        return JsonDocument.Parse(json);
+        return JsonSerializer.Deserialize<Dictionary<string, object?>>(json);
     }
 }
