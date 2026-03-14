@@ -71,7 +71,24 @@ internal sealed class OutboxDispatcher : BackgroundService
         // from the hosting thread does not leak into this background loop. Without this,
         // scopes created by IOutboxStore clash with the ambient scope from the request
         // pipeline, causing "Scope being disposed is not the Ambient Scope" errors.
-        using var _ = ExecutionContext.SuppressFlow();
+        //
+        // Pattern: SuppressFlow → start Task.Run (inherits no context) → Undo on same thread.
+        // AsyncFlowControl.Undo() must run on the thread that called SuppressFlow(), so we
+        // cannot use a long-lived `using` in an async method (the Dispose could run on any thread).
+        var flowControl = ExecutionContext.SuppressFlow();
+        var loopTask = Task.Run(() => RunPollLoopAsync(handlersByTopic, options, drainCts, stoppingToken));
+        flowControl.Undo();
+
+        await loopTask;
+    }
+
+    private async Task RunPollLoopAsync(
+        Dictionary<string, IMessageHandler> handlersByTopic,
+        OutboxOptions options,
+        CancellationTokenSource drainCts,
+        CancellationToken stoppingToken)
+    {
+        var topics = handlersByTopic.Keys.ToList();
 
         while (!stoppingToken.IsCancellationRequested)
         {
