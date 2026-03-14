@@ -29,4 +29,14 @@ public sealed class NotificationChannelAttribute : Attribute
     /// Gets the display name.
     /// </summary>
     public string Name { get; }
+
+    /// <summary>
+    /// Gets or sets a description of what this channel does.
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Umbraco icon alias (e.g. "icon-message").
+    /// </summary>
+    public string? Icon { get; set; }
 }

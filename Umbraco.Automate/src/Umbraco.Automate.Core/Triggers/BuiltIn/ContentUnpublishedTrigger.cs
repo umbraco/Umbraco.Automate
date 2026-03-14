@@ -6,7 +6,10 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 /// Fires when content is unpublished in Umbraco CMS.
 /// Produces one <see cref="TriggerEvent"/> per unpublished content item.
 /// </summary>
-[Trigger("umbracoAutomate.contentUnpublished", "Content Unpublished")]
+[Trigger("umbracoAutomate.contentUnpublished", "Content Unpublished",
+    Description = "Fires when content is unpublished.",
+    Group = "Content",
+    Icon = "icon-globe")]
 public sealed class ContentUnpublishedTrigger
     : NotificationTriggerBase<ContentUnpublishedTriggerSettings, ContentUnpublishedTriggerOutput, ContentUnpublishedNotification>
 {
@@ -16,15 +19,6 @@ public sealed class ContentUnpublishedTrigger
     public ContentUnpublishedTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
     {
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Fires when content is unpublished.";
-
-    /// <inheritdoc />
-    public override string? Group => "Content";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-globe";
 
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(ContentUnpublishedNotification notification)

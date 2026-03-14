@@ -7,7 +7,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that unpublishes a content item in Umbraco CMS.
 /// </summary>
-[Action("umbracoAutomate.unpublishContent", "Unpublish Content")]
+[Action("umbracoAutomate.unpublishContent", "Unpublish Content",
+    Description = "Unpublishes a content item in Umbraco CMS.",
+    Group = "Content",
+    Icon = "icon-globe")]
 public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSettings>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
@@ -25,15 +28,6 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
         _contentPublishingService = contentPublishingService;
         _logger = logger;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Unpublishes a content item in Umbraco CMS.";
-
-    /// <inheritdoc />
-    public override string? Group => "Content";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-globe";
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

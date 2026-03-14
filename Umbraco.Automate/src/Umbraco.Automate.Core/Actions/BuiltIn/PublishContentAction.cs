@@ -8,7 +8,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that publishes a content item in Umbraco CMS.
 /// </summary>
-[Action("umbracoAutomate.publishContent", "Publish Content")]
+[Action("umbracoAutomate.publishContent", "Publish Content",
+    Description = "Publishes a content item in Umbraco CMS.",
+    Group = "Content",
+    Icon = "icon-globe")]
 public sealed class PublishContentAction : ActionBase<PublishContentActionSettings>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
@@ -26,15 +29,6 @@ public sealed class PublishContentAction : ActionBase<PublishContentActionSettin
         _contentPublishingService = contentPublishingService;
         _logger = logger;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Publishes a content item in Umbraco CMS.";
-
-    /// <inheritdoc />
-    public override string? Group => "Content";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-globe";
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

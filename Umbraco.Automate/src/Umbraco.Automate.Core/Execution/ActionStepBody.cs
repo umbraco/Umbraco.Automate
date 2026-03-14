@@ -56,6 +56,12 @@ internal sealed class ActionStepBody : StepBodyAsync
         var data = (AutomationWorkflowData)context.Workflow.Data;
         var cancellationToken = context.CancellationToken;
 
+        // Resume path: workflow is resuming after Sleep with persisted data.
+        if (context.PersistenceData is SleepPersistenceData sleepData)
+        {
+            return await HandleSleepResumeAsync(sleepData, data, cancellationToken);
+        }
+
         // Resume path: workflow is resuming after WaitForEvent with the event data.
         if (context.Item is not null)
         {
@@ -129,21 +135,37 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Execute through the middleware pipeline.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, cancellationToken);
 
-        // Handle WaitingForInput: suspend the workflow until external event.
-        if (result.Status == ActionResultStatus.WaitingForInput)
+        // Handle suspension: the action needs the workflow to pause.
+        switch (result.Suspension)
         {
-            stepRun.Status = StepRunStatus.WaitingForInput;
-            StoreOutputData(result.OutputData, stepRun, data);
-            await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+            case ActionSuspension.WaitForEvent wait:
+                stepRun.Status = StepRunStatus.WaitingForInput;
+                StoreOutputData(result.OutputData, stepRun, data);
+                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
-            _logger.LogInformation(
-                "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
-                _stepConfig.Id, result.WaitEventName, result.WaitEventKey);
+                _logger.LogInformation(
+                    "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
+                    _stepConfig.Id, wait.EventName, wait.EventKey);
 
-            return ExecutionResult.WaitForEvent(
-                result.WaitEventName!,
-                result.WaitEventKey!,
-                DateTime.UtcNow);
+                return ExecutionResult.WaitForEvent(wait.EventName, wait.EventKey, DateTime.UtcNow);
+
+            case ActionSuspension.Sleep sleep:
+                stepRun.Status = StepRunStatus.Sleeping;
+                StoreOutputData(result.OutputData, stepRun, data);
+                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+
+                _logger.LogInformation(
+                    "Step {StepId} is sleeping for {Duration}",
+                    _stepConfig.Id, sleep.Duration);
+
+                var persistenceData = new SleepPersistenceData
+                {
+                    StepRunId = stepRun.Id,
+                    RunId = data.RunId,
+                    StepId = _stepConfig.Id,
+                };
+
+                return ExecutionResult.Sleep(sleep.Duration, persistenceData);
         }
 
         // Update step run with result.
@@ -264,6 +286,37 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             throw new InvalidOperationException(stepRun.Error);
         }
+
+        return ExecutionResult.Next();
+    }
+
+    private async Task<ExecutionResult> HandleSleepResumeAsync(
+        SleepPersistenceData sleepData,
+        AutomationWorkflowData data,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Step {StepId} resumed after sleep", sleepData.StepId);
+
+        var run = await _runRepository.GetAsync(sleepData.RunId, cancellationToken);
+        var stepRun = run?.StepRuns.FirstOrDefault(sr => sr.Id == sleepData.StepRunId && sr.Status == StepRunStatus.Sleeping);
+
+        if (stepRun is null)
+        {
+            _logger.LogWarning("No Sleeping step run found for step {StepId} in run {RunId}", sleepData.StepId, sleepData.RunId);
+            return ExecutionResult.Next();
+        }
+
+        stepRun.Status = StepRunStatus.Completed;
+        stepRun.CompletedUtc = DateTime.UtcNow;
+        stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
+
+        if (stepRun.Duration.HasValue)
+        {
+            _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
+        }
+
+        _metrics.StepExecuted(_action.Alias);
+        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
         return ExecutionResult.Next();
     }

@@ -10,7 +10,9 @@ namespace Umbraco.Automate.Core.Notifications.Channels.BuiltIn;
 /// Notification channel that sends a JSON POST to a configured webhook URL.
 /// Optionally signs the payload with HMAC-SHA256.
 /// </summary>
-[NotificationChannel("umbracoAutomate.webhook", "Webhook")]
+[NotificationChannel("umbracoAutomate.webhook", "Webhook",
+    Description = "Sends a JSON POST to a webhook URL when a run fails.",
+    Icon = "icon-webhook")]
 public sealed class WebhookNotificationChannel : NotificationChannelBase<WebhookNotificationChannelSettings>
 {
     private readonly IHttpClientFactory _httpClientFactory;
@@ -28,12 +30,6 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Sends a JSON POST to a webhook URL when a run fails.";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-webhook";
 
     /// <inheritdoc />
     protected override async Task NotifyAsync(

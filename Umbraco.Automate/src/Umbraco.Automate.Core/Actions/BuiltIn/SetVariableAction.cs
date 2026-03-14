@@ -3,7 +3,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that sets a named variable for use in downstream steps.
 /// </summary>
-[Action("umbracoAutomate.setVariable", "Set Variable")]
+[Action("umbracoAutomate.setVariable", "Set Variable",
+    Description = "Sets a named variable for use in downstream steps.",
+    Group = "Utilities",
+    Icon = "icon-brackets")]
 public sealed class SetVariableAction : ActionBase<SetVariableActionSettings>
 {
     /// <summary>
@@ -12,15 +15,6 @@ public sealed class SetVariableAction : ActionBase<SetVariableActionSettings>
     public SetVariableAction(ActionInfrastructure infrastructure) : base(infrastructure)
     {
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Sets a named variable for use in downstream steps.";
-
-    /// <inheritdoc />
-    public override string? Group => "Utilities";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-brackets";
 
     /// <inheritdoc />
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

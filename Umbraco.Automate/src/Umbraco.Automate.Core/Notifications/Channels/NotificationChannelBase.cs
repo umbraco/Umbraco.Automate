@@ -32,10 +32,10 @@ public abstract class NotificationChannelBase<TSettings> : INotificationChannel
     public string Name => _attribute.Name;
 
     /// <inheritdoc />
-    public abstract string? Description { get; }
+    public virtual string? Description => _attribute.Description;
 
     /// <inheritdoc />
-    public abstract string? Icon { get; }
+    public virtual string? Icon => _attribute.Icon;
 
     /// <inheritdoc />
     public Type? SettingsType => typeof(TSettings) == typeof(object) ? null : typeof(TSettings);
