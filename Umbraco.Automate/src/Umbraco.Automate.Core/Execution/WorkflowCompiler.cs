@@ -25,7 +25,7 @@ namespace Umbraco.Automate.Core.Execution;
 internal sealed class WorkflowCompiler : IWorkflowCompiler
 {
     private readonly ActionCollection _actions;
-    private readonly ControlFlowCollection _controlFlow;
+    private readonly ControlFlowCollection _controlFlows;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly BindingEvaluator _bindingEvaluator;
     private readonly SettingsBindingResolver _settingsBindingResolver;
@@ -38,7 +38,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
 
     public WorkflowCompiler(
         ActionCollection actions,
-        ControlFlowCollection controlFlow,
+        ControlFlowCollection controlFlows,
         ActionMiddlewarePipeline pipeline,
         BindingEvaluator bindingEvaluator,
         SettingsBindingResolver settingsBindingResolver,
@@ -50,7 +50,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         ILogger<WorkflowCompiler> logger)
     {
         _actions = actions;
-        _controlFlow = controlFlow;
+        _controlFlows = controlFlows;
         _pipeline = pipeline;
         _bindingEvaluator = bindingEvaluator;
         _settingsBindingResolver = settingsBindingResolver;
@@ -120,7 +120,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         }
 
         // Try control flow collection.
-        var controlFlow = _controlFlow.GetByAlias(stepConfig.ActionAlias);
+        var controlFlow = _controlFlows.GetByAlias(stepConfig.ActionAlias);
         if (controlFlow is not null)
         {
             return CompileControlFlowStep(stepConfig, controlFlow);
