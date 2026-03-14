@@ -8,7 +8,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Obsolete("Use SwitchControlFlow instead. This action will be removed in a future version.")]
 [Action("umbracoAutomate.switch", "Switch",
     Description = "Evaluates cases with conditions and routes to the first matching branch.",
-    Group = "Flow Control",
+    Group = "Control Flow",
     Icon = "icon-merge")]
 public sealed class SwitchAction : ActionBase<SwitchActionSettings>
 {

@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.ControlFlow.BuiltIn;
 /// </summary>
 [ControlFlow("umbracoAutomate.switch", "Switch",
     Description = "Evaluates cases with conditions and routes to the first matching branch.",
-    Group = "Flow Control",
+    Group = "Control Flow",
     Icon = "icon-merge")]
 public sealed class SwitchControlFlow : ControlFlowBase<SwitchControlFlowSettings>
 {

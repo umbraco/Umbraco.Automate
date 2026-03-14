@@ -78,7 +78,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         CancellationToken cancellationToken)
     {
         // Build binding data context: trigger output + all prior step outputs.
-        var bindingData = BuildBindingData(data);
+        var bindingData = BindingDataBuilder.Build(data);
 
         // Resolve input mappings via bindings.
         var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
@@ -333,22 +333,6 @@ internal sealed class ActionStepBody : StepBodyAsync
         var outputDict = JsonSerializer.Deserialize<Dictionary<string, object?>>(
             outputJson, Dispatch.JsonOptions.Default) ?? [];
         data.StepOutputs[_stepConfig.Id] = outputDict;
-    }
-
-    private static Dictionary<string, object?> BuildBindingData(AutomationWorkflowData data)
-    {
-        var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["trigger"] = data.TriggerOutput,
-        };
-
-        // Add step outputs keyed by step ID.
-        foreach (var (stepId, outputs) in data.StepOutputs)
-        {
-            bindingData[$"steps.{stepId}"] = outputs;
-        }
-
-        return bindingData;
     }
 
     private Dictionary<string, object?> ResolveInputMappings(

@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.ControlFlow.BuiltIn;
 /// </summary>
 [ControlFlow("umbracoAutomate.forEach", "For Each",
     Description = "Iterates over a collection, executing child steps for each item.",
-    Group = "Flow Control",
+    Group = "Control Flow",
     Icon = "icon-repeat")]
 public sealed class ForEachControlFlow : ControlFlowBase<ForEachControlFlowSettings>
 {

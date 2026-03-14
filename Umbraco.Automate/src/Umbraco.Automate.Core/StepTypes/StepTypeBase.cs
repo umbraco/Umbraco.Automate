@@ -8,16 +8,25 @@ namespace Umbraco.Automate.Core.StepTypes;
 /// <see cref="StepTypeAttribute"/> and auto-derives settings schema via <see cref="EditableModelSchemaBuilder"/>.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
-public abstract class StepTypeBase<TSettings> : IStepType
+/// <typeparam name="TAttribute">The attribute type deriving from <see cref="StepTypeAttribute"/> that provides metadata for this step type.</typeparam>
+/// <typeparam name="TInfrastructure">The infrastructure type providing access to shared services and concerns for this step type.</typeparam>
+public abstract class StepTypeBase<TSettings, TAttribute, TInfrastructure> : IStepType
     where TSettings : class, new()
+    where TAttribute : StepTypeAttribute
+    where TInfrastructure : StepTypeInfrastructure
 {
     private readonly StepTypeAttribute _attribute;
-    private readonly StepTypeInfrastructure _infrastructure;
+    private readonly TInfrastructure _infrastructure;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="StepTypeBase{TSettings}"/> class.
+    /// Gets the infrastructure instance providing access to shared services and concerns for this step type.
     /// </summary>
-    protected StepTypeBase(StepTypeInfrastructure infrastructure)
+    public TInfrastructure Infrastructure => _infrastructure;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StepTypeBase{TSettings, TAttribute, TInfrastructure}"/> class.
+    /// </summary>
+    protected StepTypeBase(TInfrastructure infrastructure)
     {
         _infrastructure = infrastructure;
         _attribute = GetType().GetCustomAttribute<StepTypeAttribute>(inherit: false)

@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.ControlFlow.BuiltIn;
 /// </summary>
 [ControlFlow("umbracoAutomate.while", "While",
     Description = "Repeatedly executes child steps while conditions are met.",
-    Group = "Flow Control",
+    Group = "Control Flow",
     Icon = "icon-cycle")]
 public sealed class WhileControlFlow : ControlFlowBase<WhileControlFlowSettings>
 {

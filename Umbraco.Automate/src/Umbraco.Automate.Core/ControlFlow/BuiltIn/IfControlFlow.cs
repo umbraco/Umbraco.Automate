@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.ControlFlow.BuiltIn;
 /// </summary>
 [ControlFlow("umbracoAutomate.if", "If",
     Description = "Evaluates conditions and routes to the true or false branch.",
-    Group = "Flow Control",
+    Group = "Control Flow",
     Icon = "icon-split")]
 public sealed class IfControlFlow : ControlFlowBase<IfControlFlowSettings>
 {

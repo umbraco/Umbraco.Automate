@@ -7,7 +7,7 @@ namespace Umbraco.Automate.Core.Actions;
 /// and auto-derives settings schema.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
-public abstract class ActionBase<TSettings> : StepTypeBase<TSettings>, IAction
+public abstract class ActionBase<TSettings> : StepTypeBase<TSettings, ActionAttribute, ActionInfrastructure>, IAction
     where TSettings : class, new()
 {
     /// <summary>

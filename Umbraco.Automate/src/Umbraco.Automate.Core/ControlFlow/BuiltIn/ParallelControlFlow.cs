@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.ControlFlow.BuiltIn;
 /// </summary>
 [ControlFlow("umbracoAutomate.parallel", "Parallel",
     Description = "Executes all child branches simultaneously.",
-    Group = "Flow Control",
+    Group = "Control Flow",
     Icon = "icon-split-alt")]
 public sealed class ParallelControlFlow : ControlFlowBase<object>
 {

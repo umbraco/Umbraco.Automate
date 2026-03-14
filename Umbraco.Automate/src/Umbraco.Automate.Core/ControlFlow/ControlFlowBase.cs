@@ -7,7 +7,7 @@ namespace Umbraco.Automate.Core.ControlFlow;
 /// and auto-derives settings schema.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
-public abstract class ControlFlowBase<TSettings> : StepTypeBase<TSettings>, IControlFlow
+public abstract class ControlFlowBase<TSettings> : StepTypeBase<TSettings, ControlFlowAttribute, ControlFlowInfrastructure>, IControlFlow
     where TSettings : class, new()
 {
     /// <summary>
