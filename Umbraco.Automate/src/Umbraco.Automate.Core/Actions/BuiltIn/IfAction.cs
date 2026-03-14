@@ -5,7 +5,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that evaluates conditions and routes to the true or false branch.
 /// </summary>
-[Action("umbracoAutomate.if", "If")]
+[Action("umbracoAutomate.if", "If",
+    Description = "Evaluates conditions and routes to the true or false branch.",
+    Group = "Flow Control",
+    Icon = "icon-split")]
 public sealed class IfAction : ActionBase<IfActionSettings>
 {
     private readonly ConditionEvaluator _conditionEvaluator;
@@ -18,15 +21,6 @@ public sealed class IfAction : ActionBase<IfActionSettings>
     {
         _conditionEvaluator = conditionEvaluator;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Evaluates conditions and routes to the true or false branch.";
-
-    /// <inheritdoc />
-    public override string? Group => "Flow Control";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-split";
 
     /// <inheritdoc />
     public IReadOnlyList<string> Outcomes => ["true", "false"];

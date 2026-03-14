@@ -3,7 +3,10 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that evaluates an expression and routes to a matching case branch.
 /// </summary>
-[Action("umbracoAutomate.switch", "Switch")]
+[Action("umbracoAutomate.switch", "Switch",
+    Description = "Evaluates an expression and routes to a matching case branch.",
+    Group = "Flow Control",
+    Icon = "icon-merge")]
 public sealed class SwitchAction : ActionBase<SwitchActionSettings>
 {
     /// <summary>
@@ -13,15 +16,6 @@ public sealed class SwitchAction : ActionBase<SwitchActionSettings>
         : base(infrastructure)
     {
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Evaluates an expression and routes to a matching case branch.";
-
-    /// <inheritdoc />
-    public override string? Group => "Flow Control";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-merge";
 
     /// <inheritdoc />
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
