@@ -1,6 +1,6 @@
-using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Notifications.Channels;
 
-namespace Umbraco.Automate.Core.Notifications.Channels;
+namespace Umbraco.Automate.Core.Runs;
 
 /// <summary>
 /// Structured data representing a completed automation run. Used by

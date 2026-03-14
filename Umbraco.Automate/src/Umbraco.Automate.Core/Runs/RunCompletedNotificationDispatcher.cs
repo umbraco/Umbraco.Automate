@@ -2,11 +2,11 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
-using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
 
-namespace Umbraco.Automate.Core.Notifications.Channels;
+namespace Umbraco.Automate.Core.Runs;
 
 /// <summary>
 /// Handles <see cref="AutomationRunCompletedNotification"/> and dispatches to configured

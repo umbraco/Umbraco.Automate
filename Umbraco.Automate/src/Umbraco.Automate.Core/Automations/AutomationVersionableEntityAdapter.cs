@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Versioning;
 using static Umbraco.Automate.Core.Versioning.VersionComparer;
 

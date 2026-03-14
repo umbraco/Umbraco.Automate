@@ -1,5 +1,4 @@
 using Umbraco.Automate.Core.Models;
-using Umbraco.Automate.Core.Notifications.Channels;
 
 namespace Umbraco.Automate.Core.Automations;
 
