@@ -1,5 +1,6 @@
 using System.Reflection;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Core.Triggers;
 
@@ -13,7 +14,7 @@ public abstract class TriggerBase<TSettings, TOutput> : ITrigger
     where TSettings : class, new()
     where TOutput : class
 {
-    private readonly TriggerAttribute _attribute;
+    private readonly StepTypeAttribute _attribute;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TriggerBase{TSettings, TOutput}"/> class.
@@ -21,7 +22,7 @@ public abstract class TriggerBase<TSettings, TOutput> : ITrigger
     protected TriggerBase(TriggerInfrastructure infrastructure)
     {
         Infrastructure = infrastructure;
-        _attribute = GetType().GetCustomAttribute<TriggerAttribute>(inherit: false)
+        _attribute = GetType().GetCustomAttribute<StepTypeAttribute>(inherit: false)
             ?? throw new InvalidOperationException(
                 $"Trigger '{GetType().FullName}' is missing required [Trigger] attribute.");
     }
