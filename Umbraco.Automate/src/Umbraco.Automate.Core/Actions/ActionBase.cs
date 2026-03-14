@@ -39,6 +39,14 @@ public abstract class ActionBase<TSettings, TOutput> : StepTypeBase<TSettings, T
     /// <param name="duration">The duration to sleep for.</param>
     /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
     protected static ActionResult Sleep(TimeSpan duration, TOutput output) => ActionResult.Sleep(duration, output);
+
+    /// <summary>
+    /// Creates a result that suspends the workflow until the specified event is received, with typed output data.
+    /// </summary>
+    /// <param name="eventName">The WorkflowCore event name to wait for.</param>
+    /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult WaitForInput(string eventName, string eventKey, TOutput output) => ActionResult.WaitForInput(eventName, eventKey, output);
 }
 
 /// <summary>
@@ -74,4 +82,11 @@ public abstract class ActionBase<TSettings> : StepTypeBase<TSettings, object, Ac
     /// </summary>
     /// <param name="duration">The duration to sleep for.</param>
     protected static ActionResult Sleep(TimeSpan duration) => ActionResult.Sleep(duration);
+
+    /// <summary>
+    /// Creates a result that suspends the workflow until the specified event is received.
+    /// </summary>
+    /// <param name="eventName">The WorkflowCore event name to wait for.</param>
+    /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
+    protected static ActionResult WaitForInput(string eventName, string eventKey) => ActionResult.WaitForInput(eventName, eventKey);
 }
