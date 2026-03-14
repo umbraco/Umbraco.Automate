@@ -237,6 +237,94 @@ public class AutomationExecutorTests
         _workflowRegistry.Verify(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()), Times.Never);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_OutcomeConnections_WiresValueOutcomeWithValue()
+    {
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+
+        var automation = new AutomationBuilder()
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .AddStep(falseStep)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(3);
+
+        // If step should have two outcomes with values
+        var ifOutcomes = def.Steps.FindById(0).Outcomes;
+        ifOutcomes.Count.ShouldBe(2);
+
+        // Both should be ValueOutcome with non-null Value (lambda returning the outcome string)
+        var trueOutcome = (ValueOutcome)ifOutcomes[0];
+        var falseOutcome = (ValueOutcome)ifOutcomes[1];
+
+        // Verify the outcomes point to correct steps
+        trueOutcome.NextStep.ShouldBe(1);
+        falseOutcome.NextStep.ShouldBe(2);
+
+        // Verify the outcome values match (GetValue compiles the lambda)
+        trueOutcome.GetValue(null!).ShouldBe("true");
+        falseOutcome.GetValue(null!).ShouldBe("false");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MixedSequentialAndBranching_WiresCorrectly()
+    {
+        StepConfiguration stepA = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+
+        var automation = new AutomationBuilder()
+            .AddStep(stepA)
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .WithConnection(stepA.Id, ifStep.Id)         // Sequential (no outcome)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")  // Branching
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(3);
+
+        // Step A → If (sequential, no outcome value)
+        var seqOutcome = (ValueOutcome)def.Steps.FindById(0).Outcomes[0];
+        seqOutcome.NextStep.ShouldBe(1);
+        seqOutcome.GetValue(null!).ShouldBeNull(); // No Value lambda = sequential
+
+        // If → True Branch (outcome = "true")
+        var branchOutcome = (ValueOutcome)def.Steps.FindById(1).Outcomes[0];
+        branchOutcome.NextStep.ShouldBe(2);
+        branchOutcome.GetValue(null!).ShouldBe("true");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoConnections_FallsBackToSequential()
+    {
+        // This is the same as the existing MultipleSteps test but explicitly verifies fallback
+        StepConfiguration stepA = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration stepB = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step B");
+
+        var automation = new AutomationBuilder()
+            .AddStep(stepA)
+            .AddStep(stepB)
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.FindById(0).Outcomes.Count.ShouldBe(1);
+        ((ValueOutcome)def.Steps.FindById(0).Outcomes[0]).NextStep.ShouldBe(1);
+        ((ValueOutcome)def.Steps.FindById(0).Outcomes[0]).GetValue(null!).ShouldBeNull();
+    }
+
     private static Automation CreateAutomation(string actionAlias) =>
         new AutomationBuilder()
             .AddStep(new StepConfigurationBuilder().WithActionAlias(actionAlias).WithName("Step 1"))
