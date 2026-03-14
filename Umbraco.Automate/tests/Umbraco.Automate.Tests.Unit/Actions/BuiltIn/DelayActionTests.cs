@@ -38,7 +38,8 @@ public class DelayActionTests
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
 
         result.Status.ShouldBe(ActionResultStatus.Sleeping);
-        result.SleepDuration.ShouldBe(TimeSpan.FromMinutes(5));
+        var suspension = result.Suspension.ShouldBeOfType<ActionSuspension.Sleep>();
+        suspension.Duration.ShouldBe(TimeSpan.FromMinutes(5));
         result.OutputData.ShouldNotBeNull();
     }
 

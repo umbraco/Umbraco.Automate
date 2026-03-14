@@ -134,42 +134,37 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Execute through the middleware pipeline.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, cancellationToken);
 
-        // Handle WaitingForInput: suspend the workflow until external event.
-        if (result.Status == ActionResultStatus.WaitingForInput)
+        // Handle suspension: the action needs the workflow to pause.
+        switch (result.Suspension)
         {
-            stepRun.Status = StepRunStatus.WaitingForInput;
-            StoreOutputData(result.OutputData, stepRun, data);
-            await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+            case ActionSuspension.WaitForEvent wait:
+                stepRun.Status = StepRunStatus.WaitingForInput;
+                StoreOutputData(result.OutputData, stepRun, data);
+                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
-            _logger.LogInformation(
-                "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
-                _stepConfig.Id, result.WaitEventName, result.WaitEventKey);
+                _logger.LogInformation(
+                    "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
+                    _stepConfig.Id, wait.EventName, wait.EventKey);
 
-            return ExecutionResult.WaitForEvent(
-                result.WaitEventName!,
-                result.WaitEventKey!,
-                DateTime.UtcNow);
-        }
+                return ExecutionResult.WaitForEvent(wait.EventName, wait.EventKey, DateTime.UtcNow);
 
-        // Handle Sleeping: durably suspend the workflow for the configured duration.
-        if (result.Status == ActionResultStatus.Sleeping)
-        {
-            stepRun.Status = StepRunStatus.Sleeping;
-            StoreOutputData(result.OutputData, stepRun, data);
-            await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+            case ActionSuspension.Sleep sleep:
+                stepRun.Status = StepRunStatus.Sleeping;
+                StoreOutputData(result.OutputData, stepRun, data);
+                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
-            _logger.LogInformation(
-                "Step {StepId} is sleeping for {Duration}",
-                _stepConfig.Id, result.SleepDuration);
+                _logger.LogInformation(
+                    "Step {StepId} is sleeping for {Duration}",
+                    _stepConfig.Id, sleep.Duration);
 
-            var persistenceData = new SleepPersistenceData
-            {
-                StepRunId = stepRun.Id,
-                RunId = data.RunId,
-                StepId = _stepConfig.Id,
-            };
+                var persistenceData = new SleepPersistenceData
+                {
+                    StepRunId = stepRun.Id,
+                    RunId = data.RunId,
+                    StepId = _stepConfig.Id,
+                };
 
-            return ExecutionResult.Sleep(result.SleepDuration!.Value, persistenceData);
+                return ExecutionResult.Sleep(sleep.Duration, persistenceData);
         }
 
         // Update step run with result.
