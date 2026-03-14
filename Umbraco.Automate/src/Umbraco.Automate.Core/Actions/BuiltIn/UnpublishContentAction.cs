@@ -11,7 +11,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     Description = "Unpublishes a content item in Umbraco CMS.",
     Group = "Content",
     Icon = "icon-globe")]
-public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSettings>, ICmsAction
+public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSettings, UnpublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
     private readonly ILogger<UnpublishContentAction> _logger;
@@ -55,7 +55,7 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
 
         if (result.Success)
         {
-            return ActionResult.Success(new
+            return Success(new UnpublishContentOutput
             {
                 ContentKey = contentKey,
                 Cultures = cultures?.ToArray(),

@@ -5,7 +5,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// Settings for the <see cref="PublishContentAction"/>.
 /// </summary>
-public sealed class PublishContentActionSettings
+public sealed class PublishContentSettings
 {
     /// <summary>
     /// Gets or sets the key (GUID) of the content item to publish. Supports binding syntax.

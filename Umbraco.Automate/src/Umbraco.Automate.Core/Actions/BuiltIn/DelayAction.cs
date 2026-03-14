@@ -10,7 +10,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     Description = "Pauses execution for a specified duration.",
     Group = "Core",
     Icon = "icon-time")]
-public sealed class DelayAction : ActionBase<DelayActionSettings>
+public sealed class DelayAction : ActionBase<DelaySettings, DelayOutput>
 {
     private readonly ILogger<DelayAction> _logger;
 
@@ -26,7 +26,7 @@ public sealed class DelayAction : ActionBase<DelayActionSettings>
     /// <inheritdoc />
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
-        var settings = context.GetSettings<DelayActionSettings>();
+        var settings = context.GetSettings<DelaySettings>();
 
         if (!TimeSpan.TryParse(settings.Duration, out var duration) || duration < TimeSpan.Zero)
         {
@@ -37,13 +37,13 @@ public sealed class DelayAction : ActionBase<DelayActionSettings>
 
         if (duration == TimeSpan.Zero)
         {
-            return Task.FromResult(ActionResult.Success(new { DelayedFor = "00:00:00" }));
+            return Task.FromResult(Success(new DelayOutput { DelayedFor = "00:00:00" }));
         }
 
         _logger.LogDebug(
             "Automation {AutomationId} / Run {RunId}: Sleeping for {Duration} (durable)",
             context.AutomationId, context.RunId, duration);
 
-        return Task.FromResult(ActionResult.Sleep(duration, new { DelayedFor = duration.ToString() }));
+        return Task.FromResult(Sleep(duration, new DelayOutput { DelayedFor = duration.ToString() }));
     }
 }

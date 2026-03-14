@@ -5,7 +5,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// Settings for the <see cref="SetVariableAction"/>.
 /// </summary>
-public sealed class SetVariableActionSettings
+public sealed class SetVariableSettings
 {
     /// <summary>
     /// Gets or sets the variable name. Supports binding syntax.

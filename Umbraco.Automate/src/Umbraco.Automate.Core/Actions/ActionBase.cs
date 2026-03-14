@@ -19,10 +19,30 @@ public abstract class ActionBase<TSettings, TOutput> : StepTypeBase<TSettings, T
 
     /// <inheritdoc />
     public abstract Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates a successful result with typed output data.
+    /// </summary>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult Success(TOutput output) => ActionResult.Success(output);
+
+    /// <summary>
+    /// Creates a successful result with a named outcome and typed output data.
+    /// </summary>
+    /// <param name="outcome">The named outcome for branching.</param>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult SuccessWithOutcome(string outcome, TOutput output) => ActionResult.SuccessWithOutcome(outcome, output);
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration with typed output data.
+    /// </summary>
+    /// <param name="duration">The duration to sleep for.</param>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult Sleep(TimeSpan duration, TOutput output) => ActionResult.Sleep(duration, output);
 }
 
 /// <summary>
-/// Base class for actions with no output.
+/// Base class for actions with no declared output.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
 public abstract class ActionBase<TSettings> : ActionBase<TSettings, object>

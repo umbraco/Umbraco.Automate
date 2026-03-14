@@ -56,7 +56,7 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
         };
 
         return response.IsSuccessStatusCode
-            ? ActionResult.Success(output)
+            ? Success(output)
             : ActionResult.Failed(
                 new HttpRequestException($"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}"),
                 StepRunErrorCategory.InvalidResponse);

@@ -12,7 +12,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     Description = "Publishes a content item in Umbraco CMS.",
     Group = "Content",
     Icon = "icon-globe")]
-public sealed class PublishContentAction : ActionBase<PublishContentActionSettings>, ICmsAction
+public sealed class PublishContentAction : ActionBase<PublishContentSettings, PublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
     private readonly ILogger<PublishContentAction> _logger;
@@ -33,7 +33,7 @@ public sealed class PublishContentAction : ActionBase<PublishContentActionSettin
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
-        var settings = context.GetSettings<PublishContentActionSettings>();
+        var settings = context.GetSettings<PublishContentSettings>();
 
         if (string.IsNullOrWhiteSpace(settings.ContentKey) || !Guid.TryParse(settings.ContentKey, out var contentKey))
         {
@@ -56,7 +56,7 @@ public sealed class PublishContentAction : ActionBase<PublishContentActionSettin
 
         if (result.Success)
         {
-            return ActionResult.Success(new
+            return Success(new PublishContentOutput
             {
                 ContentKey = contentKey,
                 Cultures = culturesToPublish.Select(c => c.Culture).ToArray(),
