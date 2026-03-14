@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -155,6 +156,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         // Sort steps by connections to determine execution order.
         var orderedSteps = TopologicalSort(automation.Steps, automation.Connections);
         var stepIndex = 0;
+        var stepIdToIndex = new Dictionary<Guid, int>();
 
         foreach (var stepConfig in orderedSteps)
         {
@@ -176,19 +178,50 @@ internal sealed class AutomationExecutor : IAutomationExecutor
                 _metrics,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
+            var currentIndex = stepIndex++;
+            stepIdToIndex[stepConfig.Id] = currentIndex;
+
             var workflowStep = new ActionWorkflowStep(stepBody)
             {
-                Id = stepIndex++,
+                Id = currentIndex,
                 Name = stepConfig.Name,
             };
 
             definition.Steps.Add(workflowStep);
         }
 
-        // Wire up step transitions (sequential for now — each step goes to the next).
-        for (var i = 0; i < definition.Steps.Count - 1; i++)
+        // Wire up step transitions.
+        if (automation.Connections.Count > 0)
         {
-            definition.Steps.FindById(i).Outcomes.Add(new ValueOutcome { NextStep = i + 1 });
+            // Connection-aware wiring: use outcome values from connections.
+            foreach (var connection in automation.Connections)
+            {
+                if (!stepIdToIndex.TryGetValue(connection.SourceStepId, out var sourceIndex) ||
+                    !stepIdToIndex.TryGetValue(connection.TargetStepId, out var targetIndex))
+                {
+                    continue;
+                }
+
+                var outcome = new ValueOutcome { NextStep = targetIndex };
+                if (connection.Outcome is not null)
+                {
+                    // WorkflowCore matches: ValueOutcome.GetValue(data) == ExecutionResult.OutcomeValue
+                    // When Value is null (no lambda), the outcome matches any result (default/sequential).
+                    var outcomeValue = connection.Outcome;
+                    Expression<Func<AutomationWorkflowData, object>> expr = _ => outcomeValue;
+                    outcome.Value = expr;
+                }
+
+                definition.Steps.FindById(sourceIndex).Outcomes.Add(outcome);
+            }
+        }
+        else
+        {
+            // Sequential fallback: each step goes to the next.
+            for (var i = 0; i < definition.Steps.Count - 1; i++)
+            {
+                definition.Steps.FindById(i).Outcomes.Add(new ValueOutcome { NextStep = i + 1 });
+            }
         }
 
         return definition;

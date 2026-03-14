@@ -110,6 +110,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ExecutionContext = data.ExecutionContext,
             Connection = connection,
             Action = _action,
+            ExpressionData = expressionData,
         };
 
         // Create and persist step run.
@@ -181,6 +182,12 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
             throw result.Exception ?? new InvalidOperationException($"Step '{_stepConfig.Name}' failed.");
+        }
+
+        // If the action returned a named outcome, route via WorkflowCore's outcome matching.
+        if (result.Status == ActionResultStatus.Success && result.Outcome is not null)
+        {
+            return ExecutionResult.Outcome(result.Outcome);
         }
 
         return ExecutionResult.Next();

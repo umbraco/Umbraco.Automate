@@ -27,4 +27,7 @@ public sealed class ActionItemResponseModel
 
     /// <summary>The settings schema, or null if no settings.</summary>
     public EditableModelSchema? SettingsSchema { get; set; }
+
+    /// <summary>The named outcomes this action can produce for branching, or null for sequential actions.</summary>
+    public IReadOnlyList<string>? Outcomes { get; set; }
 }

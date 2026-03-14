@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Connections;
@@ -112,6 +113,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<ExpressionEvaluator>();
         builder.Services.AddSingleton<SettingsExpressionResolver>();
+        builder.Services.AddSingleton<ConditionEvaluator>();
 
         // HTTP client for HttpRequestAction — with SSRF protection
         builder.Services.AddHttpClient("UmbracoAutomate")

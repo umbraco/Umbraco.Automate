@@ -29,6 +29,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Group = source.Group;
         target.Icon = source.Icon;
         target.SettingsSchema = source.GetSettingsSchema();
+        target.Outcomes = source.Outcomes;
     }
 
     // Umbraco.Code.MapAll

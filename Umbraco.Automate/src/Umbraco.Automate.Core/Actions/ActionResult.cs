@@ -12,7 +12,8 @@ public sealed class ActionResult
         StepRunErrorCategory? errorCategory,
         string? reason,
         string? waitEventName = null,
-        string? waitEventKey = null)
+        string? waitEventKey = null,
+        string? outcome = null)
     {
         Status = status;
         OutputData = outputData;
@@ -21,6 +22,7 @@ public sealed class ActionResult
         Reason = reason;
         WaitEventName = waitEventName;
         WaitEventKey = waitEventKey;
+        Outcome = outcome;
     }
 
     /// <summary>
@@ -59,10 +61,24 @@ public sealed class ActionResult
     public string? WaitEventKey { get; }
 
     /// <summary>
+    /// Gets the named outcome for branching actions (e.g. "true"/"false" for If, case value for Switch).
+    /// When null, the step follows the default (sequential) transition.
+    /// </summary>
+    public string? Outcome { get; }
+
+    /// <summary>
     /// Creates a successful result with optional output data.
     /// </summary>
     public static ActionResult Success(object? outputData = null)
         => new(ActionResultStatus.Success, outputData, null, null, null);
+
+    /// <summary>
+    /// Creates a successful result with a named outcome for branching.
+    /// </summary>
+    /// <param name="outcome">The named outcome (e.g. "true", "false", or a switch case value).</param>
+    /// <param name="outputData">Optional output data.</param>
+    public static ActionResult SuccessWithOutcome(string outcome, object? outputData = null)
+        => new(ActionResultStatus.Success, outputData, null, null, null, outcome: outcome);
 
     /// <summary>
     /// Creates a failed result.
