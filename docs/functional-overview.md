@@ -30,7 +30,7 @@ It is the first CMS-embedded automation engine in the .NET ecosystem.
 | **Step** | A configured instance of an action within an automation, with specific settings and position on the canvas |
 | **Connection** | A named, reusable set of credentials for an external service (e.g. "Production Slack", "Staging SMTP") |
 | **Run** | A single execution of an automation, with full step-by-step audit trail |
-| **Expression** | Data binding between steps using `${ trigger.contentName | truncate:100 }` syntax |
+| **Binding** | Data binding between steps using `${ trigger.contentName | truncate:100 }` syntax |
 
 ---
 
@@ -78,7 +78,7 @@ Automations are built in a full-screen visual node graph editor within the Umbra
 
 ## Data Flow Between Steps
 
-Steps pass data to each other using an expression syntax inspired by Umbraco's UFM:
+Steps pass data to each other using a binding syntax inspired by Umbraco's UFM:
 
 ```
 ${ trigger.contentName }                        — reference trigger output
@@ -260,7 +260,7 @@ A new backoffice section with:
 ## Extensibility for Developers
 
 - **Custom triggers and actions** — implement an interface, add an attribute, register via DI
-- **Custom expression filters** — extend the `${ }` expression system with new filters
+- **Custom binding filters** — extend the `${ }` binding system with new filters
 - **Custom notification channels** — add PagerDuty, OpsGenie, or any alerting system
 - **Middleware pipeline** — insert cross-cutting concerns (logging, metrics, validation) around action execution
 - **Lifecycle notifications** — react to automation events (saving, running, completing) from other packages

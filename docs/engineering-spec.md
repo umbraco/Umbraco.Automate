@@ -187,11 +187,11 @@ public interface ITrigger
     string? Group { get; }
     string? Icon { get; }
     Type? SettingsType { get; }    // Input: drives config UI
-    Type? OutputType { get; }      // Output: drives expression autocompletion
+    Type? OutputType { get; }      // Output: drives binding autocompletion
     EditableModelSchema? GetSettingsSchema();
 
     /// <summary>
-    /// Describes the output properties this trigger produces, for expression autocompletion
+    /// Describes the output properties this trigger produces, for binding autocompletion
     /// and validation. Auto-derived from OutputType by the base class — override only if needed.
     /// </summary>
     IReadOnlyList<TriggerOutputProperty> GetOutputProperties();
@@ -304,7 +304,7 @@ public abstract class WebhookTriggerBase<TSettings, TOutput>
 
 // Each trigger defines a strongly-typed POCO for its output.
 // These are compile-time safe at the handler boundary, then flattened
-// to a dictionary at the dispatcher for the dynamic expression engine.
+// to a dictionary at the dispatcher for the dynamic binding engine.
 
 public class ContentPublishedOutput
 {
@@ -1374,7 +1374,7 @@ Deploy transfers the **published version** of an automation. On arrival, the aut
 
 ---
 
-## Data Flow & Expression Syntax
+## Data Flow & Binding Syntax
 
 ### Runtime Data Model
 
@@ -1394,9 +1394,9 @@ public class AutomationRunData
 }
 ```
 
-When a step completes, the action execution middleware writes its output to `Steps[stepId]`. Downstream steps can reference these outputs in their settings via expressions.
+When a step completes, the action execution middleware writes its output to `Steps[stepId]`. Downstream steps can reference these outputs in their settings via bindings.
 
-### Expression Syntax
+### Binding Syntax
 
 Inspired by **UFM** (Umbraco Flavoured Markdown) — uses the familiar `${ }` interpolation syntax with `|` filter pipes. Evaluated **server-side** in C#.
 
@@ -1409,7 +1409,7 @@ ${ steps.sendEmail.messageId }        — output from a named step
 ${ variables.counter }                — user-defined variable
 ```
 
-Steps are referenced by their **user-defined name** (slugified to camelCase), not by GUID. This keeps expressions readable and stable across environments.
+Steps are referenced by their **user-defined name** (slugified to camelCase), not by GUID. This keeps bindings readable and stable across environments.
 
 #### Filters (chainable)
 
@@ -1433,12 +1433,12 @@ ${ trigger.email | fallback:no-reply@example.com }
 | `stripHtml` | Remove HTML tags | `${ body \| stripHtml }` |
 | `json` | Serialize to JSON | `${ data \| json }` |
 
-#### Where expressions are used
+#### Where bindings are used
 
-Expressions can appear in any **string-type** settings field on an action. The `EditableModelSchemaBuilder` marks string fields as expression-enabled by default. The middleware resolves expressions before passing settings to `ExecuteAsync`.
+Bindings can appear in any **string-type** settings field on an action. The `EditableModelSchemaBuilder` marks string fields as binding-enabled by default. The middleware resolves bindings before passing settings to `ExecuteAsync`.
 
 ```csharp
-// Settings POCO — expressions resolve before the action sees the values
+// Settings POCO — bindings resolve before the action sees the values
 public class SendSlackMessageSettings
 {
     [Field]
@@ -1447,20 +1447,20 @@ public class SendSlackMessageSettings
 }
 ```
 
-At runtime, the expression `"Published: ${ trigger.contentName }"` resolves to `"Published: Summer Sale Page"` before the action executes.
+At runtime, the binding `"Published: ${ trigger.contentName }"` resolves to `"Published: Summer Sale Page"` before the action executes.
 
 #### Extensible filters
 
 Third parties register custom filters via collection builder:
 
 ```csharp
-builder.ExpressionFilters()
+builder.BindingFilters()
     .Add<TruncateFilter>()
     .Add<FormatDateFilter>();
 
 // Custom filter
-[ExpressionFilter("currencyFormat")]
-public class CurrencyFormatFilter : IExpressionFilter
+[BindingFilter("currencyFormat")]
+public class CurrencyFormatFilter : IBindingFilter
 {
     public object? Apply(object? value, string[] args)
     {
@@ -1476,39 +1476,39 @@ public class CurrencyFormatFilter : IExpressionFilter
 
 We investigated whether the CMS's **UFM (Umbraco Flavoured Markdown)** implementation could be reused. Key findings:
 
-**UFM is entirely frontend.** There is zero server-side C# code — all parsing, expression evaluation, and filter execution lives in TypeScript (`src/Umbraco.Web.UI.Client/src/packages/ufm/`). The expression engine uses `@heximal/expressions` (a browser-only JS expression evaluator) and rendering produces Lit web components. No C# parser, tokenizer, or filter system exists in the CMS codebase.
+**UFM is entirely frontend.** There is zero server-side C# code — all parsing, expression evaluation, and filter execution lives in TypeScript (`src/Umbraco.Web.UI.Client/src/packages/ufm/`). The UFM expression engine uses `@heximal/expressions` (a browser-only JS expression evaluator) and rendering produces Lit web components. No C# parser, tokenizer, or filter system exists in the CMS codebase.
 
 **What we adopt from UFM (design, not code):**
 
 | UFM Concept | Automate Equivalent | Reuse Type |
 |-------------|---------------------|------------|
-| `${ expression }` syntax | Same tokenizer pattern (`/\$\{((?:[^{}]\|\{[^{}]*\})*)\}/`) | Pattern only — reimplemented in C# |
+| `${ expression }` syntax | Same tokenizer pattern (`/\$\{((?:[^{}]\|\{[^{}]*\})*)\}/`) | Pattern only — reimplemented in C# as binding engine |
 | `\| filter:arg1:arg2` pipe syntax | Same pipe syntax | Pattern only |
-| `UmbUfmFilterApi` interface (`filter(...args)`) | `IExpressionFilter.Apply(object?, string[])` | Mirrored interface shape |
-| Extension manifest registration (`ufmFilter` type) | `ExpressionFilterCollectionBuilder` | Umbraco DI equivalent |
+| `UmbUfmFilterApi` interface (`filter(...args)`) | `IBindingFilter.Apply(object?, string[])` | Mirrored interface shape |
+| Extension manifest registration (`ufmFilter` type) | `BindingFilterCollectionBuilder` | Umbraco DI equivalent |
 | Built-in filters (truncate, fallback, lowercase, uppercase, stripHtml) | Same filter set, ported to C# | Behaviour ported |
 
 **What we cannot reuse:**
-- `@heximal/expressions` — JavaScript-only, browser-only expression evaluator
+- `@heximal/expressions` — JavaScript-only, browser-only evaluator
 - `Marked.js` plugins — UFM extends a Markdown parser; we are not rendering Markdown
 - Lit web components (`<umb-ufm-render>`, `<umb-ufm-js-expression>`) — browser rendering concerns
 
-**Decision:** Build a lightweight C# expression engine that mirrors UFM's syntax and filter semantics but is purpose-built for server-side automation data binding. The tokenizer regex from UFM's `marked-ufmjs.plugin.ts` translates directly to .NET `Regex`. The filter interface is a 1:1 port. Users familiar with UFM expressions in the backoffice will find the automation expression syntax immediately recognizable.
+**Decision:** Build a lightweight C# binding engine that mirrors UFM's syntax and filter semantics but is purpose-built for server-side automation data binding. The tokenizer regex from UFM's `marked-ufmjs.plugin.ts` translates directly to .NET `Regex`. The filter interface is a 1:1 port. Users familiar with UFM expressions in the backoffice will find the automation binding syntax immediately recognizable.
 
 #### Implementation
 
-Server-side expression parser using a simple tokenizer (not a full JS engine). Resolves property paths against `AutomationRunData`, applies filters in sequence. **No arbitrary code execution** — expressions are pure data lookups with transformations, sandboxed by design.
+Server-side binding parser using a simple tokenizer (not a full JS engine). Resolves property paths against `AutomationRunData`, applies filters in sequence. **No arbitrary code execution** — bindings are pure data lookups with transformations, sandboxed by design.
 
 The tokenizer is a direct port of UFM's regex pattern:
 
 ```csharp
 // C# port of UFM's marked-ufmjs.plugin.ts tokenizer
-private static readonly Regex ExpressionPattern = new(
+private static readonly Regex BindingPattern = new(
     @"\$\{((?:[^{}]|\{[^{}]*\})*)\}",
     RegexOptions.Compiled);
 
 // Filter pipe parsing
-private static (string path, FilterCall[] filters) ParseExpression(string expr)
+private static (string path, FilterCall[] filters) ParseBinding(string expr)
 {
     // "trigger.name | truncate:100:... | uppercase"
     var segments = expr.Split('|').Select(s => s.Trim()).ToArray();
@@ -2238,7 +2238,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | 7 | **AI provider abstraction** | Direct SDK calls vs Umbraco AI abstraction | ✅ **Decided: Via Umbraco.AI.** All AI integration ships as `Umbraco.AI.Automate` and depends on Umbraco.AI's abstractions. Deferred to Phase 3. |
 | 8 | **Newtonsoft.Json** | Accept dual dependency vs replace | ✅ **Decided: Accept it.** WorkflowCore has a hard dep on Newtonsoft.Json. Isolated to the engine layer — our domain model and API use System.Text.Json. |
 | 9 | **Workflow data model** | Typed TData POCO vs generic dictionary bag | ✅ **Decided: `AutomationRunData` dictionary bag.** User-defined automations have variable steps, so a generic `Dictionary<string, object?>` data bag is the right fit. Steps read/write via typed accessors. |
-| 10 | **Expression syntax** | Reuse UFM code vs port UFM design | ✅ **Decided: Port UFM design to C#.** UFM is entirely frontend (TypeScript/Lit/Marked.js) — no server-side code exists. We adopt the `${ }` syntax, `\| filter:args` pipes, and filter interface shape, but implement a purpose-built C# tokenizer and evaluator. Users familiar with UFM will find the syntax immediately recognizable. |
+| 10 | **Binding syntax** | Reuse UFM code vs port UFM design | ✅ **Decided: Port UFM design to C#.** UFM is entirely frontend (TypeScript/Lit/Marked.js) — no server-side code exists. We adopt the `${ }` syntax, `\| filter:args` pipes, and filter interface shape, but implement a purpose-built C# tokenizer and evaluator. Users familiar with UFM will find the syntax immediately recognizable. |
 
 ---
 
