@@ -32,7 +32,7 @@ public class DelayActionTests
             RunId = Guid.NewGuid(),
             StepId = Guid.NewGuid(),
             ActionAlias = _action.Alias,
-            Settings = new DelayActionSettings { Duration = "00:05:00" },
+            Settings = new DelaySettings { Duration = "00:05:00" },
         };
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
@@ -52,7 +52,7 @@ public class DelayActionTests
             RunId = Guid.NewGuid(),
             StepId = Guid.NewGuid(),
             ActionAlias = _action.Alias,
-            Settings = new DelayActionSettings { Duration = "00:00:00" },
+            Settings = new DelaySettings { Duration = "00:00:00" },
         };
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
@@ -69,7 +69,7 @@ public class DelayActionTests
             RunId = Guid.NewGuid(),
             StepId = Guid.NewGuid(),
             ActionAlias = _action.Alias,
-            Settings = new DelayActionSettings { Duration = "not-a-timespan" },
+            Settings = new DelaySettings { Duration = "not-a-timespan" },
         };
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
@@ -87,7 +87,7 @@ public class DelayActionTests
             RunId = Guid.NewGuid(),
             StepId = Guid.NewGuid(),
             ActionAlias = _action.Alias,
-            Settings = new DelayActionSettings { Duration = "-00:05:00" },
+            Settings = new DelaySettings { Duration = "-00:05:00" },
         };
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);

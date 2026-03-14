@@ -15,7 +15,7 @@ namespace Umbraco.Automate.Slack.Actions;
     Description = "Posts a message to a Slack channel.",
     Group = "Messaging",
     Icon = "icon-message")]
-public sealed class SendMessageAction : ActionBase<SendMessageSettings>
+public sealed class SendMessageAction : ActionBase<SendMessageSettings, SendMessageOutput>
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IOAuthCredentialsService _credentialsService;
@@ -89,10 +89,10 @@ public sealed class SendMessageAction : ActionBase<SendMessageSettings>
                 StepRunErrorCategory.InvalidResponse);
         }
 
-        return ActionResult.Success(new
+        return Success(new SendMessageOutput
         {
-            result.Channel,
-            result.Ts,
+            Channel = result.Channel,
+            Ts = result.Ts,
         });
     }
 

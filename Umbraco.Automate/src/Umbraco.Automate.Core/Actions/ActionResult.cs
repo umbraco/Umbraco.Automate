@@ -61,17 +61,30 @@ public sealed class ActionResult
     public string? Outcome { get; }
 
     /// <summary>
-    /// Creates a successful result with optional output data.
+    /// Creates a successful result with no output data.
     /// </summary>
-    public static ActionResult Success(object? outputData = null)
+    public static ActionResult Success()
+        => new(ActionResultStatus.Success, null, null, null, null);
+
+    /// <summary>
+    /// Creates a successful result with output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult Success(object outputData)
         => new(ActionResultStatus.Success, outputData, null, null, null);
 
     /// <summary>
-    /// Creates a successful result with a named outcome for branching.
+    /// Creates a successful result with a named outcome and no output data.
     /// </summary>
     /// <param name="outcome">The named outcome (e.g. "true", "false", or a switch case value).</param>
-    /// <param name="outputData">Optional output data.</param>
-    public static ActionResult SuccessWithOutcome(string outcome, object? outputData = null)
+    public static ActionResult SuccessWithOutcome(string outcome)
+        => new(ActionResultStatus.Success, null, null, null, null, outcome: outcome);
+
+    /// <summary>
+    /// Creates a successful result with a named outcome and output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult SuccessWithOutcome(string outcome, object outputData)
         => new(ActionResultStatus.Success, outputData, null, null, null, outcome: outcome);
 
     /// <summary>
@@ -91,18 +104,31 @@ public sealed class ActionResult
     /// </summary>
     /// <param name="eventName">The WorkflowCore event name to wait for.</param>
     /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
-    /// <param name="outputData">Optional output data to store before waiting.</param>
-    public static ActionResult WaitForInput(string eventName, string eventKey, object? outputData = null)
+    public static ActionResult WaitForInput(string eventName, string eventKey)
+        => new(ActionResultStatus.WaitingForInput, null, null, null, null,
+            new ActionSuspension.WaitForEvent(eventName, eventKey));
+
+    /// <summary>
+    /// Creates a result that suspends the workflow until the specified event is received, with output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult WaitForInput(string eventName, string eventKey, object outputData)
         => new(ActionResultStatus.WaitingForInput, outputData, null, null, null,
             new ActionSuspension.WaitForEvent(eventName, eventKey));
 
     /// <summary>
-    /// Creates a result that durably sleeps for the specified duration.
-    /// WorkflowCore persists the resume time so the delay survives application restarts.
+    /// Creates a result that durably sleeps for the specified duration with no output data.
     /// </summary>
     /// <param name="duration">The duration to sleep for.</param>
-    /// <param name="outputData">Optional output data to store before sleeping.</param>
-    public static ActionResult Sleep(TimeSpan duration, object? outputData = null)
+    public static ActionResult Sleep(TimeSpan duration)
+        => new(ActionResultStatus.Sleeping, null, null, null, null,
+            new ActionSuspension.Sleep(duration));
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration with output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult Sleep(TimeSpan duration, object outputData)
         => new(ActionResultStatus.Sleeping, outputData, null, null, null,
             new ActionSuspension.Sleep(duration));
 }

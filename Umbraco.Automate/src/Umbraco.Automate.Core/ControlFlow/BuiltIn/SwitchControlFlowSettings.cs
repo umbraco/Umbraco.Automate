@@ -1,12 +1,12 @@
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Settings;
 
-namespace Umbraco.Automate.Core.Actions.BuiltIn;
+namespace Umbraco.Automate.Core.ControlFlow.BuiltIn;
 
 /// <summary>
-/// Settings for the <see cref="SwitchAction"/>.
+/// Settings for the <see cref="SwitchControlFlow"/>.
 /// </summary>
-public sealed class SwitchActionSettings
+public sealed class SwitchControlFlowSettings
 {
     /// <summary>
     /// Gets or sets the cases to evaluate. Cases are evaluated in order; the first match wins.

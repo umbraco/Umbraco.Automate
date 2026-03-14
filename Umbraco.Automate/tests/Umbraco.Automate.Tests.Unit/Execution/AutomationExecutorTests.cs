@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Bindings;
@@ -34,12 +36,33 @@ public class AutomationExecutorTests
         action.Setup(a => a.Alias).Returns("testAction");
 
         var actions = CreateActionCollection(action.Object);
+        var controlFlow = new ControlFlowCollection(Enumerable.Empty<IControlFlow>);
         var pipeline = new ActionMiddlewarePipeline(new ActionMiddlewareCollection(Array.Empty<IActionMiddleware>));
         var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
+        var conditionEvaluator = new ConditionEvaluator(evaluator);
 
         var services = new ServiceCollection();
         services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
         var sp = services.BuildServiceProvider();
+
+        var meterFactory = new Mock<IMeterFactory>();
+        meterFactory.Setup(f => f.Create(It.IsAny<MeterOptions>()))
+            .Returns((MeterOptions opts) => new Meter(opts.Name));
+
+        var metrics = new AutomateMetrics(meterFactory.Object);
+
+        var compiler = new WorkflowCompiler(
+            actions,
+            controlFlow,
+            pipeline,
+            evaluator,
+            new SettingsBindingResolver(evaluator),
+            conditionEvaluator,
+            _runRepo.Object,
+            Mock.Of<IConnectionService>(),
+            metrics,
+            sp,
+            Mock.Of<ILogger<WorkflowCompiler>>());
 
         _defaultWorkspace = new WorkspaceBuilder().Build();
 
@@ -54,23 +77,14 @@ public class AutomationExecutorTests
         _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
 
-        var meterFactory = new Mock<IMeterFactory>();
-        meterFactory.Setup(f => f.Create(It.IsAny<MeterOptions>()))
-            .Returns((MeterOptions opts) => new Meter(opts.Name));
-
         _executor = new AutomationExecutor(
             _workflowHost.Object,
             _workflowRegistry.Object,
-            actions,
-            pipeline,
-            evaluator,
-            new SettingsBindingResolver(evaluator),
+            compiler,
             _runRepo.Object,
-            Mock.Of<IConnectionService>(),
             _workspaceService.Object,
             Mock.Of<IRateLimitService>(),
-            new AutomateMetrics(meterFactory.Object),
-            sp,
+            metrics,
             Mock.Of<ILogger<AutomationExecutor>>());
     }
 
@@ -308,14 +322,6 @@ public class AutomationExecutorTests
     [Fact]
     public async Task ExecuteAsync_BranchConvergence_BothBranchesPointToSharedStep()
     {
-        // Arrange: If → true branch → shared end step
-        //          If → false branch → shared end step
-        //
-        //   If ──(true)──→ TrueStep ──→ SharedEnd
-        //    └──(false)──→ FalseStep ──↗
-        //
-        // With exclusive branching (If), only one branch runs, so SharedEnd
-        // should receive exactly one incoming outcome at runtime.
         StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
         StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
         StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
@@ -332,23 +338,18 @@ public class AutomationExecutorTests
             .WithConnection(falseStep.Id, sharedEnd.Id)
             .Build();
 
-        // Act
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
-        // Assert
         var def = _registeredDefinitions[0];
         def.Steps.Count.ShouldBe(4);
 
-        // Topological order: If (0), then TrueStep/FalseStep (1,2) in some order, then SharedEnd (3)
         def.Steps.FindById(0).Name.ShouldBe("If");
         def.Steps.FindById(3).Name.ShouldBe("Shared End");
 
-        // If step has two outcome-based connections
         var ifOutcomes = def.Steps.FindById(0).Outcomes;
         ifOutcomes.Count.ShouldBe(2);
         ifOutcomes.Cast<ValueOutcome>().Select(o => o.GetValue(null!)).ShouldBe(["true", "false"], ignoreOrder: true);
 
-        // Both branch steps should have an outcome pointing to SharedEnd (index 3)
         var trueStepIndex = def.Steps.FindById(0).Outcomes.Cast<ValueOutcome>()
             .First(o => (string)o.GetValue(null!)! == "true").NextStep;
         var falseStepIndex = def.Steps.FindById(0).Outcomes.Cast<ValueOutcome>()
@@ -362,15 +363,12 @@ public class AutomationExecutorTests
         falseStepOutcomes.Count.ShouldBe(1);
         ((ValueOutcome)falseStepOutcomes[0]).NextStep.ShouldBe(3);
 
-        // SharedEnd has no outgoing outcomes (terminal step)
         def.Steps.FindById(3).Outcomes.Count.ShouldBe(0);
     }
 
     [Fact]
     public async Task ExecuteAsync_BranchConvergence_TopologicalOrder_ConvergenceStepIsLast()
     {
-        // Arrange: Same diamond shape, but steps added in scrambled order
-        // to verify topological sort places the convergence step after both branches.
         StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
         StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
         StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
@@ -387,10 +385,8 @@ public class AutomationExecutorTests
             .WithConnection(falseStep.Id, sharedEnd.Id)
             .Build();
 
-        // Act
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
-        // Assert: Topological order should be If first, SharedEnd last
         var def = _registeredDefinitions[0];
         def.Steps.FindById(0).Name.ShouldBe("If");
         def.Steps.FindById(3).Name.ShouldBe("Shared End");
@@ -399,11 +395,6 @@ public class AutomationExecutorTests
     [Fact]
     public async Task ExecuteAsync_BranchConvergence_WithTailSteps_WiresDiamondThenSequential()
     {
-        // Arrange: Diamond convergence followed by additional sequential steps
-        //
-        //   If ──(true)──→ TrueStep ──→ SharedMerge → FinalStep
-        //    └──(false)──→ FalseStep ──↗
-        //
         StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
         StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
         StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
@@ -423,14 +414,11 @@ public class AutomationExecutorTests
             .WithConnection(sharedMerge.Id, finalStep.Id)
             .Build();
 
-        // Act
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
-        // Assert
         var def = _registeredDefinitions[0];
         def.Steps.Count.ShouldBe(5);
 
-        // SharedMerge should continue to FinalStep
         var mergeIndex = Enumerable.Range(0, 5)
             .First(i => def.Steps.FindById(i).Name == "Shared Merge");
         var finalIndex = Enumerable.Range(0, 5)
@@ -440,14 +428,12 @@ public class AutomationExecutorTests
         mergeOutcomes.Count.ShouldBe(1);
         ((ValueOutcome)mergeOutcomes[0]).NextStep.ShouldBe(finalIndex);
 
-        // FinalStep is terminal
         def.Steps.FindById(finalIndex).Outcomes.Count.ShouldBe(0);
     }
 
     [Fact]
     public async Task ExecuteAsync_NoConnections_FallsBackToSequential()
     {
-        // This is the same as the existing MultipleSteps test but explicitly verifies fallback
         StepConfiguration stepA = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step A");
         StepConfiguration stepB = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step B");
 

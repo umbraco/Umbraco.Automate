@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
@@ -14,6 +15,7 @@ using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
@@ -60,6 +62,8 @@ public static partial class UmbracoBuilderExtensions
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<ITrigger, TriggerAttribute>(cache: true));
         builder.AutomateActions()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAction, ActionAttribute>(cache: true));
+        builder.AutomateControlFlow()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<IControlFlow, ControlFlowAttribute>(cache: true));
         builder.AutomateConnectionTypes()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IConnectionType, ConnectionTypeAttribute>(cache: true));
         builder.AutomateNotificationChannels()
@@ -89,6 +93,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEditableModelResolver, EditableModelResolver>();
         builder.Services.AddSingleton<ActionInfrastructure>();
         builder.Services.AddSingleton<TriggerInfrastructure>();
+        builder.Services.AddSingleton<ControlFlowInfrastructure>();
         builder.Services.AddSingleton<ConnectionTypeInfrastructure>();
         builder.Services.AddSingleton<NotificationChannelInfrastructure>();
 
@@ -136,6 +141,7 @@ public static partial class UmbracoBuilderExtensions
 
         // Automation execution
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
+        builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         // WorkflowCore engine with outbox-backed queue
@@ -159,6 +165,12 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static ActionCollectionBuilder AutomateActions(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<ActionCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the control flow collection builder. Control flow types are auto-discovered.
+    /// </summary>
+    public static ControlFlowCollectionBuilder AutomateControlFlow(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<ControlFlowCollectionBuilder>();
 
     /// <summary>
     /// Gets the binding filter collection builder. Filters are auto-discovered.

@@ -1,12 +1,12 @@
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Settings;
 
-namespace Umbraco.Automate.Core.Actions.BuiltIn;
+namespace Umbraco.Automate.Core.ControlFlow.BuiltIn;
 
 /// <summary>
-/// Settings for the <see cref="IfAction"/>.
+/// Settings for the <see cref="IfControlFlow"/>.
 /// </summary>
-public sealed class IfActionSettings
+public sealed class IfControlFlowSettings
 {
     /// <summary>
     /// Gets or sets the conditions to evaluate.

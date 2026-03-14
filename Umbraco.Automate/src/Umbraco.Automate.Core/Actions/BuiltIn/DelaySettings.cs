@@ -5,7 +5,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// Settings for the <see cref="DelayAction"/>.
 /// </summary>
-public sealed class DelayActionSettings
+public sealed class DelaySettings
 {
     /// <summary>
     /// Gets or sets the delay duration as a TimeSpan string (e.g. "00:05:00" for 5 minutes).

@@ -1,72 +1,92 @@
-using System.Reflection;
-using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Core.Actions;
 
 /// <summary>
-/// Base class for actions that reads metadata from the <see cref="ActionAttribute"/>
-/// and auto-derives settings schema.
+/// Base class for actions that produce typed output. Reads metadata from the <see cref="ActionAttribute"/>
+/// and auto-derives settings and output schemas. Provides typed convenience methods for returning output data.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
-public abstract class ActionBase<TSettings> : IAction
+/// <typeparam name="TOutput">The output POCO type describing the data this action produces.</typeparam>
+public abstract class ActionBase<TSettings, TOutput> : StepTypeBase<TSettings, TOutput, ActionAttribute, ActionInfrastructure>, IAction
     where TSettings : class, new()
+    where TOutput : class
 {
-    private readonly ActionAttribute _attribute;
-    private readonly ActionInfrastructure _infrastructure;
-
     /// <summary>
-    /// Initializes a new instance of the <see cref="ActionBase{TSettings}"/> class.
+    /// Initializes a new instance of the <see cref="ActionBase{TSettings, TOutput}"/> class.
     /// </summary>
-    protected ActionBase(ActionInfrastructure infrastructure)
-    {
-        _infrastructure = infrastructure;
-        _attribute = GetType().GetCustomAttribute<ActionAttribute>(inherit: false)
-            ?? throw new InvalidOperationException(
-                $"Action '{GetType().FullName}' is missing required [Action] attribute.");
-    }
-
-    /// <inheritdoc />
-    public string Alias => _attribute.Alias;
-
-    /// <inheritdoc />
-    public string Name => _attribute.Name;
-
-    /// <inheritdoc />
-    public virtual string? Description => _attribute.Description;
-
-    /// <inheritdoc />
-    public virtual string? Group => _attribute.Group;
-
-    /// <inheritdoc />
-    public virtual string? Icon => _attribute.Icon;
-
-    /// <inheritdoc />
-    public Type? SettingsType => typeof(TSettings) == typeof(object) ? null : typeof(TSettings);
-
-    /// <inheritdoc />
-    public EditableModelSchema? GetSettingsSchema()
-    {
-        if (SettingsType is null)
-        {
-            return null;
-        }
-
-        return EditableModelSchemaBuilder.Build(SettingsType);
-    }
-
-    /// <summary>
-    /// Resolves action settings from a raw dictionary to a typed <typeparamref name="TSettings"/> instance,
-    /// applying configuration variable substitution and validation.
-    /// </summary>
-    /// <param name="settings">The raw settings dictionary from the step configuration.</param>
-    /// <returns>The resolved settings, or null if settings are empty or the action has no settings type.</returns>
-    public TSettings? ResolveSettings(Dictionary<string, object?> settings)
-        => _infrastructure.ModelResolver.ResolveModel<TSettings>(Alias, settings, GetSettingsSchema());
-
-    /// <inheritdoc />
-    object? IAction.ResolveSettings(Dictionary<string, object?> settings)
-        => ResolveSettings(settings);
+    protected ActionBase(ActionInfrastructure infrastructure) : base(infrastructure) { }
 
     /// <inheritdoc />
     public abstract Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates a successful result with typed output data.
+    /// </summary>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult Success(TOutput output) => ActionResult.Success(output);
+
+    /// <summary>
+    /// Creates a successful result with a named outcome and typed output data.
+    /// </summary>
+    /// <param name="outcome">The named outcome for branching.</param>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult SuccessWithOutcome(string outcome, TOutput output) => ActionResult.SuccessWithOutcome(outcome, output);
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration with typed output data.
+    /// </summary>
+    /// <param name="duration">The duration to sleep for.</param>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult Sleep(TimeSpan duration, TOutput output) => ActionResult.Sleep(duration, output);
+
+    /// <summary>
+    /// Creates a result that suspends the workflow until the specified event is received, with typed output data.
+    /// </summary>
+    /// <param name="eventName">The WorkflowCore event name to wait for.</param>
+    /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
+    /// <param name="output">The output data matching the declared <typeparamref name="TOutput"/> schema.</param>
+    protected static ActionResult WaitForInput(string eventName, string eventKey, TOutput output) => ActionResult.WaitForInput(eventName, eventKey, output);
+}
+
+/// <summary>
+/// Base class for actions that produce no output. Reads metadata from the <see cref="ActionAttribute"/>
+/// and auto-derives settings schema. Use <see cref="ActionBase{TSettings, TOutput}"/> instead if
+/// the action produces output data.
+/// </summary>
+/// <typeparam name="TSettings">The settings POCO type (use <see cref="object"/> if no settings).</typeparam>
+public abstract class ActionBase<TSettings> : StepTypeBase<TSettings, object, ActionAttribute, ActionInfrastructure>, IAction
+    where TSettings : class, new()
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ActionBase{TSettings}"/> class.
+    /// </summary>
+    protected ActionBase(ActionInfrastructure infrastructure) : base(infrastructure) { }
+
+    /// <inheritdoc />
+    public abstract Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates a successful result with no output data.
+    /// </summary>
+    protected static ActionResult Success() => ActionResult.Success();
+
+    /// <summary>
+    /// Creates a successful result with a named outcome and no output data.
+    /// </summary>
+    /// <param name="outcome">The named outcome for branching.</param>
+    protected static ActionResult SuccessWithOutcome(string outcome) => ActionResult.SuccessWithOutcome(outcome);
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration with no output data.
+    /// </summary>
+    /// <param name="duration">The duration to sleep for.</param>
+    protected static ActionResult Sleep(TimeSpan duration) => ActionResult.Sleep(duration);
+
+    /// <summary>
+    /// Creates a result that suspends the workflow until the specified event is received.
+    /// </summary>
+    /// <param name="eventName">The WorkflowCore event name to wait for.</param>
+    /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
+    protected static ActionResult WaitForInput(string eventName, string eventKey) => ActionResult.WaitForInput(eventName, eventKey);
 }
