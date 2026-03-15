@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Versioning;
 
 namespace Umbraco.Automate.Core.Automations;
@@ -112,6 +113,44 @@ public interface IAutomationService
     Task<Automation> RollbackAutomationAsync(
         Guid automationId,
         int targetVersion,
+        Guid? userId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Exports an automation as a portable model, stripping sensitive fields and replacing
+    /// environment-specific IDs with aliases.
+    /// </summary>
+    /// <param name="automationId">The automation to export.</param>
+    /// <param name="options">Options controlling which optional sections to include.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The export model, or null if the automation was not found.</returns>
+    Task<AutomationExportModel?> ExportAutomationAsync(
+        Guid automationId,
+        AutomationExportOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Validates an export model against the target environment without creating anything.
+    /// </summary>
+    /// <param name="exportModel">The export model to validate.</param>
+    /// <param name="workspaceId">The target workspace to import into.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<AutomationImportResult> ValidateImportAsync(
+        AutomationExportModel exportModel,
+        Guid workspaceId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Imports an automation from an export model into a target workspace.
+    /// The automation is created as Draft and disabled.
+    /// </summary>
+    /// <param name="exportModel">The export model to import.</param>
+    /// <param name="workspaceId">The target workspace to import into.</param>
+    /// <param name="userId">The user performing the import.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<AutomationImportResult> ImportAutomationAsync(
+        AutomationExportModel exportModel,
+        Guid workspaceId,
         Guid? userId = null,
         CancellationToken cancellationToken = default);
 }
