@@ -32,9 +32,8 @@ export const workspaceManagementTreeManifests: Array<UmbExtensionManifest> = [
     {
         type: "treeItem",
         alias: "UmbracoAutomate.TreeItem.Workspace",
+        kind: "default",
         name: "Workspace Tree Item",
         forEntityTypes: [UA_WORKSPACE_ENTITY_TYPE],
-        api: () => import("./tree-item/workspace-tree-item.context.js"),
-        element: () => import("./tree-item/workspace-tree-item.element.js"),
     },
 ];

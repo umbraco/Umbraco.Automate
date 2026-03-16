@@ -14,6 +14,7 @@ export interface UaAutomationDetailModel extends UmbEntityModel {
     description: string | null;
     isEnabled: boolean;
     workspaceId: string;
+    groupId: string | null;
     status: AutomationStatusModel;
     publishedVersion: number | null;
     draftVersion: number;

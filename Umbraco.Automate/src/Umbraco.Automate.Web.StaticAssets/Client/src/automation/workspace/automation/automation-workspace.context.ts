@@ -12,13 +12,14 @@ import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice
 import {
     UA_AUTOMATION_WORKSPACE_ALIAS,
     UA_AUTOMATION_ENTITY_TYPE,
-    UA_AUTOMATION_WORKSPACE_ENTITY_TYPE,
+    UA_AUTOMATION_GROUP_ENTITY_TYPE,
 } from "../../constants.js";
+import { UA_WORKSPACE_ENTITY_TYPE } from "../../../workspace-management/constants.js";
 import { UA_AUTOMATION_DETAIL_REPOSITORY_ALIAS } from "../../repository/constants.js";
 import type { UaAutomationDetailModel } from "../../types.js";
 import { UA_EMPTY_GUID } from "../../../core/index.js";
 import { UaAutomationWorkspaceEditorElement } from "./automation-workspace-editor.element.js";
-import { AutomationsService } from "../../../api/sdk.gen.js";
+import { AutomationsService, WorkspacesService } from "../../../api/sdk.gen.js";
 
 export class UaAutomationWorkspaceContext
     extends UmbEntityDetailWorkspaceContextBase<UaAutomationDetailModel>
@@ -46,21 +47,28 @@ export class UaAutomationWorkspaceContext
                 path: "create/:parentEntityType/:parentUnique",
                 component: UaAutomationWorkspaceEditorElement,
                 setup: async (_component, info) => {
-                    const parentEntityType = info.match.params.parentEntityType;
-                    const parentUnique = info.match.params.parentUnique;
-                    const isWorkspaceParent =
-                        parentEntityType === UA_AUTOMATION_WORKSPACE_ENTITY_TYPE &&
-                        parentUnique &&
-                        parentUnique !== "null";
+                    const parentEntityType = decodeURIComponent(info.match.params.parentEntityType);
+                    const rawParentUnique = decodeURIComponent(info.match.params.parentUnique);
+                    const parentUnique = rawParentUnique === "null" ? null : rawParentUnique;
+
+                    const preset: Partial<UaAutomationDetailModel> = {};
+
+                    if (parentEntityType === UA_WORKSPACE_ENTITY_TYPE && parentUnique) {
+                        preset.workspaceId = parentUnique;
+                    } else if (parentEntityType === UA_AUTOMATION_GROUP_ENTITY_TYPE && parentUnique) {
+                        preset.groupId = parentUnique;
+                        const workspaceId = await this.#resolveWorkspaceForGroup(parentUnique);
+                        if (workspaceId) {
+                            preset.workspaceId = workspaceId;
+                        }
+                    }
 
                     await this.createScaffold({
                         parent: {
-                            unique: parentUnique === "null" ? null : parentUnique,
+                            unique: parentUnique ?? null,
                             entityType: parentEntityType,
                         },
-                        preset: isWorkspaceParent
-                            ? ({ workspaceId: parentUnique } as Partial<UaAutomationDetailModel>)
-                            : undefined,
+                        preset,
                     });
 
                     new UmbWorkspaceIsNewRedirectController(
@@ -113,6 +121,27 @@ export class UaAutomationWorkspaceContext
 
         await this.load(unique);
         this.#reloadStructure(unique);
+    }
+
+    async #resolveWorkspaceForGroup(groupId: string): Promise<string | undefined> {
+        const { data: workspaces } = await tryExecute(
+            this,
+            WorkspacesService.getWorkspaces({ query: { skip: 0, take: 100 } }),
+        );
+
+        if (!workspaces) return undefined;
+
+        for (const ws of workspaces.items) {
+            const { data: groups } = await tryExecute(
+                this,
+                WorkspacesService.getWorkspacesByIdGroups({ path: { id: ws.id } }),
+            );
+            if (groups?.some((g) => g.id === groupId)) {
+                return ws.id;
+            }
+        }
+
+        return undefined;
     }
 
     #reloadStructure(unique: string) {

@@ -79,6 +79,12 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                     <umb-property-layout label="Published Version" orientation="vertical">
                         <div slot="editor">${this._model.publishedVersion ?? "-"}</div>
                     </umb-property-layout>
+                    <umb-property-layout label="Workspace ID" orientation="vertical">
+                        <div slot="editor">${this._model.workspaceId || "-"}</div>
+                    </umb-property-layout>
+                    <umb-property-layout label="Group ID" orientation="vertical">
+                        <div slot="editor">${this._model.groupId || "-"}</div>
+                    </umb-property-layout>
                 </uui-box>
             </div>
         `;

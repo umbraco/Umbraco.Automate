@@ -47,6 +47,7 @@ public sealed class AllAutomationController : AutomationControllerBase
     public async Task<ActionResult<PagedViewModel<AutomationItemResponseModel>>> GetAllAutomations(
         string? filter = null,
         Guid? groupId = null,
+        Guid? workspaceId = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
@@ -59,6 +60,15 @@ public sealed class AllAutomationController : AutomationControllerBase
         {
             var userGroupKeys = user.Groups.Select(g => g.Key).ToList();
             workspaceIds = await _workspaceService.GetAccessibleWorkspaceIdsAsync(userGroupKeys, cancellationToken);
+        }
+
+        // If a specific workspace is requested, intersect with the access-scoped set.
+        if (workspaceId.HasValue)
+        {
+            var requested = new HashSet<Guid> { workspaceId.Value };
+            workspaceIds = workspaceIds is not null
+                ? (IReadOnlySet<Guid>)requested.Intersect(workspaceIds).ToHashSet()
+                : requested;
         }
 
         var (items, total) = await _automationService.GetAutomationsPagedAsync(filter, workspaceIds, groupId, skip, take, cancellationToken);

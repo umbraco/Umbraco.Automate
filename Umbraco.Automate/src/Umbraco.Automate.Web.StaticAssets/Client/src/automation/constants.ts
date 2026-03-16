@@ -1,5 +1,5 @@
-export { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_ROOT_ENTITY_TYPE, UA_AUTOMATION_WORKSPACE_ENTITY_TYPE } from "./entity.js";
-export type { UaAutomationEntityType, UaAutomationRootEntityType, UaAutomationWorkspaceEntityType } from "./entity.js";
+export { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_ROOT_ENTITY_TYPE, UA_AUTOMATION_GROUP_ENTITY_TYPE } from "./entity.js";
+export type { UaAutomationEntityType, UaAutomationRootEntityType, UaAutomationGroupEntityType } from "./entity.js";
 
 export * from "./workspace/constants.js";
 export * from "./repository/constants.js";

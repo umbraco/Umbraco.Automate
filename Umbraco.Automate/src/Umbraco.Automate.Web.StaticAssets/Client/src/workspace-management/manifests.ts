@@ -3,6 +3,7 @@ import { workspaceManagementEntityActionManifests } from "./entity-actions/manif
 import { workspaceManagementMenuManifests } from "./menu/manifests.js";
 import { workspaceManagementRepositoryManifests } from "./repository/manifests.js";
 import { workspaceManagementTreeManifests } from "./tree/manifests.js";
+import { workspaceMgmtTreeManifests } from "./tree-mgmt/manifests.js";
 import { workspaceManagementWorkspaceManifests } from "./workspace/manifests.js";
 
 export const workspaceManagementManifests = [
@@ -11,5 +12,6 @@ export const workspaceManagementManifests = [
     ...workspaceManagementMenuManifests,
     ...workspaceManagementRepositoryManifests,
     ...workspaceManagementTreeManifests,
+    ...workspaceMgmtTreeManifests,
     ...workspaceManagementWorkspaceManifests,
 ];

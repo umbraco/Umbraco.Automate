@@ -32,9 +32,8 @@ export const connectionTreeManifests: Array<UmbExtensionManifest> = [
     {
         type: "treeItem",
         alias: "UmbracoAutomate.TreeItem.Connection",
+        kind: "default",
         name: "Connection Tree Item",
         forEntityTypes: [UA_CONNECTION_ENTITY_TYPE],
-        api: () => import("./tree-item/connection-tree-item.context.js"),
-        element: () => import("./tree-item/connection-tree-item.element.js"),
     },
 ];

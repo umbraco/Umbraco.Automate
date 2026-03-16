@@ -8,8 +8,8 @@ import {
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import {
     UA_WORKSPACE_MGMT_WORKSPACE_ALIAS,
-    UA_WORKSPACE_ENTITY_TYPE,
-    UA_WORKSPACE_ROOT_ENTITY_TYPE,
+    UA_WORKSPACE_MGMT_ENTITY_TYPE,
+    UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE,
 } from "../../constants.js";
 import { UA_WORKSPACE_DETAIL_REPOSITORY_ALIAS } from "../../repository/constants.js";
 import type { UaWorkspaceDetailModel } from "../../types.js";
@@ -24,7 +24,7 @@ export class UaWorkspaceMgmtWorkspaceContext
     constructor(host: UmbControllerHost) {
         super(host, {
             workspaceAlias: UA_WORKSPACE_MGMT_WORKSPACE_ALIAS,
-            entityType: UA_WORKSPACE_ENTITY_TYPE,
+            entityType: UA_WORKSPACE_MGMT_ENTITY_TYPE,
             detailRepositoryAlias: UA_WORKSPACE_DETAIL_REPOSITORY_ALIAS,
         });
 
@@ -36,7 +36,7 @@ export class UaWorkspaceMgmtWorkspaceContext
                 component: UaWorkspaceMgmtWorkspaceEditorElement,
                 setup: async () => {
                     await this.createScaffold({
-                        parent: { unique: null, entityType: UA_WORKSPACE_ROOT_ENTITY_TYPE },
+                        parent: { unique: null, entityType: UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE },
                     });
                     new UmbWorkspaceIsNewRedirectController(
                         this,

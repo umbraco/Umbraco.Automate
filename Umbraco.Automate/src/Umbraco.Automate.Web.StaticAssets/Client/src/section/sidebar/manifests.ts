@@ -1,17 +1,15 @@
 import { UA_MENU_ALIAS, UA_SECTION_ALIAS, UA_SETTINGS_MENU_ALIAS } from "../constants.js";
-import { UA_AUTOMATION_ROOT_ENTITY_TYPE } from "../../automation/constants.js";
 
 export const sectionSidebarManifests: Array<UmbExtensionManifest> = [
     {
         type: "sectionSidebarApp",
-        kind: "menuWithEntityActions",
+        kind: "menu",
         alias: "UmbracoAutomate.SectionSidebarApp.Menu",
         name: "Automate Section Sidebar",
         weight: 1000,
         meta: {
-            label: "Automations",
+            label: "#uaMenu_automations",
             menu: UA_MENU_ALIAS,
-            entityType: UA_AUTOMATION_ROOT_ENTITY_TYPE,
         },
         conditions: [
             {

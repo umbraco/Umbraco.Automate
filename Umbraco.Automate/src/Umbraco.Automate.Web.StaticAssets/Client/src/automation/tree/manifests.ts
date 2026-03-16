@@ -3,7 +3,32 @@ import {
     UA_AUTOMATION_TREE_REPOSITORY_ALIAS,
     UA_AUTOMATION_TREE_STORE_ALIAS,
 } from "./constants.js";
-import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_WORKSPACE_ENTITY_TYPE } from "../entity.js";
+import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_GROUP_ENTITY_TYPE } from "../entity.js";
+import { UA_AUTOMATION_GROUP_WORKSPACE_ALIAS } from "../workspace/constants.js";
+import { UA_WORKSPACE_VIEW_WORKSPACE_ALIAS } from "../../workspace-management/workspace/constants.js";
+import { UA_AUTOMATION_TREE_ITEM_CHILDREN_COLLECTION_ALIAS } from "./tree-item-children/collection/constants.js";
+import { manifests as treeItemChildrenManifests } from "./tree-item-children/manifests.js";
+import { UMB_WORKSPACE_CONDITION_ALIAS } from "@umbraco-cms/backoffice/workspace";
+import { UA_AUTOMATION_ICON } from "../constants.js";
+
+const workspaceView: UmbExtensionManifest = {
+    type: "workspaceView",
+    kind: "collection",
+    alias: "UmbracoAutomate.WorkspaceView.Automation.TreeItemChildrenCollection",
+    name: "Automation Tree Item Children Collection Workspace View",
+    meta: {
+        label: "Automations",
+        pathname: "automations",
+        icon: UA_AUTOMATION_ICON,
+        collectionAlias: UA_AUTOMATION_TREE_ITEM_CHILDREN_COLLECTION_ALIAS,
+    },
+    conditions: [
+        {
+            alias: UMB_WORKSPACE_CONDITION_ALIAS,
+            oneOf: [UA_WORKSPACE_VIEW_WORKSPACE_ALIAS, UA_AUTOMATION_GROUP_WORKSPACE_ALIAS],
+        },
+    ],
+};
 
 export const automationTreeManifests: Array<UmbExtensionManifest> = [
     {
@@ -38,9 +63,11 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
     },
     {
         type: "treeItem",
-        alias: "UmbracoAutomate.TreeItem.AutomationWorkspace",
+        alias: "UmbracoAutomate.TreeItem.AutomationGroup",
         kind: "default",
-        name: "Automation Workspace Tree Item",
-        forEntityTypes: [UA_AUTOMATION_WORKSPACE_ENTITY_TYPE],
+        name: "Automation Group Tree Item",
+        forEntityTypes: [UA_AUTOMATION_GROUP_ENTITY_TYPE],
     },
+    workspaceView,
+    ...treeItemChildrenManifests,
 ];

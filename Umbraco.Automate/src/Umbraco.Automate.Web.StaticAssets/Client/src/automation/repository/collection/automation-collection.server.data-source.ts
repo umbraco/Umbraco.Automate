@@ -1,20 +1,19 @@
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import type { UmbCollectionDataSource, UmbCollectionFilterModel } from "@umbraco-cms/backoffice/collection";
+import { UmbControllerBase } from "@umbraco-cms/backoffice/class-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { AutomationsService } from "../../../api/sdk.gen.js";
 import { UaAutomationTypeMapper } from "../../type-mapper.js";
 import type { UaAutomationItemModel } from "../../types.js";
 
-export class UaAutomationCollectionServerDataSource implements UmbCollectionDataSource<UaAutomationItemModel> {
-    #host: UmbControllerHost;
-
+export class UaAutomationCollectionServerDataSource extends UmbControllerBase implements UmbCollectionDataSource<UaAutomationItemModel> {
     constructor(host: UmbControllerHost) {
-        this.#host = host;
+        super(host);
     }
 
     async getCollection(filter: UmbCollectionFilterModel) {
         const { data, error } = await tryExecute(
-            this.#host,
+            this,
             AutomationsService.getAutomations({
                 query: {
                     filter: filter.filter,

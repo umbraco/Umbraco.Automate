@@ -20,6 +20,16 @@ export type ApprovalDecisionRequestModel = {
 
 export type ApprovalOutcomeModel = 'Approved' | 'Rejected';
 
+export type AutomationAncestorResponseModel = {
+    id: string;
+    entityType: string;
+    name: string;
+    parentId?: string | null;
+    parentEntityType?: string | null;
+    hasChildren: boolean;
+    isFolder: boolean;
+};
+
 export type AutomationItemResponseModel = {
     id: string;
     alias: string;
@@ -459,6 +469,7 @@ export type GetAutomationsData = {
     query?: {
         filter?: string;
         groupId?: string;
+        workspaceId?: string;
         skip?: number;
         take?: number;
     };
@@ -596,6 +607,37 @@ export type PutAutomationsByIdResponses = {
      */
     200: unknown;
 };
+
+export type GetAutomationsByIdAncestorsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/ancestors';
+};
+
+export type GetAutomationsByIdAncestorsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAutomationsByIdAncestorsError = GetAutomationsByIdAncestorsErrors[keyof GetAutomationsByIdAncestorsErrors];
+
+export type GetAutomationsByIdAncestorsResponses = {
+    /**
+     * OK
+     */
+    200: Array<AutomationAncestorResponseModel>;
+};
+
+export type GetAutomationsByIdAncestorsResponse = GetAutomationsByIdAncestorsResponses[keyof GetAutomationsByIdAncestorsResponses];
 
 export type PostAutomationsByIdPublishData = {
     body?: never;

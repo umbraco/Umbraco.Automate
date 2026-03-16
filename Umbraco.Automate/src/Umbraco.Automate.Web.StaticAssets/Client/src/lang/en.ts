@@ -8,6 +8,8 @@ export default {
         select: "Select",
         close: "Close",
         create: "Create",
+        createAutomation: "Automation",
+        createFolder: "Folder",
         delete: "Delete",
         save: "Save",
         saveAndPublish: "Save and Publish",

@@ -2,7 +2,7 @@ import {
     UmbSubmitWorkspaceAction,
     UMB_WORKSPACE_CONDITION_ALIAS,
 } from "@umbraco-cms/backoffice/workspace";
-import { UA_WORKSPACE_MGMT_WORKSPACE_ALIAS, UA_WORKSPACE_ENTITY_TYPE } from "../../constants.js";
+import { UA_WORKSPACE_MGMT_WORKSPACE_ALIAS, UA_WORKSPACE_MGMT_ENTITY_TYPE } from "../../constants.js";
 
 export const manifests: Array<UmbExtensionManifest> = [
     {
@@ -12,7 +12,7 @@ export const manifests: Array<UmbExtensionManifest> = [
         name: "Workspace Management Workspace",
         api: () => import("./workspace-mgmt-workspace.context.js"),
         meta: {
-            entityType: UA_WORKSPACE_ENTITY_TYPE,
+            entityType: UA_WORKSPACE_MGMT_ENTITY_TYPE,
         },
     },
     {
