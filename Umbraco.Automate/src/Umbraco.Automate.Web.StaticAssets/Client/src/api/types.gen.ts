@@ -387,6 +387,7 @@ export type WorkspaceGroupResponseModel = {
     id: string;
     name: string;
     parentId?: string | null;
+    workspaceId: string;
     dateCreated: string;
 };
 
@@ -767,6 +768,37 @@ export type PostAutomationsByIdUnpublishResponses = {
      */
     200: unknown;
 };
+
+export type GetAutomationsGroupsByGroupIdData = {
+    body?: never;
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/groups/{groupId}';
+};
+
+export type GetAutomationsGroupsByGroupIdErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAutomationsGroupsByGroupIdError = GetAutomationsGroupsByGroupIdErrors[keyof GetAutomationsGroupsByGroupIdErrors];
+
+export type GetAutomationsGroupsByGroupIdResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceGroupResponseModel;
+};
+
+export type GetAutomationsGroupsByGroupIdResponse = GetAutomationsGroupsByGroupIdResponses[keyof GetAutomationsGroupsByGroupIdResponses];
 
 export type GetCatalogueActionsData = {
     body?: never;
