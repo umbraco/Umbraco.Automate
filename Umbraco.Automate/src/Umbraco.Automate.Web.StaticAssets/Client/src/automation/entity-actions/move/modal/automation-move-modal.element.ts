@@ -11,11 +11,13 @@ import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import type { UmbEntityUnique } from "@umbraco-cms/backoffice/entity";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { AutomationsService, WorkspacesService } from "../../../../api/sdk.gen.js";
+import type { UaAutomationDetailModel } from "../../../types.js";
 
 @customElement("ua-automation-move-modal")
 export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomationMoveModalData> {
     #detailRepository = new UaAutomationDetailRepository(this);
     #workspaceIds = new Set<string>();
+    #automationData?: UaAutomationDetailModel;
 
     @state()
     private _automationName?: string;
@@ -32,20 +34,13 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
     async connectedCallback() {
         super.connectedCallback();
 
-        // Load workspace IDs so we can distinguish workspaces from groups in selection
-        const { data: workspaces } = await tryExecute(
-            this,
-            WorkspacesService.getWorkspaces({ query: { skip: 0, take: 100 } }),
-        );
-        if (workspaces) {
-            for (const ws of workspaces.items) {
-                this.#workspaceIds.add(ws.id);
-            }
-        }
+        // Load all workspace IDs so we can distinguish workspaces from groups in selection.
+        await this.#loadAllWorkspaceIds();
 
         if (!this.data?.unique) return;
         const { data } = await this.#detailRepository.requestByUnique(this.data.unique);
         if (data) {
+            this.#automationData = data;
             this._automationName = data.name;
             if (data.groupId) {
                 this._oldParentEntityType = UA_AUTOMATION_GROUP_ENTITY_TYPE;
@@ -55,6 +50,25 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
                 this._oldParentUnique = data.workspaceId;
             }
         }
+    }
+
+    async #loadAllWorkspaceIds() {
+        const pageSize = 100;
+        let skip = 0;
+        let total = 0;
+
+        do {
+            const { data } = await tryExecute(
+                this,
+                WorkspacesService.getWorkspaces({ query: { skip, take: pageSize } }),
+            );
+            if (!data) break;
+            total = data.total;
+            for (const ws of data.items) {
+                this.#workspaceIds.add(ws.id);
+            }
+            skip += pageSize;
+        } while (skip < total);
     }
 
     #onSelectionChange() {
@@ -75,8 +89,9 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
 
         const isWorkspace = this.#workspaceIds.has(targetUnique);
 
-        // Fetch current automation data
-        const { data: automation } = await this.#detailRepository.requestByUnique(this.data.unique);
+        // Re-fetch to get latest state (may have changed since modal opened).
+        const { data: freshData } = await this.#detailRepository.requestByUnique(this.data.unique);
+        const automation = freshData ?? this.#automationData;
         if (!automation) return;
 
         if (isWorkspace) {

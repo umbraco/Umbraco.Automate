@@ -91,21 +91,24 @@ export class UaWorkspaceTreeServerDataSource
         ]);
 
         const items: UaWorkspaceTreeItemModel[] = [];
+        let total = 0;
 
         // Add root-level groups for this workspace
         if (groupsResult.data) {
             const rootGroups = groupsResult.data.filter((g) => !g.parentId);
             items.push(...rootGroups.map((g) => this.#mapGroupItem(g, workspaceId, UA_WORKSPACE_ENTITY_TYPE)));
+            total += rootGroups.length;
         }
 
         // Add ungrouped automations for this workspace
         if (automationsResult.data) {
             items.push(...automationsResult.data.items.map((a) => this.#mapAutomationItem(a, workspaceId, UA_WORKSPACE_ENTITY_TYPE)));
+            total += automationsResult.data.total;
         }
 
         return {
             data: {
-                total: items.length,
+                total,
                 items,
             },
         };
@@ -141,18 +144,21 @@ export class UaWorkspaceTreeServerDataSource
         ]);
 
         const items: UaWorkspaceTreeItemModel[] = [];
+        let total = 0;
 
         if (subGroupsResult.data) {
             items.push(...subGroupsResult.data.map((g) => this.#mapGroupItem(g, groupId, UA_AUTOMATION_GROUP_ENTITY_TYPE)));
+            total += subGroupsResult.data.length;
         }
 
         if (automationsResult.data) {
             items.push(...automationsResult.data.items.map((a) => this.#mapAutomationItem(a, groupId, UA_AUTOMATION_GROUP_ENTITY_TYPE)));
+            total += automationsResult.data.total;
         }
 
         return {
             data: {
-                total: items.length,
+                total,
                 items,
             },
         };

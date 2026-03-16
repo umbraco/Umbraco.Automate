@@ -2,12 +2,21 @@ using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
 
 public class TriggerNotificationHandlerTests
 {
+    private static Mock<IRuntimeState> CreateRunningRuntimeState()
+    {
+        var runtimeState = new Mock<IRuntimeState>();
+        runtimeState.Setup(r => r.Level).Returns(RuntimeLevel.Run);
+        return runtimeState;
+    }
+
     [Fact]
     public async Task HandleAsync_DispatchesAllEventsFromAllTriggers()
     {
@@ -33,7 +42,8 @@ public class TriggerNotificationHandlerTests
 
         var handler = new TriggerNotificationHandler<TestNotification>(
             [trigger1.Object, trigger2.Object],
-            dispatcher.Object);
+            dispatcher.Object,
+            CreateRunningRuntimeState().Object);
 
         await handler.HandleAsync(new TestNotification(), CancellationToken.None);
 
@@ -47,7 +57,31 @@ public class TriggerNotificationHandlerTests
     public async Task HandleAsync_NoTriggers_DoesNothing()
     {
         var dispatcher = new Mock<ITriggerDispatcher>();
-        var handler = new TriggerNotificationHandler<TestNotification>([], dispatcher.Object);
+        var handler = new TriggerNotificationHandler<TestNotification>(
+            [],
+            dispatcher.Object,
+            CreateRunningRuntimeState().Object);
+
+        await handler.HandleAsync(new TestNotification(), CancellationToken.None);
+
+        dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NotRunLevel_SkipsDispatch()
+    {
+        var dispatcher = new Mock<ITriggerDispatcher>();
+        var runtimeState = new Mock<IRuntimeState>();
+        runtimeState.Setup(r => r.Level).Returns(RuntimeLevel.Install);
+
+        var trigger = new Mock<INotificationTrigger<TestNotification>>();
+        trigger.Setup(t => t.MapEvent(It.IsAny<TestNotification>()))
+            .Returns([new TriggerEvent { TriggerAlias = "test", InitiatorType = "system" }]);
+
+        var handler = new TriggerNotificationHandler<TestNotification>(
+            [trigger.Object],
+            dispatcher.Object,
+            runtimeState.Object);
 
         await handler.HandleAsync(new TestNotification(), CancellationToken.None);
 

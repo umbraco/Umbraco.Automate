@@ -45,7 +45,7 @@ public sealed class GroupResolveAutomationController : AutomationControllerBase
         var group = await _groupService.GetGroupAsync(groupId, cancellationToken);
         if (group is null)
         {
-            return AutomationNotFound();
+            return NotFound(new ProblemDetails { Title = "Group not found", Detail = $"No group found with ID {groupId}." });
         }
 
         var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, group.WorkspaceId);

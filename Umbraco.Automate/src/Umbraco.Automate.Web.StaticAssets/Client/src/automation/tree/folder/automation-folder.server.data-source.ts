@@ -92,8 +92,9 @@ export class UaAutomationFolderServerDataSource extends UmbControllerBase implem
             return { error };
         }
 
-        // The API returns the created group ID as a string in the response body.
-        const createdId = data as unknown as string;
+        // The API returns the created group ID as a plain GUID string body (see CreateWorkspaceGroupController).
+        // The SDK types this as `unknown` (201 response with no schema), so we extract the string value.
+        const createdId = typeof data === "string" ? data : String(data ?? "");
 
         return {
             data: {

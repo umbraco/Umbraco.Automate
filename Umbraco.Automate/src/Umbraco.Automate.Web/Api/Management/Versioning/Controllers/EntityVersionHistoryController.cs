@@ -105,12 +105,14 @@ public class EntityVersionHistoryController : VersioningControllerBase
             pagedVersions.Add(currentVersionModel);
         }
 
-        pagedVersions.AddRange(historicalVersions.Select(v =>
-        {
-            var model = _umbracoMapper.Map<EntityVersionResponseModel>(v)!;
-            model.IsPublished = publishedVersion == model.Version;
-            return model;
-        }));
+        pagedVersions.AddRange(historicalVersions
+            .Where(v => v.Version != currentVersion) // Exclude current version from historical results to avoid duplicates.
+            .Select(v =>
+            {
+                var model = _umbracoMapper.Map<EntityVersionResponseModel>(v)!;
+                model.IsPublished = publishedVersion == model.Version;
+                return model;
+            }));
 
         var totalVersions = historicalTotal + 1;
 

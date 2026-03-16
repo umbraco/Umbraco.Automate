@@ -19,12 +19,19 @@ namespace Umbraco.Automate.Core.Dispatch;
 /// <typeparam name="TNotification">The Umbraco notification type.</typeparam>
 internal sealed class TriggerNotificationHandler<TNotification>(
     IEnumerable<INotificationTrigger<TNotification>> triggers,
-    ITriggerDispatcher dispatcher) : INotificationAsyncHandler<TNotification>
+    ITriggerDispatcher dispatcher,
+    IRuntimeState runtimeState) : INotificationAsyncHandler<TNotification>
     where TNotification : INotification
 {
     /// <inheritdoc />
     public async Task HandleAsync(TNotification notification, CancellationToken cancellationToken)
     {
+        // Skip dispatch during install/upgrade — Automate tables may not exist yet.
+        if (runtimeState.Level != RuntimeLevel.Run)
+        {
+            return;
+        }
+
         foreach (var trigger in triggers)
         {
             foreach (var evt in trigger.MapEvent(notification))

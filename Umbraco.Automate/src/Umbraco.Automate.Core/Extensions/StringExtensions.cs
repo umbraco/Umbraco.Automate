@@ -119,8 +119,14 @@ internal static class StringExtensions
                 continue;
             }
 
+            // Reset delimiter flag on first non-delimiter character after a delimiter.
+            if (hasSeenDelimiter)
+            {
+                hasSeenDelimiter = false;
+            }
+
             // Check if this is the start of a new word (uppercase letter in camelCase/PascalCase)
-            if (char.IsUpper(c) && currentWord.Length > 0 && !hasSeenDelimiter)
+            if (char.IsUpper(c) && currentWord.Length > 0)
             {
                 // Handle consecutive uppercase letters (e.g., "XMLParser" -> "XML", "Parser")
                 if (i + 1 < str.Length && char.IsUpper(str[i + 1]))

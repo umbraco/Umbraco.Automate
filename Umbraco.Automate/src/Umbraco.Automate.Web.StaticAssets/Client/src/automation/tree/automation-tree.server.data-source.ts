@@ -84,7 +84,7 @@ export class UaAutomationTreeServerDataSource
 
         return {
             data: {
-                total: data.items.length,
+                total: data.total,
                 items: data.items.map((a) => this.#mapAutomationItem(a, groupId, UA_AUTOMATION_GROUP_ENTITY_TYPE)),
             },
         };
