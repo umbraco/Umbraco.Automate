@@ -46,4 +46,7 @@ public enum StepRunStatus
 
     /// <summary>Step is waiting for external input (e.g. approval).</summary>
     WaitingForInput = 5,
+
+    /// <summary>Step is durably sleeping for a configured duration.</summary>
+    Sleeping = 6,
 }

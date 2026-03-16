@@ -1,3 +1,4 @@
+using Json.Schema;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -45,11 +46,13 @@ public class ContentUnpublishedTriggerTests
     [Fact]
     public void HasOutputProperties()
     {
-        var props = _trigger.GetOutputProperties();
-        props.Count.ShouldBeGreaterThan(0);
-        props.ShouldContain(p => p.Name == "contentKey");
-        props.ShouldContain(p => p.Name == "contentName");
-        props.ShouldContain(p => p.Name == "contentTypeAlias");
+        var schema = _trigger.GetOutputSchema();
+        schema.ShouldNotBeNull();
+        var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
+        properties.ShouldNotBeNull();
+        properties.Keys.ShouldContain("contentKey");
+        properties.Keys.ShouldContain("contentName");
+        properties.Keys.ShouldContain("contentTypeAlias");
     }
 
     [Fact]

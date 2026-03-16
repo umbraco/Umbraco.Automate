@@ -21,7 +21,7 @@ public class SetVariableActionTests
 
     [Fact]
     public void HasSettingsType()
-        => _action.SettingsType.ShouldBe(typeof(SetVariableActionSettings));
+        => _action.SettingsType.ShouldBe(typeof(SetVariableSettings));
 
     [Fact]
     public async Task ExecuteAsync_ReturnsSuccessWithNameAndValue()
@@ -32,7 +32,7 @@ public class SetVariableActionTests
             RunId = Guid.NewGuid(),
             StepId = Guid.NewGuid(),
             ActionAlias = "umbracoAutomate.setVariable",
-            Settings = new SetVariableActionSettings { Name = "myVar", Value = "hello" },
+            Settings = new SetVariableSettings { Name = "myVar", Value = "hello" },
         };
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
@@ -50,7 +50,7 @@ public class SetVariableActionTests
             RunId = Guid.NewGuid(),
             StepId = Guid.NewGuid(),
             ActionAlias = "umbracoAutomate.setVariable",
-            Settings = new SetVariableActionSettings(),
+            Settings = new SetVariableSettings(),
         };
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
@@ -66,7 +66,7 @@ public class SetVariableActionTests
             RunId = Guid.NewGuid(),
             StepId = Guid.NewGuid(),
             ActionAlias = "umbracoAutomate.setVariable",
-            Settings = new SetVariableActionSettings { Name = "", Value = "" },
+            Settings = new SetVariableSettings { Name = "", Value = "" },
         };
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);

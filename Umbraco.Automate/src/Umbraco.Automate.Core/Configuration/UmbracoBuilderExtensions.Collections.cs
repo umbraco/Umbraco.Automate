@@ -3,16 +3,19 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
@@ -59,11 +62,13 @@ public static partial class UmbracoBuilderExtensions
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<ITrigger, TriggerAttribute>(cache: true));
         builder.AutomateActions()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IAction, ActionAttribute>(cache: true));
+        builder.AutomateControlFlow()
+            .Add(() => builder.TypeLoader.GetTypesWithAttribute<IControlFlow, ControlFlowAttribute>(cache: true));
         builder.AutomateConnectionTypes()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IConnectionType, ConnectionTypeAttribute>(cache: true));
         builder.AutomateNotificationChannels()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<INotificationChannel, NotificationChannelAttribute>(cache: true));
-        builder.AutomateExpressionFilters();
+        builder.AutomateBindingFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>()
             .Add<WorkspaceVersionableEntityAdapter>();
@@ -88,6 +93,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEditableModelResolver, EditableModelResolver>();
         builder.Services.AddSingleton<ActionInfrastructure>();
         builder.Services.AddSingleton<TriggerInfrastructure>();
+        builder.Services.AddSingleton<ControlFlowInfrastructure>();
         builder.Services.AddSingleton<ConnectionTypeInfrastructure>();
         builder.Services.AddSingleton<NotificationChannelInfrastructure>();
 
@@ -110,8 +116,9 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
-        builder.Services.AddSingleton<ExpressionEvaluator>();
-        builder.Services.AddSingleton<SettingsExpressionResolver>();
+        builder.Services.AddSingleton<BindingEvaluator>();
+        builder.Services.AddSingleton<SettingsBindingResolver>();
+        builder.Services.AddSingleton<ConditionEvaluator>();
 
         // HTTP client for HttpRequestAction — with SSRF protection
         builder.Services.AddHttpClient("UmbracoAutomate")
@@ -134,6 +141,7 @@ public static partial class UmbracoBuilderExtensions
 
         // Automation execution
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
+        builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         // WorkflowCore engine with outbox-backed queue.
@@ -159,10 +167,16 @@ public static partial class UmbracoBuilderExtensions
         => builder.WithCollectionBuilder<ActionCollectionBuilder>();
 
     /// <summary>
-    /// Gets the expression filter collection builder. Filters are auto-discovered.
+    /// Gets the control flow collection builder. Control flow types are auto-discovered.
     /// </summary>
-    public static ExpressionFilterCollectionBuilder AutomateExpressionFilters(this IUmbracoBuilder builder)
-        => builder.WithCollectionBuilder<ExpressionFilterCollectionBuilder>();
+    public static ControlFlowCollectionBuilder AutomateControlFlow(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<ControlFlowCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the binding filter collection builder. Filters are auto-discovered.
+    /// </summary>
+    public static BindingFilterCollectionBuilder AutomateBindingFilters(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<BindingFilterCollectionBuilder>();
 
     /// <summary>
     /// Gets the action middleware collection builder. Use to control pipeline order.

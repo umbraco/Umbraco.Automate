@@ -1,16 +1,10 @@
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Umbraco.Automate.Core.Actions;
-using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
-using Umbraco.Automate.Core.Expressions;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
 using WorkflowCore.Interface;
-using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Core.Execution;
 
@@ -22,45 +16,30 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 {
     private readonly IWorkflowHost _workflowHost;
     private readonly IWorkflowRegistry _workflowRegistry;
-    private readonly ActionCollection _actions;
-    private readonly ActionMiddlewarePipeline _pipeline;
-    private readonly ExpressionEvaluator _expressionEvaluator;
-    private readonly SettingsExpressionResolver _settingsExpressionResolver;
+    private readonly IWorkflowCompiler _compiler;
     private readonly IAutomationRunRepository _runRepository;
-    private readonly IConnectionService _connectionService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IRateLimitService _rateLimitService;
     private readonly AutomateMetrics _metrics;
-    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AutomationExecutor> _logger;
 
     public AutomationExecutor(
         IWorkflowHost workflowHost,
         IWorkflowRegistry workflowRegistry,
-        ActionCollection actions,
-        ActionMiddlewarePipeline pipeline,
-        ExpressionEvaluator expressionEvaluator,
-        SettingsExpressionResolver settingsExpressionResolver,
+        IWorkflowCompiler compiler,
         IAutomationRunRepository runRepository,
-        IConnectionService connectionService,
         IWorkspaceService workspaceService,
         IRateLimitService rateLimitService,
         AutomateMetrics metrics,
-        IServiceProvider serviceProvider,
         ILogger<AutomationExecutor> logger)
     {
         _workflowHost = workflowHost;
         _workflowRegistry = workflowRegistry;
-        _actions = actions;
-        _pipeline = pipeline;
-        _expressionEvaluator = expressionEvaluator;
-        _settingsExpressionResolver = settingsExpressionResolver;
+        _compiler = compiler;
         _runRepository = runRepository;
-        _connectionService = connectionService;
         _workspaceService = workspaceService;
         _rateLimitService = rateLimitService;
         _metrics = metrics;
-        _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
@@ -120,7 +99,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 
         if (existing is null)
         {
-            var definition = CompileWorkflowDefinition(automation, workflowId);
+            var definition = _compiler.Compile(automation, workflowId);
             _workflowRegistry.RegisterWorkflow(definition);
         }
 
@@ -141,118 +120,5 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             workflowId, instanceId, run.Id, workspace.ServiceAccountKey);
 
         return run.Id;
-    }
-
-    private WorkflowDefinition CompileWorkflowDefinition(Automation automation, string workflowId)
-    {
-        var definition = new WorkflowDefinition
-        {
-            Id = workflowId,
-            Version = automation.Version,
-            DataType = typeof(AutomationWorkflowData),
-        };
-
-        // Sort steps by connections to determine execution order.
-        var orderedSteps = TopologicalSort(automation.Steps, automation.Connections);
-        var stepIndex = 0;
-
-        foreach (var stepConfig in orderedSteps)
-        {
-            var action = _actions.FirstOrDefault(a => a.Alias == stepConfig.ActionAlias);
-            if (action is null)
-            {
-                _logger.LogWarning("Action '{ActionAlias}' not found, skipping step {StepId}", stepConfig.ActionAlias, stepConfig.Id);
-                continue;
-            }
-
-            var stepBody = new ActionStepBody(
-                stepConfig,
-                action,
-                _pipeline,
-                _expressionEvaluator,
-                _settingsExpressionResolver,
-                _runRepository,
-                _connectionService,
-                _metrics,
-                _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
-
-            var workflowStep = new ActionWorkflowStep(stepBody)
-            {
-                Id = stepIndex++,
-                Name = stepConfig.Name,
-            };
-
-            definition.Steps.Add(workflowStep);
-        }
-
-        // Wire up step transitions (sequential for now — each step goes to the next).
-        for (var i = 0; i < definition.Steps.Count - 1; i++)
-        {
-            definition.Steps.FindById(i).Outcomes.Add(new ValueOutcome { NextStep = i + 1 });
-        }
-
-        return definition;
-    }
-
-    /// <summary>
-    /// Orders steps by their connections using topological sort.
-    /// Falls back to original order if no connections exist.
-    /// </summary>
-    private static List<StepConfiguration> TopologicalSort(
-        IList<StepConfiguration> steps,
-        IList<StepConnection> connections)
-    {
-        if (connections.Count == 0)
-        {
-            return [..steps];
-        }
-
-        var adjacency = new Dictionary<Guid, List<Guid>>();
-        var inDegree = new Dictionary<Guid, int>();
-
-        foreach (var step in steps)
-        {
-            adjacency[step.Id] = [];
-            inDegree[step.Id] = 0;
-        }
-
-        foreach (var conn in connections)
-        {
-            if (adjacency.ContainsKey(conn.SourceStepId) && inDegree.ContainsKey(conn.TargetStepId))
-            {
-                adjacency[conn.SourceStepId].Add(conn.TargetStepId);
-                inDegree[conn.TargetStepId]++;
-            }
-        }
-
-        var queue = new Queue<Guid>(inDegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));
-        var result = new List<StepConfiguration>();
-        var stepLookup = steps.ToDictionary(s => s.Id);
-
-        while (queue.Count > 0)
-        {
-            var id = queue.Dequeue();
-            if (stepLookup.TryGetValue(id, out var step))
-            {
-                result.Add(step);
-            }
-
-            foreach (var neighbor in adjacency[id])
-            {
-                inDegree[neighbor]--;
-                if (inDegree[neighbor] == 0)
-                {
-                    queue.Enqueue(neighbor);
-                }
-            }
-        }
-
-        // If topological sort didn't include all steps (cycle), fall back.
-        if (result.Count < steps.Count)
-        {
-            return [..steps];
-        }
-
-        return result;
     }
 }

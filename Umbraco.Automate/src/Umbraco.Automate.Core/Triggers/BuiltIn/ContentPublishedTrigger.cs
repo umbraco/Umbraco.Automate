@@ -6,7 +6,10 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 /// Fires when content is published in Umbraco CMS.
 /// Produces one <see cref="TriggerEvent"/> per published content item.
 /// </summary>
-[Trigger("umbracoAutomate.contentPublished", "Content Published")]
+[Trigger("umbracoAutomate.contentPublished", "Content Published",
+    Description = "Fires when content is published.",
+    Group = "Content",
+    Icon = "icon-document")]
 public sealed class ContentPublishedTrigger
     : NotificationTriggerBase<ContentPublishedTriggerSettings, ContentPublishedTriggerOutput, ContentPublishedNotification>
 {
@@ -16,15 +19,6 @@ public sealed class ContentPublishedTrigger
     public ContentPublishedTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
     {
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Fires when content is published.";
-
-    /// <inheritdoc />
-    public override string? Group => "Content";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-document";
 
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(ContentPublishedNotification notification)

@@ -8,8 +8,11 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that publishes a content item in Umbraco CMS.
 /// </summary>
-[Action("umbracoAutomate.publishContent", "Publish Content")]
-public sealed class PublishContentAction : ActionBase<PublishContentActionSettings>, ICmsAction
+[Action("umbracoAutomate.publishContent", "Publish Content",
+    Description = "Publishes a content item in Umbraco CMS.",
+    Group = "Content",
+    Icon = "icon-globe")]
+public sealed class PublishContentAction : ActionBase<PublishContentSettings, PublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
     private readonly ILogger<PublishContentAction> _logger;
@@ -28,18 +31,9 @@ public sealed class PublishContentAction : ActionBase<PublishContentActionSettin
     }
 
     /// <inheritdoc />
-    public override string? Description => "Publishes a content item in Umbraco CMS.";
-
-    /// <inheritdoc />
-    public override string? Group => "Content";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-globe";
-
-    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
-        var settings = context.GetSettings<PublishContentActionSettings>();
+        var settings = context.GetSettings<PublishContentSettings>();
 
         if (string.IsNullOrWhiteSpace(settings.ContentKey) || !Guid.TryParse(settings.ContentKey, out var contentKey))
         {
@@ -62,7 +56,7 @@ public sealed class PublishContentAction : ActionBase<PublishContentActionSettin
 
         if (result.Success)
         {
-            return ActionResult.Success(new
+            return Success(new PublishContentOutput
             {
                 ContentKey = contentKey,
                 Cultures = culturesToPublish.Select(c => c.Culture).ToArray(),

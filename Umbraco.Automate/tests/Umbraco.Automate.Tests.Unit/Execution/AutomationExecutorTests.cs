@@ -4,10 +4,12 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Tests.Common.Builders;
@@ -34,12 +36,33 @@ public class AutomationExecutorTests
         action.Setup(a => a.Alias).Returns("testAction");
 
         var actions = CreateActionCollection(action.Object);
+        var controlFlow = new ControlFlowCollection(Enumerable.Empty<IControlFlow>);
         var pipeline = new ActionMiddlewarePipeline(new ActionMiddlewareCollection(Array.Empty<IActionMiddleware>));
-        var evaluator = new ExpressionEvaluator(new ExpressionFilterCollection(Array.Empty<IExpressionFilter>));
+        var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
+        var conditionEvaluator = new ConditionEvaluator(evaluator);
 
         var services = new ServiceCollection();
         services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
         var sp = services.BuildServiceProvider();
+
+        var meterFactory = new Mock<IMeterFactory>();
+        meterFactory.Setup(f => f.Create(It.IsAny<MeterOptions>()))
+            .Returns((MeterOptions opts) => new Meter(opts.Name));
+
+        var metrics = new AutomateMetrics(meterFactory.Object);
+
+        var compiler = new WorkflowCompiler(
+            actions,
+            controlFlow,
+            pipeline,
+            evaluator,
+            new SettingsBindingResolver(evaluator),
+            conditionEvaluator,
+            _runRepo.Object,
+            Mock.Of<IConnectionService>(),
+            metrics,
+            sp,
+            Mock.Of<ILogger<WorkflowCompiler>>());
 
         _defaultWorkspace = new WorkspaceBuilder().Build();
 
@@ -54,23 +77,14 @@ public class AutomationExecutorTests
         _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
 
-        var meterFactory = new Mock<IMeterFactory>();
-        meterFactory.Setup(f => f.Create(It.IsAny<MeterOptions>()))
-            .Returns((MeterOptions opts) => new Meter(opts.Name));
-
         _executor = new AutomationExecutor(
             _workflowHost.Object,
             _workflowRegistry.Object,
-            actions,
-            pipeline,
-            evaluator,
-            new SettingsExpressionResolver(evaluator),
+            compiler,
             _runRepo.Object,
-            Mock.Of<IConnectionService>(),
             _workspaceService.Object,
             Mock.Of<IRateLimitService>(),
-            new AutomateMetrics(meterFactory.Object),
-            sp,
+            metrics,
             Mock.Of<ILogger<AutomationExecutor>>());
     }
 
@@ -235,6 +249,205 @@ public class AutomationExecutorTests
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
         _workflowRegistry.Verify(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OutcomeConnections_WiresValueOutcomeWithValue()
+    {
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+
+        var automation = new AutomationBuilder()
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .AddStep(falseStep)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(3);
+
+        // If step should have two outcomes with values
+        var ifOutcomes = def.Steps.FindById(0).Outcomes;
+        ifOutcomes.Count.ShouldBe(2);
+
+        // Both should be ValueOutcome with non-null Value (lambda returning the outcome string)
+        var trueOutcome = (ValueOutcome)ifOutcomes[0];
+        var falseOutcome = (ValueOutcome)ifOutcomes[1];
+
+        // Verify the outcomes point to correct steps
+        trueOutcome.NextStep.ShouldBe(1);
+        falseOutcome.NextStep.ShouldBe(2);
+
+        // Verify the outcome values match (GetValue compiles the lambda)
+        trueOutcome.GetValue(null!).ShouldBe("true");
+        falseOutcome.GetValue(null!).ShouldBe("false");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MixedSequentialAndBranching_WiresCorrectly()
+    {
+        StepConfiguration stepA = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+
+        var automation = new AutomationBuilder()
+            .AddStep(stepA)
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .WithConnection(stepA.Id, ifStep.Id)         // Sequential (no outcome)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")  // Branching
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(3);
+
+        // Step A → If (sequential, no outcome value)
+        var seqOutcome = (ValueOutcome)def.Steps.FindById(0).Outcomes[0];
+        seqOutcome.NextStep.ShouldBe(1);
+        seqOutcome.GetValue(null!).ShouldBeNull(); // No Value lambda = sequential
+
+        // If → True Branch (outcome = "true")
+        var branchOutcome = (ValueOutcome)def.Steps.FindById(1).Outcomes[0];
+        branchOutcome.NextStep.ShouldBe(2);
+        branchOutcome.GetValue(null!).ShouldBe("true");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BranchConvergence_BothBranchesPointToSharedStep()
+    {
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+        StepConfiguration sharedEnd = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Shared End");
+
+        var automation = new AutomationBuilder()
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .AddStep(falseStep)
+            .AddStep(sharedEnd)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .WithConnection(trueStep.Id, sharedEnd.Id)
+            .WithConnection(falseStep.Id, sharedEnd.Id)
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(4);
+
+        def.Steps.FindById(0).Name.ShouldBe("If");
+        def.Steps.FindById(3).Name.ShouldBe("Shared End");
+
+        var ifOutcomes = def.Steps.FindById(0).Outcomes;
+        ifOutcomes.Count.ShouldBe(2);
+        ifOutcomes.Cast<ValueOutcome>().Select(o => o.GetValue(null!)).ShouldBe(["true", "false"], ignoreOrder: true);
+
+        var trueStepIndex = def.Steps.FindById(0).Outcomes.Cast<ValueOutcome>()
+            .First(o => (string)o.GetValue(null!)! == "true").NextStep;
+        var falseStepIndex = def.Steps.FindById(0).Outcomes.Cast<ValueOutcome>()
+            .First(o => (string)o.GetValue(null!)! == "false").NextStep;
+
+        var trueStepOutcomes = def.Steps.FindById(trueStepIndex).Outcomes;
+        trueStepOutcomes.Count.ShouldBe(1);
+        ((ValueOutcome)trueStepOutcomes[0]).NextStep.ShouldBe(3);
+
+        var falseStepOutcomes = def.Steps.FindById(falseStepIndex).Outcomes;
+        falseStepOutcomes.Count.ShouldBe(1);
+        ((ValueOutcome)falseStepOutcomes[0]).NextStep.ShouldBe(3);
+
+        def.Steps.FindById(3).Outcomes.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BranchConvergence_TopologicalOrder_ConvergenceStepIsLast()
+    {
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+        StepConfiguration sharedEnd = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Shared End");
+
+        var automation = new AutomationBuilder()
+            .AddStep(sharedEnd)   // Deliberately add convergence step first
+            .AddStep(falseStep)
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .WithConnection(trueStep.Id, sharedEnd.Id)
+            .WithConnection(falseStep.Id, sharedEnd.Id)
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.FindById(0).Name.ShouldBe("If");
+        def.Steps.FindById(3).Name.ShouldBe("Shared End");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BranchConvergence_WithTailSteps_WiresDiamondThenSequential()
+    {
+        StepConfiguration ifStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("If");
+        StepConfiguration trueStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("True Branch");
+        StepConfiguration falseStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("False Branch");
+        StepConfiguration sharedMerge = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Shared Merge");
+        StepConfiguration finalStep = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Final Step");
+
+        var automation = new AutomationBuilder()
+            .AddStep(ifStep)
+            .AddStep(trueStep)
+            .AddStep(falseStep)
+            .AddStep(sharedMerge)
+            .AddStep(finalStep)
+            .WithConnection(ifStep.Id, trueStep.Id, "true")
+            .WithConnection(ifStep.Id, falseStep.Id, "false")
+            .WithConnection(trueStep.Id, sharedMerge.Id)
+            .WithConnection(falseStep.Id, sharedMerge.Id)
+            .WithConnection(sharedMerge.Id, finalStep.Id)
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.Count.ShouldBe(5);
+
+        var mergeIndex = Enumerable.Range(0, 5)
+            .First(i => def.Steps.FindById(i).Name == "Shared Merge");
+        var finalIndex = Enumerable.Range(0, 5)
+            .First(i => def.Steps.FindById(i).Name == "Final Step");
+
+        var mergeOutcomes = def.Steps.FindById(mergeIndex).Outcomes;
+        mergeOutcomes.Count.ShouldBe(1);
+        ((ValueOutcome)mergeOutcomes[0]).NextStep.ShouldBe(finalIndex);
+
+        def.Steps.FindById(finalIndex).Outcomes.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoConnections_FallsBackToSequential()
+    {
+        StepConfiguration stepA = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration stepB = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step B");
+
+        var automation = new AutomationBuilder()
+            .AddStep(stepA)
+            .AddStep(stepB)
+            .Build();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        var def = _registeredDefinitions[0];
+        def.Steps.FindById(0).Outcomes.Count.ShouldBe(1);
+        ((ValueOutcome)def.Steps.FindById(0).Outcomes[0]).NextStep.ShouldBe(1);
+        ((ValueOutcome)def.Steps.FindById(0).Outcomes[0]).GetValue(null!).ShouldBeNull();
     }
 
     private static Automation CreateAutomation(string actionAlias) =>

@@ -6,7 +6,7 @@ using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -22,8 +22,8 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly StepConfiguration _stepConfig;
     private readonly IAction _action;
     private readonly ActionMiddlewarePipeline _pipeline;
-    private readonly ExpressionEvaluator _expressionEvaluator;
-    private readonly SettingsExpressionResolver _settingsExpressionResolver;
+    private readonly BindingEvaluator _bindingEvaluator;
+    private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
     private readonly AutomateMetrics _metrics;
@@ -33,8 +33,8 @@ internal sealed class ActionStepBody : StepBodyAsync
         StepConfiguration stepConfig,
         IAction action,
         ActionMiddlewarePipeline pipeline,
-        ExpressionEvaluator expressionEvaluator,
-        SettingsExpressionResolver settingsExpressionResolver,
+        BindingEvaluator bindingEvaluator,
+        SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
         AutomateMetrics metrics,
@@ -43,8 +43,8 @@ internal sealed class ActionStepBody : StepBodyAsync
         _stepConfig = stepConfig;
         _action = action;
         _pipeline = pipeline;
-        _expressionEvaluator = expressionEvaluator;
-        _settingsExpressionResolver = settingsExpressionResolver;
+        _bindingEvaluator = bindingEvaluator;
+        _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
         _metrics = metrics;
@@ -55,6 +55,12 @@ internal sealed class ActionStepBody : StepBodyAsync
     {
         var data = (AutomationWorkflowData)context.Workflow.Data;
         var cancellationToken = context.CancellationToken;
+
+        // Resume path: workflow is resuming after Sleep with persisted data.
+        if (context.PersistenceData is SleepPersistenceData sleepData)
+        {
+            return await HandleSleepResumeAsync(sleepData, data, cancellationToken);
+        }
 
         // Resume path: workflow is resuming after WaitForEvent with the event data.
         if (context.Item is not null)
@@ -71,11 +77,11 @@ internal sealed class ActionStepBody : StepBodyAsync
         AutomationWorkflowData data,
         CancellationToken cancellationToken)
     {
-        // Build expression data context: trigger output + all prior step outputs.
-        var expressionData = BuildExpressionData(data);
+        // Build binding data context: trigger output + all prior step outputs.
+        var bindingData = BindingDataBuilder.Build(data);
 
-        // Resolve input mappings via expressions.
-        var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, expressionData);
+        // Resolve input mappings via bindings.
+        var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
 
         // Resolve settings for the action (deserialize, resolve $config refs, validate).
         object? settings = null;
@@ -84,10 +90,10 @@ internal sealed class ActionStepBody : StepBodyAsync
             settings = _action.ResolveSettings(_stepConfig.Settings);
         }
 
-        // Evaluate ${ } expressions in settings properties marked with SupportsExpressions.
+        // Evaluate ${ } bindings in settings properties marked with SupportsBindings.
         if (settings is not null)
         {
-            _settingsExpressionResolver.ResolveExpressions(settings, expressionData);
+            _settingsBindingResolver.ResolveBindings(settings, bindingData);
         }
 
         // Resolve connection for this step (if configured).
@@ -110,6 +116,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ExecutionContext = data.ExecutionContext,
             Connection = connection,
             Action = _action,
+            BindingData = bindingData,
         };
 
         // Create and persist step run.
@@ -128,21 +135,37 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Execute through the middleware pipeline.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, cancellationToken);
 
-        // Handle WaitingForInput: suspend the workflow until external event.
-        if (result.Status == ActionResultStatus.WaitingForInput)
+        // Handle suspension: the action needs the workflow to pause.
+        switch (result.Suspension)
         {
-            stepRun.Status = StepRunStatus.WaitingForInput;
-            StoreOutputData(result.OutputData, stepRun, data);
-            await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+            case ActionSuspension.WaitForEvent wait:
+                stepRun.Status = StepRunStatus.WaitingForInput;
+                StoreOutputData(result.OutputData, stepRun, data);
+                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
-            _logger.LogInformation(
-                "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
-                _stepConfig.Id, result.WaitEventName, result.WaitEventKey);
+                _logger.LogInformation(
+                    "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
+                    _stepConfig.Id, wait.EventName, wait.EventKey);
 
-            return ExecutionResult.WaitForEvent(
-                result.WaitEventName!,
-                result.WaitEventKey!,
-                DateTime.UtcNow);
+                return ExecutionResult.WaitForEvent(wait.EventName, wait.EventKey, DateTime.UtcNow);
+
+            case ActionSuspension.Sleep sleep:
+                stepRun.Status = StepRunStatus.Sleeping;
+                StoreOutputData(result.OutputData, stepRun, data);
+                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+
+                _logger.LogInformation(
+                    "Step {StepId} is sleeping for {Duration}",
+                    _stepConfig.Id, sleep.Duration);
+
+                var persistenceData = new SleepPersistenceData
+                {
+                    StepRunId = stepRun.Id,
+                    RunId = data.RunId,
+                    StepId = _stepConfig.Id,
+                };
+
+                return ExecutionResult.Sleep(sleep.Duration, persistenceData);
         }
 
         // Update step run with result.
@@ -181,6 +204,12 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
             throw result.Exception ?? new InvalidOperationException($"Step '{_stepConfig.Name}' failed.");
+        }
+
+        // If the action returned a named outcome, route via WorkflowCore's outcome matching.
+        if (result.Status == ActionResultStatus.Success && result.Outcome is not null)
+        {
+            return ExecutionResult.Outcome(result.Outcome);
         }
 
         return ExecutionResult.Next();
@@ -261,6 +290,37 @@ internal sealed class ActionStepBody : StepBodyAsync
         return ExecutionResult.Next();
     }
 
+    private async Task<ExecutionResult> HandleSleepResumeAsync(
+        SleepPersistenceData sleepData,
+        AutomationWorkflowData data,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Step {StepId} resumed after sleep", sleepData.StepId);
+
+        var run = await _runRepository.GetAsync(sleepData.RunId, cancellationToken);
+        var stepRun = run?.StepRuns.FirstOrDefault(sr => sr.Id == sleepData.StepRunId && sr.Status == StepRunStatus.Sleeping);
+
+        if (stepRun is null)
+        {
+            _logger.LogWarning("No Sleeping step run found for step {StepId} in run {RunId}", sleepData.StepId, sleepData.RunId);
+            return ExecutionResult.Next();
+        }
+
+        stepRun.Status = StepRunStatus.Completed;
+        stepRun.CompletedUtc = DateTime.UtcNow;
+        stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
+
+        if (stepRun.Duration.HasValue)
+        {
+            _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
+        }
+
+        _metrics.StepExecuted(_action.Alias);
+        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+
+        return ExecutionResult.Next();
+    }
+
     private void StoreOutputData(object? outputData, StepRun stepRun, AutomationWorkflowData data)
     {
         if (outputData is null)
@@ -275,31 +335,15 @@ internal sealed class ActionStepBody : StepBodyAsync
         data.StepOutputs[_stepConfig.Id] = outputDict;
     }
 
-    private static Dictionary<string, object?> BuildExpressionData(AutomationWorkflowData data)
-    {
-        var expressionData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["trigger"] = data.TriggerOutput,
-        };
-
-        // Add step outputs keyed by step ID.
-        foreach (var (stepId, outputs) in data.StepOutputs)
-        {
-            expressionData[$"steps.{stepId}"] = outputs;
-        }
-
-        return expressionData;
-    }
-
     private Dictionary<string, object?> ResolveInputMappings(
         Dictionary<string, string> inputMappings,
-        Dictionary<string, object?> expressionData)
+        Dictionary<string, object?> bindingData)
     {
         var resolved = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (key, expression) in inputMappings)
+        foreach (var (key, binding) in inputMappings)
         {
-            resolved[key] = _expressionEvaluator.Evaluate(expression, expressionData);
+            resolved[key] = _bindingEvaluator.Evaluate(binding, bindingData);
         }
 
         return resolved;

@@ -11,16 +11,16 @@ public sealed class ActionResult
         Exception? exception,
         StepRunErrorCategory? errorCategory,
         string? reason,
-        string? waitEventName = null,
-        string? waitEventKey = null)
+        ActionSuspension? suspension = null,
+        string? outcome = null)
     {
         Status = status;
         OutputData = outputData;
         Exception = exception;
         ErrorCategory = errorCategory;
         Reason = reason;
-        WaitEventName = waitEventName;
-        WaitEventKey = waitEventKey;
+        Suspension = suspension;
+        Outcome = outcome;
     }
 
     /// <summary>
@@ -49,20 +49,43 @@ public sealed class ActionResult
     public string? Reason { get; }
 
     /// <summary>
-    /// Gets the event name to wait for (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/>).
+    /// Gets the suspension data when the action requires the workflow to pause
+    /// (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/> or <see cref="ActionResultStatus.Sleeping"/>).
     /// </summary>
-    public string? WaitEventName { get; }
+    public ActionSuspension? Suspension { get; }
 
     /// <summary>
-    /// Gets the event key to wait for (only set when <see cref="Status"/> is <see cref="ActionResultStatus.WaitingForInput"/>).
+    /// Gets the named outcome for branching actions (e.g. "true"/"false" for If, case value for Switch).
+    /// When null, the step follows the default (sequential) transition.
     /// </summary>
-    public string? WaitEventKey { get; }
+    public string? Outcome { get; }
 
     /// <summary>
-    /// Creates a successful result with optional output data.
+    /// Creates a successful result with no output data.
     /// </summary>
-    public static ActionResult Success(object? outputData = null)
+    public static ActionResult Success()
+        => new(ActionResultStatus.Success, null, null, null, null);
+
+    /// <summary>
+    /// Creates a successful result with output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult Success(object outputData)
         => new(ActionResultStatus.Success, outputData, null, null, null);
+
+    /// <summary>
+    /// Creates a successful result with a named outcome and no output data.
+    /// </summary>
+    /// <param name="outcome">The named outcome (e.g. "true", "false", or a switch case value).</param>
+    public static ActionResult SuccessWithOutcome(string outcome)
+        => new(ActionResultStatus.Success, null, null, null, null, outcome: outcome);
+
+    /// <summary>
+    /// Creates a successful result with a named outcome and output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult SuccessWithOutcome(string outcome, object outputData)
+        => new(ActionResultStatus.Success, outputData, null, null, null, outcome: outcome);
 
     /// <summary>
     /// Creates a failed result.
@@ -81,9 +104,52 @@ public sealed class ActionResult
     /// </summary>
     /// <param name="eventName">The WorkflowCore event name to wait for.</param>
     /// <param name="eventKey">The WorkflowCore event key to wait for.</param>
-    /// <param name="outputData">Optional output data to store before waiting.</param>
-    public static ActionResult WaitForInput(string eventName, string eventKey, object? outputData = null)
-        => new(ActionResultStatus.WaitingForInput, outputData, null, null, null, eventName, eventKey);
+    public static ActionResult WaitForInput(string eventName, string eventKey)
+        => new(ActionResultStatus.WaitingForInput, null, null, null, null,
+            new ActionSuspension.WaitForEvent(eventName, eventKey));
+
+    /// <summary>
+    /// Creates a result that suspends the workflow until the specified event is received, with output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult WaitForInput(string eventName, string eventKey, object outputData)
+        => new(ActionResultStatus.WaitingForInput, outputData, null, null, null,
+            new ActionSuspension.WaitForEvent(eventName, eventKey));
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration with no output data.
+    /// </summary>
+    /// <param name="duration">The duration to sleep for.</param>
+    public static ActionResult Sleep(TimeSpan duration)
+        => new(ActionResultStatus.Sleeping, null, null, null, null,
+            new ActionSuspension.Sleep(duration));
+
+    /// <summary>
+    /// Creates a result that durably sleeps for the specified duration with output data.
+    /// Use the typed convenience methods on <see cref="ActionBase{TSettings, TOutput}"/> instead.
+    /// </summary>
+    internal static ActionResult Sleep(TimeSpan duration, object outputData)
+        => new(ActionResultStatus.Sleeping, outputData, null, null, null,
+            new ActionSuspension.Sleep(duration));
+}
+
+/// <summary>
+/// Describes how a workflow should be suspended when an action cannot complete immediately.
+/// </summary>
+public abstract record ActionSuspension
+{
+    /// <summary>
+    /// Suspend until an external event is published (e.g. approval decision).
+    /// </summary>
+    /// <param name="EventName">The WorkflowCore event name to wait for.</param>
+    /// <param name="EventKey">The WorkflowCore event key to wait for.</param>
+    public sealed record WaitForEvent(string EventName, string EventKey) : ActionSuspension;
+
+    /// <summary>
+    /// Suspend for a fixed duration. WorkflowCore persists the resume time in the database.
+    /// </summary>
+    /// <param name="Duration">The duration to sleep for.</param>
+    public sealed record Sleep(TimeSpan Duration) : ActionSuspension;
 }
 
 /// <summary>
@@ -102,6 +168,9 @@ public enum ActionResultStatus
 
     /// <summary>The action is waiting for external input (e.g. approval).</summary>
     WaitingForInput = 3,
+
+    /// <summary>The action is durably sleeping for a configured duration.</summary>
+    Sleeping = 4,
 }
 
 /// <summary>

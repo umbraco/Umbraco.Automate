@@ -11,6 +11,10 @@ export type ActionItemResponseModel = {
     group?: string | null;
     icon?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
+    outputSchema?: {
+        [key: string]: unknown;
+    } | null;
+    type: string;
 };
 
 export type ApprovalDecisionRequestModel = {
@@ -30,6 +34,33 @@ export type AutomationAncestorResponseModel = {
     isFolder: boolean;
 };
 
+export type AutomationExportDefinitionModel = {
+    alias: string;
+    name: string;
+    description?: string | null;
+    trigger?: TriggerConfigurationModel | null;
+    steps: Array<ExportStepModel>;
+    connections: Array<StepConnectionModel>;
+    canvasState?: string | null;
+    notificationSettings?: AutomationNotificationSettingsModel | null;
+};
+
+export type AutomationExportModel = {
+    formatVersion: string;
+    exportedAt: string;
+    exportedFrom: ExportSourceModel;
+    automation: AutomationExportDefinitionModel;
+    connectionReferences: Array<ConnectionReferenceModel>;
+};
+
+export type AutomationImportResultModel = {
+    success: boolean;
+    automationId?: string | null;
+    automationAlias?: string | null;
+    errors: Array<string>;
+    warnings: Array<string>;
+};
+
 export type AutomationItemResponseModel = {
     id: string;
     alias: string;
@@ -45,7 +76,6 @@ export type AutomationItemResponseModel = {
 };
 
 export type AutomationNotificationSettingsModel = {
-    notifyOn: NotifyOnModel;
     channels: Array<ChannelConfigurationModel>;
 };
 
@@ -100,6 +130,7 @@ export type ChannelConfigurationModel = {
         [key: string]: unknown;
     };
     isEnabled: boolean;
+    notifyOn: NotifyOnModel;
 };
 
 export type ConnectionItemResponseModel = {
@@ -110,6 +141,12 @@ export type ConnectionItemResponseModel = {
     version: number;
     dateCreated: string;
     dateModified: string;
+};
+
+export type ConnectionReferenceModel = {
+    alias: string;
+    type: string;
+    name: string;
 };
 
 export type ConnectionResponseModel = {
@@ -132,6 +169,19 @@ export type ConnectionTypeItemResponseModel = {
     group?: string | null;
     icon?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
+};
+
+export type ControlFlowItemResponseModel = {
+    alias: string;
+    name: string;
+    description?: string | null;
+    group?: string | null;
+    icon?: string | null;
+    settingsSchema?: EditableModelSchemaModel | null;
+    outputSchema?: {
+        [key: string]: unknown;
+    } | null;
+    type: string;
 };
 
 export type CreateAutomationRequestModel = {
@@ -181,7 +231,7 @@ export type EditableModelFieldDescriptorModel = {
     isSensitive: boolean;
     isRequired: boolean;
     group?: string | null;
-    supportsExpressions: boolean;
+    supportsBindings: boolean;
 };
 
 export type EditableModelSchemaModel = {
@@ -210,6 +260,33 @@ export type EntityVersionResponseModel = {
     createdByUserId?: string | null;
     changeDescription?: string | null;
     isPublished: boolean;
+};
+
+export type ExportSourceModel = {
+    product: string;
+    version: string;
+};
+
+export type ExportStepModel = {
+    id: string;
+    actionAlias: string;
+    name: string;
+    connectionAlias?: string | null;
+    settings: {
+        [key: string]: unknown;
+    };
+    inputMappings: {
+        [key: string]: string;
+    };
+    position: StepPositionModel;
+    errorBehavior: StepErrorBehaviorModel;
+    retryInterval?: string | null;
+    maxRetries?: number | null;
+};
+
+export type ImportAutomationRequestModel = {
+    workspaceId: string;
+    exportModel: AutomationExportModel;
 };
 
 export type NotificationChannelItemResponseModel = {
@@ -317,7 +394,20 @@ export type StepRunResponseModel = {
     durationMs?: number | null;
 };
 
-export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput';
+export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput' | 'Sleeping';
+
+export type StepTypeItemResponseModel = {
+    alias: string;
+    name: string;
+    description?: string | null;
+    group?: string | null;
+    icon?: string | null;
+    settingsSchema?: EditableModelSchemaModel | null;
+    outputSchema?: {
+        [key: string]: unknown;
+    } | null;
+    type: string;
+};
 
 export type TriggerConfigurationModel = {
     triggerAlias: string;
@@ -333,13 +423,10 @@ export type TriggerItemResponseModel = {
     group?: string | null;
     icon?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
-    outputProperties: Array<TriggerOutputPropertyModel>;
-};
-
-export type TriggerOutputPropertyModel = {
-    name: string;
+    outputSchema?: {
+        [key: string]: unknown;
+    } | null;
     type: string;
-    description?: string | null;
 };
 
 export type UpdateAutomationRequestModel = {
@@ -640,6 +727,39 @@ export type GetAutomationsByIdAncestorsResponses = {
 
 export type GetAutomationsByIdAncestorsResponse = GetAutomationsByIdAncestorsResponses[keyof GetAutomationsByIdAncestorsResponses];
 
+export type GetAutomationsByIdExportData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        include?: string;
+    };
+    url: '/umbraco/automate/management/api/v1/automations/{id}/export';
+};
+
+export type GetAutomationsByIdExportErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAutomationsByIdExportError = GetAutomationsByIdExportErrors[keyof GetAutomationsByIdExportErrors];
+
+export type GetAutomationsByIdExportResponses = {
+    /**
+     * OK
+     */
+    200: AutomationExportModel;
+};
+
+export type GetAutomationsByIdExportResponse = GetAutomationsByIdExportResponses[keyof GetAutomationsByIdExportResponses];
+
 export type PostAutomationsByIdPublishData = {
     body?: never;
     path: {
@@ -800,6 +920,64 @@ export type GetAutomationsGroupsByGroupIdResponses = {
 
 export type GetAutomationsGroupsByGroupIdResponse = GetAutomationsGroupsByGroupIdResponses[keyof GetAutomationsGroupsByGroupIdResponses];
 
+export type PostAutomationsImportData = {
+    body?: ImportAutomationRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/import';
+};
+
+export type PostAutomationsImportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type PostAutomationsImportError = PostAutomationsImportErrors[keyof PostAutomationsImportErrors];
+
+export type PostAutomationsImportResponses = {
+    /**
+     * Created
+     */
+    201: AutomationImportResultModel;
+};
+
+export type PostAutomationsImportResponse = PostAutomationsImportResponses[keyof PostAutomationsImportResponses];
+
+export type PostAutomationsImportValidateData = {
+    body?: ImportAutomationRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/import/validate';
+};
+
+export type PostAutomationsImportValidateErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type PostAutomationsImportValidateError = PostAutomationsImportValidateErrors[keyof PostAutomationsImportValidateErrors];
+
+export type PostAutomationsImportValidateResponses = {
+    /**
+     * OK
+     */
+    200: AutomationImportResultModel;
+};
+
+export type PostAutomationsImportValidateResponse = PostAutomationsImportValidateResponses[keyof PostAutomationsImportValidateResponses];
+
 export type GetCatalogueActionsData = {
     body?: never;
     path?: never;
@@ -846,6 +1024,29 @@ export type GetCatalogueConnectionTypesResponses = {
 
 export type GetCatalogueConnectionTypesResponse = GetCatalogueConnectionTypesResponses[keyof GetCatalogueConnectionTypesResponses];
 
+export type GetCatalogueControlFlowsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/catalogue/control-flows';
+};
+
+export type GetCatalogueControlFlowsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetCatalogueControlFlowsResponses = {
+    /**
+     * OK
+     */
+    200: Array<ControlFlowItemResponseModel>;
+};
+
+export type GetCatalogueControlFlowsResponse = GetCatalogueControlFlowsResponses[keyof GetCatalogueControlFlowsResponses];
+
 export type GetCatalogueNotificationChannelsData = {
     body?: never;
     path?: never;
@@ -868,6 +1069,31 @@ export type GetCatalogueNotificationChannelsResponses = {
 };
 
 export type GetCatalogueNotificationChannelsResponse = GetCatalogueNotificationChannelsResponses[keyof GetCatalogueNotificationChannelsResponses];
+
+export type GetCatalogueStepTypesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        type?: string;
+    };
+    url: '/umbraco/automate/management/api/v1/catalogue/step-types';
+};
+
+export type GetCatalogueStepTypesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetCatalogueStepTypesResponses = {
+    /**
+     * OK
+     */
+    200: Array<StepTypeItemResponseModel>;
+};
+
+export type GetCatalogueStepTypesResponse = GetCatalogueStepTypesResponses[keyof GetCatalogueStepTypesResponses];
 
 export type GetCatalogueTriggersData = {
     body?: never;

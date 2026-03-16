@@ -32,10 +32,10 @@ public abstract class NotificationChannelBase<TSettings> : INotificationChannel
     public string Name => _attribute.Name;
 
     /// <inheritdoc />
-    public abstract string? Description { get; }
+    public virtual string? Description => _attribute.Description;
 
     /// <inheritdoc />
-    public abstract string? Icon { get; }
+    public virtual string? Icon => _attribute.Icon;
 
     /// <inheritdoc />
     public Type? SettingsType => typeof(TSettings) == typeof(object) ? null : typeof(TSettings);
@@ -62,11 +62,11 @@ public abstract class NotificationChannelBase<TSettings> : INotificationChannel
         => ResolveSettings(settings);
 
     /// <inheritdoc />
-    public Task NotifyAsync(RunNotification notification, object? settings, CancellationToken cancellationToken)
-        => NotifyAsync(notification, settings as TSettings ?? new TSettings(), cancellationToken);
+    public Task NotifyAsync(NotificationMessage message, object? settings, CancellationToken cancellationToken)
+        => NotifyAsync(message, settings as TSettings ?? new TSettings(), cancellationToken);
 
     /// <summary>
-    /// Sends a notification through this channel with typed settings.
+    /// Sends a notification message through this channel with typed settings.
     /// </summary>
-    protected abstract Task NotifyAsync(RunNotification notification, TSettings settings, CancellationToken cancellationToken);
+    protected abstract Task NotifyAsync(NotificationMessage message, TSettings settings, CancellationToken cancellationToken);
 }

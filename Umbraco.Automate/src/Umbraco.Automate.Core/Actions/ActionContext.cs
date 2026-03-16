@@ -67,4 +67,10 @@ public sealed class ActionContext
     /// Gets the action instance being executed. Set by the pipeline for middleware inspection.
     /// </summary>
     public IAction? Action { get; init; }
+
+    /// <summary>
+    /// Gets the runtime binding data (trigger output + step outputs) for actions that
+    /// need to evaluate bindings directly (e.g. condition evaluation in the If action).
+    /// </summary>
+    public IReadOnlyDictionary<string, object?>? BindingData { get; init; }
 }

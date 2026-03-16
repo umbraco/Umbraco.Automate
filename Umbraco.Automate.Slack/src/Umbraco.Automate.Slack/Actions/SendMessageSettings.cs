@@ -16,6 +16,6 @@ public sealed class SendMessageSettings
     /// <summary>
     /// Gets or sets the message text.
     /// </summary>
-    [Field(Label = "Message", Description = "The message text to send. Supports ${ expression } syntax.", SortOrder = 1, SupportsExpressions = true)]
+    [Field(Label = "Message", Description = "The message text to send. Supports ${ binding } syntax.", SortOrder = 1, SupportsBindings = true)]
     public string Message { get; set; } = string.Empty;
 }

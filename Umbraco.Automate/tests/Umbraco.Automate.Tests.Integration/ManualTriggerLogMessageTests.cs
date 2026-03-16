@@ -7,12 +7,14 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Settings;
@@ -81,8 +83,11 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(actions);
         services.AddSingleton(triggers);
         services.AddSingleton(middlewareCollection);
-        services.AddSingleton(new ExpressionEvaluator(Array.Empty<IExpressionFilter>()));
-        services.AddSingleton<SettingsExpressionResolver>();
+        var controlFlow = new ControlFlowCollection(Enumerable.Empty<IControlFlow>);
+        services.AddSingleton(controlFlow);
+        services.AddSingleton(new BindingEvaluator(Array.Empty<IBindingFilter>()));
+        services.AddSingleton<SettingsBindingResolver>();
+        services.AddSingleton<ConditionEvaluator>();
         services.AddSingleton<ActionMiddlewarePipeline>();
         services.AddMetrics();
         services.AddSingleton<AutomateMetrics>();
@@ -101,6 +106,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Execution.
+        services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();

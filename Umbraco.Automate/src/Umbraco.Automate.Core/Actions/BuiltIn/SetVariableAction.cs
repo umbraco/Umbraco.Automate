@@ -3,8 +3,11 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that sets a named variable for use in downstream steps.
 /// </summary>
-[Action("umbracoAutomate.setVariable", "Set Variable")]
-public sealed class SetVariableAction : ActionBase<SetVariableActionSettings>
+[Action("umbracoAutomate.setVariable", "Set Variable",
+    Description = "Sets a named variable for use in downstream steps.",
+    Group = "Utilities",
+    Icon = "icon-brackets")]
+public sealed class SetVariableAction : ActionBase<SetVariableSettings, SetVariableOutput>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="SetVariableAction"/> class.
@@ -14,23 +17,14 @@ public sealed class SetVariableAction : ActionBase<SetVariableActionSettings>
     }
 
     /// <inheritdoc />
-    public override string? Description => "Sets a named variable for use in downstream steps.";
-
-    /// <inheritdoc />
-    public override string? Group => "Utilities";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-brackets";
-
-    /// <inheritdoc />
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
-        var settings = context.GetSettings<SetVariableActionSettings>();
+        var settings = context.GetSettings<SetVariableSettings>();
 
-        return Task.FromResult(ActionResult.Success(new
+        return Task.FromResult(Success(new SetVariableOutput
         {
-            settings.Name,
-            settings.Value,
+            Name = settings.Name,
+            Value = settings.Value,
         }));
     }
 }

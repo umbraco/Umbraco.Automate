@@ -55,8 +55,8 @@ public static class EditableModelSchemaBuilder
             IsSensitive = attr?.IsSensitive ?? false,
             IsRequired = validationRules.OfType<RequiredAttribute>().Any(),
             Group = attr?.Group,
-            SupportsExpressions = attr?.SupportsExpressions ?? false,
-            ValidationRules = validationRules,
+            SupportsBindings = attr?.SupportsBindings ?? false,
+            ValidationRules = InferValidationAttributes(property),
         };
     }
 

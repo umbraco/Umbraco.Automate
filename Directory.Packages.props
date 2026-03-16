@@ -33,6 +33,11 @@
     <PackageVersion Include="Cronos" Version="0.9.0" />
   </ItemGroup>
 
+  <!-- JSON Schema generation for output schemas -->
+  <ItemGroup>
+    <PackageVersion Include="JsonSchema.Net.Generation" Version="[5.1.1, 5.999.999)" />
+  </ItemGroup>
+
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
     <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.2.0, 7.999.999)" />

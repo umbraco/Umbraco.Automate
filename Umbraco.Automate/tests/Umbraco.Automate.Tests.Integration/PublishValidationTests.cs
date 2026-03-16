@@ -1,6 +1,10 @@
 using System.Data;
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Tests.Common.Builders;
@@ -46,8 +50,12 @@ public class PublishValidationTests
             Mock.Of<IAutomationRunRepository>(),
             Mock.Of<IEntityVersionService>(),
             _workspaceService.Object,
+            Mock.Of<IConnectionService>(),
             _scopeProvider.Object,
-            Mock.Of<IEventMessagesFactory>());
+            Mock.Of<IEventMessagesFactory>(),
+            new ActionCollection(() => []),
+            new TriggerCollection(() => []),
+            new ControlFlowCollection(() => []));
     }
 
     [Fact]

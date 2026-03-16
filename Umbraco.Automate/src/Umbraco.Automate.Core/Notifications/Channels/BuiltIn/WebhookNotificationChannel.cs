@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -10,7 +9,9 @@ namespace Umbraco.Automate.Core.Notifications.Channels.BuiltIn;
 /// Notification channel that sends a JSON POST to a configured webhook URL.
 /// Optionally signs the payload with HMAC-SHA256.
 /// </summary>
-[NotificationChannel("umbracoAutomate.webhook", "Webhook")]
+[NotificationChannel("umbracoAutomate.webhook", "Webhook",
+    Description = "Sends a JSON POST to a webhook URL when a run fails.",
+    Icon = "icon-webhook")]
 public sealed class WebhookNotificationChannel : NotificationChannelBase<WebhookNotificationChannelSettings>
 {
     private readonly IHttpClientFactory _httpClientFactory;
@@ -30,14 +31,8 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
     }
 
     /// <inheritdoc />
-    public override string? Description => "Sends a JSON POST to a webhook URL when a run fails.";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-webhook";
-
-    /// <inheritdoc />
     protected override async Task NotifyAsync(
-        RunNotification notification,
+        NotificationMessage message,
         WebhookNotificationChannelSettings settings,
         CancellationToken cancellationToken)
     {
@@ -48,7 +43,7 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
         }
 
         var client = _httpClientFactory.CreateClient("UmbracoAutomate");
-        var payload = JsonSerializer.Serialize(notification);
+        var payload = JsonSerializer.Serialize(message.Data ?? message);
 
         var request = new HttpRequestMessage(HttpMethod.Post, settings.Url)
         {
@@ -66,8 +61,8 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning(
-                "Webhook notification to {Url} returned {StatusCode} for run {RunId}",
-                settings.Url, response.StatusCode, notification.RunId);
+                "Webhook notification to {Url} returned {StatusCode}",
+                settings.Url, response.StatusCode);
         }
     }
 

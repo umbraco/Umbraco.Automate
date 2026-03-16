@@ -21,7 +21,7 @@ export const UaCatalogueTypeMapper = {
             group: response.group ?? null,
             icon: response.icon ?? null,
             settingsSchema: response.settingsSchema ?? null,
-            outputProperties: response.outputProperties,
+            outputSchema: response.outputSchema ?? null,
         };
     },
 

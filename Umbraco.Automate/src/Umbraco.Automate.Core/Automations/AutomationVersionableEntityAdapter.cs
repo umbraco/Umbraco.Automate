@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Versioning;
 using static Umbraco.Automate.Core.Versioning.VersionComparer;
 
@@ -135,8 +134,6 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
         AutomationNotificationSettings? from,
         AutomationNotificationSettings? to)
     {
-        CompareScalar(changes, "NotificationSettings.NotifyOn", from?.NotifyOn.ToString(), to?.NotifyOn.ToString());
-
         var fromChannels = from?.Channels ?? [];
         var toChannels = to?.Channels ?? [];
 
@@ -165,6 +162,7 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
 
             CompareScalar(changes, $"{prefix}.ChannelAlias", fromChannels[i].ChannelAlias, toChannels[i].ChannelAlias);
             CompareScalar(changes, $"{prefix}.IsEnabled", fromChannels[i].IsEnabled.ToString(), toChannels[i].IsEnabled.ToString());
+            CompareScalar(changes, $"{prefix}.NotifyOn", fromChannels[i].NotifyOn.ToString(), toChannels[i].NotifyOn.ToString());
             CompareObjectDictionary(changes, $"{prefix}.Settings", fromChannels[i].Settings, toChannels[i].Settings);
         }
     }
