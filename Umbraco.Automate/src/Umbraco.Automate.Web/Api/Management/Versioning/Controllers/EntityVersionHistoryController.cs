@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Models;
@@ -6,6 +7,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Web.Api.Management.Versioning.Models;
 using Umbraco.Cms.Api.Common.Builders;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Versioning.Controllers;
 
@@ -17,6 +19,8 @@ public class EntityVersionHistoryController : VersioningControllerBase
 {
     private readonly IEntityVersionService _versionService;
     private readonly VersionableEntityAdapterCollection _entityTypes;
+    private readonly IAuthorizationService _authorizationService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoMapper _umbracoMapper;
 
     /// <summary>
@@ -25,10 +29,14 @@ public class EntityVersionHistoryController : VersioningControllerBase
     public EntityVersionHistoryController(
         IEntityVersionService versionService,
         VersionableEntityAdapterCollection entityTypes,
+        IAuthorizationService authorizationService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoMapper umbracoMapper)
     {
         _versionService = versionService;
         _entityTypes = entityTypes;
+        _authorizationService = authorizationService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _umbracoMapper = umbracoMapper;
     }
 
@@ -57,6 +65,12 @@ public class EntityVersionHistoryController : VersioningControllerBase
         if (currentEntity is not IAuditableEntity auditable)
         {
             return EntityNotFound(entityType, entityId);
+        }
+
+        var forbidden = await AuthorizeEntityAccessAsync(currentEntity);
+        if (forbidden is not null)
+        {
+            return forbidden;
         }
 
         var currentVersion = currentEntity is IVersionableEntity versionable ? versionable.Version : 1;
@@ -123,13 +137,25 @@ public class EntityVersionHistoryController : VersioningControllerBase
         [FromRoute] int entityVersion,
         CancellationToken cancellationToken = default)
     {
-        var normalizedType = NormalizeEntityType(entityType);
-        if (normalizedType is null)
+        var handler = _entityTypes.GetByTypeName(entityType);
+        if (handler is null)
         {
             return UnknownEntityType(entityType);
         }
 
-        var versionRecord = await _versionService.GetVersionAsync(entityId, normalizedType, entityVersion, cancellationToken);
+        var currentEntity = await handler.GetEntityAsync(entityId, cancellationToken);
+        if (currentEntity is null)
+        {
+            return EntityNotFound(entityType, entityId);
+        }
+
+        var forbidden = await AuthorizeEntityAccessAsync(currentEntity);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
+        var versionRecord = await _versionService.GetVersionAsync(entityId, handler.EntityTypeName, entityVersion, cancellationToken);
         if (versionRecord is null)
         {
             return VersionNotFound(entityVersion);
@@ -153,14 +179,26 @@ public class EntityVersionHistoryController : VersioningControllerBase
         [FromRoute] int toEntityVersion,
         CancellationToken cancellationToken = default)
     {
-        var normalizedType = NormalizeEntityType(entityType);
-        if (normalizedType is null)
+        var handler = _entityTypes.GetByTypeName(entityType);
+        if (handler is null)
         {
             return UnknownEntityType(entityType);
         }
 
+        var currentEntity = await handler.GetEntityAsync(entityId, cancellationToken);
+        if (currentEntity is null)
+        {
+            return EntityNotFound(entityType, entityId);
+        }
+
+        var forbidden = await AuthorizeEntityAccessAsync(currentEntity);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
         var comparison = await _versionService.CompareVersionsAsync(
-            entityId, normalizedType, fromEntityVersion, toEntityVersion, cancellationToken);
+            entityId, handler.EntityTypeName, fromEntityVersion, toEntityVersion, cancellationToken);
 
         if (comparison is null)
         {
@@ -212,9 +250,22 @@ public class EntityVersionHistoryController : VersioningControllerBase
             return UnknownEntityType(entityType);
         }
 
+        var currentEntity = await handler.GetEntityAsync(entityId, cancellationToken);
+        if (currentEntity is null)
+        {
+            return EntityNotFound(entityType, entityId);
+        }
+
+        var forbidden = await AuthorizeEntityAccessAsync(currentEntity);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
         try
         {
-            await handler.RollbackAsync(entityId, entityVersion, cancellationToken);
+            var userKey = CurrentUserKey(_backOfficeSecurityAccessor);
+            await handler.RollbackAsync(entityId, entityVersion, userKey, cancellationToken);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -226,9 +277,24 @@ public class EntityVersionHistoryController : VersioningControllerBase
         }
     }
 
-    private string? NormalizeEntityType(string entityType)
+    /// <summary>
+    /// Resolves the workspace ID from the entity and authorizes workspace access.
+    /// For automations, uses the WorkspaceId property. For workspaces, the entity ID is the workspace.
+    /// </summary>
+    private async Task<IActionResult?> AuthorizeEntityAccessAsync(object entity)
     {
-        var handler = _entityTypes.GetByTypeName(entityType);
-        return handler?.EntityTypeName;
+        Guid? workspaceId = entity switch
+        {
+            Core.Automations.Automation automation => automation.WorkspaceId,
+            Core.Workspaces.Workspace workspace => workspace.Id,
+            _ => null,
+        };
+
+        if (workspaceId.HasValue)
+        {
+            return await AuthorizeWorkspaceAccessAsync(_authorizationService, workspaceId.Value);
+        }
+
+        return null;
     }
 }

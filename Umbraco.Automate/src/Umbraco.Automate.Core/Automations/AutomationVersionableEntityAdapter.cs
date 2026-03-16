@@ -170,8 +170,8 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
     }
 
     /// <inheritdoc />
-    public override Task RollbackAsync(Guid entityId, int version, CancellationToken cancellationToken = default)
-        => _automationService.RollbackAutomationAsync(entityId, version, cancellationToken: cancellationToken);
+    public override Task RollbackAsync(Guid entityId, int version, Guid? userId = null, CancellationToken cancellationToken = default)
+        => _automationService.RollbackAutomationAsync(entityId, version, userId, cancellationToken);
 
     /// <inheritdoc />
     protected override async Task<Automation?> GetEntityAsync(Guid entityId, CancellationToken cancellationToken)

@@ -15,7 +15,7 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
         _dbContextFactory = dbContextFactory;
     }
 
-    public async Task<IEnumerable<EntityVersion>> GetVersionHistoryAsync(
+    public async Task<(IEnumerable<EntityVersion> Items, int Total)> GetVersionHistoryPagedAsync(
         Guid entityId,
         string entityType,
         int skip,
@@ -24,25 +24,18 @@ internal sealed class EFCoreEntityVersionRepository : IEntityVersionRepository
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var entities = await db.EntityVersions
-            .Where(v => v.EntityId == entityId && v.EntityType == entityType)
+        var query = db.EntityVersions
+            .Where(v => v.EntityId == entityId && v.EntityType == entityType);
+
+        var total = await query.CountAsync(cancellationToken);
+
+        var entities = await query
             .OrderByDescending(v => v.Version)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(MapToDomain);
-    }
-
-    public async Task<int> GetVersionCountByEntityAsync(
-        Guid entityId,
-        string entityType,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        return await db.EntityVersions
-            .CountAsync(v => v.EntityId == entityId && v.EntityType == entityType, cancellationToken);
+        return (entities.Select(MapToDomain), total);
     }
 
     public async Task<EntityVersion?> GetVersionAsync(

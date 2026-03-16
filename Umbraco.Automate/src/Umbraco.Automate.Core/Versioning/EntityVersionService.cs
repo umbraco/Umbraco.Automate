@@ -32,10 +32,7 @@ internal sealed class EntityVersionService : IEntityVersionService
     {
         ValidateEntityType(entityType);
 
-        var items = await _repository.GetVersionHistoryAsync(entityId, entityType, skip, take, cancellationToken);
-        var total = await _repository.GetVersionCountByEntityAsync(entityId, entityType, cancellationToken);
-
-        return (items, total);
+        return await _repository.GetVersionHistoryPagedAsync(entityId, entityType, skip, take, cancellationToken);
     }
 
     /// <inheritdoc />

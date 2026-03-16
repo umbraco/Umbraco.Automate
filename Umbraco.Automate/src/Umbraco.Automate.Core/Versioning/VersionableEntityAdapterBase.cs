@@ -76,7 +76,7 @@ public abstract class VersionableEntityAdapterBase<TEntity> : IVersionableEntity
     protected abstract IReadOnlyList<ValueChange> CompareVersions(TEntity from, TEntity to);
 
     /// <inheritdoc />
-    public abstract Task RollbackAsync(Guid entityId, int version, CancellationToken cancellationToken = default);
+    public abstract Task RollbackAsync(Guid entityId, int version, Guid? userId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the current state of an entity from the main entity table.

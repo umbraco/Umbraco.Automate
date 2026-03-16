@@ -1,7 +1,10 @@
 import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
+import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice/entity-action";
 import type { UaAutomationDetailModel } from "../../../types.js";
+import { UA_AUTOMATION_ENTITY_TYPE } from "../../../constants.js";
 import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
@@ -10,6 +13,7 @@ import "../../../../core/version-history/components/version-history/version-hist
 @customElement("ua-automation-info-workspace-view")
 export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
     #workspaceContext?: typeof UA_AUTOMATION_WORKSPACE_CONTEXT.TYPE;
+    #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
 
     @state()
     private _model?: UaAutomationDetailModel;
@@ -23,6 +27,9 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                     this._model = model;
                 });
             }
+        });
+        this.consumeContext(UMB_ACTION_EVENT_CONTEXT, (context) => {
+            this.#eventContext = context;
         });
     }
 
@@ -86,6 +93,12 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
         const unique = this.#workspaceContext?.getUnique();
         if (unique) {
             await this.#workspaceContext?.load(unique);
+            this.#eventContext?.dispatchEvent(
+                new UmbRequestReloadStructureForEntityEvent({
+                    entityType: UA_AUTOMATION_ENTITY_TYPE,
+                    unique,
+                }),
+            );
         }
     }
 

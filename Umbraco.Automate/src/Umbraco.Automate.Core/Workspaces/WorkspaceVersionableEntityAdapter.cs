@@ -65,8 +65,8 @@ internal sealed class WorkspaceVersionableEntityAdapter : VersionableEntityAdapt
     }
 
     /// <inheritdoc />
-    public override Task RollbackAsync(Guid entityId, int version, CancellationToken cancellationToken = default)
-        => _workspaceService.RollbackWorkspaceAsync(entityId, version, cancellationToken: cancellationToken);
+    public override Task RollbackAsync(Guid entityId, int version, Guid? userId = null, CancellationToken cancellationToken = default)
+        => _workspaceService.RollbackWorkspaceAsync(entityId, version, userId, cancellationToken);
 
     /// <inheritdoc />
     protected override async Task<Workspace?> GetEntityAsync(Guid entityId, CancellationToken cancellationToken)
