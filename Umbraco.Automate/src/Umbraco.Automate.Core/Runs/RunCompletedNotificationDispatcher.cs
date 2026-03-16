@@ -48,11 +48,6 @@ internal sealed class RunCompletedNotificationDispatcher
             return;
         }
 
-        if (!await ShouldNotifyAsync(run, settings.NotifyOn, cancellationToken))
-        {
-            return;
-        }
-
         var runData = new RunNotification
         {
             AutomationId = automation.Id,
@@ -74,6 +69,11 @@ internal sealed class RunCompletedNotificationDispatcher
         foreach (var channelConfig in settings.Channels)
         {
             if (!channelConfig.IsEnabled)
+            {
+                continue;
+            }
+
+            if (!await ShouldNotifyAsync(run, channelConfig.NotifyOn, cancellationToken))
             {
                 continue;
             }

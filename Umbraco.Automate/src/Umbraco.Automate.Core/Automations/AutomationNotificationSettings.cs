@@ -6,11 +6,6 @@ namespace Umbraco.Automate.Core.Automations;
 public sealed class AutomationNotificationSettings
 {
     /// <summary>
-    /// Gets or sets when to send notifications.
-    /// </summary>
-    public NotifyOn NotifyOn { get; set; } = NotifyOn.Failed;
-
-    /// <summary>
     /// Gets or sets the configured notification channels.
     /// </summary>
     public List<ChannelConfiguration> Channels { get; set; } = [];
@@ -35,6 +30,11 @@ public sealed class ChannelConfiguration
     /// Gets or sets whether this channel configuration is enabled.
     /// </summary>
     public bool IsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets when this channel should send notifications.
+    /// </summary>
+    public NotifyOn NotifyOn { get; set; } = NotifyOn.Failed;
 }
 
 /// <summary>
