@@ -52,13 +52,13 @@ public class RunCompletedNotificationDispatcherTests
             Name = "Test Automation",
             NotificationSettings = new AutomationNotificationSettings
             {
-                NotifyOn = notifyOn,
                 Channels =
                 [
                     new ChannelConfiguration
                     {
                         ChannelAlias = "umbracoAutomate.webhook",
                         IsEnabled = channelEnabled,
+                        NotifyOn = notifyOn,
                         Settings = new Dictionary<string, object?> { ["Url"] = "https://example.com/hook" },
                     }
                 ],
@@ -270,6 +270,68 @@ public class RunCompletedNotificationDispatcherTests
 
         // Should not throw
         await _dispatcher.HandleAsync(notification, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TwoChannels_DifferentNotifyOn_OnlyMatchingChannelFires()
+    {
+        var automationId = Guid.NewGuid();
+        var run = CreateRun(AutomationRunStatus.Failed, automationId);
+
+        var emailChannel = new Mock<INotificationChannel>();
+        emailChannel.Setup(c => c.Alias).Returns("umbracoAutomate.email");
+        emailChannel.Setup(c => c.ResolveSettings(It.IsAny<Dictionary<string, object?>>()))
+            .Returns(new object());
+
+        var channelCollection = new NotificationChannelCollection(() => [_channel.Object, emailChannel.Object]);
+        var dispatcher = new RunCompletedNotificationDispatcher(
+            channelCollection,
+            _automationService.Object,
+            _runService.Object,
+            Mock.Of<ILogger<RunCompletedNotificationDispatcher>>());
+
+        var automation = new Automation
+        {
+            Id = automationId,
+            Alias = "test",
+            Name = "Test Automation",
+            NotificationSettings = new AutomationNotificationSettings
+            {
+                Channels =
+                [
+                    new ChannelConfiguration
+                    {
+                        ChannelAlias = "umbracoAutomate.webhook",
+                        NotifyOn = NotifyOn.Completed, // Should NOT fire for a failed run
+                        Settings = new Dictionary<string, object?> { ["Url"] = "https://example.com/hook" },
+                    },
+                    new ChannelConfiguration
+                    {
+                        ChannelAlias = "umbracoAutomate.email",
+                        NotifyOn = NotifyOn.Failed, // Should fire for a failed run
+                        Settings = new Dictionary<string, object?> { ["To"] = "test@example.com" },
+                    },
+                ],
+            },
+        };
+
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+        _channel.Setup(c => c.ResolveSettings(It.IsAny<Dictionary<string, object?>>()))
+            .Returns(new object());
+
+        var notification = new AutomationRunCompletedNotification(run, new EventMessages());
+        await dispatcher.HandleAsync(notification, CancellationToken.None);
+
+        // Webhook channel (NotifyOn.Completed) should NOT fire for a failed run
+        _channel.Verify(
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        // Email channel (NotifyOn.Failed) SHOULD fire for a failed run
+        emailChannel.Verify(
+            c => c.NotifyAsync(It.IsAny<NotificationMessage>(), It.IsAny<object?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

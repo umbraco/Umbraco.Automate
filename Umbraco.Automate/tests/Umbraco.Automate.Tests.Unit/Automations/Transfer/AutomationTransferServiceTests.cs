@@ -106,8 +106,7 @@ public class AutomationTransferTests
 
         automation.NotificationSettings = new AutomationNotificationSettings
         {
-            NotifyOn = NotifyOn.Failed,
-            Channels = [new ChannelConfiguration { ChannelAlias = "email", IsEnabled = true }],
+            Channels = [new ChannelConfiguration { ChannelAlias = "email", IsEnabled = true, NotifyOn = NotifyOn.Failed }],
         };
 
         _repo.Setup(r => r.GetAsync(automation.Id, It.IsAny<CancellationToken>()))
@@ -128,8 +127,7 @@ public class AutomationTransferTests
 
         automation.NotificationSettings = new AutomationNotificationSettings
         {
-            NotifyOn = NotifyOn.Failed,
-            Channels = [new ChannelConfiguration { ChannelAlias = "email", IsEnabled = true }],
+            Channels = [new ChannelConfiguration { ChannelAlias = "email", IsEnabled = true, NotifyOn = NotifyOn.Failed }],
         };
 
         _repo.Setup(r => r.GetAsync(automation.Id, It.IsAny<CancellationToken>()))
@@ -140,7 +138,7 @@ public class AutomationTransferTests
 
         result.ShouldNotBeNull();
         result.Automation.NotificationSettings.ShouldNotBeNull();
-        result.Automation.NotificationSettings.NotifyOn.ShouldBe(NotifyOn.Failed);
+        result.Automation.NotificationSettings.Channels[0].NotifyOn.ShouldBe(NotifyOn.Failed);
     }
 
     [Fact]
