@@ -10,7 +10,7 @@ import { UmbRequestReloadChildrenOfEntityEvent } from "@umbraco-cms/backoffice/e
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import type { UmbEntityUnique } from "@umbraco-cms/backoffice/entity";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { WorkspacesService } from "../../../../api/sdk.gen.js";
+import { AutomationsService, WorkspacesService } from "../../../../api/sdk.gen.js";
 
 @customElement("ua-automation-move-modal")
 export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomationMoveModalData> {
@@ -83,8 +83,15 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
             automation.groupId = null;
             automation.workspaceId = targetUnique;
         } else {
-            // It's a group
+            // Moving to a group — resolve its workspace to handle cross-workspace moves
+            const { data: group } = await tryExecute(
+                this,
+                AutomationsService.getAutomationsGroupsByGroupId({ path: { groupId: targetUnique } }),
+            );
             automation.groupId = targetUnique;
+            if (group) {
+                automation.workspaceId = group.workspaceId;
+            }
         }
 
         const { error } = await this.#detailRepository.save(automation);

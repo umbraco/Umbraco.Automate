@@ -3,7 +3,7 @@ import type { UmbDetailDataSource } from "@umbraco-cms/backoffice/repository";
 import type { UmbFolderModel } from "@umbraco-cms/backoffice/tree";
 import { UmbControllerBase } from "@umbraco-cms/backoffice/class-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { WorkspacesService } from "../../../api/sdk.gen.js";
+import { AutomationsService, WorkspacesService } from "../../../api/sdk.gen.js";
 import { UA_AUTOMATION_GROUP_ENTITY_TYPE } from "../../entity.js";
 
 /**
@@ -154,30 +154,17 @@ export class UaAutomationFolderServerDataSource extends UmbControllerBase implem
     }
 
     /**
-     * Resolves a group's workspace by searching across workspaces.
+     * Resolves a group's workspace via the group resolve endpoint.
      * Returns the workspaceId and the group data, or undefined if not found.
      */
     async #resolveGroupWithWorkspace(
         groupId: string,
     ): Promise<{ workspaceId: string; group: { id: string; name: string; parentId?: string | null } } | undefined> {
-        const { data: workspaces } = await tryExecute(
+        const { data } = await tryExecute(
             this,
-            WorkspacesService.getWorkspaces({ query: { skip: 0, take: 100 } }),
+            AutomationsService.getAutomationsGroupsByGroupId({ path: { groupId } }),
         );
-
-        if (!workspaces) return undefined;
-
-        for (const ws of workspaces.items) {
-            const { data: groups } = await tryExecute(
-                this,
-                WorkspacesService.getWorkspacesByIdGroups({ path: { id: ws.id } }),
-            );
-            const match = groups?.find((g) => g.id === groupId);
-            if (match) {
-                return { workspaceId: ws.id, group: match };
-            }
-        }
-
-        return undefined;
+        if (!data) return undefined;
+        return { workspaceId: data.workspaceId, group: data };
     }
 }

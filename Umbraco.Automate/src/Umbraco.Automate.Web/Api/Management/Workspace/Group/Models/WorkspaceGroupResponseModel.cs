@@ -18,6 +18,10 @@ public sealed class WorkspaceGroupResponseModel
     /// <summary>The parent group ID, or null if at root.</summary>
     public Guid? ParentId { get; set; }
 
+    /// <summary>The workspace this group belongs to.</summary>
+    [Required]
+    public Guid WorkspaceId { get; set; }
+
     /// <summary>When the group was created.</summary>
     public DateTime DateCreated { get; set; }
 }

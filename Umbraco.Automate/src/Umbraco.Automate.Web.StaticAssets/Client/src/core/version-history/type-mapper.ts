@@ -1,44 +1,42 @@
 import type {
+    EntityVersionComparisonResponseModel,
+    EntityVersionHistoryResponseModel,
+    EntityVersionResponseModel,
+    ValueChangeModel,
+} from "../../api/index.js";
+import type {
     UaVersionComparisonResponse,
     UaVersionHistoryItem,
     UaVersionHistoryResponse,
     UaVersionValueChange,
 } from "./types.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type VersionHistoryApiResponse = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type VersionComparisonApiResponse = any;
-
 export const UaVersionHistoryTypeMapper = {
-    mapToVersionHistoryResponse(data: VersionHistoryApiResponse): UaVersionHistoryResponse {
+    mapToVersionHistoryResponse(data: EntityVersionHistoryResponseModel): UaVersionHistoryResponse {
         return {
             currentVersion: data.currentVersion,
             publishedVersion: data.publishedVersion ?? null,
             totalVersions: data.totalVersions,
             versions: data.versions.map(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (v: any): UaVersionHistoryItem => ({
+                (v: EntityVersionResponseModel): UaVersionHistoryItem => ({
                     id: v.id,
                     entityId: v.entityId,
                     version: v.version,
                     dateCreated: v.dateCreated,
                     createdByUserId: v.createdByUserId,
-                    createdByUserName: v.createdByUserName,
                     changeDescription: v.changeDescription,
+                    isPublished: v.isPublished,
                 }),
             ),
         };
     },
 
-    mapToComparisonResponse(data: VersionComparisonApiResponse): UaVersionComparisonResponse {
+    mapToComparisonResponse(data: EntityVersionComparisonResponseModel): UaVersionComparisonResponse {
         return {
             fromVersion: data.fromVersion,
             toVersion: data.toVersion,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             changes: data.changes.map(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (c: any): UaVersionValueChange => ({
+                (c: ValueChangeModel): UaVersionValueChange => ({
                     path: c.path,
                     oldValue: c.oldValue,
                     newValue: c.newValue,

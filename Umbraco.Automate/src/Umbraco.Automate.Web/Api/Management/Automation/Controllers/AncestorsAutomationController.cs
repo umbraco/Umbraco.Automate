@@ -67,10 +67,10 @@ public sealed class AncestorsAutomationController : AutomationControllerBase
             ancestors.Add(new AutomationAncestorResponseModel
             {
                 Id = workspace.Id,
-                EntityType = "ua:workspace",
+                EntityType = Constants.EntityType.Workspace,
                 Name = workspace.Name,
                 ParentId = null,
-                ParentEntityType = "ua:workspace-root",
+                ParentEntityType = Constants.EntityType.WorkspaceRoot,
                 HasChildren = true,
                 IsFolder = false,
             });
@@ -106,12 +106,14 @@ public sealed class AncestorsAutomationController : AutomationControllerBase
             }
 
             var parentId = group.ParentId ?? workspaceId;
-            var parentEntityType = group.ParentId.HasValue ? "ua:automation-group" : "ua:workspace";
+            var parentEntityType = group.ParentId.HasValue
+                ? Constants.EntityType.AutomationGroup
+                : Constants.EntityType.Workspace;
 
             chain.Insert(0, new AutomationAncestorResponseModel
             {
                 Id = group.Id,
-                EntityType = "ua:automation-group",
+                EntityType = Constants.EntityType.AutomationGroup,
                 Name = group.Name,
                 ParentId = parentId,
                 ParentEntityType = parentEntityType,

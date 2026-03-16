@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -14,16 +15,19 @@ public sealed class PublishAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PublishAutomationController"/> class.
     /// </summary>
     public PublishAutomationController(
         IAutomationService automationService,
-        IAuthorizationService authorizationService)
+        IAuthorizationService authorizationService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
     }
 
     /// <summary>
@@ -52,7 +56,7 @@ public sealed class PublishAutomationController : AutomationControllerBase
 
         try
         {
-            await _automationService.PublishAutomationAsync(id, cancellationToken: cancellationToken);
+            await _automationService.PublishAutomationAsync(id, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
         }
         catch (AutomationValidationException ex)
         {

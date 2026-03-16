@@ -19,7 +19,7 @@ import { UA_AUTOMATION_DETAIL_REPOSITORY_ALIAS } from "../../repository/constant
 import type { UaAutomationDetailModel } from "../../types.js";
 import { UA_EMPTY_GUID } from "../../../core/index.js";
 import { UaAutomationWorkspaceEditorElement } from "./automation-workspace-editor.element.js";
-import { AutomationsService, WorkspacesService } from "../../../api/sdk.gen.js";
+import { AutomationsService } from "../../../api/sdk.gen.js";
 
 export class UaAutomationWorkspaceContext
     extends UmbEntityDetailWorkspaceContextBase<UaAutomationDetailModel>
@@ -124,24 +124,11 @@ export class UaAutomationWorkspaceContext
     }
 
     async #resolveWorkspaceForGroup(groupId: string): Promise<string | undefined> {
-        const { data: workspaces } = await tryExecute(
+        const { data } = await tryExecute(
             this,
-            WorkspacesService.getWorkspaces({ query: { skip: 0, take: 100 } }),
+            AutomationsService.getAutomationsGroupsByGroupId({ path: { groupId } }),
         );
-
-        if (!workspaces) return undefined;
-
-        for (const ws of workspaces.items) {
-            const { data: groups } = await tryExecute(
-                this,
-                WorkspacesService.getWorkspacesByIdGroups({ path: { id: ws.id } }),
-            );
-            if (groups?.some((g) => g.id === groupId)) {
-                return ws.id;
-            }
-        }
-
-        return undefined;
+        return data?.workspaceId;
     }
 
     #reloadStructure(unique: string) {

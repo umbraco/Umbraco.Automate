@@ -1,45 +1,11 @@
-import { UMB_WORKSPACE_CONTEXT } from "@umbraco-cms/backoffice/workspace";
-import {
-    UmbWorkspaceRouteManager,
-    type UmbRoutableWorkspaceContext,
-} from "@umbraco-cms/backoffice/workspace";
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
-import { UmbContextBase } from "@umbraco-cms/backoffice/class-api";
-import { UmbEntityContext } from "@umbraco-cms/backoffice/entity";
-import { UmbViewContext } from "@umbraco-cms/backoffice/view";
+import { UaRoutableWorkspaceContext } from "../../../core/index.js";
 import { UA_AUTOMATION_GROUP_WORKSPACE_ALIAS } from "../constants.js";
 import { UA_AUTOMATION_GROUP_ENTITY_TYPE } from "../../constants.js";
-import { UmbWorkspaceEditorElement } from "@umbraco-cms/backoffice/workspace";
 
-export class UaAutomationGroupWorkspaceContext extends UmbContextBase implements UmbRoutableWorkspaceContext {
-    public readonly workspaceAlias = UA_AUTOMATION_GROUP_WORKSPACE_ALIAS;
-    public readonly routes = new UmbWorkspaceRouteManager(this);
-    public readonly view = new UmbViewContext(this, null);
-
-    #entityContext = new UmbEntityContext(this);
-
+export class UaAutomationGroupWorkspaceContext extends UaRoutableWorkspaceContext {
     constructor(host: UmbControllerHost) {
-        super(host, UMB_WORKSPACE_CONTEXT.toString());
-        this.#entityContext.setEntityType(UA_AUTOMATION_GROUP_ENTITY_TYPE);
-
-        this.routes.setRoutes([
-            {
-                path: "edit/:unique",
-                component: UmbWorkspaceEditorElement,
-                setup: (_component, info) => {
-                    const unique = info.match.params.unique;
-                    this.#entityContext.setUnique(unique);
-                },
-            },
-        ]);
-    }
-
-    getEntityType() {
-        return this.#entityContext.getEntityType()!;
-    }
-
-    getUnique() {
-        return this.#entityContext.getUnique();
+        super(host, UA_AUTOMATION_GROUP_WORKSPACE_ALIAS, UA_AUTOMATION_GROUP_ENTITY_TYPE);
     }
 }
 

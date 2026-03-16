@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Web.Api.Management.Workspace.Models;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Controllers;
 
@@ -14,14 +15,19 @@ namespace Umbraco.Automate.Web.Api.Management.Workspace.Controllers;
 public sealed class CreateWorkspaceController : WorkspaceControllerBase
 {
     private readonly IWorkspaceService _workspaceService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CreateWorkspaceController"/> class.
     /// </summary>
-    public CreateWorkspaceController(IWorkspaceService workspaceService, IUmbracoMapper mapper)
+    public CreateWorkspaceController(
+        IWorkspaceService workspaceService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IUmbracoMapper mapper)
     {
         _workspaceService = workspaceService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _mapper = mapper;
     }
 
@@ -38,7 +44,7 @@ public sealed class CreateWorkspaceController : WorkspaceControllerBase
     {
         var workspace = _mapper.Map<Core.Workspaces.Workspace>(requestModel)!;
 
-        var created = await _workspaceService.CreateWorkspaceAsync(workspace, cancellationToken: cancellationToken);
+        var created = await _workspaceService.CreateWorkspaceAsync(workspace, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
 
         return CreatedAtAction(
             nameof(ByIdWorkspaceController.GetWorkspaceById),

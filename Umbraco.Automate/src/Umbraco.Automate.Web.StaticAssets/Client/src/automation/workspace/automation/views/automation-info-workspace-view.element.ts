@@ -5,8 +5,12 @@ import type { UaAutomationDetailModel } from "../../../types.js";
 import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
+import "../../../../core/version-history/components/version-history/version-history.element.js";
+
 @customElement("ua-automation-info-workspace-view")
 export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
+    #workspaceContext?: typeof UA_AUTOMATION_WORKSPACE_CONTEXT.TYPE;
+
     @state()
     private _model?: UaAutomationDetailModel;
 
@@ -14,6 +18,7 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
         super();
         this.consumeContext(UA_AUTOMATION_WORKSPACE_CONTEXT, (context) => {
             if (context) {
+                this.#workspaceContext = context;
                 this.observe(context.data, (model) => {
                     this._model = model;
                 });
@@ -26,7 +31,17 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
 
         return html`
             <div class="container">
-                <uui-box headline="Status">
+                <ua-version-history
+                    entity-id=${this._model.unique}
+                    .currentVersion=${this._model.draftVersion}
+                    .publishedVersion=${this._model.publishedVersion}
+                    @rollback=${this.#onRollback}
+                >
+                </ua-version-history>
+            </div>
+
+            <div class="container">
+                <uui-box headline="Info">
                     <umb-property-layout label="Status" orientation="vertical">
                         <div slot="editor">
                             <uui-tag color=${this.#statusColor(this._model.status)} look="secondary">
@@ -41,28 +56,6 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                             </uui-tag>
                         </div>
                     </umb-property-layout>
-                </uui-box>
-
-                <uui-box headline="History">
-                    ${this._model.dateCreated
-                        ? html`
-                              <umb-property-layout label="Created" orientation="vertical">
-                                  <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
-                              </umb-property-layout>
-                          `
-                        : ""}
-                    ${this._model.dateModified
-                        ? html`
-                              <umb-property-layout label="Modified" orientation="vertical">
-                                  <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
-                              </umb-property-layout>
-                          `
-                        : ""}
-                </uui-box>
-            </div>
-
-            <div class="container">
-                <uui-box headline=${this.localize.term("general_general")}>
                     <umb-property-layout label="Id" orientation="vertical">
                         <div slot="editor">
                             ${this._model.unique === UA_EMPTY_GUID
@@ -70,24 +63,30 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                                 : this._model.unique}
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="Alias" orientation="vertical">
-                        <div slot="editor">${this._model.alias || "-"}</div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Draft Version" orientation="vertical">
-                        <div slot="editor">${this._model.draftVersion}</div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Published Version" orientation="vertical">
-                        <div slot="editor">${this._model.publishedVersion ?? "-"}</div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Workspace ID" orientation="vertical">
-                        <div slot="editor">${this._model.workspaceId || "-"}</div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Group ID" orientation="vertical">
-                        <div slot="editor">${this._model.groupId || "-"}</div>
-                    </umb-property-layout>
+                    ${this._model.dateCreated
+                        ? html`
+                              <umb-property-layout label="Date Created" orientation="vertical">
+                                  <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
+                              </umb-property-layout>
+                          `
+                        : ""}
+                    ${this._model.dateModified
+                        ? html`
+                              <umb-property-layout label="Date Modified" orientation="vertical">
+                                  <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
+                              </umb-property-layout>
+                          `
+                        : ""}
                 </uui-box>
             </div>
         `;
+    }
+
+    async #onRollback() {
+        const unique = this.#workspaceContext?.getUnique();
+        if (unique) {
+            await this.#workspaceContext?.load(unique);
+        }
     }
 
     #statusColor(status: string): string {

@@ -248,24 +248,12 @@ export class UaWorkspaceTreeServerDataSource
     async #resolveWorkspaceForGroup(
         groupId: string,
     ): Promise<{ workspaceId: string } | undefined> {
-        const { data: workspaces } = await tryExecute(
+        const { data } = await tryExecute(
             this,
-            WorkspacesService.getWorkspaces({ query: { skip: 0, take: 100 } }),
+            AutomationsService.getAutomationsGroupsByGroupId({ path: { groupId } }),
         );
-
-        if (!workspaces) return undefined;
-
-        for (const ws of workspaces.items) {
-            const { data: groups } = await tryExecute(
-                this,
-                WorkspacesService.getWorkspacesByIdGroups({ path: { id: ws.id } }),
-            );
-            if (groups?.find((g) => g.id === groupId)) {
-                return { workspaceId: ws.id };
-            }
-        }
-
-        return undefined;
+        if (!data) return undefined;
+        return { workspaceId: data.workspaceId };
     }
 
     #mapWorkspaceItem(item: WorkspaceItemResponseModel): UaWorkspaceTreeItemModel {

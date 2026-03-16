@@ -12,10 +12,10 @@ export interface UaVersionHistoryItem {
     dateCreated: string;
     /** The user ID who created this version, if available. */
     createdByUserId?: string | null;
-    /** The user name who created this version, if available. */
-    createdByUserName?: string | null;
     /** Optional description of what changed in this version. */
     changeDescription?: string | null;
+    /** Whether this version is the currently published version. */
+    isPublished: boolean;
 }
 
 /**

@@ -5,6 +5,7 @@ using Umbraco.Automate.Web.Authorization;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.Builders;
 using Umbraco.Cms.Api.Common.Filters;
+using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Security.Authorization;
 using Umbraco.Extensions;
 
@@ -56,6 +57,13 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
     /// </remarks>
     protected IActionResult Forbidden()
         => new StatusCodeResult(StatusCodes.Status403Forbidden);
+
+    /// <summary>
+    /// Gets the key of the current back-office user.
+    /// </summary>
+    protected static Guid CurrentUserKey(IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
+        => backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key
+           ?? throw new InvalidOperationException("No backoffice user found");
 
     /// <summary>
     /// Authorizes workspace access for the current user. Returns <c>null</c> if authorized,

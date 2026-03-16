@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Web.Api.Management.Workspace.Models;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Controllers;
 
@@ -14,14 +15,19 @@ namespace Umbraco.Automate.Web.Api.Management.Workspace.Controllers;
 public sealed class UpdateWorkspaceController : WorkspaceControllerBase
 {
     private readonly IWorkspaceService _workspaceService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UpdateWorkspaceController"/> class.
     /// </summary>
-    public UpdateWorkspaceController(IWorkspaceService workspaceService, IUmbracoMapper mapper)
+    public UpdateWorkspaceController(
+        IWorkspaceService workspaceService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IUmbracoMapper mapper)
     {
         _workspaceService = workspaceService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _mapper = mapper;
     }
 
@@ -45,7 +51,7 @@ public sealed class UpdateWorkspaceController : WorkspaceControllerBase
 
         _mapper.Map(requestModel, existing);
 
-        await _workspaceService.UpdateWorkspaceAsync(existing, cancellationToken: cancellationToken);
+        await _workspaceService.UpdateWorkspaceAsync(existing, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
 
         return Ok();
     }

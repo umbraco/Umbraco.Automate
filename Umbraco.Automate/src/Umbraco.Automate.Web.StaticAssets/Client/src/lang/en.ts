@@ -77,4 +77,14 @@ export default {
     uaDashboard: {
         overview: "Overview",
     },
+    uaVersionHistory: {
+        history: "History",
+        compare: "Compare",
+        compareVersions: (fromVersion: number, toVersion: number) =>
+            `Compare version ${fromVersion} with version ${toVersion}`,
+        changes: "Changes",
+        noChanges: "No changes detected between these versions.",
+        noVersionsYet: "No versions yet.",
+        rollback: (version: number) => `Rollback to version ${version}`,
+    },
 } satisfies UmbLocalizationDictionary;

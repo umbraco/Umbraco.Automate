@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -14,16 +15,19 @@ public sealed class UnpublishAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UnpublishAutomationController"/> class.
     /// </summary>
     public UnpublishAutomationController(
         IAutomationService automationService,
-        IAuthorizationService authorizationService)
+        IAuthorizationService authorizationService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
     }
 
     /// <summary>
@@ -49,7 +53,7 @@ public sealed class UnpublishAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        await _automationService.UnpublishAutomationAsync(id, cancellationToken: cancellationToken);
+        await _automationService.UnpublishAutomationAsync(id, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
 
         return Ok();
     }
