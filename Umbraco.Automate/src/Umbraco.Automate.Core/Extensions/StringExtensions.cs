@@ -37,31 +37,6 @@ internal static class StringExtensions
     }
 
     /// <summary>
-    /// Converts a string to PascalCase from any common case format (camelCase, kebab-case, snake_case).
-    /// </summary>
-    public static string ToPascalCase(this string str)
-    {
-        if (string.IsNullOrEmpty(str))
-            return str;
-
-        var words = SplitIntoWords(str);
-        if (words.Length == 0)
-            return str;
-
-        var result = new List<string>();
-        foreach (var word in words)
-        {
-            if (string.IsNullOrEmpty(word))
-                continue;
-
-            // Capitalize first letter of each word
-            result.Add(char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant());
-        }
-
-        return string.Join("", result);
-    }
-
-    /// <summary>
     /// Converts a string to kebab-case from any common case format (camelCase, PascalCase, snake_case).
     /// </summary>
     public static string ToKebabCase(this string str)
@@ -101,7 +76,6 @@ internal static class StringExtensions
 
         var words = new List<string>();
         var currentWord = new System.Text.StringBuilder();
-        var hasSeenDelimiter = false;
 
         for (var i = 0; i < str.Length; i++)
         {
@@ -115,14 +89,8 @@ internal static class StringExtensions
                     words.Add(currentWord.ToString());
                     currentWord.Clear();
                 }
-                hasSeenDelimiter = true;
-                continue;
-            }
 
-            // Reset delimiter flag on first non-delimiter character after a delimiter.
-            if (hasSeenDelimiter)
-            {
-                hasSeenDelimiter = false;
+                continue;
             }
 
             // Check if this is the start of a new word (uppercase letter in camelCase/PascalCase)

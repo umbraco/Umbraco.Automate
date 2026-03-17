@@ -1,53 +1,47 @@
 using Microsoft.Extensions.Logging;
-using Umbraco.Cms.Core.Models.Membership;
-using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Infrastructure.Migrations;
-using Umbraco.Cms.Infrastructure.Scoping;
 
 namespace Umbraco.Automate.Core.Migrations;
 
 /// <summary>
 /// Migration to add the Automate section to the Admin user group.
 /// </summary>
+/// <remarks>
+/// Uses direct database access instead of <c>IUserGroupService</c> because the service layer
+/// performs authorization checks and publishes notifications that may fail during migration context.
+/// </remarks>
 public class AddAutomateSectionToAdminGroup : AsyncMigrationBase
 {
-    private readonly IUserGroupService _userGroupService;
-    private readonly IScopeProvider _scopeProvider;
+    private const string UserGroup2AppTable = Cms.Core.Constants.DatabaseSchema.Tables.UserGroup2App;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AddAutomateSectionToAdminGroup"/> class.
     /// </summary>
-    public AddAutomateSectionToAdminGroup(
-        IMigrationContext context,
-        IScopeProvider scopeProvider,
-        IUserGroupService userGroupService)
+    public AddAutomateSectionToAdminGroup(IMigrationContext context)
         : base(context)
     {
-        _scopeProvider = scopeProvider;
-        _userGroupService = userGroupService;
     }
 
     /// <inheritdoc />
-    protected override async Task MigrateAsync()
+    protected override Task MigrateAsync()
     {
-        using IScope scope = _scopeProvider.CreateScope();
+        var quotedTable = SqlSyntax.GetQuotedTableName(UserGroup2AppTable);
 
-        IUserGroup? adminUserGroup = await _userGroupService.GetAsync(
-            Cms.Core.Constants.Security.AdminGroupAlias);
+        // Check if the Automate section is already assigned to the admin group (userGroupId = 1)
+        var exists = Database.ExecuteScalar<int>(
+            Sql($"SELECT COUNT(*) FROM {quotedTable} WHERE userGroupId = @0 AND app = @1", 1, Constants.Sections.Automate));
 
-        if (adminUserGroup is not null)
+        if (exists > 0)
         {
-            if (adminUserGroup.AllowedSections.Contains(Constants.Sections.Automate))
-            {
-                Logger.LogDebug("The Umbraco Automate section has been assigned to the Admin group already");
-            }
-            else
-            {
-                adminUserGroup.AddAllowedSection(Constants.Sections.Automate);
-                await _userGroupService.UpdateAsync(adminUserGroup, Cms.Core.Constants.Security.SuperUserKey);
-            }
+            Logger.LogDebug("The Umbraco Automate section has been assigned to the Admin group already");
+            return Task.CompletedTask;
         }
 
-        scope.Complete();
+        Database.Execute(
+            Sql($"INSERT INTO {quotedTable} (userGroupId, app) VALUES (@0, @1)", 1, Constants.Sections.Automate));
+
+        Logger.LogInformation("The Umbraco Automate section has been assigned to the Admin group");
+
+        return Task.CompletedTask;
     }
 }

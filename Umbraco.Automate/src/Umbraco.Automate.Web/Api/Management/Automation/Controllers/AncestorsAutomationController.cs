@@ -94,11 +94,18 @@ public sealed class AncestorsAutomationController : AutomationControllerBase
         Guid groupId,
         CancellationToken cancellationToken)
     {
+        const int maxDepth = 100;
         var chain = new List<AutomationAncestorResponseModel>();
         var currentId = (Guid?)groupId;
+        var visited = new HashSet<Guid>();
 
-        while (currentId.HasValue)
+        while (currentId.HasValue && visited.Count < maxDepth)
         {
+            if (!visited.Add(currentId.Value))
+            {
+                break;
+            }
+
             var group = await _workspaceGroupService.GetGroupAsync(currentId.Value, cancellationToken);
             if (group is null)
             {

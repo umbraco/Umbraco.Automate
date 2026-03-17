@@ -23,5 +23,5 @@ public sealed class NotificationChannelItemResponseModel
     public string? Icon { get; set; }
 
     /// <summary>The settings schema, or null if no settings.</summary>
-    public Core.Settings.EditableModelSchema? SettingsSchema { get; set; }
+    public EditableModelSchema? SettingsSchema { get; set; }
 }

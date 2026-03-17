@@ -31,16 +31,17 @@ public class EditableModelSchemaBuilderTests
         apiKeyField.Label.ShouldBe("API Key");
         apiKeyField.Description.ShouldBe("Your secret key");
         apiKeyField.IsSensitive.ShouldBeTrue();
-        apiKeyField.Group.ShouldBe("Authentication");
+        apiKeyField.Group.ShouldBe("#uaFieldGroups_authenticationLabel");
     }
 
     [Fact]
-    public void Build_UsesHumanizedName_WhenNoLabel()
+    public void Build_UsesLocalizationKey_WhenNoLabel()
     {
         var schema = EditableModelSchemaBuilder.Build(typeof(SampleSettings))!;
 
         var field = schema.Fields.First(f => f.PropertyName == "EndpointUrl");
-        field.Label.ShouldBe("Endpoint Url");
+        field.Label.ShouldBe("#uaFields_sampleSettingsEndpointUrlLabel");
+        field.Description.ShouldBe("#uaFields_sampleSettingsEndpointUrlDescription");
     }
 
     [Fact]
