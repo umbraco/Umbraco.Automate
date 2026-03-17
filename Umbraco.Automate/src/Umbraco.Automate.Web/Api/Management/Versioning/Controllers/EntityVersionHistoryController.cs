@@ -292,11 +292,11 @@ public class EntityVersionHistoryController : VersioningControllerBase
             _ => null,
         };
 
-        if (workspaceId.HasValue)
+        if (!workspaceId.HasValue)
         {
-            return await AuthorizeWorkspaceAccessAsync(_authorizationService, workspaceId.Value);
+            return Forbid();
         }
 
-        return null;
+        return await AuthorizeWorkspaceAccessAsync(_authorizationService, workspaceId.Value);
     }
 }

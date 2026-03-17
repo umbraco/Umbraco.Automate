@@ -33,7 +33,7 @@ public static class EditableModelSchemaBuilder
             .ThenBy(f => f.Key)
             .ToList();
 
-        return new EditableModelSchema { Fields = fields };
+        return new EditableModelSchema { Type = settingsType, Fields = fields };
     }
 
     private static EditableModelFieldDescriptor BuildFieldDescriptor(PropertyInfo property)
@@ -56,7 +56,7 @@ public static class EditableModelSchemaBuilder
             IsRequired = validationRules.OfType<RequiredAttribute>().Any(),
             Group = attr?.Group,
             SupportsBindings = attr?.SupportsBindings ?? false,
-            ValidationRules = InferValidationAttributes(property),
+            ValidationRules = validationRules,
         };
     }
 

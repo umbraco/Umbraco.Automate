@@ -74,8 +74,8 @@ public class EditableModelSerializerTests
     {
         var model = new TestModel { ApiKey = "secret-key", Endpoint = "https://api.example.com" };
         var schema = CreateSchema(
-            new EditableModelFieldDescriptor { PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true },
-            new EditableModelFieldDescriptor { PropertyName = "Endpoint", Label = "Endpoint", PropertyType = typeof(string), IsSensitive = false });
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true },
+            new EditableModelFieldDescriptor { Key = "endpoint", PropertyName = "Endpoint", Label = "Endpoint", PropertyType = typeof(string), IsSensitive = false });
 
         var result = _serializer.Serialize(model, schema);
 
@@ -121,9 +121,9 @@ public class EditableModelSerializerTests
             Region = "us-east-1",
         };
         var schema = CreateSchema(
-            new EditableModelFieldDescriptor { PropertyName = "AccessKeyId", Label = "Access Key ID", PropertyType = typeof(string), IsSensitive = true },
-            new EditableModelFieldDescriptor { PropertyName = "SecretAccessKey", Label = "Secret Access Key", PropertyType = typeof(string), IsSensitive = true },
-            new EditableModelFieldDescriptor { PropertyName = "Region", Label = "Region", PropertyType = typeof(string), IsSensitive = false });
+            new EditableModelFieldDescriptor { Key = "accessKeyId", PropertyName = "AccessKeyId", Label = "Access Key ID", PropertyType = typeof(string), IsSensitive = true },
+            new EditableModelFieldDescriptor { Key = "secretAccessKey", PropertyName = "SecretAccessKey", Label = "Secret Access Key", PropertyType = typeof(string), IsSensitive = true },
+            new EditableModelFieldDescriptor { Key = "region", PropertyName = "Region", Label = "Region", PropertyType = typeof(string), IsSensitive = false });
 
         var result = _serializer.Serialize(model, schema);
 

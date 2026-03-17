@@ -2,7 +2,6 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Messaging;
-using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Core.Dispatch;

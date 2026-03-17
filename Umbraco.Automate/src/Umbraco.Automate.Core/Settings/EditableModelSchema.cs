@@ -12,6 +12,7 @@ public sealed class EditableModelSchema
     /// <summary>
     /// The type of the editable model.
     /// </summary>
+    [JsonIgnore]
     public Type? Type { get; set; }
 
     /// <summary>
