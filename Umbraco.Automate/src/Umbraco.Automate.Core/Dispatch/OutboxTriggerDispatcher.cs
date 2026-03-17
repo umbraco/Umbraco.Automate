@@ -57,4 +57,5 @@ internal sealed class OutboxTriggerDispatcher : ITriggerDispatcher
         _metrics.TriggerDispatched(triggerEvent.TriggerAlias);
         _metrics.OutboxMessagePublished(TopicName);
     }
+
 }

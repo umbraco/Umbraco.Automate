@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
+using Umbraco.Automate.Extensions;
+
 namespace Umbraco.Automate.Core.Settings;
 
 /// <summary>
@@ -25,32 +27,57 @@ public static class EditableModelSchemaBuilder
             return null;
         }
 
+        // Create an instance to read default values from property initializers.
+        var modelInstance = Activator.CreateInstance(settingsType);
+        var modelKey = settingsType.Name.ToCamelCase();
+
         var fields = properties
-            .Select(BuildFieldDescriptor)
+            .Select(p => BuildFieldDescriptor(p, modelKey, modelInstance))
             .OrderBy(f => f.SortOrder)
-            .ThenBy(f => f.PropertyName)
+            .ThenBy(f => f.Key)
             .ToList();
 
-        return new EditableModelSchema { Fields = fields };
+        return new EditableModelSchema { Type = settingsType, Fields = fields };
     }
 
-    private static EditableModelFieldDescriptor BuildFieldDescriptor(PropertyInfo property)
+    private static EditableModelFieldDescriptor BuildFieldDescriptor(
+        PropertyInfo property, string modelKey, object? modelInstance)
     {
         var attr = property.GetCustomAttribute<EditableModelFieldAttribute>();
+        var key = property.Name.ToCamelCase();
+        var validationRules = InferValidationAttributes(property);
+
+        // Read default value from the model instance's property initializer.
+        object? defaultValue = null;
+        if (modelInstance is not null && property.CanRead)
+        {
+            try
+            {
+                defaultValue = property.GetValue(modelInstance);
+            }
+            catch
+            {
+                // If we can't read the property value, leave it as null.
+            }
+        }
 
         return new EditableModelFieldDescriptor
         {
+            Key = key,
             PropertyName = property.Name,
-            Label = attr?.Label ?? HumanizePropertyName(property.Name),
+            Label = attr?.Label ?? $"#uaFields_{modelKey}{property.Name}Label",
             PropertyType = property.PropertyType,
-            Description = attr?.Description,
+            Description = attr?.Description ?? $"#uaFields_{modelKey}{property.Name}Description",
             EditorUiAlias = attr?.EditorUiAlias,
             EditorConfig = attr?.EditorConfig,
+            DefaultValue = defaultValue,
             SortOrder = attr?.SortOrder ?? 0,
             IsSensitive = attr?.IsSensitive ?? false,
-            Group = attr?.Group,
+            IsRequired = validationRules.OfType<RequiredAttribute>().Any(),
+            Group = attr?.Group is null or "" ? null :
+                attr.Group.StartsWith('#') ? attr.Group : $"#uaFieldGroups_{attr.Group.ToCamelCase()}Label",
             SupportsBindings = attr?.SupportsBindings ?? false,
-            ValidationRules = InferValidationAttributes(property),
+            ValidationRules = validationRules,
         };
     }
 

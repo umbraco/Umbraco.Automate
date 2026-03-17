@@ -148,6 +148,24 @@ public class Constants
     }
 
     /// <summary>
+    /// Entity type identifiers used by the backoffice frontend tree.
+    /// </summary>
+    public static class EntityType
+    {
+        /// <summary>The workspace entity type.</summary>
+        public const string Workspace = "ua:workspace";
+
+        /// <summary>The workspace root entity type.</summary>
+        public const string WorkspaceRoot = "ua:workspace-root";
+
+        /// <summary>The automation group (folder) entity type.</summary>
+        public const string AutomationGroup = "ua:automation-group";
+
+        /// <summary>The automation entity type.</summary>
+        public const string Automation = "ua:automation";
+    }
+
+    /// <summary>
     /// Constants for the Automate Webhook API (public, no auth).
     /// </summary>
     public static class WebhookApi

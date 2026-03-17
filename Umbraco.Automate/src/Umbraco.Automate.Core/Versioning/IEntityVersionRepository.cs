@@ -10,21 +10,13 @@ namespace Umbraco.Automate.Core.Versioning;
 internal interface IEntityVersionRepository
 {
     /// <summary>
-    /// Gets the version history for an entity with pagination support.
+    /// Gets the version history for an entity with pagination support, along with the total count.
     /// </summary>
-    Task<IEnumerable<EntityVersion>> GetVersionHistoryAsync(
+    Task<(IEnumerable<EntityVersion> Items, int Total)> GetVersionHistoryPagedAsync(
         Guid entityId,
         string entityType,
         int skip,
         int take,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Gets the count of version records for a specific entity.
-    /// </summary>
-    Task<int> GetVersionCountByEntityAsync(
-        Guid entityId,
-        string entityType,
         CancellationToken cancellationToken = default);
 
     /// <summary>

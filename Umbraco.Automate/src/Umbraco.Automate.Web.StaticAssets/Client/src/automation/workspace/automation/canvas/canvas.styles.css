@@ -1,0 +1,123 @@
+/* Node base */
+.ua-node {
+    background: var(--uui-color-surface, #fff);
+    border: 2px solid var(--uui-color-border, #e5e7eb);
+    border-radius: 8px;
+    min-width: 180px;
+    max-width: 260px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-family: var(--uui-font-family, inherit);
+    font-size: 13px;
+    overflow: hidden;
+}
+
+.ua-node:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Trigger node */
+.ua-node--trigger {
+    border-color: #6366f1;
+}
+
+.ua-node--trigger .ua-node__header {
+    background: #6366f1;
+    color: #fff;
+}
+
+/* Action node */
+.ua-node--action {
+    border-color: #3b82f6;
+}
+
+.ua-node--action .ua-node__header {
+    background: #3b82f6;
+    color: #fff;
+}
+
+/* Node parts */
+.ua-node__header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.ua-node__icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.ua-node__type {
+    flex: 1;
+}
+
+.ua-node__settings-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.8;
+    border-radius: 3px;
+    transition: opacity 120ms ease, background 120ms ease;
+}
+
+.ua-node__settings-btn:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.ua-node__body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ua-node__label {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ua-node__alias {
+    font-size: 11px;
+    color: var(--uui-color-text-alt, #6b7280);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Edge label */
+.ua-edge__label {
+    font-size: 11px;
+    fill: var(--uui-color-text-alt, #6b7280);
+}
+
+/* Handle overrides */
+.react-flow__handle {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--uui-color-surface, #fff);
+    background: #94a3b8;
+}
+
+.react-flow__handle:hover {
+    background: #3b82f6;
+}
+
+/* Dark mode: ensure node shadows work on dark backgrounds */
+.dark .ua-node {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.dark .ua-node:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}

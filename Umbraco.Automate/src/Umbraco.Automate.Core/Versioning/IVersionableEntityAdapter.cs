@@ -51,12 +51,13 @@ public interface IVersionableEntityAdapter
     /// </summary>
     /// <param name="entityId">The unique identifier of the entity.</param>
     /// <param name="version">The version number to rollback to.</param>
+    /// <param name="userId">The user performing the rollback.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <remarks>
     /// Rollback creates a new version with the state from the target version.
     /// The implementation should delegate to the entity's service for proper save logic.
     /// </remarks>
-    Task RollbackAsync(Guid entityId, int version, CancellationToken cancellationToken = default);
+    Task RollbackAsync(Guid entityId, int version, Guid? userId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the current state of an entity from the main entity table.

@@ -19,6 +19,10 @@ public sealed class CreateAutomationRequestModel
     /// <summary>Optional description.</summary>
     public string? Description { get; init; }
 
+    /// <summary>The workspace this automation belongs to.</summary>
+    [Required]
+    public required Guid WorkspaceId { get; init; }
+
     /// <summary>Whether triggers are active.</summary>
     public bool IsEnabled { get; init; }
 

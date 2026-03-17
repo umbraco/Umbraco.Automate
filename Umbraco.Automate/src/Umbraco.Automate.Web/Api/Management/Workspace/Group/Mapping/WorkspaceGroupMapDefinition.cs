@@ -41,6 +41,7 @@ public class WorkspaceGroupMapDefinition : IMapDefinition
         target.Id = source.Id;
         target.Name = source.Name;
         target.ParentId = source.ParentId;
+        target.WorkspaceId = source.WorkspaceId;
         target.DateCreated = source.DateCreated;
     }
 }

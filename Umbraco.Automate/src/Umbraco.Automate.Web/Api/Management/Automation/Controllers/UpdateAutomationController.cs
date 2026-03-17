@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -16,6 +17,7 @@ public sealed class UpdateAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
@@ -24,10 +26,12 @@ public sealed class UpdateAutomationController : AutomationControllerBase
     public UpdateAutomationController(
         IAutomationService automationService,
         IAuthorizationService authorizationService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoMapper mapper)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _mapper = mapper;
     }
 
@@ -57,7 +61,7 @@ public sealed class UpdateAutomationController : AutomationControllerBase
 
         _mapper.Map(requestModel, existing);
 
-        await _automationService.UpdateAutomationAsync(existing, cancellationToken: cancellationToken);
+        await _automationService.UpdateAutomationAsync(existing, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
 
         return Ok();
     }

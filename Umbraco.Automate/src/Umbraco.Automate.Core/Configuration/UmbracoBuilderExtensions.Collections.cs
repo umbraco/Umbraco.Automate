@@ -144,7 +144,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
-        // WorkflowCore engine with outbox-backed queue
+        // WorkflowCore engine with outbox-backed queue.
         builder.Services.AddSingleton<OutboxQueueProvider>();
         builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<OutboxQueueProvider>());
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();

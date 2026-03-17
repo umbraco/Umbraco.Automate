@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
@@ -16,6 +17,7 @@ public sealed class CreateAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
@@ -24,10 +26,12 @@ public sealed class CreateAutomationController : AutomationControllerBase
     public CreateAutomationController(
         IAutomationService automationService,
         IAuthorizationService authorizationService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoMapper mapper)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _mapper = mapper;
     }
 
@@ -50,7 +54,7 @@ public sealed class CreateAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        var created = await _automationService.CreateAutomationAsync(automation, cancellationToken: cancellationToken);
+        var created = await _automationService.CreateAutomationAsync(automation, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
 
         return CreatedAtAction(
             nameof(ByIdAutomationController.GetAutomationById),

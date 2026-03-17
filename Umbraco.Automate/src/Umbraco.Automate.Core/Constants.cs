@@ -21,8 +21,8 @@ public static class Constants
     internal static class Sections
     {
         /// <summary>
-        /// Section alias for Umbraco.Automate.
+        /// The section manifest alias. Must match the frontend manifest alias in section/constants.ts.
         /// </summary>
-        public const string Automate = "automate";
+        public const string Automate = "Ua.Section.Automate";
     }
 }

@@ -30,10 +30,11 @@ public class AutomationMapDefinition : IMapDefinition
         {
             Alias = source.Alias,
             Name = source.Name,
+            WorkspaceId = source.WorkspaceId,
         };
     }
 
-    // Umbraco.Code.MapAll -Alias -Name -Id -WorkspaceId -Status -PublishedVersion -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
+    // Umbraco.Code.MapAll -Alias -Name -Id -Status -PublishedVersion -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
     private static void MapFromCreateRequest(CreateAutomationRequestModel source, Core.Automations.Automation target, MapperContext context)
     {
         target.Description = source.Description;
@@ -44,6 +45,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Connections = source.Connections;
         target.CanvasState = source.CanvasState;
         target.NotificationSettings = source.NotificationSettings;
+        target.WorkspaceId = source.WorkspaceId;
     }
 
     // Umbraco.Code.MapAll -Id -WorkspaceId -Status -PublishedVersion -Version -DateCreated -DateModified -CreatedByUserId -ModifiedByUserId
@@ -91,6 +93,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.Name = source.Name;
         target.Description = source.Description;
         target.IsEnabled = source.IsEnabled;
+        target.WorkspaceId = source.WorkspaceId;
         target.GroupId = source.GroupId;
         target.Status = source.Status;
         target.Version = source.Version;

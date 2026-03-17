@@ -2,6 +2,7 @@ using System.Text.Json;
 using Json.Schema;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
@@ -22,6 +23,8 @@ public class CatalogueMapDefinition : IMapDefinition
         mapper.Define<IControlFlow, ControlFlowItemResponseModel>((_, _) => new ControlFlowItemResponseModel(), MapToControlFlowItem);
         mapper.Define<INotificationChannel, NotificationChannelItemResponseModel>(
             (_, _) => new NotificationChannelItemResponseModel(), MapToNotificationChannelItem);
+        mapper.Define<IConnectionType, ConnectionTypeItemResponseModel>(
+            (_, _) => new ConnectionTypeItemResponseModel(), MapToConnectionTypeItem);
     }
 
     // Umbraco.Code.MapAll
@@ -89,5 +92,16 @@ public class CatalogueMapDefinition : IMapDefinition
         // then deserialize into a dictionary for clean API serialization and Swagger rendering.
         var json = JsonSerializer.Serialize(schema, JsonSchemaSerializerOptions);
         return JsonSerializer.Deserialize<Dictionary<string, object?>>(json);
+    }
+    
+    // Umbraco.Code.MapAll
+    private static void MapToConnectionTypeItem(IConnectionType source, ConnectionTypeItemResponseModel target, MapperContext context)
+    {
+        target.Alias = source.Alias;
+        target.Name = source.Name;
+        target.Description = source.Description;
+        target.Group = source.Group;
+        target.Icon = source.Icon;
+        target.SettingsSchema = source.GetSettingsSchema();
     }
 }

@@ -13,6 +13,7 @@
         "changelog": "node scripts/generate-changelog.js",
         "changelog:list": "node scripts/generate-changelog.js --list",
         "commit-options": "node scripts/list-commit-options.js",
+        "generate-client": "npm run generate-client --workspaces --if-present",
         "format": "prettier --write .",
         "format:check": "prettier --check ."
     },

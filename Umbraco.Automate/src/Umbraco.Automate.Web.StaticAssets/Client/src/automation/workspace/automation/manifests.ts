@@ -1,0 +1,138 @@
+import {
+    UmbSubmitWorkspaceAction,
+    UMB_WORKSPACE_CONDITION_ALIAS,
+    UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
+} from "@umbraco-cms/backoffice/workspace";
+import { UA_AUTOMATION_WORKSPACE_ALIAS, UA_AUTOMATION_ENTITY_TYPE } from "../../constants.js";
+
+export const manifests: Array<UmbExtensionManifest> = [
+    {
+        type: "workspace",
+        kind: "routable",
+        alias: UA_AUTOMATION_WORKSPACE_ALIAS,
+        name: "Automation Workspace",
+        api: () => import("./automation-workspace.context.js"),
+        meta: {
+            entityType: UA_AUTOMATION_ENTITY_TYPE,
+        },
+    },
+    {
+        type: "workspaceView",
+        alias: "UmbracoAutomate.Workspace.Automation.View.Workflow",
+        name: "Automation Workflow Workspace View",
+        js: () => import("./views/automation-workflow-workspace-view.element.js"),
+        weight: 200,
+        meta: {
+            label: "Design",
+            pathname: "workflow",
+            icon: "icon-mindmap",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+        ],
+    },
+    {
+        type: "workspaceView",
+        alias: "UmbracoAutomate.Workspace.Automation.View.Runs",
+        name: "Automation Runs Workspace View",
+        js: () => import("./views/automation-runs-workspace-view.element.js"),
+        weight: 150,
+        meta: {
+            label: "Runs",
+            pathname: "runs",
+            icon: "icon-history",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+            {
+                alias: UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
+                match: false,
+            },
+        ],
+    },
+    {
+        type: "workspaceView",
+        alias: "UmbracoAutomate.Workspace.Automation.View.Info",
+        name: "Automation Info Workspace View",
+        js: () => import("./views/automation-info-workspace-view.element.js"),
+        weight: 100,
+        meta: {
+            label: "Info",
+            pathname: "info",
+            icon: "icon-info",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+        ],
+    },
+    {
+        type: "workspaceAction",
+        kind: "default",
+        alias: "UmbracoAutomate.WorkspaceAction.Automation.Save",
+        name: "Save Automation Workspace Action",
+        weight: 80,
+        api: UmbSubmitWorkspaceAction,
+        meta: {
+            label: "#uaGeneral_save",
+            look: "secondary",
+            color: "positive",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+        ],
+    },
+    {
+        type: "workspaceAction",
+        kind: "default",
+        alias: "UmbracoAutomate.WorkspaceAction.Automation.SaveAndPublish",
+        name: "Save And Publish Automation Workspace Action",
+        weight: 70,
+        api: () => import("./actions/automation-save-and-publish.action.js"),
+        meta: {
+            label: "#uaGeneral_saveAndPublish",
+            look: "primary",
+            color: "positive",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+        ],
+    },
+    {
+        type: "workspaceAction",
+        kind: "default",
+        alias: "UmbracoAutomate.WorkspaceAction.Automation.Unpublish",
+        name: "Unpublish Automation Workspace Action",
+        weight: 60,
+        api: () => import("./actions/automation-unpublish.action.js"),
+        meta: {
+            label: "#uaGeneral_unpublish",
+            look: "default",
+            color: "warning",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+            {
+                alias: UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
+                match: false,
+            },
+        ],
+    },
+];
