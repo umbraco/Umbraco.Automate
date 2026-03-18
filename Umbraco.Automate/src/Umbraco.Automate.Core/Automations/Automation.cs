@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Umbraco.Automate.Core.Models;
 
 namespace Umbraco.Automate.Core.Automations;
@@ -8,6 +9,7 @@ namespace Umbraco.Automate.Core.Automations;
 public sealed class Automation : IPublishableEntity
 {
     /// <inheritdoc />
+    [JsonInclude]
     public Guid Id { get; internal set; }
 
     /// <summary>
@@ -76,6 +78,7 @@ public sealed class Automation : IPublishableEntity
     public string? CanvasState { get; set; }
 
     /// <inheritdoc />
+    [JsonInclude]
     public int Version { get; internal set; } = 1;
 
     /// <inheritdoc />
