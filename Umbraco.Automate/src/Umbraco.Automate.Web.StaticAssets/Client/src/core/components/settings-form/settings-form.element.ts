@@ -1,6 +1,7 @@
-import { css, html, customElement, property } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, property, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
 import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.js";
 
 export interface SettingsChangeDetail {
@@ -20,6 +21,83 @@ export class UaSettingsFormElement extends UmbLitElement {
     @property({ type: Object })
     values: Record<string, unknown> = {};
 
+    @state()
+    private _propertyValues: UmbPropertyValueData[] = [];
+
+    /**
+     * Tracks whether the initial population has been done for the current fields.
+     * Prevents re-populating on every values change which would reset cursor position.
+     */
+    #isInitialized = false;
+
+    /**
+     * Tracks the last settings we emitted via the change event.
+     * Used to distinguish echo updates from external changes.
+     */
+    #lastEmittedSettings: Record<string, unknown> | null = null;
+
+    override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
+        if (this.#isInitialized && changedProperties.size === 1 && changedProperties.has("values")) {
+            if (this.#isEchoUpdate(this.values)) {
+                return false;
+            }
+            this.#isInitialized = false;
+        }
+        return true;
+    }
+
+    #isEchoUpdate(incoming: Record<string, unknown> | undefined): boolean {
+        if (!this.#lastEmittedSettings || !incoming) {
+            return false;
+        }
+
+        const lastKeys = Object.keys(this.#lastEmittedSettings);
+        const incomingKeys = Object.keys(incoming);
+
+        if (lastKeys.length !== incomingKeys.length) {
+            return false;
+        }
+
+        return lastKeys.every((key) => this.#lastEmittedSettings![key] === incoming[key]);
+    }
+
+    override updated(changedProperties: Map<string, unknown>) {
+        if (changedProperties.has("fields")) {
+            this.#isInitialized = false;
+            this.#lastEmittedSettings = null;
+        }
+
+        if (!this.#isInitialized && this.fields.length > 0) {
+            this.#populatePropertyValues();
+            this.#isInitialized = true;
+        }
+    }
+
+    #populatePropertyValues() {
+        this._propertyValues = this.fields.map((field) => ({
+            alias: field.key,
+            value: this.values?.[field.key] ?? field.defaultValue,
+        }));
+    }
+
+    #onChange(e: Event) {
+        const dataset = e.target as UmbPropertyDatasetElement;
+        const settings = dataset.value.reduce(
+            (acc, curr) => ({ ...acc, [curr.alias]: curr.value }),
+            {} as Record<string, unknown>,
+        );
+
+        this.#lastEmittedSettings = settings;
+
+        this.dispatchEvent(
+            new CustomEvent<SettingsChangeDetail>("ua:settings-change", {
+                detail: { settings },
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
     #groupFields(fields: EditableModelFieldDescriptorModel[]): GroupedFields[] {
         const sorted = [...fields].sort((a, b) => a.sortOrder - b.sortOrder);
         const groups = new Map<string, EditableModelFieldDescriptorModel[]>();
@@ -37,9 +115,7 @@ export class UaSettingsFormElement extends UmbLitElement {
 
     #toPropertyConfig(config: unknown): Array<{ alias: string; value: unknown }> {
         if (!config) return [];
-        // If it's already an array of alias-value pairs, return as is
         if (Array.isArray(config)) return config as Array<{ alias: string; value: unknown }>;
-        // If it's an object, convert its entries to alias-value pairs
         if (typeof config !== "object") return [];
         return Object.entries(config).map(([alias, value]) => ({ alias, value }));
     }
@@ -73,18 +149,20 @@ export class UaSettingsFormElement extends UmbLitElement {
         const grouped = this.#groupFields(this.fields);
 
         return html`
-            ${grouped.map((g) =>
-                g.group
-                    ? html`
-                          <uui-box class="uui-text">
-                              <span slot="headline">${g.group}</span>
+            <umb-property-dataset .value=${this._propertyValues} @change=${this.#onChange}>
+                ${grouped.map((g) =>
+                    g.group
+                        ? html`
+                              <uui-box class="uui-text">
+                                  <span slot="headline">${g.group}</span>
+                                  ${g.fields.map((f) => this.#renderField(f))}
+                              </uui-box>
+                          `
+                        : html`<uui-box class="uui-text">
                               ${g.fields.map((f) => this.#renderField(f))}
-                          </uui-box>
-                      `
-                    : html`<uui-box class="uui-text">
-                          ${g.fields.map((f) => this.#renderField(f))}
-                      </uui-box>`,
-            )}
+                          </uui-box>`,
+                )}
+            </umb-property-dataset>
         `;
     }
 
@@ -97,16 +175,8 @@ export class UaSettingsFormElement extends UmbLitElement {
                 gap: var(--uui-size-layout-1);
             }
 
-            umb-property-layout[orientation="vertical"] {
-                padding: var(--uui-size-space-2) 0;
-            }
-
-            umb-property-layout:first-of-type {
-                padding-top: 0;
-            }
-
-            umb-property-layout:last-of-type {
-                padding-bottom: 0;
+            umb-property {
+                --uui-size-layout-1: var(--uui-size-space-2);
             }
 
             umb-property-layout [slot="description"] {

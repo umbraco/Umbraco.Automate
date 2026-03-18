@@ -19,6 +19,7 @@ import "../canvas/ua-automation-canvas.element.js";
 export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     #workspaceContext?: typeof UA_AUTOMATION_WORKSPACE_CONTEXT.TYPE;
     #catalogueRepository: UaCatalogueRepository;
+    #isCanvasUpdate = false;
 
     @state()
     private _nodes: Node[] = [];
@@ -42,7 +43,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             this.observe(context.data, (model) => {
                 if (!model) return;
                 this._model = model;
-                this.#syncFromModel(model);
+                if (!this.#isCanvasUpdate) {
+                    this.#syncFromModel(model);
+                }
             });
         });
     }
@@ -72,10 +75,12 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const trigger = flowToTrigger(nodes, this._model.trigger);
         const canvasState = JSON.stringify(flowToCanvasState(nodes, viewport));
 
+        this.#isCanvasUpdate = true;
         this.#workspaceContext?.updateProperty("steps", steps);
         this.#workspaceContext?.updateProperty("connections", connections);
         this.#workspaceContext?.updateProperty("trigger", trigger);
         this.#workspaceContext?.updateProperty("canvasState", canvasState);
+        this.#isCanvasUpdate = false;
     }
 
     async #onNodeSettingsOpen(event: CustomEvent<NodeSettingsOpenDetail>) {

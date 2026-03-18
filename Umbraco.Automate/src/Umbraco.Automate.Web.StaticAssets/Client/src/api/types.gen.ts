@@ -235,7 +235,6 @@ export type EditableModelFieldDescriptorModel = {
 };
 
 export type EditableModelSchemaModel = {
-    type?: string | null;
     fields: Array<EditableModelFieldDescriptorModel>;
 };
 
