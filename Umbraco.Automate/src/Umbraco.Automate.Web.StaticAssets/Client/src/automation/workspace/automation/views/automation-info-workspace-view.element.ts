@@ -49,6 +49,13 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
 
             <div class="container">
                 <uui-box headline="Info">
+                    <umb-property-layout label="Id" orientation="vertical">
+                        <div slot="editor">
+                            ${this._model.unique === UA_EMPTY_GUID
+                                ? html`<uui-tag color="default" look="placeholder">Unsaved</uui-tag>`
+                                : this._model.unique}
+                        </div>
+                    </umb-property-layout>
                     <umb-property-layout label="Status" orientation="vertical">
                         <div slot="editor">
                             <uui-tag color=${this.#statusColor(this._model.status)} look="secondary">
@@ -61,13 +68,6 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                             <uui-tag color=${this._model.isEnabled ? "positive" : "default"} look="secondary">
                                 ${this._model.isEnabled ? "Enabled" : "Disabled"}
                             </uui-tag>
-                        </div>
-                    </umb-property-layout>
-                    <umb-property-layout label="Id" orientation="vertical">
-                        <div slot="editor">
-                            ${this._model.unique === UA_EMPTY_GUID
-                                ? html`<uui-tag color="default" look="placeholder">Unsaved</uui-tag>`
-                                : this._model.unique}
                         </div>
                     </umb-property-layout>
                     ${this._model.dateCreated
