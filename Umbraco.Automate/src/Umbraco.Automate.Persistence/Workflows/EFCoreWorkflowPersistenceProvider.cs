@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
-using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -14,7 +13,7 @@ namespace Umbraco.Automate.Persistence.Workflows;
 internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 {
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
-    private readonly AutomateMetrics _metrics;
+    private readonly RunFinalizer _runFinalizer;
 
     private static readonly JsonSerializerSettings JsonSettings = new()
     {
@@ -24,10 +23,10 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
     public EFCoreWorkflowPersistenceProvider(
         IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
-        AutomateMetrics metrics)
+        RunFinalizer runFinalizer)
     {
         _dbContextFactory = dbContextFactory;
-        _metrics = metrics;
+        _runFinalizer = runFinalizer;
     }
 
     // === IPersistenceProvider ===
@@ -72,7 +71,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        RecordRunTerminalMetrics(workflow);
+        await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
     }
 
     public async Task PersistWorkflow(WorkflowInstance workflow, List<EventSubscription> subscriptions, CancellationToken cancellationToken)
@@ -97,7 +96,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
         await db.SaveChangesAsync(cancellationToken);
 
-        RecordRunTerminalMetrics(workflow);
+        await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
     }
 
     public async Task<WorkflowInstance> GetWorkflowInstance(string id, CancellationToken cancellationToken)
@@ -391,34 +390,6 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         }
 
         await db.SaveChangesAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Records run-level metrics when the workflow reaches a terminal state.
-    /// </summary>
-    private void RecordRunTerminalMetrics(WorkflowInstance workflow)
-    {
-        if (workflow.Status is not (WorkflowStatus.Complete or WorkflowStatus.Terminated))
-        {
-            return;
-        }
-
-        var alias = (workflow.Data as AutomationWorkflowData)?.AutomationAlias ?? "unknown";
-
-        if (workflow.Status == WorkflowStatus.Complete)
-        {
-            _metrics.RunCompleted(alias);
-        }
-        else
-        {
-            _metrics.RunFailed(alias);
-        }
-
-        if (workflow.CompleteTime.HasValue)
-        {
-            var durationMs = (workflow.CompleteTime.Value - workflow.CreateTime).TotalMilliseconds;
-            _metrics.RecordRunDuration(durationMs, alias);
-        }
     }
 
     // === Entity mapping ===

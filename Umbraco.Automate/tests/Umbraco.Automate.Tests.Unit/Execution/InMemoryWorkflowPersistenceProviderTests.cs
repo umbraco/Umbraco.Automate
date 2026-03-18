@@ -1,11 +1,32 @@
+using System.Diagnostics.Metrics;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Tests.Unit.Execution;
 
 public class InMemoryWorkflowPersistenceProviderTests
 {
-    private readonly InMemoryWorkflowPersistenceProvider _provider = new();
+    private readonly InMemoryWorkflowPersistenceProvider _provider;
+
+    public InMemoryWorkflowPersistenceProviderTests()
+    {
+        var meterFactory = new Mock<IMeterFactory>();
+        meterFactory
+            .Setup(f => f.Create(It.IsAny<MeterOptions>()))
+            .Returns(new Meter("test"));
+
+        var metrics = new AutomateMetrics(meterFactory.Object);
+        var finalizer = new RunFinalizer(
+            Mock.Of<IAutomationRunRepository>(),
+            metrics,
+            NullLogger<RunFinalizer>.Instance);
+
+        _provider = new InMemoryWorkflowPersistenceProvider(finalizer);
+    }
 
     [Fact]
     public async Task CreateNewWorkflow_AssignsIdAndPersists()
