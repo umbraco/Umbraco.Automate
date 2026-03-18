@@ -143,6 +143,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
+        builder.Services.AddSingleton<RunFinalizer>();
 
         // WorkflowCore engine with outbox-backed queue.
         builder.Services.AddSingleton<OutboxQueueProvider>();
@@ -150,6 +151,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
         builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
         builder.Services.AddWorkflow();
+        builder.Services.AddHostedService<WorkflowHostLifecycle>();
 
         return builder;
     }
