@@ -46,13 +46,13 @@ public sealed class EditableModelFieldDescriptor
     /// Gets the property name on the settings POCO.
     /// </summary>
     [JsonIgnore]
-    public required string PropertyName { get; init; }
+    public string PropertyName { get; init; } = string.Empty;
 
     /// <summary>
     /// Gets the CLR type of the property.
     /// </summary>
     [JsonIgnore]
-    public required Type PropertyType { get; init; }
+    public Type PropertyType { get; init; } = null!;
 
     /// <summary>
     /// Gets the Umbraco editor UI alias, or null to infer from the property type.
