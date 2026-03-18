@@ -93,6 +93,10 @@ export class UaAutomationWorkspaceContext
         this._data.updateCurrent({ [key]: value } as Partial<UaAutomationDetailModel>);
     }
 
+    updateProperties(properties: Partial<UaAutomationDetailModel>) {
+        this._data.updateCurrent(properties);
+    }
+
     async publish() {
         const unique = this.getUnique();
         if (!unique || unique === UA_EMPTY_GUID) return;

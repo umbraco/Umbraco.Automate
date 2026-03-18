@@ -76,10 +76,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const canvasState = JSON.stringify(flowToCanvasState(nodes, viewport));
 
         this.#isCanvasUpdate = true;
-        this.#workspaceContext?.updateProperty("steps", steps);
-        this.#workspaceContext?.updateProperty("connections", connections);
-        this.#workspaceContext?.updateProperty("trigger", trigger);
-        this.#workspaceContext?.updateProperty("canvasState", canvasState);
+        this.#workspaceContext?.updateProperties({ steps, connections, trigger, canvasState });
         this.#isCanvasUpdate = false;
     }
 
