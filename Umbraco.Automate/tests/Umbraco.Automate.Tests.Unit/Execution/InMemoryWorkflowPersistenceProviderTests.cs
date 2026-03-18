@@ -4,6 +4,8 @@ using Moq;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Scoping;
 using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Tests.Unit.Execution;
@@ -22,6 +24,8 @@ public class InMemoryWorkflowPersistenceProviderTests
         var metrics = new AutomateMetrics(meterFactory.Object);
         var finalizer = new RunFinalizer(
             Mock.Of<IAutomationRunRepository>(),
+            Mock.Of<ICoreScopeProvider>(),
+            Mock.Of<IEventMessagesFactory>(),
             metrics,
             NullLogger<RunFinalizer>.Instance);
 
