@@ -7,6 +7,7 @@ using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.HealthChecks;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Messaging;
@@ -129,9 +130,9 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IOutbox, DatabaseOutbox>();
         builder.Services.AddHostedService<OutboxDispatcher>();
 
-        // Health checks
-        builder.Services.AddHealthChecks()
-            .AddCheck<OutboxHealthCheck>("umbraco-automate-outbox", tags: ["automate"]);
+        // Health check infrastructure
+        builder.Services.AddSingleton<RunCleanupTracker>();
+        builder.Services.AddSingleton<IAutomateHealthService, AutomateHealthService>();
 
         // Trigger dispatch via outbox
         builder.Services.AddSingleton<ITriggerDispatcher, OutboxTriggerDispatcher>();

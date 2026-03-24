@@ -20,6 +20,7 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
     private readonly IRuntimeState _runtimeState;
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IMainDom _mainDom;
+    private readonly RunCleanupTracker _tracker;
     private readonly ILogger<RunCleanupBackgroundJob> _logger;
 
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(12);
@@ -31,6 +32,7 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
         IRuntimeState runtimeState,
         IServerRoleAccessor serverRoleAccessor,
         IMainDom mainDom,
+        RunCleanupTracker tracker,
         ILogger<RunCleanupBackgroundJob> logger)
         : base(logger, CleanupInterval, StartupDelay)
     {
@@ -39,6 +41,7 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
         _runtimeState = runtimeState;
         _serverRoleAccessor = serverRoleAccessor;
         _mainDom = mainDom;
+        _tracker = tracker;
         _logger = logger;
     }
 
@@ -114,6 +117,8 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
             {
                 _logger.LogDebug("Run cleanup completed. No old runs to delete");
             }
+
+            _tracker.RecordSuccess();
         }
         catch (Exception ex)
         {
