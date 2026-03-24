@@ -439,6 +439,7 @@ export type UpdateAutomationRequestModel = {
     connections: Array<StepConnectionModel>;
     canvasState?: string | null;
     notificationSettings?: AutomationNotificationSettingsModel | null;
+    version: number;
 };
 
 export type UpdateConnectionRequestModel = {
@@ -448,6 +449,7 @@ export type UpdateConnectionRequestModel = {
     settings: {
         [key: string]: unknown;
     };
+    version: number;
 };
 
 export type UpdateWorkspaceGroupRequestModel = {
@@ -684,6 +686,10 @@ export type PutAutomationsByIdErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
 };
 
 export type PutAutomationsByIdError = PutAutomationsByIdErrors[keyof PutAutomationsByIdErrors];
@@ -1249,6 +1255,10 @@ export type PutConnectionsByIdErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
 };
 
 export type PutConnectionsByIdError = PutConnectionsByIdErrors[keyof PutConnectionsByIdErrors];

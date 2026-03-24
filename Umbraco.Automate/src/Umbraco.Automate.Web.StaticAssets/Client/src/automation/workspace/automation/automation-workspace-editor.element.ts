@@ -7,6 +7,7 @@ import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "./automation-workspace.context-
 import { UA_AUTOMATION_WORKSPACE_ALIAS } from "../../constants.js";
 import type { UaAutomationDetailModel } from "../../types.js";
 import { UA_AUTOMATION_ROOT_WORKSPACE_PATH } from "../automation-root/paths.js";
+import "../../../core/components/status-selector/status-selector.element.js";
 
 @customElement("ua-automation-workspace-editor")
 export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbLitElement) {
@@ -68,6 +69,11 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         this._aliasLocked = !this._aliasLocked;
     }
 
+    #onEnabledChange(event: CustomEvent<{ value: boolean }>) {
+        event.stopPropagation();
+        this.#workspaceContext?.updateProperty("isEnabled", event.detail.value);
+    }
+
     #generateAlias(name: string): string {
         return name
             .toLowerCase()
@@ -112,6 +118,13 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
                             ${umbBindToValidation(this, "$.alias", this._model.alias)}
                         ></uui-input-lock>
                     </uui-input>
+
+                    <ua-status-selector
+                        active-label="Enabled"
+                        inactive-label="Disabled"
+                        .value=${this._model.isEnabled}
+                        @change=${this.#onEnabledChange}
+                    ></ua-status-selector>
                 </div>
 
                 ${when(

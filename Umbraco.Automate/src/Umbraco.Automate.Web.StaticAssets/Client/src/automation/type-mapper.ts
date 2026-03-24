@@ -56,6 +56,7 @@ export const UaAutomationTypeMapper = {
             steps: model.steps,
             connections: model.connections,
             canvasState: model.canvasState,
+            version: model.version,
         };
     },
 
@@ -69,6 +70,7 @@ export const UaAutomationTypeMapper = {
             steps: model.steps,
             connections: model.connections,
             canvasState: model.canvasState,
+            version: model.version,
         };
     },
 };

@@ -39,6 +39,7 @@ export const UaConnectionTypeMapper = {
             name: model.name,
             type: model.type,
             settings: model.settings,
+            version: model.version,
         };
     },
 
@@ -48,6 +49,7 @@ export const UaConnectionTypeMapper = {
             name: model.name,
             type: model.type,
             settings: model.settings,
+            version: model.version,
         };
     },
 };
