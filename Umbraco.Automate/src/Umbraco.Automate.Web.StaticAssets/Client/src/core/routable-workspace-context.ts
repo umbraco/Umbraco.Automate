@@ -35,6 +35,7 @@ export class UaRoutableWorkspaceContext extends UmbContextBase implements UmbRou
                 setup: (_component, info) => {
                     const unique = info.match.params.unique;
                     this.#entityContext.setUnique(unique);
+                    this.onRouteSetup(unique);
                 },
             },
         ]);
@@ -47,4 +48,10 @@ export class UaRoutableWorkspaceContext extends UmbContextBase implements UmbRou
     getUnique() {
         return this.#entityContext.getUnique();
     }
+
+    /**
+     * Override to perform additional setup when the route resolves a unique.
+     * Called after the entity unique has been set.
+     */
+    protected onRouteSetup(_unique: string): void {}
 }
