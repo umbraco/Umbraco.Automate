@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -200,11 +202,115 @@ public class WebhookEndpointControllerTests
         captured.Output.Method.ShouldBe("POST");
     }
 
+    [Fact]
+    public async Task ReceiveWebhook_ValidHmacSignature_Returns202()
+    {
+        var secret = "hmac-secret-key";
+        var automation = CreateAutomation(secret: secret, validateSignature: true);
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var body = """{"event":"test"}""";
+        var signature = ComputeHmacSha256(body, secret);
+
+        SetRequestBody(body);
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Signature"] = $"sha256={signature}";
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<AcceptedResult>();
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_InvalidHmacSignature_Returns401()
+    {
+        var automation = CreateAutomation(secret: "hmac-secret-key", validateSignature: true);
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var body = """{"event":"test"}""";
+        SetRequestBody(body);
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Signature"] = "sha256=badhex000000";
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<UnauthorizedResult>();
+        _dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_MissingSignatureHeaderWhenRequired_Returns401()
+    {
+        var automation = CreateAutomation(secret: "hmac-secret-key", validateSignature: true);
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var body = """{"event":"test"}""";
+        SetRequestBody(body);
+        // No X-Webhook-Signature header
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<UnauthorizedResult>();
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_TamperedBody_Returns401()
+    {
+        var secret = "hmac-secret-key";
+        var automation = CreateAutomation(secret: secret, validateSignature: true);
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        // Sign the original body but send a different one.
+        var signature = ComputeHmacSha256("""{"event":"original"}""", secret);
+        SetRequestBody("""{"event":"tampered"}""");
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Signature"] = $"sha256={signature}";
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<UnauthorizedResult>();
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_SignatureMode_IgnoresPlainSecretHeader()
+    {
+        var secret = "hmac-secret-key";
+        var automation = CreateAutomation(secret: secret, validateSignature: true);
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        // Provide the plain secret header but not the HMAC signature — should still fail.
+        SetRequestBody("""{"event":"test"}""");
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = secret;
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<UnauthorizedResult>();
+    }
+
+    private void SetRequestBody(string body)
+    {
+        var bytes = Encoding.UTF8.GetBytes(body);
+        _controller.ControllerContext.HttpContext.Request.Body = new MemoryStream(bytes);
+        _controller.ControllerContext.HttpContext.Request.ContentLength = bytes.Length;
+        _controller.ControllerContext.HttpContext.Request.ContentType = "application/json";
+    }
+
+    private static string ComputeHmacSha256(string payload, string secret)
+    {
+        var keyBytes = Encoding.UTF8.GetBytes(secret);
+        var payloadBytes = Encoding.UTF8.GetBytes(payload);
+        var hashBytes = HMACSHA256.HashData(keyBytes, payloadBytes);
+        return Convert.ToHexStringLower(hashBytes);
+    }
+
     private static Automation CreateAutomation(
         AutomationStatus status = AutomationStatus.Published,
         bool isEnabled = true,
         string triggerAlias = "umbracoAutomate.webhook",
-        string? secret = null)
+        string? secret = null,
+        bool validateSignature = false)
     {
         var builder = new AutomationBuilder()
             .WithStatus(status)
@@ -212,7 +318,7 @@ public class WebhookEndpointControllerTests
 
         if (triggerAlias == "umbracoAutomate.webhook")
         {
-            builder.WithWebhookTrigger(secret);
+            builder.WithWebhookTrigger(secret, validateSignature);
         }
         else
         {

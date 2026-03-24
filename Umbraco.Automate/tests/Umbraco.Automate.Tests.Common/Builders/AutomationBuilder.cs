@@ -55,12 +55,17 @@ public class AutomationBuilder
     public AutomationBuilder WithManualTrigger()
         => WithTrigger("umbracoAutomate.manual");
 
-    public AutomationBuilder WithWebhookTrigger(string? secret = null)
+    public AutomationBuilder WithWebhookTrigger(string? secret = null, bool validateSignature = false)
     {
         var settings = new Dictionary<string, object?>();
         if (secret is not null)
         {
             settings["secret"] = secret;
+        }
+
+        if (validateSignature)
+        {
+            settings["validateSignature"] = true;
         }
 
         return WithTrigger("umbracoAutomate.webhook", settings);

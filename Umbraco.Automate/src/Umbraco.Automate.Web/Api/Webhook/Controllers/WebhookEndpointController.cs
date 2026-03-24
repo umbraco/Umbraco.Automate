@@ -26,6 +26,7 @@ public sealed class WebhookEndpointController : ControllerBase
 {
     internal const string SecretHeaderName = "X-Webhook-Secret";
     internal const string SecretQueryParam = "secret";
+    internal const string SignatureHeaderName = "X-Webhook-Signature";
 
     private readonly IAutomationService _automationService;
     private readonly ITriggerDispatcher _dispatcher;
@@ -96,14 +97,10 @@ public sealed class WebhookEndpointController : ControllerBase
             return NotFound();
         }
 
-        // Validate the webhook secret (resolves $ConfigKey references via the trigger's resolver).
+        // Resolve trigger settings (resolves $ConfigKey references via the trigger's resolver).
         var triggerSettings = automation.Trigger?.Settings != null
             ? trigger.ResolveSettings(automation.Trigger.Settings)
             : null;
-        if (!string.IsNullOrEmpty(triggerSettings?.Secret) && !ValidateSecret(triggerSettings.Secret))
-        {
-            return Unauthorized();
-        }
 
         var allowedMethods = triggerSettings?.AllowedMethods ?? ["POST"];
         if (!allowedMethods.Contains(Request.Method, StringComparer.OrdinalIgnoreCase))
@@ -114,6 +111,15 @@ public sealed class WebhookEndpointController : ControllerBase
                 Detail = $"This webhook accepts: {string.Join(", ", allowedMethods)}",
                 Status = StatusCodes.Status405MethodNotAllowed,
             });
+        }
+
+        // Plain secret validation (when signature mode is off).
+        // Checked before body reading since it doesn't need the body.
+        if (!string.IsNullOrEmpty(triggerSettings?.Secret)
+            && !triggerSettings.ValidateSignature
+            && !ValidateSecret(triggerSettings.Secret))
+        {
+            return Unauthorized();
         }
 
         // Validate payload size before reading into memory.
@@ -171,6 +177,15 @@ public sealed class WebhookEndpointController : ControllerBase
             }
         }
 
+        // HMAC-SHA256 signature validation (when signature mode is on).
+        // Must happen after body reading since the signature covers the body.
+        if (!string.IsNullOrEmpty(triggerSettings?.Secret)
+            && triggerSettings.ValidateSignature
+            && !ValidateSignature(triggerSettings.Secret, body ?? string.Empty))
+        {
+            return Unauthorized();
+        }
+
         var output = new WebhookTriggerOutput
         {
             Method = Request.Method,
@@ -213,5 +228,31 @@ public sealed class WebhookEndpointController : ControllerBase
         return CryptographicOperations.FixedTimeEquals(
             System.Text.Encoding.UTF8.GetBytes(expectedSecret),
             System.Text.Encoding.UTF8.GetBytes(providedSecret));
+    }
+
+    private bool ValidateSignature(string secret, string body)
+    {
+        // Expect header format: "sha256=<hex>"
+        var header = Request.Headers[SignatureHeaderName].FirstOrDefault();
+        if (string.IsNullOrEmpty(header) || !header.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var providedHex = header["sha256=".Length..];
+        var expectedHex = ComputeHmacSha256(body, secret);
+
+        // Constant-time comparison to prevent timing attacks.
+        return CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(expectedHex),
+            System.Text.Encoding.UTF8.GetBytes(providedHex));
+    }
+
+    private static string ComputeHmacSha256(string payload, string secret)
+    {
+        var keyBytes = System.Text.Encoding.UTF8.GetBytes(secret);
+        var payloadBytes = System.Text.Encoding.UTF8.GetBytes(payload);
+        var hashBytes = HMACSHA256.HashData(keyBytes, payloadBytes);
+        return Convert.ToHexStringLower(hashBytes);
     }
 }

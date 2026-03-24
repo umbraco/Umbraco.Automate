@@ -75,4 +75,33 @@ public class ErrorHandlingMiddlewareTests
         result.Status.ShouldBe(ActionResultStatus.Failed);
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Cancelled);
     }
+
+    [Fact]
+    public async Task ApplyAsync_StepTimeoutCancelled_ReturnsTimeoutFailure()
+    {
+        // Simulate the ActionStepBody pattern: a linked CTS for step timeout
+        // fires while the outer workflow token is still active.
+        using var workflowCts = new CancellationTokenSource();
+        using var stepCts = CancellationTokenSource.CreateLinkedTokenSource(workflowCts.Token);
+        stepCts.Cancel(); // Step timeout fires
+
+        // The context carries the step token (as ActionStepBody sets it).
+        var context = new ActionContext
+        {
+            AutomationId = Guid.NewGuid(),
+            RunId = Guid.NewGuid(),
+            StepId = Guid.NewGuid(),
+            ActionAlias = "test.action",
+            CancellationToken = stepCts.Token,
+        };
+
+        var result = await _middleware.ApplyAsync(
+            context,
+            (_, ct) => throw new OperationCanceledException(ct),
+            workflowCts.Token); // Outer token still alive
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Timeout);
+        result.Exception.ShouldBeOfType<TimeoutException>();
+    }
 }
