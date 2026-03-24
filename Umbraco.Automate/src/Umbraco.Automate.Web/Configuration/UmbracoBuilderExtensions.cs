@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
@@ -21,6 +23,7 @@ using Umbraco.Cms.Api.Common.DependencyInjection;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Web.Common.ApplicationBuilder;
 
 namespace Umbraco.Automate.Extensions;
 
@@ -38,6 +41,7 @@ public static partial class UmbracoBuilderExtensions
         builder.AddUmbracoAutomateManagementApi();
         builder.AddUmbracoAutomateWebhookApi();
         builder.AddUmbracoAutomateMapDefinitions();
+        builder.AddUmbracoAutomateHealthCheckEndpoint();
 
         return builder;
     }
@@ -169,4 +173,22 @@ public static partial class UmbracoBuilderExtensions
                 typeInfo.Properties.Add(properties[i]);
             }
         };
+
+    private static IUmbracoBuilder AddUmbracoAutomateHealthCheckEndpoint(this IUmbracoBuilder builder)
+    {
+        builder.Services.Configure<UmbracoPipelineOptions>(options =>
+        {
+            options.AddFilter(new UmbracoPipelineFilter(
+                "UmbracoAutomate",
+                endpoints: app => app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapHealthChecks("/umbraco/automate/health", new HealthCheckOptions
+                    {
+                        Predicate = check => check.Tags.Contains("automate"),
+                    });
+                })));
+        });
+
+        return builder;
+    }
 }
