@@ -83,7 +83,8 @@ public static partial class UmbracoBuilderExtensions
         builder.AutomateActionMiddleware()
             .Append<ErrorHandlingMiddleware>()
             .Append<StepRunLoggingMiddleware>()
-            .Append<AuditTrailMiddleware>();
+            .Append<AuditTrailMiddleware>()
+            .Append<SettingsValidationMiddleware>();
 
         // Security
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
