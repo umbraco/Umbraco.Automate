@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Connections;
 
 namespace Umbraco.Automate.Persistence.Connections;
@@ -100,7 +101,15 @@ internal sealed class EFCoreConnectionRepository : IConnectionRepository
             _factory.UpdateEntity(existing, connection);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException(nameof(Connection), connection.Id);
+        }
+
         return connection;
     }
 

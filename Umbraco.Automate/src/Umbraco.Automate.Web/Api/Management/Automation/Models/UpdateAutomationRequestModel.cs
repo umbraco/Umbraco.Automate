@@ -39,4 +39,12 @@ public sealed class UpdateAutomationRequestModel
 
     /// <summary>Notification channel settings.</summary>
     public AutomationNotificationSettings? NotificationSettings { get; init; }
+
+    /// <summary>
+    /// The version of the automation that the client last read.
+    /// Used for optimistic concurrency — the server returns 409 Conflict if this
+    /// does not match the current version.
+    /// </summary>
+    [Required]
+    public int Version { get; init; }
 }

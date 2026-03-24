@@ -70,6 +70,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(1);
@@ -128,6 +129,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(1);

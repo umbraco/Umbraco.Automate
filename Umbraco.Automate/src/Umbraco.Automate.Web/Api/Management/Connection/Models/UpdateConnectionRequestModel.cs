@@ -21,4 +21,12 @@ public sealed class UpdateConnectionRequestModel
 
     /// <summary>The connection settings.</summary>
     public Dictionary<string, object?> Settings { get; init; } = [];
+
+    /// <summary>
+    /// The version of the connection that the client last read.
+    /// Used for optimistic concurrency — the server returns 409 Conflict if this
+    /// does not match the current version.
+    /// </summary>
+    [Required]
+    public int Version { get; init; }
 }

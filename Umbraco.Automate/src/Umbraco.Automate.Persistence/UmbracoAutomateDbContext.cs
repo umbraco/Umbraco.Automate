@@ -100,7 +100,7 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.IsEnabled).IsRequired();
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.Definition);
-            entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
+            entity.Property(e => e.Version).IsRequired().HasDefaultValue(1).IsConcurrencyToken();
             entity.Property(e => e.DateCreated).IsRequired();
             entity.Property(e => e.DateModified).IsRequired();
 
@@ -280,7 +280,7 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
             entity.Property(e => e.Type).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Settings);
-            entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
+            entity.Property(e => e.Version).IsRequired().HasDefaultValue(1).IsConcurrencyToken();
             entity.Property(e => e.DateCreated).IsRequired();
             entity.Property(e => e.DateModified).IsRequired();
 

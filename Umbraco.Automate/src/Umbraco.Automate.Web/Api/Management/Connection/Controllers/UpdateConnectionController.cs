@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Web.Api.Management.Connection.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -32,6 +33,7 @@ public sealed class UpdateConnectionController : ConnectionControllerBase
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateConnection(
         Guid id,
         UpdateConnectionRequestModel requestModel,
@@ -43,9 +45,31 @@ public sealed class UpdateConnectionController : ConnectionControllerBase
             return ConnectionNotFound();
         }
 
+        if (requestModel.Version != existing.Version)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "Concurrency conflict",
+                Detail = "The connection was modified by another request. Reload and try again.",
+                Status = StatusCodes.Status409Conflict,
+            });
+        }
+
         _mapper.Map(requestModel, existing);
 
-        await _connectionService.UpdateConnectionAsync(existing, cancellationToken: cancellationToken);
+        try
+        {
+            await _connectionService.UpdateConnectionAsync(existing, cancellationToken: cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "Concurrency conflict",
+                Detail = "The connection was modified by another request. Reload and try again.",
+                Status = StatusCodes.Status409Conflict,
+            });
+        }
 
         return Ok();
     }

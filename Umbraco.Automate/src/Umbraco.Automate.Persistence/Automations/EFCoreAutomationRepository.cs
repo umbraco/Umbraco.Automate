@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Automations;
 
 namespace Umbraco.Automate.Persistence.Automations;
@@ -115,7 +116,15 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
             _factory.UpdateEntity(existing, automation);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException(nameof(Automation), automation.Id);
+        }
+
         return automation;
     }
 

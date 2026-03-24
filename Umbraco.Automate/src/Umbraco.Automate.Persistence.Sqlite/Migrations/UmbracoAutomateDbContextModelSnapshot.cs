@@ -65,6 +65,7 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(1);
@@ -123,6 +124,7 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(1);

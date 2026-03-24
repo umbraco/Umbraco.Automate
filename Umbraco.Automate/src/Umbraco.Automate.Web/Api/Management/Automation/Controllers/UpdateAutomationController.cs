@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -42,6 +43,7 @@ public sealed class UpdateAutomationController : AutomationControllerBase
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateAutomation(
         Guid id,
         UpdateAutomationRequestModel requestModel,
@@ -59,9 +61,31 @@ public sealed class UpdateAutomationController : AutomationControllerBase
             return forbidden;
         }
 
+        if (requestModel.Version != existing.Version)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "Concurrency conflict",
+                Detail = "The automation was modified by another request. Reload and try again.",
+                Status = StatusCodes.Status409Conflict,
+            });
+        }
+
         _mapper.Map(requestModel, existing);
 
-        await _automationService.UpdateAutomationAsync(existing, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        try
+        {
+            await _automationService.UpdateAutomationAsync(existing, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "Concurrency conflict",
+                Detail = "The automation was modified by another request. Reload and try again.",
+                Status = StatusCodes.Status409Conflict,
+            });
+        }
 
         return Ok();
     }
