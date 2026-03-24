@@ -43,6 +43,7 @@ public class AutomationExecutorTests
 
         var services = new ServiceCollection();
         services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
+        services.Configure<Umbraco.Automate.Core.Configuration.ExecutionOptions>(_ => { });
         var sp = services.BuildServiceProvider();
 
         var meterFactory = new Mock<IMeterFactory>();

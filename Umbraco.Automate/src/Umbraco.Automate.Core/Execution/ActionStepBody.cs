@@ -1,9 +1,11 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Bindings;
@@ -26,6 +28,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
+    private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<ActionStepBody> _logger;
 
@@ -37,6 +40,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
+        IOptions<ExecutionOptions> executionOptions,
         AutomateMetrics metrics,
         ILogger<ActionStepBody> logger)
     {
@@ -47,6 +51,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
+        _executionOptions = executionOptions;
         _metrics = metrics;
         _logger = logger;
     }
@@ -103,6 +108,13 @@ internal sealed class ActionStepBody : StepBodyAsync
             connection = await _connectionService.GetConfiguredConnectionAsync(connectionId, cancellationToken);
         }
 
+        // Create a linked CancellationTokenSource that enforces the step timeout.
+        // If the workflow-level token is cancelled, this will also cancel.
+        var stepTimeout = _executionOptions.Value.DefaultTimeout;
+        using var stepCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        stepCts.CancelAfter(stepTimeout);
+        var stepCancellationToken = stepCts.Token;
+
         // Create action context.
         var actionContext = new ActionContext
         {
@@ -112,7 +124,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ActionAlias = _action.Alias,
             Settings = settings,
             InputData = resolvedInputs,
-            CancellationToken = cancellationToken,
+            CancellationToken = stepCancellationToken,
             ExecutionContext = data.ExecutionContext,
             Connection = connection,
             Action = _action,
@@ -132,8 +144,8 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
-        // Execute through the middleware pipeline.
-        var result = await _pipeline.ExecuteAsync(_action, actionContext, cancellationToken);
+        // Execute through the middleware pipeline with the timeout-linked token.
+        var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
 
         // Handle suspension: the action needs the workflow to pause.
         switch (result.Suspension)

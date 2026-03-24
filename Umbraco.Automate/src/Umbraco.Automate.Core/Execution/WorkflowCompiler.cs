@@ -1,7 +1,9 @@
 using System.Linq.Expressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Bindings;
@@ -139,6 +141,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 _settingsBindingResolver,
                 _runRepository,
                 _connectionService,
+                _serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>(),
                 _metrics,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
