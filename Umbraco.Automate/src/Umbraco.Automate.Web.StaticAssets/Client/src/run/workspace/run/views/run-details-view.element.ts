@@ -188,15 +188,15 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                 gap: var(--uui-size-layout-1);
             }
 
-            uui-box {
-                --uui-box-default-padding: 0 var(--uui-size-space-5);
+            .main uui-box {
+                --uui-box-default-padding: 0;
             }
 
             .step-header {
                 display: flex;
                 align-items: center;
                 gap: var(--uui-size-space-3);
-                padding: var(--uui-size-space-3) 0;
+                padding: var(--uui-size-space-3);
                 cursor: pointer;
             }
 
@@ -215,7 +215,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
             }
 
             .step-details {
-                padding: 0 var(--uui-size-space-5) var(--uui-size-space-3);
+                padding: var(--uui-size-space-5);
                 border-top: 1px solid var(--uui-color-border);
             }
 
@@ -237,8 +237,12 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                 padding: var(--uui-size-layout-2);
             }
 
-            umb-property-layout[orientation="vertical"]:not(:last-child) {
+            umb-property-layout[orientation="vertical"] {
                 padding-bottom: 0;
+            }
+
+            umb-property-layout:first-of-type {
+                padding-top: 0;
             }
 
             uui-loader {

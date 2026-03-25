@@ -26,6 +26,7 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
     private _loading = true;
 
     private _columns: UmbTableColumn[] = [
+        { name: "Run", alias: "run" },
         { name: "Status", alias: "status" },
         { name: "Started", alias: "startedUtc" },
         { name: "Duration", alias: "duration" },
@@ -90,12 +91,16 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
             icon: "icon-nodes",
             data: [
                 {
-                    columnAlias: "status",
+                    columnAlias: "run",
                     value: html`<a href="${UA_RUN_WORKSPACE_PATH}/edit/${item.unique}">
-                        <uui-tag color=${this.#statusColor(item.status)} look="secondary">
-                            ${item.status}
-                        </uui-tag>
+                        ${item.unique.substring(0, 8)}...
                     </a>`,
+                },
+                {
+                    columnAlias: "status",
+                    value: html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">
+                        ${item.status}
+                    </uui-tag>`,
                 },
                 {
                     columnAlias: "startedUtc",
