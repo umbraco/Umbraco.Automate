@@ -34,6 +34,7 @@ public sealed class ContentSavedTrigger
                 {
                     ContentKey = content.Key,
                     ContentName = content.Name,
+                    ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
                 },
             };

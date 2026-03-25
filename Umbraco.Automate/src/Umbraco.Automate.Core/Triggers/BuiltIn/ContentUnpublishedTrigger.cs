@@ -34,6 +34,7 @@ public sealed class ContentUnpublishedTrigger
                 {
                     ContentKey = content.Key,
                     ContentName = content.Name,
+                    ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
                 },
             };

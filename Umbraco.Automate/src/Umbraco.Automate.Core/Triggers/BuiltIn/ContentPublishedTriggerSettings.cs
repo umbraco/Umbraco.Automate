@@ -8,8 +8,11 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class ContentPublishedTriggerSettings
 {
     /// <summary>
-    /// Gets or sets the content type alias to filter on. If null, all content types match.
+    /// Gets or sets the content type unique IDs to filter on (comma-separated). If null, all content types match.
     /// </summary>
-    [Field(Label = "Content Type", Description = "Only fire for this content type. Leave blank to match all.")]
-    public string? ContentTypeAlias { get; set; }
+    [Field(
+        Label = "Content Types",
+        Description = "Only fire for these content types. Leave blank to match all.",
+        EditorUiAlias = "Umb.PropertyEditorUi.DocumentTypePicker")]
+    public string? ContentTypes { get; set; }
 }

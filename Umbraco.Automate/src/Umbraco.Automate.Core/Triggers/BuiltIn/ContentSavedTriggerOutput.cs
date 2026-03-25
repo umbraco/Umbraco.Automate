@@ -16,6 +16,11 @@ public sealed class ContentSavedTriggerOutput
     public string? ContentName { get; init; }
 
     /// <summary>
+    /// Gets the content type's unique key.
+    /// </summary>
+    public Guid? ContentTypeKey { get; init; }
+
+    /// <summary>
     /// Gets the content type alias.
     /// </summary>
     public string? ContentTypeAlias { get; init; }
