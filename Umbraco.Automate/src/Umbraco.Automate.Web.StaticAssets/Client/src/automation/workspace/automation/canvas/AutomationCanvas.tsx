@@ -152,7 +152,7 @@ export default function AutomationCanvas({
             deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
             nodesConnectable={!readOnly}
             nodesDraggable={!readOnly}
-            elementsSelectable={!readOnly}
+            elementsSelectable
             proOptions={{ hideAttribution: true }}
         >
             <Background />
