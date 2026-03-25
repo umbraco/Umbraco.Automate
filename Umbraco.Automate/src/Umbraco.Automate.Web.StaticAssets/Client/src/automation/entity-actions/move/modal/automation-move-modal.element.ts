@@ -146,8 +146,11 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
                                     alias="${UA_WORKSPACE_TREE_ALIAS}"
                                     .props=${{
                                         hideTreeRoot: false,
+                                        hideTreeItemActions: true,
                                         selectionConfiguration: {
                                             multiple: false,
+                                            selectable: true,
+                                            selection: [],
                                         },
                                         selectableFilter: (item: UmbTreeItemModelBase) =>
                                             item.entityType === UA_WORKSPACE_ENTITY_TYPE ||
