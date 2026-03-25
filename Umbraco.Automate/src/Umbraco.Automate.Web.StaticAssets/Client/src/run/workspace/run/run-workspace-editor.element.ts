@@ -43,10 +43,10 @@ export class UaRunWorkspaceEditorElement extends UmbLitElement {
         return html`
             <umb-workspace-editor alias="${UA_RUN_WORKSPACE_ALIAS}" .enforceNoFooter=${true}>
                 <div id="header" slot="header">
+                    <span class="title">Run ${this._run.unique.substring(0, 8)}...</span>
                     <uui-tag color=${this.#statusColor(this._run.status)} look="secondary">
                         ${this._run.status}
                     </uui-tag>
-                    <span class="title">Run ${this._run.unique.substring(0, 8)}...</span>
                 </div>
             </umb-workspace-editor>
         `;
@@ -69,6 +69,7 @@ export class UaRunWorkspaceEditorElement extends UmbLitElement {
             }
 
             .title {
+                flex-grow: 1;
                 font-size: var(--uui-size-6);
                 font-weight: 600;
             }
