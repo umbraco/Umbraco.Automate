@@ -128,6 +128,31 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
         return automation;
     }
 
+    public async Task<Automation> SaveMetadataAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        AutomationEntity? existing = await db.Automations.FindAsync([automation.Id], cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{automation.Id}' not found.");
+
+        automation.Version = existing.Version;
+        automation.DateModified = DateTime.UtcNow;
+        automation.ModifiedByUserId = userId;
+
+        _factory.UpdateEntity(existing, automation);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException(nameof(Automation), automation.Id);
+        }
+
+        return automation;
+    }
+
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);

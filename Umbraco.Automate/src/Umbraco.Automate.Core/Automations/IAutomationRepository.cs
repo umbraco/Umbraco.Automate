@@ -36,9 +36,14 @@ internal interface IAutomationRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Saves an automation (insert or update).
+    /// Saves an automation (insert or update). Increments the version number on update.
     /// </summary>
     Task<Automation> SaveAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves lifecycle metadata (status, published version, enabled) without incrementing the version.
+    /// </summary>
+    Task<Automation> SaveMetadataAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes an automation by its ID.

@@ -157,9 +157,7 @@ internal sealed class AutomationService : IAutomationService
         automation.Status = AutomationStatus.Published;
         automation.IsEnabled = true;
 
-        var saved = await _automationRepository.SaveAsync(automation, userId, cancellationToken);
-
-        await _versionService.SaveVersionAsync(saved, userId, "Published", cancellationToken);
+        var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
 
         scope.Notifications.Publish(new AutomationPublishedNotification(saved, eventMessages));
         scope.Complete();
@@ -235,9 +233,7 @@ internal sealed class AutomationService : IAutomationService
         automation.Status = AutomationStatus.Inactive;
         automation.IsEnabled = false;
 
-        var saved = await _automationRepository.SaveAsync(automation, userId, cancellationToken);
-
-        await _versionService.SaveVersionAsync(saved, userId, "Unpublished", cancellationToken);
+        var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
 
         scope.Notifications.Publish(new AutomationUnpublishedNotification(saved, eventMessages));
         scope.Complete();
