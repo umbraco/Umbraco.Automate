@@ -2,10 +2,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.OpenIddict.Credentials.Persistence;
-using Umbraco.Cms.Core.Cache;
-using Umbraco.Cms.Core.Events;
-using Umbraco.Cms.Core.Scoping;
-using Umbraco.Cms.Persistence.EFCore.Scoping;
 
 namespace Umbraco.Automate.OpenIddict.Tests.Integration;
 
@@ -15,24 +11,22 @@ namespace Umbraco.Automate.OpenIddict.Tests.Integration;
 public sealed class OpenIddictTestFixture : IDisposable
 {
     private readonly SqliteConnection _connection;
+    private readonly DbContextOptions<OpenIddictDbContext> _options;
 
     public OpenIddictTestFixture()
     {
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();
 
+        _options = new DbContextOptionsBuilder<OpenIddictDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
         using var context = CreateContext();
         context.Database.EnsureCreated();
     }
 
-    public OpenIddictDbContext CreateContext()
-    {
-        var options = new DbContextOptionsBuilder<OpenIddictDbContext>()
-            .UseSqlite(_connection)
-            .Options;
-
-        return new OpenIddictDbContext(options);
-    }
+    public OpenIddictDbContext CreateContext() => new(_options);
 
     public void Dispose()
     {
@@ -42,87 +36,18 @@ public sealed class OpenIddictTestFixture : IDisposable
 }
 
 /// <summary>
-/// Test scope provider for <see cref="OpenIddictDbContext"/>.
+/// Test <see cref="IDbContextFactory{TContext}"/> backed by the test fixture.
 /// </summary>
-public sealed class TestOpenIddictScopeProvider : IEFCoreScopeProvider<OpenIddictDbContext>
+public sealed class TestDbContextFactory : IDbContextFactory<OpenIddictDbContext>
 {
-    private readonly Func<OpenIddictDbContext> _contextFactory;
+    private readonly OpenIddictTestFixture _fixture;
 
-    public TestOpenIddictScopeProvider(Func<OpenIddictDbContext> contextFactory)
+    public TestDbContextFactory(OpenIddictTestFixture fixture)
     {
-        _contextFactory = contextFactory;
+        _fixture = fixture;
     }
 
-    public IEfCoreScope<OpenIddictDbContext> CreateScope(
-        RepositoryCacheMode repositoryCacheMode = RepositoryCacheMode.Unspecified,
-        bool? scopeFileSystems = null)
-        => new TestOpenIddictScope(_contextFactory());
-
-    public IEfCoreScope<OpenIddictDbContext> CreateDetachedScope(
-        RepositoryCacheMode repositoryCacheMode = RepositoryCacheMode.Unspecified,
-        bool? scopeFileSystems = null)
-        => CreateScope(repositoryCacheMode, scopeFileSystems);
-
-    public void AttachScope(IEfCoreScope<OpenIddictDbContext> other) { }
-
-    public IEfCoreScope<OpenIddictDbContext> DetachScope()
-        => throw new NotSupportedException();
-
-    public IScopeContext? AmbientScopeContext => null;
-}
-
-/// <summary>
-/// Test scope for <see cref="OpenIddictDbContext"/>.
-/// </summary>
-public sealed class TestOpenIddictScope : IEfCoreScope<OpenIddictDbContext>
-{
-    private readonly OpenIddictDbContext _context;
-    private bool _completed;
-    private bool _disposed;
-
-    public TestOpenIddictScope(OpenIddictDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<T> ExecuteWithContextAsync<T>(Func<OpenIddictDbContext, Task<T>> method)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return await method(_context);
-    }
-
-    public async Task ExecuteWithContextAsync<T>(Func<OpenIddictDbContext, Task> method)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        await method(_context);
-    }
-
-    public IScopeContext? ScopeContext { get; set; }
-    public IScopedNotificationPublisher Notifications => throw new NotSupportedException();
-    public Guid InstanceId { get; } = Guid.NewGuid();
-    public int CreatedThreadId => Environment.CurrentManagedThreadId;
-    public int Depth => 0;
-    public ILockingMechanism Locks => throw new NotSupportedException();
-    public RepositoryCacheMode RepositoryCacheMode => RepositoryCacheMode.Default;
-    public IsolatedCaches IsolatedCaches => throw new NotSupportedException();
-
-    public bool Complete() { _completed = true; return true; }
-    public void ReadLock(params int[] lockIds) { }
-    public void WriteLock(params int[] lockIds) { }
-    public void WriteLock(TimeSpan timeout, int lockId) { }
-    public void ReadLock(TimeSpan timeout, int lockId) { }
-    public void EagerWriteLock(params int[] lockIds) { }
-    public void EagerWriteLock(TimeSpan timeout, int lockId) { }
-    public void EagerReadLock(TimeSpan timeout, int lockId) { }
-    public void EagerReadLock(params int[] lockIds) { }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        if (_completed) _context.SaveChanges();
-        _context.Dispose();
-    }
+    public OpenIddictDbContext CreateDbContext() => _fixture.CreateContext();
 }
 
 /// <summary>

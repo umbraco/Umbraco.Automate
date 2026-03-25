@@ -11,7 +11,7 @@ namespace Umbraco.Automate.OpenIddict.Providers;
 /// <list type="bullet">
 ///   <item>Client ID/secret from <see cref="IOAuthProviderConfigurationSource"/> (replaceable via DI)</item>
 ///   <item>Scopes from <see cref="IOAuthProviderConfigurationSource"/> (additive — merged with any scopes set by the provider package)</item>
-///   <item>Redirect URI from convention: <c>automate/oauth/callback/{providerName}</c></item>
+///   <item>Redirect URI from convention: <c>umbraco/automate/oauth/callback/{providerName}</c></item>
 /// </list>
 /// </summary>
 internal sealed class OpenIddictClientCredentialsConfigurator : IPostConfigureOptions<OpenIddictClientOptions>
@@ -27,7 +27,7 @@ internal sealed class OpenIddictClientCredentialsConfigurator : IPostConfigureOp
         _logger = logger;
     }
 
-    internal const string CallbackPathPrefix = "automate/oauth/callback/";
+    internal const string CallbackPathPrefix = "umbraco/automate/oauth/callback/";
 
     public void PostConfigure(string? name, OpenIddictClientOptions options)
     {
@@ -38,9 +38,17 @@ internal sealed class OpenIddictClientCredentialsConfigurator : IPostConfigureOp
                 continue;
             }
 
-            // Apply conventional redirect URI: automate/oauth/callback/{providerName}
-            registration.RedirectUri = new Uri(
+            // Apply conventional redirect URI: umbraco/automate/oauth/callback/{providerName}
+            var callbackUri = new Uri(
                 $"{CallbackPathPrefix}{registration.ProviderName.ToLowerInvariant()}", UriKind.Relative);
+            registration.RedirectUri = callbackUri;
+
+            // Register the provider-specific callback as a known redirection endpoint
+            // so OpenIddict's middleware recognises and passes it through to the controller.
+            if (!options.RedirectionEndpointUris.Contains(callbackUri))
+            {
+                options.RedirectionEndpointUris.Add(callbackUri);
+            }
 
             var config = _configurationSource.GetConfiguration(registration.ProviderName);
             if (config is null)

@@ -1,21 +1,19 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Client.AspNetCore;
 using Umbraco.Cms.Api.Common.Attributes;
-using Umbraco.Cms.Web.Common.Authorization;
 
 namespace Umbraco.Automate.OpenIddict.Controllers;
 
 /// <summary>
 /// Initiates an OAuth challenge that redirects the user to the external provider's authorize page.
-/// Requires backoffice authentication — only logged-in users can start an OAuth flow.
+/// No authorization attribute — the endpoint only redirects to the external provider.
+/// Security is enforced by the state parameter validated on the callback.
 /// </summary>
 [ApiController]
-[Route("automate/oauth")]
+[Route("umbraco/automate/oauth")]
 [MapToApi(Constants.OAuthApi.ApiName)]
 [ApiExplorerSettings(GroupName = "OAuth")]
-[Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
 public sealed class OAuthChallengeController : ControllerBase
 {
     /// <summary>

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Client.AspNetCore;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Cms.Api.Common.Attributes;
+using static OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants;
 
 namespace Umbraco.Automate.OpenIddict.Controllers;
 
@@ -12,7 +13,7 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 /// Returns HTML that postMessages back to the parent window (popup flow).
 /// </summary>
 [ApiController]
-[Route("automate/oauth")]
+[Route("umbraco/automate/oauth")]
 [MapToApi(Constants.OAuthApi.ApiName)]
 [ApiExplorerSettings(GroupName = "OAuth")]
 public sealed class OAuthCallbackController : ControllerBase
@@ -41,8 +42,8 @@ public sealed class OAuthCallbackController : ControllerBase
             return Content(BuildPopupHtml(success: false, error: "Authentication failed."), "text/html");
         }
 
-        var accessToken = result.Properties?.GetTokenValue("access_token");
-        var refreshToken = result.Properties?.GetTokenValue("refresh_token");
+        var accessToken = result.Properties?.GetTokenValue(Tokens.BackchannelAccessToken);
+        var refreshToken = result.Properties?.GetTokenValue(Tokens.RefreshToken);
         var expiresAt = result.Properties?.ExpiresUtc;
 
         if (string.IsNullOrEmpty(accessToken))

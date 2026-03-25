@@ -15,8 +15,7 @@ public class CredentialsPersistenceTests : IDisposable
     public CredentialsPersistenceTests()
     {
         _fixture = new OpenIddictTestFixture();
-        var scopeProvider = new TestOpenIddictScopeProvider(_fixture.CreateContext);
-        _repository = new EFCoreOAuthCredentialsRepository(scopeProvider, new OAuthCredentialsFactory(new PassthroughFieldProtector()));
+        _repository = new EFCoreOAuthCredentialsRepository(new TestDbContextFactory(_fixture), new OAuthCredentialsFactory(new PassthroughFieldProtector()));
     }
 
     [Fact]

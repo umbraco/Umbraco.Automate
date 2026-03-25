@@ -66,7 +66,10 @@ public static class UmbracoBuilderExtensions
             {
                 options.AllowAuthorizationCodeFlow();
 
-                options.SetRedirectionEndpointUris("automate/oauth/callback");
+                // Placeholder — provider-specific callback URIs are added dynamically
+                // by OpenIddictClientCredentialsConfigurator, but OpenIddict requires
+                // at least one redirection endpoint at configuration time.
+                options.SetRedirectionEndpointUris("umbraco/automate/oauth/callback");
 
                 options.AddEphemeralEncryptionKey()
                     .AddEphemeralSigningKey();
