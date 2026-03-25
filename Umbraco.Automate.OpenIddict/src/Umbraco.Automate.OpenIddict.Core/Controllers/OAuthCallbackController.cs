@@ -56,7 +56,10 @@ public sealed class OAuthCallbackController : ControllerBase
             Provider = provider,
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            ExpiresUtc = expiresAt?.UtcDateTime,
+            // Only store expiry when a refresh token is available — providers like Slack
+            // issue long-lived tokens with no refresh mechanism, so the expiry from
+            // OpenIddict's response is misleading and would cause premature rejection.
+            ExpiresUtc = !string.IsNullOrEmpty(refreshToken) ? expiresAt?.UtcDateTime : null,
         };
 
         var saved = await _credentialsService.CreateCredentialsAsync(credential);
