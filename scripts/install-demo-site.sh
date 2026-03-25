@@ -129,7 +129,15 @@ add_product_projects() {
 echo "Adding Umbraco.Automate projects..."
 add_product_projects "Umbraco.Automate" "Core"
 
-# Step 6: Add demo site to solution
+# Step 6: Add OpenIddict projects
+echo "Adding Umbraco.Automate.OpenIddict projects..."
+add_product_projects "Umbraco.Automate.OpenIddict" "OpenIddict"
+
+# Step 7: Add Slack projects
+echo "Adding Umbraco.Automate.Slack projects..."
+add_product_projects "Umbraco.Automate.Slack" "Slack"
+
+# Step 8: Add demo site to solution
 echo "Adding demo site to solution..."
 dotnet sln "Umbraco.Automate.local.slnx" add "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
 
@@ -140,6 +148,16 @@ DEMO_PROJECT="demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj"
 # Core references (Startup + Web.StaticAssets)
 dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate/src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj"
 dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj"
+
+# OpenIddict add-on
+if [ -f "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.csproj" ]; then
+    dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.csproj"
+fi
+
+# Slack add-on
+if [ -f "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj" ]; then
+    dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj"
+fi
 
 echo ""
 echo "========================================="

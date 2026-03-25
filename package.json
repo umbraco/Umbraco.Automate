@@ -5,7 +5,7 @@
     "description": "Root package for Umbraco.Automate frontend development",
     "workspaces": [
         "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Client",
-        "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Client"
+        "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/Client"
     ],
     "scripts": {
         "build": "npm run build --workspaces",

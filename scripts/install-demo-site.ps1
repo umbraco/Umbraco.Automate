@@ -106,7 +106,15 @@ function Add-ProductProjects {
 Write-Host "Adding Umbraco.Automate projects..." -ForegroundColor Green
 Add-ProductProjects -ProductFolder "Umbraco.Automate" -SolutionFolder "Core"
 
-# Step 6: Add demo site to solution
+# Step 6: Add OpenIddict projects
+Write-Host "Adding Umbraco.Automate.OpenIddict projects..." -ForegroundColor Green
+Add-ProductProjects -ProductFolder "Umbraco.Automate.OpenIddict" -SolutionFolder "OpenIddict"
+
+# Step 7: Add Slack projects
+Write-Host "Adding Umbraco.Automate.Slack projects..." -ForegroundColor Green
+Add-ProductProjects -ProductFolder "Umbraco.Automate.Slack" -SolutionFolder "Slack"
+
+# Step 8: Add demo site to solution
 Write-Host "Adding demo site to solution..." -ForegroundColor Green
 dotnet sln "Umbraco.Automate.local.slnx" add "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
 
@@ -117,6 +125,16 @@ $demoProject = "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj"
 # Core references (Startup + Web.StaticAssets)
 dotnet add $demoProject reference "Umbraco.Automate/src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj"
 dotnet add $demoProject reference "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj"
+
+# OpenIddict add-on
+if (Test-Path "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.csproj") {
+    dotnet add $demoProject reference "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.csproj"
+}
+
+# Slack add-on
+if (Test-Path "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj") {
+    dotnet add $demoProject reference "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj"
+}
 
 Write-Host ""
 Write-Host "=== Setup Complete! ===" -ForegroundColor Green
