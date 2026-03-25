@@ -1,7 +1,9 @@
 import { memo } from "react";
 import {
     BaseEdge,
+    EdgeLabelRenderer,
     getSmoothStepPath,
+    useReactFlow,
     type EdgeProps,
 } from "@xyflow/react";
 
@@ -13,10 +15,11 @@ function AutomationEdge({
     targetY,
     sourcePosition,
     targetPosition,
+    selected,
     label,
     markerEnd,
 }: EdgeProps) {
-    const [edgePath] = getSmoothStepPath({
+    const [edgePath, labelX, labelY] = getSmoothStepPath({
         sourceX,
         sourceY,
         sourcePosition,
@@ -25,9 +28,15 @@ function AutomationEdge({
         targetPosition,
     });
 
+    const { deleteElements } = useReactFlow();
+
+    const onDelete = () => {
+        deleteElements({ edges: [{ id }] });
+    };
+
     return (
         <>
-            <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} />
+            <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} interactionWidth={20} />
             {label && (
                 <text>
                     <textPath
@@ -40,6 +49,23 @@ function AutomationEdge({
                         {label}
                     </textPath>
                 </text>
+            )}
+            {selected && (
+                <EdgeLabelRenderer>
+                    <button
+                        className="ua-edge__delete-btn"
+                        style={{
+                            position: "absolute",
+                            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+                            pointerEvents: "all",
+                        }}
+                        onClick={onDelete}
+                        title="Delete connection"
+                        type="button"
+                    >
+                        ✕
+                    </button>
+                </EdgeLabelRenderer>
             )}
         </>
     );
