@@ -1,6 +1,7 @@
 import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { umbBindToValidation } from "@umbraco-cms/backoffice/validation";
 import type { UaWorkspaceDetailModel } from "../../../types.js";
 import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
 import { UA_WORKSPACE_MGMT_WORKSPACE_CONTEXT } from "../workspace-mgmt-workspace.context-token.js";
@@ -55,14 +56,17 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
                         label=${this.localize.term("uaWorkspace_serviceAccountKey")}
                         description="The API user identity used when running automations in this workspace."
                         orientation="vertical"
+                        mandatory
                     >
                         <umb-user-input
                             slot="editor"
                             max="1"
+                            required
                             .selection=${this._model.serviceAccountKey && this._model.serviceAccountKey !== UA_EMPTY_GUID
                                 ? [this._model.serviceAccountKey]
                                 : []}
                             @change=${this.#onServiceAccountChange}
+                            ${umbBindToValidation(this, "$.serviceAccountKey", this._model.serviceAccountKey)}
                         ></umb-user-input>
                     </umb-property-layout>
 
@@ -70,11 +74,14 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
                         label=${this.localize.term("uaWorkspace_userGroups")}
                         description="User groups that have access to automations in this workspace."
                         orientation="vertical"
+                        mandatory
                     >
                         <umb-user-group-input
                             slot="editor"
+                            required
                             .selection=${this._model.userGroups}
                             @change=${this.#onUserGroupsChange}
+                            ${umbBindToValidation(this, "$.userGroups", this._model.userGroups)}
                         ></umb-user-group-input>
                     </umb-property-layout>
 
