@@ -36,6 +36,7 @@ function TriggerNode({ data, id }: NodeProps) {
             </div>
             <div className="ua-node__body">
                 <span className="ua-node__label">{nodeData.label}</span>
+                <span className="ua-node__alias">{nodeData.triggerAlias}</span>
             </div>
             <Handle type="source" position={Position.Bottom} />
         </div>
