@@ -34,7 +34,7 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
         if (!this.data) return html``;
 
         return html`
-            <umb-body-layout .headline=${this.data.triggerAlias}>
+            <umb-body-layout .headline=${this.data.triggerName}>
                 <div id="content">
                     <ua-settings-form
                         .fields=${this.data.schema.fields}

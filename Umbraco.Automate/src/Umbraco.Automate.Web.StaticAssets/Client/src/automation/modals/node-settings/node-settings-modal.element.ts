@@ -34,7 +34,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
         if (!this.data) return html``;
 
         return html`
-            <umb-body-layout .headline=${this.data.actionAlias}>
+            <umb-body-layout .headline=${this.data.actionName}>
                 <div id="content">
                     <ua-settings-form
                         .fields=${this.data.schema.fields}
