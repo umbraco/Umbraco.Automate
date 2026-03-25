@@ -38,6 +38,9 @@ export const sectionSidebarManifests: Array<UmbExtensionManifest> = [
                 alias: "Umb.Condition.SectionAlias",
                 match: UA_SECTION_ALIAS,
             },
+            {
+                alias: "Umb.Condition.CurrentUser.IsAdmin",
+            },
         ],
     },
 ];
