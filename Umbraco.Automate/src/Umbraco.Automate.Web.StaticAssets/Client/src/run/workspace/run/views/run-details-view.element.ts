@@ -190,6 +190,11 @@ export class UaRunDetailsViewElement extends UmbLitElement {
 
             .main uui-box {
                 --uui-box-default-padding: 0;
+                --uui-box-border-radius: 0;
+            }
+
+            .main uui-box > uui-box + uui-box {
+                border-top: 1px solid var(--uui-color-border);
             }
 
             .step-header {
