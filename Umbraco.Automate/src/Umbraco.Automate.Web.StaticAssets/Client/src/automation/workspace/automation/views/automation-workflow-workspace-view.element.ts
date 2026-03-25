@@ -110,8 +110,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     async #openTriggerSettingsModal() {
         if (!this._model?.trigger) return;
 
-        const schema = await this.#getTriggerSchema(this._model.trigger.triggerAlias);
-        if (!schema) return;
+        const catalogueItem = await this.#getTriggerCatalogueItem(this._model.trigger.triggerAlias);
+        if (!catalogueItem) return;
 
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
@@ -119,8 +119,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modal = modalManager.open(this, UA_TRIGGER_SETTINGS_MODAL, {
             data: {
                 triggerAlias: this._model.trigger.triggerAlias,
+                triggerName: catalogueItem.name,
                 settings: this._model.trigger.settings,
-                schema,
+                schema: catalogueItem.schema,
             },
         });
 
@@ -140,8 +141,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const step = this._model.steps.find((s) => s.id === stepId);
         if (!step) return;
 
-        const schema = await this.#getActionSchema(step.actionAlias);
-        if (!schema) return;
+        const catalogueItem = await this.#getActionCatalogueItem(step.actionAlias);
+        if (!catalogueItem) return;
 
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
@@ -150,8 +151,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             data: {
                 stepId: step.id,
                 actionAlias: step.actionAlias,
+                actionName: catalogueItem.name,
                 settings: step.settings,
-                schema,
+                schema: catalogueItem.schema,
             },
         });
 
@@ -166,16 +168,18 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
     }
 
-    async #getTriggerSchema(alias: string): Promise<EditableModelSchemaModel | null> {
+    async #getTriggerCatalogueItem(alias: string): Promise<{ name: string; schema: EditableModelSchemaModel } | null> {
         const { data } = await this.#catalogueRepository.requestTriggers();
         const trigger = data?.find((t) => t.alias === alias);
-        return trigger?.settingsSchema ?? null;
+        if (!trigger?.settingsSchema) return null;
+        return { name: trigger.name, schema: trigger.settingsSchema };
     }
 
-    async #getActionSchema(alias: string): Promise<EditableModelSchemaModel | null> {
+    async #getActionCatalogueItem(alias: string): Promise<{ name: string; schema: EditableModelSchemaModel } | null> {
         const { data } = await this.#catalogueRepository.requestActions();
         const action = data?.find((a) => a.alias === alias);
-        return action?.settingsSchema ?? null;
+        if (!action?.settingsSchema) return null;
+        return { name: action.name, schema: action.settingsSchema };
     }
 
     async #onAddNodeRequest(event: CustomEvent<AddNodeRequestDetail>) {
