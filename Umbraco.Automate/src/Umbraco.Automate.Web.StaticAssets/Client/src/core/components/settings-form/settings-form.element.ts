@@ -1,4 +1,4 @@
-import { css, html, customElement, property, state } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, nothing, property, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
@@ -20,6 +20,9 @@ export class UaSettingsFormElement extends UmbLitElement {
 
     @property({ type: Object })
     values: Record<string, unknown> = {};
+
+    @property({ type: Boolean, attribute: "no-box" })
+    noBox = false;
 
     @state()
     private _propertyValues: UmbPropertyValueData[] = [];
@@ -115,6 +118,13 @@ export class UaSettingsFormElement extends UmbLitElement {
 
     #toPropertyConfig(config: unknown): Array<{ alias: string; value: unknown }> {
         if (!config) return [];
+        if (typeof config === "string") {
+            try {
+                return this.#toPropertyConfig(JSON.parse(config));
+            } catch {
+                return [];
+            }
+        }
         if (Array.isArray(config)) return config as Array<{ alias: string; value: unknown }>;
         if (typeof config !== "object") return [];
         return Object.entries(config).map(([alias, value]) => ({ alias, value }));
@@ -151,16 +161,19 @@ export class UaSettingsFormElement extends UmbLitElement {
         return html`
             <umb-property-dataset .value=${this._propertyValues} @change=${this.#onChange}>
                 ${grouped.map((g) =>
-                    g.group
-                        ? html`
-                              <uui-box class="uui-text">
-                                  <span slot="headline">${g.group}</span>
-                                  ${g.fields.map((f) => this.#renderField(f))}
-                              </uui-box>
-                          `
-                        : html`<uui-box class="uui-text">
-                              ${g.fields.map((f) => this.#renderField(f))}
-                          </uui-box>`,
+                    this.noBox
+                        ? html`${g.group ? html`<span class="group-headline">${g.group}</span>` : nothing}
+                              ${g.fields.map((f) => this.#renderField(f))}`
+                        : g.group
+                          ? html`
+                                <uui-box class="uui-text">
+                                    <span slot="headline">${g.group}</span>
+                                    ${g.fields.map((f) => this.#renderField(f))}
+                                </uui-box>
+                            `
+                          : html`<uui-box class="uui-text">
+                                ${g.fields.map((f) => this.#renderField(f))}
+                            </uui-box>`,
                 )}
             </umb-property-dataset>
         `;
