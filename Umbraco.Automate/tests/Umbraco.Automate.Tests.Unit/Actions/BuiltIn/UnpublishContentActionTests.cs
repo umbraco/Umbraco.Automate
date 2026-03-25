@@ -133,6 +133,7 @@ public class UnpublishContentActionTests
                     AutomationName = "Test",
                     RunId = Guid.NewGuid(),
                     InitiatorType = "test",
+                    AllowedConnections = [],
                 }
                 : null,
         };

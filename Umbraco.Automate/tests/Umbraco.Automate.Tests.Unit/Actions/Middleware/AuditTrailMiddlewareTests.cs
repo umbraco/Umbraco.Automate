@@ -30,6 +30,7 @@ public class AuditTrailMiddlewareTests
         AutomationName = "Test Automation",
         RunId = Guid.NewGuid(),
         InitiatorType = "system",
+        AllowedConnections = [],
     };
 
     private static ActionContext CreateContext(IAction? action = null, AutomationExecutionContext? executionContext = null) => new()

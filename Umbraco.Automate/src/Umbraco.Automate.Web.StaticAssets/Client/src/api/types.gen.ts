@@ -10,6 +10,7 @@ export type ActionItemResponseModel = {
     description?: string | null;
     group?: string | null;
     icon?: string | null;
+    connectionTypeAlias?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
     outputSchema?: {
         [key: string]: unknown;

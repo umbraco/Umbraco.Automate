@@ -47,6 +47,12 @@ public sealed class AutomationExecutionContext
     public string? InitiatorId { get; init; }
 
     /// <summary>
+    /// Gets the connection IDs allowed in this workspace.
+    /// Used for auto-resolving connections by type when a step has no explicit connection ID.
+    /// </summary>
+    public required IReadOnlyList<Guid> AllowedConnections { get; init; }
+
+    /// <summary>
     /// Formats the <c>PerformingDetails</c> string for the CMS audit trail.
     /// </summary>
     public string FormatPerformingDetails()

@@ -36,6 +36,11 @@ public interface IStepType : IDiscoverable
     string? Icon { get; }
 
     /// <summary>
+    /// Gets the connection type alias that this step type requires, or null if no connection is needed.
+    /// </summary>
+    string? ConnectionTypeAlias { get; }
+
+    /// <summary>
     /// Gets the settings POCO type that drives the configuration UI, or null if the step type has no settings.
     /// </summary>
     Type? SettingsType { get; }

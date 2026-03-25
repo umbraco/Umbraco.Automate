@@ -25,6 +25,9 @@ public class StepTypeItemResponseModel
     /// <summary>The icon alias.</summary>
     public string? Icon { get; set; }
 
+    /// <summary>The connection type alias required by this step type, or null if no connection is needed.</summary>
+    public string? ConnectionTypeAlias { get; set; }
+
     /// <summary>The settings schema, or null if no settings.</summary>
     public EditableModelSchema? SettingsSchema { get; set; }
 

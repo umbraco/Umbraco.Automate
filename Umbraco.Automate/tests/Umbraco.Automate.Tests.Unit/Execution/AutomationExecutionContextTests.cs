@@ -14,6 +14,7 @@ public class AutomationExecutionContextTests
         RunId = Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
         InitiatorType = "user",
         InitiatorId = "admin@test.com",
+        AllowedConnections = [],
     };
 
     [Fact]
@@ -51,6 +52,7 @@ public class AutomationExecutionContextTests
             RunId = Guid.NewGuid(),
             InitiatorType = "scheduled",
             InitiatorId = null,
+            AllowedConnections = [],
         };
 
         var result = context.FormatEventDetails(Guid.NewGuid());

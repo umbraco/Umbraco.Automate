@@ -101,11 +101,16 @@ internal sealed class ActionStepBody : StepBodyAsync
             _settingsBindingResolver.ResolveBindings(settings, bindingData);
         }
 
-        // Resolve connection for this step (if configured).
+        // Resolve connection for this step.
+        // Priority: explicit step connectionId > auto-resolve by action's connection type alias.
         ConfiguredConnection? connection = null;
         if (_stepConfig.ConnectionId is { } connectionId)
         {
             connection = await _connectionService.GetConfiguredConnectionAsync(connectionId, cancellationToken);
+        }
+        else if (_action.ConnectionTypeAlias is { } typeAlias)
+        {
+            connection = await ResolveConnectionByTypeAsync(typeAlias, data.ExecutionContext, cancellationToken);
         }
 
         // Create a linked CancellationTokenSource that enforces the step timeout.
@@ -345,6 +350,28 @@ internal sealed class ActionStepBody : StepBodyAsync
         var outputDict = JsonSerializer.Deserialize<Dictionary<string, object?>>(
             outputJson, Dispatch.JsonOptions.Default) ?? [];
         data.StepOutputs[_stepConfig.Id] = outputDict;
+    }
+
+    private async Task<ConfiguredConnection?> ResolveConnectionByTypeAsync(
+        string connectionTypeAlias,
+        AutomationExecutionContext executionContext,
+        CancellationToken cancellationToken)
+    {
+        foreach (var allowedId in executionContext.AllowedConnections)
+        {
+            var configured = await _connectionService.GetConfiguredConnectionAsync(allowedId, cancellationToken);
+            if (configured is not null &&
+                string.Equals(configured.Type, connectionTypeAlias, StringComparison.OrdinalIgnoreCase))
+            {
+                return configured;
+            }
+        }
+
+        _logger.LogWarning(
+            "No connection of type '{ConnectionTypeAlias}' found in workspace '{WorkspaceId}' for step {StepId}",
+            connectionTypeAlias, executionContext.WorkspaceId, _stepConfig.Id);
+
+        return null;
     }
 
     private Dictionary<string, object?> ResolveInputMappings(

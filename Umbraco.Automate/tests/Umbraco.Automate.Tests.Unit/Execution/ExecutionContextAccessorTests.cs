@@ -58,5 +58,6 @@ public class ExecutionContextAccessorTests
         RunId = Guid.NewGuid(),
         InitiatorType = "user",
         InitiatorId = "test@example.com",
+        AllowedConnections = [],
     };
 }

@@ -35,6 +35,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Description = source.Description;
         target.Group = source.Group;
         target.Icon = source.Icon;
+        target.ConnectionTypeAlias = source.ConnectionTypeAlias;
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
         target.Type = "action";
@@ -48,6 +49,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Description = source.Description;
         target.Group = source.Group;
         target.Icon = source.Icon;
+        target.ConnectionTypeAlias = source.ConnectionTypeAlias;
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
         target.Type = "trigger";
@@ -61,6 +63,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Description = source.Description;
         target.Group = source.Group;
         target.Icon = source.Icon;
+        target.ConnectionTypeAlias = source.ConnectionTypeAlias;
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
         target.Type = "controlFlow";

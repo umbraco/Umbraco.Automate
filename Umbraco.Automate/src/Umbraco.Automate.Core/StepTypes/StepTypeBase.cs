@@ -54,6 +54,9 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
     public virtual string? Icon => _attribute.Icon;
 
     /// <inheritdoc />
+    public virtual string? ConnectionTypeAlias => _attribute.ConnectionTypeAlias;
+
+    /// <inheritdoc />
     public Type? SettingsType => typeof(TSettings) == typeof(object) ? null : typeof(TSettings);
 
     /// <inheritdoc />

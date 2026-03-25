@@ -13,7 +13,9 @@ export interface UaTriggerCatalogueItemModel extends UaCatalogueItemModel {
     outputSchema: { [key: string]: unknown } | null;
 }
 
-export interface UaActionCatalogueItemModel extends UaCatalogueItemModel {}
+export interface UaActionCatalogueItemModel extends UaCatalogueItemModel {
+    connectionTypeAlias: string | null;
+}
 
 export interface UaConnectionTypeCatalogueItemModel extends UaCatalogueItemModel {}
 

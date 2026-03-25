@@ -45,4 +45,10 @@ public abstract class StepTypeAttribute : Attribute
     /// Gets or sets the Umbraco icon alias.
     /// </summary>
     public string? Icon { get; set; }
+
+    /// <summary>
+    /// Gets or sets the connection type alias that this step type requires (e.g. "slack").
+    /// When set, the UI will prompt the user to select a connection of this type.
+    /// </summary>
+    public string? ConnectionTypeAlias { get; set; }
 }

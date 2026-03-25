@@ -89,6 +89,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             RunId = run.Id,
             InitiatorType = initiatorType,
             InitiatorId = initiatorId,
+            AllowedConnections = workspace.AllowedConnections.ToList(),
         };
 
         using var _ = ExecutionContextAccessor.Set(executionContext);

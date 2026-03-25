@@ -14,7 +14,8 @@ namespace Umbraco.Automate.Slack.Actions;
 [Action("slack.sendMessage", "Send Slack Message",
     Description = "Posts a message to a Slack channel.",
     Group = "Messaging",
-    Icon = "icon-message")]
+    Icon = "icon-message",
+    ConnectionTypeAlias = "slack")]
 public sealed class SendMessageAction : ActionBase<SendMessageSettings, SendMessageOutput>
 {
     private readonly IHttpClientFactory _httpClientFactory;
@@ -57,7 +58,7 @@ public sealed class SendMessageAction : ActionBase<SendMessageSettings, SendMess
             ?? throw new InvalidOperationException("A Slack connection is required to send messages.");
 
         var connectionSettings = connection.GetSettings<SlackConnectionSettings>();
-        if (connectionSettings.OAuthCredentialsId is not { } credentialId)
+        if (connectionSettings.OAuthCredentialsId is not { } credentialId || credentialId == Guid.Empty)
         {
             return ActionResult.Failed(
                 new InvalidOperationException("Slack workspace is not authenticated."),
