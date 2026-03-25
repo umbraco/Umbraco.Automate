@@ -22,6 +22,9 @@ export class UaAutomationCanvasElement extends UmbLitElement {
     @property({ type: Object })
     viewport?: Viewport;
 
+    @property({ type: Boolean, attribute: "read-only" })
+    readOnly = false;
+
     @state()
     private _mounted = false;
 
@@ -60,7 +63,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
 
     override updated(changedProperties: Map<string, unknown>) {
         super.updated(changedProperties);
-        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport"))) {
+        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport") || changedProperties.has("readOnly"))) {
             this.#renderReact();
         }
     }
@@ -81,6 +84,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 edges: this.edges,
                 viewport: this.viewport,
                 colorMode: this._colorMode,
+                readOnly: this.readOnly,
                 onCanvasChange: this.#onCanvasChange,
                 onAddNodeRequest: this.#onAddNodeRequest,
             }),

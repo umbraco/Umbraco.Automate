@@ -23,14 +23,16 @@ function TriggerNode({ data, id }: NodeProps) {
             <div className="ua-node__header">
                 <span className="ua-node__icon">&#x26A1;</span>
                 <span className="ua-node__type">Trigger</span>
-                <button
-                    className="ua-node__settings-btn"
-                    onClick={onSettingsClick}
-                    title="Settings"
-                    type="button"
-                >
-                    &#x270F;&#xFE0F;
-                </button>
+                {!nodeData.runStatus && (
+                    <button
+                        className="ua-node__settings-btn"
+                        onClick={onSettingsClick}
+                        title="Settings"
+                        type="button"
+                    >
+                        &#x270F;&#xFE0F;
+                    </button>
+                )}
             </div>
             <div className="ua-node__body">
                 <span className="ua-node__label">{nodeData.label}</span>

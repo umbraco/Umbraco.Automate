@@ -32,6 +32,7 @@ interface AutomationCanvasProps {
     edges: Edge[];
     viewport?: Viewport;
     colorMode?: ColorMode;
+    readOnly?: boolean;
     onCanvasChange?: (detail: CanvasChangeDetail) => void;
     onAddNodeRequest?: (detail: AddNodeRequestDetail) => void;
 }
@@ -41,6 +42,7 @@ export default function AutomationCanvas({
     edges: externalEdges,
     viewport,
     colorMode = "light",
+    readOnly = false,
     onCanvasChange,
     onAddNodeRequest,
 }: AutomationCanvasProps) {
@@ -136,18 +138,21 @@ export default function AutomationCanvas({
         <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={onConnect}
+            onNodesChange={readOnly ? undefined : handleNodesChange}
+            onEdgesChange={readOnly ? undefined : handleEdgesChange}
+            onConnect={readOnly ? undefined : onConnect}
             onInit={onInit}
-            onPaneClick={handlePaneClick}
+            onPaneClick={readOnly ? undefined : handlePaneClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             defaultViewport={viewport}
             fitView={!viewport}
             colorMode={colorMode}
-            deleteKeyCode={["Backspace", "Delete"]}
+            deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
+            nodesConnectable={!readOnly}
+            nodesDraggable={!readOnly}
+            elementsSelectable={!readOnly}
             proOptions={{ hideAttribution: true }}
         >
             <Background />

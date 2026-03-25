@@ -99,6 +99,7 @@ export class UaRunCanvasViewElement extends UmbLitElement {
 
         return html`
             <ua-automation-canvas
+                read-only
                 .nodes=${this._nodes}
                 .edges=${this._edges}
                 .viewport=${this._viewport}

@@ -24,14 +24,16 @@ function ActionNode({ data, id }: NodeProps) {
             <div className="ua-node__header">
                 <span className="ua-node__icon">⚙️</span>
                 <span className="ua-node__type">Action</span>
-                <button
-                    className="ua-node__settings-btn"
-                    onClick={onSettingsClick}
-                    title="Settings"
-                    type="button"
-                >
-                    ✏️
-                </button>
+                {!nodeData.runStatus && (
+                    <button
+                        className="ua-node__settings-btn"
+                        onClick={onSettingsClick}
+                        title="Settings"
+                        type="button"
+                    >
+                        ✏️
+                    </button>
+                )}
             </div>
             <div className="ua-node__body">
                 <span className="ua-node__label">{nodeData.label}</span>
