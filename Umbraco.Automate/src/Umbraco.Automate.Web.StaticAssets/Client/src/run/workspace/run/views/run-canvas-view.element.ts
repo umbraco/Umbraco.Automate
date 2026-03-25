@@ -7,12 +7,15 @@ import type { UaRunDetailModel } from "../../../types.js";
 import type { UaAutomationDetailModel } from "../../../../automation/types.js";
 import { modelToNodes, modelToEdges } from "../../../../automation/workspace/automation/canvas/utils/model-to-flow.js";
 import type { CanvasState } from "../../../../automation/workspace/automation/canvas/types.js";
+import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import "../../../../automation/workspace/automation/canvas/ua-automation-canvas.element.js";
 
 const TRIGGER_NODE_ID = "__trigger__";
 
 @customElement("ua-run-canvas-view")
 export class UaRunCanvasViewElement extends UmbLitElement {
+    #catalogueRepository: UaCatalogueRepository;
+
     @state()
     private _nodes: Node[] = [];
 
@@ -27,6 +30,7 @@ export class UaRunCanvasViewElement extends UmbLitElement {
 
     constructor() {
         super();
+        this.#catalogueRepository = new UaCatalogueRepository(this);
         this.consumeContext(UA_RUN_WORKSPACE_CONTEXT, (context) => {
             if (!context) return;
             this.observe(context.run, (run) => {
@@ -42,11 +46,12 @@ export class UaRunCanvasViewElement extends UmbLitElement {
 
     #automation?: UaAutomationDetailModel;
 
-    #rebuildCanvas() {
+    async #rebuildCanvas() {
         if (!this.#automation || !this._run) return;
 
         const canvasState = this.#parseCanvasState(this.#automation.canvasState);
-        const nodes = modelToNodes(this.#automation.trigger, this.#automation.steps, canvasState);
+        const catalogueNames = await this.#buildCatalogueNames();
+        const nodes = modelToNodes(this.#automation.trigger, this.#automation.steps, canvasState, catalogueNames);
         const edges = modelToEdges(this.#automation.connections);
 
         // Apply step run status as CSS classes via node data
@@ -81,6 +86,21 @@ export class UaRunCanvasViewElement extends UmbLitElement {
         }));
 
         this._viewport = canvasState?.viewport;
+    }
+
+    async #buildCatalogueNames(): Promise<Map<string, string>> {
+        const names = new Map<string, string>();
+        const [triggers, actions] = await Promise.all([
+            this.#catalogueRepository.requestTriggers(),
+            this.#catalogueRepository.requestActions(),
+        ]);
+        for (const t of triggers.data ?? []) {
+            names.set(t.alias, t.name);
+        }
+        for (const a of actions.data ?? []) {
+            names.set(a.alias, a.name);
+        }
+        return names;
     }
 
     #parseCanvasState(json: string | null): CanvasState | null {

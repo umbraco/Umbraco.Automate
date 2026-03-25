@@ -13,6 +13,7 @@ export function modelToNodes(
     trigger: TriggerConfigurationModel | null,
     steps: StepConfigurationModel[],
     canvasState: CanvasState | null,
+    catalogueNames?: Map<string, string>,
 ): Node[] {
     const nodes: Node[] = [];
 
@@ -24,7 +25,7 @@ export function modelToNodes(
             position,
             data: {
                 triggerAlias: trigger.triggerAlias,
-                label: trigger.triggerAlias,
+                label: catalogueNames?.get(trigger.triggerAlias) ?? trigger.triggerAlias,
                 settings: trigger.settings,
             } satisfies TriggerNodeData,
         });
@@ -38,7 +39,9 @@ export function modelToNodes(
             data: {
                 stepId: step.id,
                 actionAlias: step.actionAlias,
-                label: step.name,
+                label: step.name === step.actionAlias
+                    ? (catalogueNames?.get(step.actionAlias) ?? step.name)
+                    : step.name,
                 settings: step.settings,
             } satisfies ActionNodeData,
         });

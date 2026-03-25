@@ -50,11 +50,27 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         });
     }
 
-    #syncFromModel(model: UaAutomationDetailModel) {
+    async #syncFromModel(model: UaAutomationDetailModel) {
         const canvasState = this.#parseCanvasState(model.canvasState);
-        this._nodes = modelToNodes(model.trigger, model.steps, canvasState);
+        const catalogueNames = await this.#buildCatalogueNames();
+        this._nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogueNames);
         this._edges = modelToEdges(model.connections);
         this._viewport = canvasState?.viewport;
+    }
+
+    async #buildCatalogueNames(): Promise<Map<string, string>> {
+        const names = new Map<string, string>();
+        const [triggers, actions] = await Promise.all([
+            this.#catalogueRepository.requestTriggers(),
+            this.#catalogueRepository.requestActions(),
+        ]);
+        for (const t of triggers.data ?? []) {
+            names.set(t.alias, t.name);
+        }
+        for (const a of actions.data ?? []) {
+            names.set(a.alias, a.name);
+        }
+        return names;
     }
 
     #parseCanvasState(json: string | null): CanvasState | null {
