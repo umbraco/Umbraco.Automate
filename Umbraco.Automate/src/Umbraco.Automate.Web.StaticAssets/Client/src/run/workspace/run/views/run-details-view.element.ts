@@ -3,24 +3,42 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UA_RUN_WORKSPACE_CONTEXT } from "../run-workspace.context-token.js";
 import type { UaRunDetailModel, UaStepRunModel } from "../../../types.js";
+import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import { formatDateTime } from "../../../../core/index.js";
 
 @customElement("ua-run-details-view")
 export class UaRunDetailsViewElement extends UmbLitElement {
+    #catalogueRepository: UaCatalogueRepository;
+
     @state()
     private _run?: UaRunDetailModel;
 
     @state()
     private _expandedStep?: string;
 
+    @state()
+    private _actionNames = new Map<string, string>();
+
     constructor() {
         super();
+        this.#catalogueRepository = new UaCatalogueRepository(this);
         this.consumeContext(UA_RUN_WORKSPACE_CONTEXT, (context) => {
             if (!context) return;
             this.observe(context.run, (run) => {
                 this._run = run;
+                if (run) this.#loadActionNames();
             });
         });
+    }
+
+    async #loadActionNames() {
+        const { data } = await this.#catalogueRepository.requestActions();
+        if (!data) return;
+        const names = new Map<string, string>();
+        for (const a of data) {
+            names.set(a.alias, a.name);
+        }
+        this._actionNames = names;
     }
 
     #statusColor(status: string): string {
@@ -63,11 +81,11 @@ export class UaRunDetailsViewElement extends UmbLitElement {
             <uui-box>
                 <div class="step-header" @click=${() => this.#toggleStep(stepRun.id)}>
                     <uui-icon name=${isExpanded ? "icon-navigation-down" : "icon-navigation-right"}></uui-icon>
-                    <span class="step-name">${stepRun.actionAlias}</span>
+                    <span class="step-name">${this._actionNames.get(stepRun.actionAlias) ?? stepRun.actionAlias}</span>
+                    <span class="step-duration">${this.#formatDuration(stepRun.durationMs)}</span>
                     <uui-tag color=${this.#statusColor(stepRun.status)} look="secondary">
                         ${stepRun.status}
                     </uui-tag>
-                    <span class="step-duration">${this.#formatDuration(stepRun.durationMs)}</span>
                 </div>
                 ${isExpanded
                     ? html`
@@ -107,7 +125,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
         return html`
             <div class="layout">
                 <div class="main">
-                    <uui-box headline="Step Runs">
+                    <uui-box headline="Steps">
                         ${this._run.stepRuns.length === 0
                             ? html`<p class="empty">${this.localize.term("uaRun_noStepRuns")}</p>`
                             : repeat(
@@ -191,6 +209,10 @@ export class UaRunDetailsViewElement extends UmbLitElement {
             .main uui-box {
                 --uui-box-default-padding: 0;
                 --uui-box-border-radius: 0;
+            }
+
+            .main uui-box > uui-box {
+                --uui-box-box-shadow: 0;
             }
 
             .main uui-box > uui-box + uui-box {
