@@ -21,10 +21,12 @@ internal interface IWorkspaceRepository
     Task<IEnumerable<Workspace>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a paged list of workspaces.
+    /// Gets a paged list of workspaces. When <paramref name="userGroupKeys"/> is provided,
+    /// only workspaces accessible to those user groups are returned.
     /// </summary>
     Task<(IEnumerable<Workspace> Items, int Total)> GetPagedAsync(
         string? filter = null,
+        IReadOnlyCollection<Guid>? userGroupKeys = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default);

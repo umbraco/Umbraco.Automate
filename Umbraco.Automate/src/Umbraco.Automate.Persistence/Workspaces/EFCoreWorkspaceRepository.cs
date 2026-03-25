@@ -54,6 +54,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
 
     public async Task<(IEnumerable<Workspace> Items, int Total)> GetPagedAsync(
         string? filter = null,
+        IReadOnlyCollection<Guid>? userGroupKeys = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
@@ -63,6 +64,11 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         IQueryable<WorkspaceEntity> query = db.Workspaces
             .Include(w => w.UserGroups)
             .Include(w => w.AllowedConnections);
+
+        if (userGroupKeys is { Count: > 0 })
+        {
+            query = query.Where(w => w.UserGroups.Any(ug => userGroupKeys.Contains(ug.UserGroupId)));
+        }
 
         if (!string.IsNullOrWhiteSpace(filter))
         {

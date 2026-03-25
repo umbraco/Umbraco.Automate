@@ -44,10 +44,11 @@ internal sealed class WorkspaceService : IWorkspaceService
 
     public Task<(IEnumerable<Workspace> Items, int Total)> GetWorkspacesPagedAsync(
         string? filter = null,
+        IReadOnlyCollection<Guid>? userGroupKeys = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
-        => _workspaceRepository.GetPagedAsync(filter, skip, take, cancellationToken);
+        => _workspaceRepository.GetPagedAsync(filter, userGroupKeys, skip, take, cancellationToken);
 
     public async Task<Workspace> CreateWorkspaceAsync(Workspace workspace, Guid? userId = null, CancellationToken cancellationToken = default)
     {
