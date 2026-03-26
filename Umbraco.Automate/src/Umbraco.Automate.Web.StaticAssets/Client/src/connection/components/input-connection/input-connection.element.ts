@@ -3,6 +3,7 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import { UMB_ITEM_PICKER_MODAL, type UmbItemPickerModel } from "@umbraco-cms/backoffice/modal";
 import { UaConnectionCollectionRepository } from "../../repository/collection/connection-collection.repository.js";
+import { UaCatalogueRepository } from "../../../catalogue/repository/catalogue.repository.js";
 import type { UaConnectionItemModel } from "../../types.js";
 import { UA_CONNECTION_ICON } from "../../constants.js";
 
@@ -15,10 +16,13 @@ export class UaInputConnectionElement extends UmbLitElement {
     private _items: UaConnectionItemModel[] = [];
 
     #repository: UaConnectionCollectionRepository;
+    #catalogueRepository: UaCatalogueRepository;
+    #iconsByType = new Map<string, string>();
 
     constructor() {
         super();
         this.#repository = new UaConnectionCollectionRepository(this);
+        this.#catalogueRepository = new UaCatalogueRepository(this);
     }
 
     override async connectedCallback() {
@@ -27,10 +31,26 @@ export class UaInputConnectionElement extends UmbLitElement {
     }
 
     async #loadItems() {
-        const { data } = await this.#repository.requestCollection({ skip: 0, take: 1000 });
-        if (data) {
-            this._items = data.items as UaConnectionItemModel[];
+        const [collectionResult, catalogueResult] = await Promise.all([
+            this.#repository.requestCollection({ skip: 0, take: 1000 }),
+            this.#catalogueRepository.requestConnectionTypes(),
+        ]);
+
+        if (collectionResult.data) {
+            this._items = collectionResult.data.items as UaConnectionItemModel[];
         }
+
+        if (catalogueResult.data) {
+            this.#iconsByType = new Map(
+                catalogueResult.data
+                    .filter((ct) => ct.icon)
+                    .map((ct) => [ct.alias, ct.icon!]),
+            );
+        }
+    }
+
+    #getIcon(typeAlias: string): string {
+        return this.#iconsByType.get(typeAlias) ?? UA_CONNECTION_ICON;
     }
 
     async #openPicker() {
@@ -46,7 +66,7 @@ export class UaInputConnectionElement extends UmbLitElement {
                     (item): UmbItemPickerModel => ({
                         label: item.name,
                         value: item.unique,
-                        icon: UA_CONNECTION_ICON,
+                        icon: this.#getIcon(item.type),
                         description: item.type,
                     }),
                 ),
@@ -98,8 +118,10 @@ export class UaInputConnectionElement extends UmbLitElement {
     }
 
     #renderSelectedItem(unique: string) {
+        const item = this._items.find((i) => i.unique === unique);
+        const icon = item ? this.#getIcon(item.type) : UA_CONNECTION_ICON;
         return html`
-            <umb-ref-item name=${this.#getItemName(unique)} icon=${UA_CONNECTION_ICON}>
+            <umb-ref-item name=${this.#getItemName(unique)} icon=${icon}>
                 <uui-action-bar slot="actions">
                     <uui-button
                         label=${this.localize.term("general_remove")}

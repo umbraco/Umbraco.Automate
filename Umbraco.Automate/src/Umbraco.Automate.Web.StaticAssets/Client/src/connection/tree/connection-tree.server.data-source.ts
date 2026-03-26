@@ -7,15 +7,19 @@ import type {
 } from "@umbraco-cms/backoffice/tree";
 import { UmbControllerBase } from "@umbraco-cms/backoffice/class-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { ConnectionsService } from "../../api/sdk.gen.js";
+import { ConnectionsService, CatalogueService } from "../../api/sdk.gen.js";
 import type { ConnectionItemResponseModel } from "../../api/types.gen.js";
 import { UA_CONNECTION_ENTITY_TYPE, UA_CONNECTION_ROOT_ENTITY_TYPE } from "../entity.js";
 import type { UaConnectionTreeItemModel } from "./types.js";
+
+const DEFAULT_ICON = "icon-link";
 
 export class UaConnectionTreeServerDataSource
     extends UmbControllerBase
     implements UmbTreeDataSource<UaConnectionTreeItemModel>
 {
+    #iconsByType: Map<string, string> | undefined;
+
     constructor(host: UmbControllerHost) {
         super(host);
     }
@@ -24,13 +28,12 @@ export class UaConnectionTreeServerDataSource
         const skip = args.paging && "skip" in args.paging ? args.paging.skip : 0;
         const take = args.paging && "take" in args.paging ? args.paging.take : 100;
 
-        const { data, error } = await tryExecute(
-            this,
-            ConnectionsService.getConnections({
-                query: { skip, take },
-            }),
-        );
+        const [connectionsResult, iconMap] = await Promise.all([
+            tryExecute(this, ConnectionsService.getConnections({ query: { skip, take } })),
+            this.#getIconMap(),
+        ]);
 
+        const { data, error } = connectionsResult;
         if (error || !data) {
             return { error };
         }
@@ -38,7 +41,7 @@ export class UaConnectionTreeServerDataSource
         return {
             data: {
                 total: data.total,
-                items: data.items.map((item) => this.#mapItem(item)),
+                items: data.items.map((item) => this.#mapItem(item, iconMap)),
             },
         };
     }
@@ -58,7 +61,19 @@ export class UaConnectionTreeServerDataSource
         return { data: [] as UaConnectionTreeItemModel[] };
     }
 
-    #mapItem(item: ConnectionItemResponseModel): UaConnectionTreeItemModel {
+    async #getIconMap(): Promise<Map<string, string>> {
+        if (this.#iconsByType) return this.#iconsByType;
+
+        const { data } = await tryExecute(this, CatalogueService.getCatalogueConnectionTypes());
+        this.#iconsByType = new Map(
+            (data ?? [])
+                .filter((ct) => ct.icon)
+                .map((ct) => [ct.alias, ct.icon!]),
+        );
+        return this.#iconsByType;
+    }
+
+    #mapItem(item: ConnectionItemResponseModel, iconMap: Map<string, string>): UaConnectionTreeItemModel {
         return {
             unique: item.id,
             entityType: UA_CONNECTION_ENTITY_TYPE,
@@ -66,7 +81,7 @@ export class UaConnectionTreeServerDataSource
             name: item.name,
             hasChildren: false,
             isFolder: false,
-            icon: "icon-link",
+            icon: iconMap.get(item.type) ?? DEFAULT_ICON,
         };
     }
 }
