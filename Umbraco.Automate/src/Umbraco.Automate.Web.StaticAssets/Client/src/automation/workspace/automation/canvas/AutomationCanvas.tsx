@@ -104,6 +104,10 @@ export default function AutomationCanvas({
     const onConnect: OnConnect = useCallback(
         (params) => {
             setEdges((eds) => {
+                // Disallow multiple outgoing edges from the same source node.
+                // Parallel execution paths are not yet supported (Phase 5).
+                if (eds.some((e) => e.source === params.source || e.target === params.target)) return eds;
+
                 const updated = addEdge({ ...params, type: "automation", animated: true }, eds);
                 setNodes((currentNodes) => {
                     emitChange(currentNodes, updated);
