@@ -240,19 +240,33 @@ public sealed class WebhookEndpointController : ControllerBase
         }
 
         var providedHex = header["sha256=".Length..];
-        var expectedHex = ComputeHmacSha256(body, secret);
 
-        // Constant-time comparison to prevent timing attacks.
-        return CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(expectedHex),
-            System.Text.Encoding.UTF8.GetBytes(providedHex));
+        // Validate hex length before parsing (SHA-256 = 64 hex chars).
+        if (providedHex.Length != 64)
+        {
+            return false;
+        }
+
+        byte[] providedBytes;
+        try
+        {
+            providedBytes = Convert.FromHexString(providedHex);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        var expectedBytes = ComputeHmacSha256Bytes(body, secret);
+
+        // Constant-time comparison on raw bytes to prevent timing attacks.
+        return CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes);
     }
 
-    private static string ComputeHmacSha256(string payload, string secret)
+    private static byte[] ComputeHmacSha256Bytes(string payload, string secret)
     {
         var keyBytes = System.Text.Encoding.UTF8.GetBytes(secret);
         var payloadBytes = System.Text.Encoding.UTF8.GetBytes(payload);
-        var hashBytes = HMACSHA256.HashData(keyBytes, payloadBytes);
-        return Convert.ToHexStringLower(hashBytes);
+        return HMACSHA256.HashData(keyBytes, payloadBytes);
     }
 }
