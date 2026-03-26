@@ -69,6 +69,11 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
     /// Requires the current user to be an administrator. Returns <c>null</c> if the user is an admin,
     /// a 401 Unauthorized result if no user is found, or a 403 Forbidden result otherwise.
     /// </summary>
+    /// <remarks>
+    /// This checks backoffice user identity only. Service account (UserKind.Api) callers
+    /// do not have a backoffice session and will receive 401. If service account access
+    /// to admin endpoints is needed in the future, this method must be extended.
+    /// </remarks>
     protected IActionResult? RequireAdmin(IBackOfficeSecurityAccessor accessor)
     {
         var user = accessor.BackOfficeSecurity?.CurrentUser;
@@ -79,6 +84,17 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
 
         return user.IsAdmin() ? null : Forbidden();
     }
+
+    /// <summary>
+    /// Returns a 409 Conflict response for an optimistic concurrency violation.
+    /// </summary>
+    protected IActionResult ConcurrencyConflict(string entityName)
+        => Conflict(new ProblemDetails
+        {
+            Title = "Concurrency conflict",
+            Detail = $"The {entityName} was modified by another request. Reload and try again.",
+            Status = StatusCodes.Status409Conflict,
+        });
 
     /// <summary>
     /// Authorizes workspace access for the current user. Returns <c>null</c> if authorized,

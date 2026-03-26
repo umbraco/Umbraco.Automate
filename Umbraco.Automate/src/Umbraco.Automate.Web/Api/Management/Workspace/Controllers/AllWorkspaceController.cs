@@ -40,7 +40,7 @@ public sealed class AllWorkspaceController : WorkspaceControllerBase
     [HttpGet]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(PagedViewModel<WorkspaceItemResponseModel>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<PagedViewModel<WorkspaceItemResponseModel>>> GetAllWorkspaces(
+    public async Task<IActionResult> GetAllWorkspaces(
         string? filter = null,
         int skip = 0,
         int take = 100,

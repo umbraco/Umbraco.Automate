@@ -63,12 +63,7 @@ public sealed class UpdateAutomationController : AutomationControllerBase
 
         if (requestModel.Version != existing.Version)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Concurrency conflict",
-                Detail = "The automation was modified by another request. Reload and try again.",
-                Status = StatusCodes.Status409Conflict,
-            });
+            return ConcurrencyConflict("automation");
         }
 
         _mapper.Map(requestModel, existing);
@@ -79,12 +74,7 @@ public sealed class UpdateAutomationController : AutomationControllerBase
         }
         catch (ConcurrencyConflictException)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Concurrency conflict",
-                Detail = "The automation was modified by another request. Reload and try again.",
-                Status = StatusCodes.Status409Conflict,
-            });
+            return ConcurrencyConflict("automation");
         }
 
         return Ok();

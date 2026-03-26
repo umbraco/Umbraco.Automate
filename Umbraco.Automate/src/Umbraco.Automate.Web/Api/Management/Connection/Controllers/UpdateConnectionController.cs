@@ -59,12 +59,7 @@ public sealed class UpdateConnectionController : ConnectionControllerBase
 
         if (requestModel.Version != existing.Version)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Concurrency conflict",
-                Detail = "The connection was modified by another request. Reload and try again.",
-                Status = StatusCodes.Status409Conflict,
-            });
+            return ConcurrencyConflict("connection");
         }
 
         _mapper.Map(requestModel, existing);
@@ -75,12 +70,7 @@ public sealed class UpdateConnectionController : ConnectionControllerBase
         }
         catch (ConcurrencyConflictException)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Concurrency conflict",
-                Detail = "The connection was modified by another request. Reload and try again.",
-                Status = StatusCodes.Status409Conflict,
-            });
+            return ConcurrencyConflict("connection");
         }
 
         return Ok();

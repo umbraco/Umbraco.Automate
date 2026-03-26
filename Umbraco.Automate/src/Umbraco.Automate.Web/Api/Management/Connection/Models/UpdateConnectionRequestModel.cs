@@ -28,5 +28,6 @@ public sealed class UpdateConnectionRequestModel
     /// does not match the current version.
     /// </summary>
     [Required]
+    [Range(1, int.MaxValue)]
     public int Version { get; init; }
 }
