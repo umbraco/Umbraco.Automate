@@ -6,7 +6,6 @@ import {
     MiniMap,
     useNodesState,
     useEdgesState,
-    useStore,
     addEdge,
     type OnConnect,
     type Viewport,
@@ -103,8 +102,10 @@ export default function AutomationCanvas({
         [onEdgesChange, setNodes, setEdges, emitChange],
     );
 
-    // Read edges from the store for cycle detection during drag.
-    const storeEdges = useStore((s) => s.edges);
+    // Keep a ref to the latest edges so isValidConnection can read them
+    // without useStore (which requires being inside the ReactFlow provider).
+    const edgesRef = useRef(edges);
+    edgesRef.current = edges;
 
     // Prevent self-loops and cycles. Reconnection from an already-connected node is
     // allowed because onConnect replaces the existing edge (single linear path enforcement).
@@ -114,7 +115,7 @@ export default function AutomationCanvas({
 
             // Walk the edge chain from target forward — if we reach source, it's a cycle.
             // Exclude edges that would be replaced by this connection (same source or same target).
-            const remaining = storeEdges.filter(
+            const remaining = edgesRef.current.filter(
                 (e) => e.source !== connection.source && e.target !== connection.target,
             );
             let current: string | null = connection.target;
@@ -128,7 +129,7 @@ export default function AutomationCanvas({
             }
             return true;
         },
-        [storeEdges],
+        [],
     );
 
     const onConnect: OnConnect = useCallback(
