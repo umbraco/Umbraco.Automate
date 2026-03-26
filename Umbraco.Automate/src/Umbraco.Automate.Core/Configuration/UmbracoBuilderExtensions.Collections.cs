@@ -80,12 +80,12 @@ public static partial class UmbracoBuilderExtensions
         // Wire run-completed notification → notification channel dispatcher
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
 
-        // Action middleware — ordered pipeline
+        // Action middleware — ordered pipeline (validation before audit so invalid configs aren't audit-trailed)
         builder.AutomateActionMiddleware()
             .Append<ErrorHandlingMiddleware>()
             .Append<StepRunLoggingMiddleware>()
-            .Append<AuditTrailMiddleware>()
-            .Append<SettingsValidationMiddleware>();
+            .Append<SettingsValidationMiddleware>()
+            .Append<AuditTrailMiddleware>();
 
         // Security
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
