@@ -13,6 +13,7 @@ import {
     type Edge,
     type ReactFlowInstance,
     type ColorMode,
+    type Connection,
 } from "@xyflow/react";
 import { nodeTypes } from "./nodes/node-types.js";
 import AutomationEdge from "./edges/AutomationEdge.js";
@@ -101,14 +102,23 @@ export default function AutomationCanvas({
         [onEdgesChange, setNodes, setEdges, emitChange],
     );
 
+    // Prevent self-loops only. Reconnection from an already-connected node is allowed
+    // because onConnect replaces the existing edge (single linear path enforcement).
+    const isValidConnection = useCallback(
+        (connection: Edge | Connection) => connection.source !== connection.target,
+        [],
+    );
+
     const onConnect: OnConnect = useCallback(
         (params) => {
             setEdges((eds) => {
-                // Disallow multiple outgoing edges from the same source node.
-                // Parallel execution paths are not yet supported (Phase 5).
-                if (eds.some((e) => e.source === params.source || e.target === params.target)) return eds;
+                // Remove any existing edge from the same source or to the same target
+                // so a new connection replaces the old one (single linear path).
+                const filtered = eds.filter(
+                    (e) => e.source !== params.source && e.target !== params.target,
+                );
 
-                const updated = addEdge({ ...params, type: "automation", animated: true }, eds);
+                const updated = addEdge({ ...params, type: "automation", animated: true }, filtered);
                 setNodes((currentNodes) => {
                     emitChange(currentNodes, updated);
                     return currentNodes;
@@ -145,6 +155,7 @@ export default function AutomationCanvas({
             onNodesChange={readOnly ? undefined : handleNodesChange}
             onEdgesChange={readOnly ? undefined : handleEdgesChange}
             onConnect={readOnly ? undefined : onConnect}
+            isValidConnection={readOnly ? undefined : isValidConnection}
             onInit={onInit}
             onPaneClick={readOnly ? undefined : handlePaneClick}
             nodeTypes={nodeTypes}
