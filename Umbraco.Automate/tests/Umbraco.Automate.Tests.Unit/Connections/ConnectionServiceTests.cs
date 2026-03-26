@@ -27,6 +27,10 @@ public class ConnectionServiceTests
                 It.IsAny<bool>()))
             .Returns(_scope.Object);
 
+        // Default GetByIdsAsync to return empty — tests for batch fetch can override.
+        _repo.Setup(r => r.GetByIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Enumerable.Empty<Connection>());
+
         _service = new ConnectionService(
             _repo.Object,
             new ConnectionTypeCollection(() => []),

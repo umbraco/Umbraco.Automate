@@ -17,6 +17,7 @@ internal interface IConnectionRepository
 
     /// <summary>
     /// Gets connections by a collection of IDs.
+    /// The order of results is not guaranteed to match the input order.
     /// </summary>
     Task<IEnumerable<Connection>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
 
