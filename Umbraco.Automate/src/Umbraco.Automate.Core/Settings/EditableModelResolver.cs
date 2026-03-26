@@ -37,8 +37,8 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         // If already the correct type, clone via JSON round-trip to avoid mutating the original object.
         if (modelType.IsInstanceOfType(data))
         {
-            var json = JsonSerializer.Serialize(data, JsonOptions.Default);
-            var deserialized = JsonSerializer.Deserialize(json, modelType, JsonOptions.Default);
+            var json = JsonSerializer.Serialize(data, JsonOptions.Settings);
+            var deserialized = JsonSerializer.Deserialize(json, modelType, JsonOptions.Settings);
             if (deserialized is not null)
             {
                 ResolveConfigurationVariablesInObject(deserialized);
@@ -51,7 +51,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         // Handle JsonElement deserialization.
         if (data is JsonElement jsonElement)
         {
-            var deserialized = jsonElement.Deserialize(modelType, JsonOptions.Default);
+            var deserialized = jsonElement.Deserialize(modelType, JsonOptions.Settings);
             if (deserialized is not null)
             {
                 ResolveConfigurationVariablesInObject(deserialized);
@@ -64,8 +64,8 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         // Try to serialize/deserialize through JSON as fallback.
         try
         {
-            var json = JsonSerializer.Serialize(data, JsonOptions.Default);
-            var deserialized = JsonSerializer.Deserialize(json, modelType, JsonOptions.Default);
+            var json = JsonSerializer.Serialize(data, JsonOptions.Settings);
+            var deserialized = JsonSerializer.Deserialize(json, modelType, JsonOptions.Settings);
             if (deserialized is not null)
             {
                 ResolveConfigurationVariablesInObject(deserialized);

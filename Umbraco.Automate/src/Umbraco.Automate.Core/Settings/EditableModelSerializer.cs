@@ -25,7 +25,7 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
             return null;
         }
 
-        var json = JsonSerializer.Serialize(model, JsonOptions.Default);
+        var json = JsonSerializer.Serialize(model, JsonOptions.Settings);
 
         if (schema is null || !schema.Fields.Any(f => f.IsSensitive))
         {
@@ -36,7 +36,7 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
         if (jsonNode is JsonObject jsonObject)
         {
             EncryptSensitiveFields(jsonObject, schema);
-            return jsonObject.ToJsonString(JsonOptions.Default);
+            return jsonObject.ToJsonString(JsonOptions.Settings);
         }
 
         return json;
@@ -54,11 +54,11 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
         if (jsonNode is JsonObject jsonObject)
         {
             DecryptFields(jsonObject);
-            var decryptedJson = jsonObject.ToJsonString(JsonOptions.Default);
-            return JsonSerializer.Deserialize<JsonElement>(decryptedJson, JsonOptions.Default);
+            var decryptedJson = jsonObject.ToJsonString(JsonOptions.Settings);
+            return JsonSerializer.Deserialize<JsonElement>(decryptedJson, JsonOptions.Settings);
         }
 
-        return JsonSerializer.Deserialize<JsonElement>(json, JsonOptions.Default);
+        return JsonSerializer.Deserialize<JsonElement>(json, JsonOptions.Settings);
     }
 
     /// <inheritdoc />
@@ -73,11 +73,11 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
         if (jsonNode is JsonObject jsonObject)
         {
             DecryptFields(jsonObject);
-            var decryptedJson = jsonObject.ToJsonString(JsonOptions.Default);
-            return JsonSerializer.Deserialize<T>(decryptedJson, JsonOptions.Default);
+            var decryptedJson = jsonObject.ToJsonString(JsonOptions.Settings);
+            return JsonSerializer.Deserialize<T>(decryptedJson, JsonOptions.Settings);
         }
 
-        return JsonSerializer.Deserialize<T>(json, JsonOptions.Default);
+        return JsonSerializer.Deserialize<T>(json, JsonOptions.Settings);
     }
 
     private void EncryptSensitiveFields(JsonObject jsonObject, EditableModelSchema schema)
