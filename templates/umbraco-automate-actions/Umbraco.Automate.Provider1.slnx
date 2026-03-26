@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Umbraco.Automate.Provider1/Umbraco.Automate.Provider1.csproj" />
+  </Folder>
+</Solution>
