@@ -49,4 +49,10 @@ public interface IConnectionService
     /// Returns null if the connection or its type is not found.
     /// </summary>
     Task<ConfiguredConnection?> GetConfiguredConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets multiple connections with their types resolved and settings deserialized, ready for runtime use.
+    /// Connections whose type is not found are excluded from the result.
+    /// </summary>
+    Task<IReadOnlyList<ConfiguredConnection>> GetConfiguredConnectionsByIdsAsync(IReadOnlyCollection<Guid> connectionIds, CancellationToken cancellationToken = default);
 }

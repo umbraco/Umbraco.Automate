@@ -357,21 +357,30 @@ internal sealed class ActionStepBody : StepBodyAsync
         AutomationExecutionContext executionContext,
         CancellationToken cancellationToken)
     {
-        foreach (var allowedId in executionContext.AllowedConnections)
+        var allConfigured = await _connectionService.GetConfiguredConnectionsByIdsAsync(
+            executionContext.AllowedConnections, cancellationToken);
+
+        var matches = allConfigured
+            .Where(c => string.Equals(c.Type, connectionTypeAlias, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (matches.Count == 0)
         {
-            var configured = await _connectionService.GetConfiguredConnectionAsync(allowedId, cancellationToken);
-            if (configured is not null &&
-                string.Equals(configured.Type, connectionTypeAlias, StringComparison.OrdinalIgnoreCase))
-            {
-                return configured;
-            }
+            _logger.LogWarning(
+                "No connection of type '{ConnectionTypeAlias}' found in workspace '{WorkspaceId}' for step {StepId}",
+                connectionTypeAlias, executionContext.WorkspaceId, _stepConfig.Id);
+
+            return null;
         }
 
-        _logger.LogWarning(
-            "No connection of type '{ConnectionTypeAlias}' found in workspace '{WorkspaceId}' for step {StepId}",
-            connectionTypeAlias, executionContext.WorkspaceId, _stepConfig.Id);
+        if (matches.Count > 1)
+        {
+            _logger.LogWarning(
+                "Multiple connections of type '{ConnectionTypeAlias}' found in workspace '{WorkspaceId}' for step {StepId}. Using first match '{ConnectionId}'",
+                connectionTypeAlias, executionContext.WorkspaceId, _stepConfig.Id, matches[0].Id);
+        }
 
-        return null;
+        return matches[0];
     }
 
     private Dictionary<string, object?> ResolveInputMappings(

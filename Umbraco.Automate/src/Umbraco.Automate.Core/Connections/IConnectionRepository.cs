@@ -16,6 +16,11 @@ internal interface IConnectionRepository
     Task<Connection?> GetByAliasAsync(string alias, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets connections by a collection of IDs.
+    /// </summary>
+    Task<IEnumerable<Connection>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets all connections.
     /// </summary>
     Task<IEnumerable<Connection>> GetAllAsync(CancellationToken cancellationToken = default);

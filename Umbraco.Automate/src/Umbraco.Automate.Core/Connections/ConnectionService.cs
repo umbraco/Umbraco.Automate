@@ -134,4 +134,24 @@ internal sealed class ConnectionService : IConnectionService
         var resolvedSettings = connectionType.ResolveSettings(connection.Settings);
         return new ConfiguredConnection(connection, connectionType, resolvedSettings);
     }
+
+    public async Task<IReadOnlyList<ConfiguredConnection>> GetConfiguredConnectionsByIdsAsync(IReadOnlyCollection<Guid> connectionIds, CancellationToken cancellationToken = default)
+    {
+        var connections = await _connectionRepository.GetByIdsAsync(connectionIds, cancellationToken);
+
+        var result = new List<ConfiguredConnection>();
+        foreach (var connection in connections)
+        {
+            var connectionType = _connectionTypeCollection.GetByAlias(connection.Type);
+            if (connectionType is null)
+            {
+                continue;
+            }
+
+            var resolvedSettings = connectionType.ResolveSettings(connection.Settings);
+            result.Add(new ConfiguredConnection(connection, connectionType, resolvedSettings));
+        }
+
+        return result;
+    }
 }
