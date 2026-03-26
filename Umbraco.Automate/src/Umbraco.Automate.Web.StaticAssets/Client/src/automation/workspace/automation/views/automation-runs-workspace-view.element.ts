@@ -132,13 +132,11 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
         }
 
         return html`
-            <div class="content">
-                <umb-table
-                    .config=${this._tableConfig}
-                    .columns=${this._columns}
-                    .items=${this._items}
-                ></umb-table>
-            </div>
+            <umb-table
+                .config=${this._tableConfig}
+                .columns=${this._columns}
+                .items=${this._items}
+            ></umb-table>
         `;
     }
 
