@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Workspaces;
 
 namespace Umbraco.Automate.Persistence.Workspaces;
@@ -106,6 +107,10 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         }
         else
         {
+            // Set EF Core's original value to the client's version so the WHERE clause
+            // detects races between the controller read and this repository save.
+            db.Entry(existing).Property(e => e.Version).OriginalValue = workspace.Version;
+
             workspace.Version = existing.Version + 1;
             workspace.DateModified = DateTime.UtcNow;
             workspace.ModifiedByUserId = userId;
@@ -117,7 +122,15 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
             WorkspaceFactory.UpdateEntity(existing, workspace);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException(nameof(Workspace), workspace.Id);
+        }
+
         return workspace;
     }
 

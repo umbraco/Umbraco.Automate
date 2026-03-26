@@ -40,6 +40,17 @@ internal sealed class EFCoreConnectionRepository : IConnectionRepository
         return entity is null ? null : _factory.BuildDomain(entity);
     }
 
+    public async Task<IEnumerable<Connection>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var entities = await db.Connections
+            .Where(c => ids.Contains(c.Id))
+            .ToListAsync(cancellationToken);
+
+        return entities.Select(_factory.BuildDomain);
+    }
+
     public async Task<IEnumerable<Connection>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -94,6 +105,10 @@ internal sealed class EFCoreConnectionRepository : IConnectionRepository
         }
         else
         {
+            // Set EF Core's original value to the client's version so the WHERE clause
+            // detects races between the controller read and this repository save.
+            db.Entry(existing).Property(e => e.Version).OriginalValue = connection.Version;
+
             connection.Version = existing.Version + 1;
             connection.DateModified = DateTime.UtcNow;
             connection.ModifiedByUserId = userId;

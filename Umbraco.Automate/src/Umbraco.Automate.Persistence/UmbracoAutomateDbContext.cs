@@ -240,7 +240,7 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.Alias).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
             entity.Property(e => e.ServiceAccountKey).IsRequired();
-            entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
+            entity.Property(e => e.Version).IsRequired().HasDefaultValue(1).IsConcurrencyToken();
             entity.Property(e => e.DateCreated).IsRequired();
             entity.Property(e => e.DateModified).IsRequired();
 

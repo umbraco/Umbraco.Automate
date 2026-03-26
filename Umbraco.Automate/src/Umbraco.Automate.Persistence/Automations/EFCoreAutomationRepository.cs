@@ -109,6 +109,10 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
         }
         else
         {
+            // Set EF Core's original value to the client's version so the WHERE clause
+            // detects races between the controller read and this repository save.
+            db.Entry(existing).Property(e => e.Version).OriginalValue = automation.Version;
+
             automation.Version = existing.Version + 1;
             automation.DateModified = DateTime.UtcNow;
             automation.ModifiedByUserId = userId;
@@ -135,11 +139,12 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
         AutomationEntity? existing = await db.Automations.FindAsync([automation.Id], cancellationToken)
             ?? throw new InvalidOperationException($"Automation '{automation.Id}' not found.");
 
-        automation.Version = existing.Version;
+        db.Entry(existing).Property(e => e.Version).OriginalValue = automation.Version;
+
         automation.DateModified = DateTime.UtcNow;
         automation.ModifiedByUserId = userId;
 
-        _factory.UpdateEntity(existing, automation);
+        _factory.UpdateMetadata(existing, automation);
 
         try
         {

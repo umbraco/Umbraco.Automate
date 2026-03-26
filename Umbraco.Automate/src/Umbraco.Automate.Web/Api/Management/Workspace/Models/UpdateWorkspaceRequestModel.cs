@@ -24,4 +24,12 @@ public sealed class UpdateWorkspaceRequestModel
 
     /// <summary>Connection IDs that automations in this workspace are allowed to use.</summary>
     public IList<Guid> AllowedConnections { get; init; } = [];
+
+    /// <summary>
+    /// The version of the workspace that the client last read.
+    /// Used for optimistic concurrency — the server returns 409 Conflict if this
+    /// does not match the current version.
+    /// </summary>
+    [Required]
+    public int Version { get; init; }
 }

@@ -102,6 +102,17 @@ internal sealed class AutomationFactory
         // DateCreated and CreatedByUserId intentionally not updated
     }
 
+    public void UpdateMetadata(AutomationEntity entity, Automation automation)
+    {
+        entity.Status = (int)automation.Status;
+        entity.IsEnabled = automation.IsEnabled;
+        entity.PublishedVersion = automation.PublishedVersion;
+        entity.GroupId = automation.GroupId;
+        entity.Version = automation.Version;
+        entity.DateModified = automation.DateModified;
+        entity.ModifiedByUserId = automation.ModifiedByUserId;
+    }
+
     private string? SerializeDefinition(Automation automation)
     {
         if (automation.Trigger is null && automation.Steps.Count == 0 && automation.Connections.Count == 0)
