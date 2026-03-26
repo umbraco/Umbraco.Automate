@@ -47,9 +47,14 @@ public sealed class AllWorkspaceController : WorkspaceControllerBase
         CancellationToken cancellationToken = default)
     {
         // Admins see all workspaces; non-admins only see workspaces their groups have access to.
-        IReadOnlyCollection<Guid>? userGroupKeys = null;
         var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
-        if (user is not null && !user.IsAdmin())
+        if (user is null)
+        {
+            return Unauthorized();
+        }
+
+        IReadOnlyCollection<Guid>? userGroupKeys = null;
+        if (!user.IsAdmin())
         {
             userGroupKeys = user.Groups.Select(g => g.Key).ToList();
         }

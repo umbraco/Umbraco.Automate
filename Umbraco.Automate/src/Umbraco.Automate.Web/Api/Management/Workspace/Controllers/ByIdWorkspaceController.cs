@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Workspaces;
@@ -14,14 +15,19 @@ namespace Umbraco.Automate.Web.Api.Management.Workspace.Controllers;
 public sealed class ByIdWorkspaceController : WorkspaceControllerBase
 {
     private readonly IWorkspaceService _workspaceService;
+    private readonly IAuthorizationService _authorizationService;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ByIdWorkspaceController"/> class.
     /// </summary>
-    public ByIdWorkspaceController(IWorkspaceService workspaceService, IUmbracoMapper mapper)
+    public ByIdWorkspaceController(
+        IWorkspaceService workspaceService,
+        IAuthorizationService authorizationService,
+        IUmbracoMapper mapper)
     {
         _workspaceService = workspaceService;
+        _authorizationService = authorizationService;
         _mapper = mapper;
     }
 
@@ -40,6 +46,12 @@ public sealed class ByIdWorkspaceController : WorkspaceControllerBase
         if (workspace is null)
         {
             return WorkspaceNotFound();
+        }
+
+        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, id);
+        if (forbidden is not null)
+        {
+            return forbidden;
         }
 
         return Ok(_mapper.Map<WorkspaceResponseModel>(workspace));

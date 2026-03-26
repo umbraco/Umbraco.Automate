@@ -66,6 +66,21 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
            ?? throw new InvalidOperationException("No backoffice user found");
 
     /// <summary>
+    /// Requires the current user to be an administrator. Returns <c>null</c> if the user is an admin,
+    /// a 401 Unauthorized result if no user is found, or a 403 Forbidden result otherwise.
+    /// </summary>
+    protected IActionResult? RequireAdmin(IBackOfficeSecurityAccessor accessor)
+    {
+        var user = accessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return new UnauthorizedResult();
+        }
+
+        return user.IsAdmin() ? null : Forbidden();
+    }
+
+    /// <summary>
     /// Authorizes workspace access for the current user. Returns <c>null</c> if authorized,
     /// or a 403 Forbidden result if the user is not a member of the workspace.
     /// </summary>

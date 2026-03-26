@@ -42,6 +42,12 @@ public sealed class CreateWorkspaceController : WorkspaceControllerBase
         CreateWorkspaceRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
+        var adminRequired = RequireAdmin(_backOfficeSecurityAccessor);
+        if (adminRequired is not null)
+        {
+            return adminRequired;
+        }
+
         var workspace = _mapper.Map<Core.Workspaces.Workspace>(requestModel)!;
 
         var created = await _workspaceService.CreateWorkspaceAsync(workspace, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);

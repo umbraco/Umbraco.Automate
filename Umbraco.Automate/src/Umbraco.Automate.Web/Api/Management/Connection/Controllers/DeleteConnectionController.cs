@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Connection.Controllers;
 
@@ -12,13 +13,17 @@ namespace Umbraco.Automate.Web.Api.Management.Connection.Controllers;
 public sealed class DeleteConnectionController : ConnectionControllerBase
 {
     private readonly IConnectionService _connectionService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeleteConnectionController"/> class.
     /// </summary>
-    public DeleteConnectionController(IConnectionService connectionService)
+    public DeleteConnectionController(
+        IConnectionService connectionService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
     {
         _connectionService = connectionService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
     }
 
     /// <summary>
@@ -32,6 +37,12 @@ public sealed class DeleteConnectionController : ConnectionControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
+        var adminRequired = RequireAdmin(_backOfficeSecurityAccessor);
+        if (adminRequired is not null)
+        {
+            return adminRequired;
+        }
+
         var deleted = await _connectionService.DeleteConnectionAsync(id, cancellationToken);
         if (!deleted)
         {

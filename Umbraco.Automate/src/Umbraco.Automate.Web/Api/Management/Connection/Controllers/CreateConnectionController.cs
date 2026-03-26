@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Web.Api.Management.Connection.Models;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Connection.Controllers;
 
@@ -14,14 +15,19 @@ namespace Umbraco.Automate.Web.Api.Management.Connection.Controllers;
 public sealed class CreateConnectionController : ConnectionControllerBase
 {
     private readonly IConnectionService _connectionService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CreateConnectionController"/> class.
     /// </summary>
-    public CreateConnectionController(IConnectionService connectionService, IUmbracoMapper mapper)
+    public CreateConnectionController(
+        IConnectionService connectionService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IUmbracoMapper mapper)
     {
         _connectionService = connectionService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _mapper = mapper;
     }
 
@@ -36,6 +42,12 @@ public sealed class CreateConnectionController : ConnectionControllerBase
         CreateConnectionRequestModel requestModel,
         CancellationToken cancellationToken = default)
     {
+        var adminRequired = RequireAdmin(_backOfficeSecurityAccessor);
+        if (adminRequired is not null)
+        {
+            return adminRequired;
+        }
+
         var connection = _mapper.Map<Core.Connections.Connection>(requestModel)!;
 
         var created = await _connectionService.CreateConnectionAsync(connection, cancellationToken: cancellationToken);
