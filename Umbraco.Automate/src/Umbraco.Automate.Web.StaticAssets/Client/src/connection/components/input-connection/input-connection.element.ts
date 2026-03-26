@@ -15,9 +15,11 @@ export class UaInputConnectionElement extends UmbLitElement {
     @state()
     private _items: UaConnectionItemModel[] = [];
 
+    @state()
+    private _iconsByType = new Map<string, string>();
+
     #repository: UaConnectionCollectionRepository;
     #catalogueRepository: UaCatalogueRepository;
-    #iconsByType = new Map<string, string>();
 
     constructor() {
         super();
@@ -41,7 +43,7 @@ export class UaInputConnectionElement extends UmbLitElement {
         }
 
         if (catalogueResult.data) {
-            this.#iconsByType = new Map(
+            this._iconsByType = new Map(
                 catalogueResult.data
                     .filter((ct) => ct.icon)
                     .map((ct) => [ct.alias, ct.icon!]),
@@ -50,7 +52,7 @@ export class UaInputConnectionElement extends UmbLitElement {
     }
 
     #getIcon(typeAlias: string): string {
-        return this.#iconsByType.get(typeAlias) ?? UA_CONNECTION_ICON;
+        return this._iconsByType.get(typeAlias) ?? UA_CONNECTION_ICON;
     }
 
     async #openPicker() {
