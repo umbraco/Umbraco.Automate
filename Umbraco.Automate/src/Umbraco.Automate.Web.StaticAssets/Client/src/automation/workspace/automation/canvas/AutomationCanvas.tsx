@@ -73,6 +73,16 @@ export default function AutomationCanvas({
     const handleNodesChange: typeof onNodesChange = useCallback(
         (changes) => {
             onNodesChange(changes);
+
+            // Only emit for user-initiated changes (drag complete, remove).
+            // Ignore React Flow internals like dimensions, select, and fitView positioning.
+            const isUserChange = changes.some(
+                (c) =>
+                    c.type === "remove" ||
+                    (c.type === "position" && c.dragging === false && c.position != null),
+            );
+            if (!isUserChange) return;
+
             queueMicrotask(() => {
                 setNodes((currentNodes) => {
                     setEdges((currentEdges) => {
@@ -89,6 +99,10 @@ export default function AutomationCanvas({
     const handleEdgesChange: typeof onEdgesChange = useCallback(
         (changes) => {
             onEdgesChange(changes);
+
+            const isUserChange = changes.some((c) => c.type === "remove");
+            if (!isUserChange) return;
+
             queueMicrotask(() => {
                 setEdges((currentEdges) => {
                     setNodes((currentNodes) => {
