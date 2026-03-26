@@ -41,6 +41,13 @@ internal sealed class OAuthCredentialsService : IOAuthCredentialsService
         credentials.DateCreated = DateTime.UtcNow;
         credentials.DateModified = DateTime.UtcNow;
 
+        if (credentials.ExpiresUtc is not null && string.IsNullOrEmpty(credentials.RefreshToken))
+        {
+            _logger.LogWarning(
+                "OAuth credentials {CredentialsId} for provider {Provider} have an expiry ({ExpiresUtc}) but no refresh token. The token will become unusable after expiry",
+                credentials.Id, credentials.Provider, credentials.ExpiresUtc);
+        }
+
         return await _repository.SaveAsync(credentials, cancellationToken);
     }
 
