@@ -1,6 +1,6 @@
 using Umbraco.Automate.Core.Settings;
 
-namespace Umbraco.Automate.Forms.Triggers;
+namespace Umbraco.Forms.Automate.Triggers;
 
 /// <summary>
 /// Settings shared by form record triggers (submitted, approved).

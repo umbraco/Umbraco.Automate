@@ -1,7 +1,7 @@
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Forms.Core.Services.Notifications;
 
-namespace Umbraco.Automate.Forms.Triggers;
+namespace Umbraco.Forms.Automate.Triggers;
 
 /// <summary>
 /// Fires when a form entry is submitted in Umbraco Forms.

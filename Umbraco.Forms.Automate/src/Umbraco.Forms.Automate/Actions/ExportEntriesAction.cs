@@ -4,7 +4,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Forms.Core.Services;
 
-namespace Umbraco.Automate.Forms.Actions;
+namespace Umbraco.Forms.Automate.Actions;
 
 /// <summary>
 /// Exports form entries as a JSON array.

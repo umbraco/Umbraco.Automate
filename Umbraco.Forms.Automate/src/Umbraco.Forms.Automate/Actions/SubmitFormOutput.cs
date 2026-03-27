@@ -1,4 +1,4 @@
-namespace Umbraco.Automate.Forms.Actions;
+namespace Umbraco.Forms.Automate.Actions;
 
 /// <summary>
 /// Output produced by the <see cref="SubmitFormAction"/>.

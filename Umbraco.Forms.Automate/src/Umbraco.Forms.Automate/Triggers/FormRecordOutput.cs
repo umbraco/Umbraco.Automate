@@ -1,4 +1,4 @@
-namespace Umbraco.Automate.Forms.Triggers;
+namespace Umbraco.Forms.Automate.Triggers;
 
 /// <summary>
 /// Output produced by form record triggers (submitted, approved).

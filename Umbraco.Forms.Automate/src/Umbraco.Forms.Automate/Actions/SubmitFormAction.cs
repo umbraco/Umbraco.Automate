@@ -4,7 +4,7 @@ using Umbraco.Automate.Core.Runs;
 using Umbraco.Forms.Core.Persistence.Dtos;
 using Umbraco.Forms.Core.Services;
 
-namespace Umbraco.Automate.Forms.Actions;
+namespace Umbraco.Forms.Automate.Actions;
 
 /// <summary>
 /// Programmatically submits a form entry to an Umbraco Forms form.

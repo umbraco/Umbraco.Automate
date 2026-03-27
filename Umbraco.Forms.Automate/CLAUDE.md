@@ -2,29 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Note:** This is the Umbraco.Automate.Forms package. See the [root CLAUDE.md](../CLAUDE.md) for shared coding standards, build commands, and repository-wide conventions.
+> **Note:** This is the Umbraco.Forms.Automate package. See the [root CLAUDE.md](../CLAUDE.md) for shared coding standards, build commands, and repository-wide conventions.
 
 ## Build Commands
 
 ```bash
 # Build the solution
-dotnet build Umbraco.Automate.Forms.slnx
+dotnet build Umbraco.Forms.Automate.slnx
 ```
 
 ## Architecture Overview
 
-Umbraco.Automate.Forms is a provider package that adds Umbraco Forms triggers and actions to Umbraco Automate. It listens to Forms notification events and provides programmatic access to form operations.
+Umbraco.Forms.Automate is a DXP provider package that adds Umbraco Forms triggers and actions to Umbraco Automate. It listens to Forms notification events and provides programmatic access to form operations.
 
 ### Project Structure
 
 Single class library project organized by domain:
 
 ```
-Umbraco.Automate.Forms/
-├── src/Umbraco.Automate.Forms/
+Umbraco.Forms.Automate/
+├── src/Umbraco.Forms.Automate/
 │   ├── Triggers/          # Form event triggers (submitted, approved)
 │   └── Actions/           # Form actions (submit, export entries)
-└── Umbraco.Automate.Forms.slnx
+└── Umbraco.Forms.Automate.slnx
 ```
 
 ### How It Works

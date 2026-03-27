@@ -1,6 +1,6 @@
 using Umbraco.Automate.Core.Settings;
 
-namespace Umbraco.Automate.Forms.Actions;
+namespace Umbraco.Forms.Automate.Actions;
 
 /// <summary>
 /// Settings for the <see cref="ExportEntriesAction"/>.

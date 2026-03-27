@@ -4,7 +4,7 @@
     <Company>Umbraco HQ</Company>
     <Authors>Umbraco</Authors>
     <Copyright>Copyright © Umbraco $([System.DateTime]::Today.ToString('yyyy'))</Copyright>
-    <Product>Umbraco Automate Forms</Product>
+    <Product>Umbraco Forms Automate</Product>
     <PackageProjectUrl>https://github.com/umbraco/Umbraco.Automate</PackageProjectUrl>
     <PackageIcon>logo-128.png</PackageIcon>
     <PackageTags>umbraco automate automation forms</PackageTags>
