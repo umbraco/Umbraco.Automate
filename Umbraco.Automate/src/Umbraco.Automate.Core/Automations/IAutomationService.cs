@@ -95,6 +95,11 @@ public interface IAutomationService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Checks whether any automations exist in the given workspace.
+    /// </summary>
+    Task<bool> ExistsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the published version references for all automations that have a published version.
     /// Returns lightweight (Id, PublishedVersion) pairs without loading full entities.
     /// </summary>

@@ -86,6 +86,9 @@ internal sealed class AutomationService : IAutomationService
         CancellationToken cancellationToken = default)
         => _automationRepository.GetPagedAsync(filter, workspaceIds, groupId, skip, take, cancellationToken);
 
+    public Task<bool> ExistsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+        => _automationRepository.ExistsByWorkspaceAsync(workspaceId, cancellationToken);
+
     public async Task<Automation> CreateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         if (automation.Id == Guid.Empty)

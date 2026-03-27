@@ -178,6 +178,7 @@ export type ControlFlowItemResponseModel = {
     description?: string | null;
     group?: string | null;
     icon?: string | null;
+    connectionTypeAlias?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
     outputSchema?: {
         [key: string]: unknown;
@@ -402,6 +403,7 @@ export type StepTypeItemResponseModel = {
     description?: string | null;
     group?: string | null;
     icon?: string | null;
+    connectionTypeAlias?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
     outputSchema?: {
         [key: string]: unknown;
@@ -422,6 +424,7 @@ export type TriggerItemResponseModel = {
     description?: string | null;
     group?: string | null;
     icon?: string | null;
+    connectionTypeAlias?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
     outputSchema?: {
         [key: string]: unknown;
@@ -464,6 +467,7 @@ export type UpdateWorkspaceRequestModel = {
     serviceAccountKey: string;
     userGroups: Array<string>;
     allowedConnections: Array<string>;
+    version: number;
 };
 
 export type ValueChangeModel = {
@@ -1603,6 +1607,10 @@ export type DeleteWorkspacesByIdErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
 };
 
 export type DeleteWorkspacesByIdError = DeleteWorkspacesByIdErrors[keyof DeleteWorkspacesByIdErrors];
@@ -1663,6 +1671,10 @@ export type PutWorkspacesByIdErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
 };
 
 export type PutWorkspacesByIdError = PutWorkspacesByIdErrors[keyof PutWorkspacesByIdErrors];

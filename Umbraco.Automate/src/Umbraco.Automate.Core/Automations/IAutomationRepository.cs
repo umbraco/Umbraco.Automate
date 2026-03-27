@@ -56,6 +56,11 @@ internal interface IAutomationRepository
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Checks whether any automations exist in the given workspace.
+    /// </summary>
+    Task<bool> ExistsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the published version references for all automations that have a published version.
     /// This is a lightweight projection — no full entity mapping.
     /// </summary>

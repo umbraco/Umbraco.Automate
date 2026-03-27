@@ -179,6 +179,12 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
         return await db.Automations.AnyAsync(a => a.Id == id, cancellationToken);
     }
 
+    public async Task<bool> ExistsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Automations.AnyAsync(a => a.WorkspaceId == workspaceId, cancellationToken);
+    }
+
     public async Task<IReadOnlyCollection<(Guid Id, int PublishedVersion)>> GetPublishedVersionReferencesAsync(
         CancellationToken cancellationToken = default)
     {
