@@ -1,9 +1,10 @@
 import { memo, useCallback } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import type { ActionNodeData } from "../types.js";
 
 function ActionNode({ data, id }: NodeProps) {
     const nodeData = data as ActionNodeData;
+    const { deleteElements } = useReactFlow();
 
     const onSettingsClick = useCallback(
         (e: React.MouseEvent) => {
@@ -18,21 +19,41 @@ function ActionNode({ data, id }: NodeProps) {
         [id],
     );
 
+    const onDeleteClick = useCallback(
+        (e: React.MouseEvent) => {
+            e.stopPropagation();
+            deleteElements({ nodes: [{ id }] });
+        },
+        [id, deleteElements],
+    );
+
     return (
         <div className="ua-node ua-node--action">
             <Handle type="target" position={Position.Top} />
             <div className="ua-node__header">
-                <span className="ua-node__icon">⚙️</span>
+                <span className="ua-node__icon">
+                    <uui-icon name="icon-circuits"></uui-icon>
+                </span>
                 <span className="ua-node__type">Action</span>
                 {!nodeData.runStatus && (
-                    <button
-                        className="ua-node__settings-btn"
-                        onClick={onSettingsClick}
-                        title="Settings"
-                        type="button"
-                    >
-                        ✏️
-                    </button>
+                    <>
+                        <button
+                            className="ua-node__delete-btn"
+                            onClick={onDeleteClick}
+                            title="Delete"
+                            type="button"
+                        >
+                            ✕
+                        </button>
+                        <button
+                            className="ua-node__settings-btn"
+                            onClick={onSettingsClick}
+                            title="Settings"
+                            type="button"
+                        >
+                            <uui-icon name="icon-edit"></uui-icon>
+                        </button>
+                    </>
                 )}
             </div>
             <div className="ua-node__body">

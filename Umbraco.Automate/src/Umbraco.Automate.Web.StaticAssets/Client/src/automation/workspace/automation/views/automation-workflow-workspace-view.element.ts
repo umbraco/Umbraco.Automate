@@ -289,7 +289,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                     label=${this.localize.term("uaCatalogue_selectAction")}
                     @click=${this.#onAddAction}
                 >
-                    <uui-icon name="icon-add"></uui-icon>
+                    <uui-icon name="icon-circuits"></uui-icon>
                     Add Action
                 </uui-button>
             </div>

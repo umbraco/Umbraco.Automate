@@ -51,6 +51,7 @@ export const UaWorkspaceTypeMapper = {
             serviceAccountKey: model.serviceAccountKey,
             userGroups: model.userGroups,
             allowedConnections: model.allowedConnections,
+            version: model.version,
         };
     },
 };

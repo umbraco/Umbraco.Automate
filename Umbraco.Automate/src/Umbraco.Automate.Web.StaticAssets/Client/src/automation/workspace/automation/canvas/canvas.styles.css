@@ -1,94 +1,116 @@
-/* Node base */
+/* Node base — aligned with uui-box */
 .ua-node {
     background: var(--uui-color-surface, #fff);
-    border: 2px solid var(--uui-color-border, #e5e7eb);
-    border-radius: 8px;
-    min-width: 180px;
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    border-radius: 16px;
+    min-width: 200px;
     max-width: 260px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
     font-family: var(--uui-font-family, inherit);
-    font-size: 13px;
+    font-size: var(--uui-type-small-size, 13px);
     overflow: hidden;
+    transition: box-shadow 120ms ease;
 }
 
 .ua-node:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Trigger node */
-.ua-node--trigger {
-    border-color: #6366f1;
-}
-
-.ua-node--trigger .ua-node__header {
-    background: #6366f1;
-    color: #fff;
-}
-
-/* Action node */
-.ua-node--action {
-    border-color: #3b82f6;
-}
-
-.ua-node--action .ua-node__header {
-    background: #3b82f6;
-    color: #fff;
+    box-shadow: var(--uui-shadow-depth-2, 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23));
 }
 
 /* Node parts */
 .ua-node__header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    gap: var(--uui-size-space-3, 9px);
+    padding: var(--uui-size-space-3, 9px) var(--uui-size-space-4, 12px);
+    border-bottom: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
 }
 
 .ua-node__icon {
-    font-size: 14px;
-    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.ua-node__icon svg {
+    width: 100%;
+    height: 100%;
 }
 
 .ua-node__type {
     flex: 1;
+    font-size: var(--uui-type-small-size, 13px);
+    font-weight: 700;
 }
 
 .ua-node__settings-btn {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 2px 4px;
-    font-size: 12px;
+    padding: 2px;
     line-height: 1;
-    opacity: 0.8;
-    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--uui-border-radius, 3px);
+    color: var(--uui-color-text, inherit);
+    opacity: 0.6;
     transition: opacity 120ms ease, background 120ms ease;
 }
 
 .ua-node__settings-btn:hover {
     opacity: 1;
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--uui-color-surface-emphasis, rgba(0, 0, 0, 0.06));
+}
+
+.ua-node__delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    line-height: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--uui-border-radius, 3px);
+    color: var(--uui-color-danger, #dc2626);
+    opacity: 0.6;
+    font-size: 12px;
+    transition: opacity 120ms ease, background 120ms ease;
+}
+
+.ua-node:hover .ua-node__delete-btn {
+    display: flex;
+}
+
+.ua-node__delete-btn:hover {
+    opacity: 1;
+    background: var(--uui-color-danger, #dc2626);
+    color: #fff;
 }
 
 .ua-node__body {
-    padding: 8px 10px;
+    padding: var(--uui-size-space-3, 9px) var(--uui-size-space-4, 12px);
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
 .ua-node__label {
-    font-weight: 500;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .ua-node__alias {
-    font-size: 11px;
+    font-size: var(--uui-type-small-size, 13px);
     color: var(--uui-color-text-alt, #6b7280);
     white-space: nowrap;
     overflow: hidden;
@@ -106,7 +128,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 1px solid var(--uui-color-border, #e5e7eb);
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
     background: var(--uui-color-surface, #fff);
     color: var(--uui-color-danger, #dc2626);
     font-size: 11px;
@@ -116,7 +138,7 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
 }
 
 .ua-edge__delete-btn:hover {
@@ -130,18 +152,18 @@
     width: 10px;
     height: 10px;
     border: 2px solid var(--uui-color-surface, #fff);
-    background: #94a3b8;
+    background: var(--uui-color-border, #c4c4c4);
 }
 
 .react-flow__handle:hover {
-    background: #3b82f6;
+    background: var(--uui-color-interactive, #1b264f);
 }
 
-/* Dark mode: ensure node shadows work on dark backgrounds */
+/* Dark mode */
 .dark .ua-node {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .dark .ua-node:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.5);
 }
