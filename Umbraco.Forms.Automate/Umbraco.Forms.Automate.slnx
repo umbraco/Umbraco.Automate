@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Umbraco.Forms.Automate/Umbraco.Forms.Automate.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Umbraco.Forms.Automate.Tests.Unit/Umbraco.Forms.Automate.Tests.Unit.csproj" />
+  </Folder>
 </Solution>
