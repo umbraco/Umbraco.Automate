@@ -8,10 +8,11 @@ namespace Umbraco.Forms.Automate.Triggers;
 public sealed class FormRecordTriggerSettings
 {
     /// <summary>
-    /// Gets or sets the form ID to filter on. Leave blank to match all forms.
+    /// Gets or sets the form IDs to filter on. Leave blank to match all forms.
     /// </summary>
     [Field(
-        Label = "Form",
-        Description = "Only fire for this form. Leave blank to match all forms.")]
-    public string? FormId { get; set; }
+        Label = "Forms",
+        Description = "Only fire for these forms. Leave blank to match all.",
+        EditorUiAlias = "Forms.PropertyEditorUi.FormPicker.Multiple")]
+    public string? FormIds { get; set; }
 }

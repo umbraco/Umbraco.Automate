@@ -10,7 +10,7 @@ public sealed class SubmitFormSettings
     /// <summary>
     /// Gets or sets the form ID to submit to.
     /// </summary>
-    [Field(Label = "Form ID", Description = "The GUID of the form to submit to.", SupportsBindings = true)]
+    [Field(Label = "Form", Description = "The form to submit to.", EditorUiAlias = "Forms.PropertyEditorUi.FormPicker.Single", SupportsBindings = true)]
     public string FormId { get; set; } = string.Empty;
 
     /// <summary>

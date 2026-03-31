@@ -10,7 +10,7 @@ public sealed class ExportEntriesSettings
     /// <summary>
     /// Gets or sets the form ID to export entries from.
     /// </summary>
-    [Field(Label = "Form ID", Description = "The GUID of the form to export entries from.", SupportsBindings = true)]
+    [Field(Label = "Form", Description = "The form to export entries from.", EditorUiAlias = "Forms.PropertyEditorUi.FormPicker.Single", SupportsBindings = true)]
     public string FormId { get; set; } = string.Empty;
 
     /// <summary>
