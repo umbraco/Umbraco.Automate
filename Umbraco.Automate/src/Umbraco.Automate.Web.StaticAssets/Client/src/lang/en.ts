@@ -40,6 +40,10 @@ export default {
         bulkDeleteConfirm: (count: number) =>
             `Are you sure you want to delete ${count} automation(s)?`,
     },
+    uaCanvas: {
+        nodeDeleteConfirm: (label: string) =>
+            `Are you sure you want to delete "${label}"?`,
+    },
     uaCatalogue: {
         selectTrigger: "Select Trigger",
         selectAction: "Select Action",

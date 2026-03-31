@@ -36,6 +36,7 @@ interface AutomationCanvasProps {
     readOnly?: boolean;
     onCanvasChange?: (detail: CanvasChangeDetail) => void;
     onAddNodeRequest?: (detail: AddNodeRequestDetail) => void;
+    onDeleteRequest?: (nodes: Node[]) => Promise<boolean>;
 }
 
 export default function AutomationCanvas({
@@ -46,6 +47,7 @@ export default function AutomationCanvas({
     readOnly = false,
     onCanvasChange,
     onAddNodeRequest,
+    onDeleteRequest,
 }: AutomationCanvasProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState(externalNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(externalEdges);
@@ -170,6 +172,14 @@ export default function AutomationCanvas({
         rfInstance.current = instance;
     }, []);
 
+    const handleBeforeDelete = useCallback(
+        async ({ nodes: nodesToDelete }: { nodes: Node[]; edges: Edge[] }) => {
+            if (nodesToDelete.length === 0 || !onDeleteRequest) return true;
+            return onDeleteRequest(nodesToDelete);
+        },
+        [onDeleteRequest],
+    );
+
     const handlePaneClick = useCallback(
         (event: React.MouseEvent) => {
             if (!onAddNodeRequest || !rfInstance.current) return;
@@ -193,6 +203,7 @@ export default function AutomationCanvas({
             onEdgesChange={readOnly ? undefined : handleEdgesChange}
             onConnect={readOnly ? undefined : onConnect}
             isValidConnection={readOnly ? undefined : isValidConnection}
+            onBeforeDelete={readOnly ? undefined : handleBeforeDelete}
             onInit={onInit}
             onPaneClick={readOnly ? undefined : handlePaneClick}
             nodeTypes={nodeTypes}

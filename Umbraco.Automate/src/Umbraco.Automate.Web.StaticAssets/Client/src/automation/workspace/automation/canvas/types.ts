@@ -32,3 +32,8 @@ export interface NodeSettingsOpenDetail {
 export interface AddNodeRequestDetail {
     position: { x: number; y: number };
 }
+
+export interface NodeDeleteRequestDetail {
+    nodes: import("@xyflow/react").Node[];
+    resolve: (confirmed: boolean) => void;
+}
