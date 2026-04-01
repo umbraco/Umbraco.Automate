@@ -20,6 +20,7 @@ export class UaWorkspaceMgmtWorkspaceContext
     implements UmbRoutableWorkspaceContext
 {
     readonly routes = new UmbWorkspaceRouteManager(this);
+    readonly name = this._data.createObservablePartOfCurrent((data) => data?.name);
 
     constructor(host: UmbControllerHost) {
         super(host, {
@@ -28,7 +29,7 @@ export class UaWorkspaceMgmtWorkspaceContext
             detailRepositoryAlias: UA_WORKSPACE_DETAIL_REPOSITORY_ALIAS,
         });
 
-        this.observe(this.data, (data) => this.view.setTitle(data?.name), null);
+        this.observe(this.name, (name) => this.view.setTitle(name), null);
 
         this.routes.setRoutes([
             {

@@ -209,7 +209,18 @@ export class UaWorkspaceTreeServerDataSource
             return { data: ancestors };
         }
 
-        // Workspace is a root-level item, no ancestors needed
+        // Workspace is a root-level item — return itself so the breadcrumb's
+        // slice(0, -1) preserves the tree root.
+        if (entityType === UA_WORKSPACE_ENTITY_TYPE && unique) {
+            const { data: ws } = await tryExecute(
+                this,
+                WorkspacesService.getWorkspacesById({ path: { id: unique } }),
+            );
+            if (ws) {
+                return { data: [this.#mapWorkspaceItem(ws)] };
+            }
+        }
+
         return { data: [] as UaWorkspaceTreeItemModel[] };
     }
 

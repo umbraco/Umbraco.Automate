@@ -26,6 +26,7 @@ export class UaAutomationWorkspaceContext
     implements UmbRoutableWorkspaceContext
 {
     readonly routes = new UmbWorkspaceRouteManager(this);
+    readonly name = this._data.createObservablePartOfCurrent((data) => data?.name);
 
     #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
 
@@ -40,7 +41,7 @@ export class UaAutomationWorkspaceContext
             this.#eventContext = context;
         });
 
-        this.observe(this.data, (data) => this.view.setTitle(data?.name), null);
+        this.observe(this.name, (name) => this.view.setTitle(name), null);
 
         this.routes.setRoutes([
             {

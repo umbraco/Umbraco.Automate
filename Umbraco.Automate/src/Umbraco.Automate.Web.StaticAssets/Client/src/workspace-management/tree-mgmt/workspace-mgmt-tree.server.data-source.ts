@@ -53,7 +53,19 @@ export class UaWorkspaceMgmtTreeServerDataSource
         };
     }
 
-    async getAncestorsOf(_args: UmbTreeAncestorsOfRequestArgs) {
+    async getAncestorsOf(args: UmbTreeAncestorsOfRequestArgs) {
+        const { unique } = args.treeItem;
+        if (!unique) return { data: [] as UaWorkspaceMgmtTreeItemModel[] };
+
+        // Return the entity itself so the breadcrumb's slice(0, -1) preserves the tree root.
+        const { data: ws } = await tryExecute(
+            this,
+            WorkspacesService.getWorkspacesById({ path: { id: unique } }),
+        );
+        if (ws) {
+            return { data: [this.#mapItem(ws)] };
+        }
+
         return { data: [] as UaWorkspaceMgmtTreeItemModel[] };
     }
 
