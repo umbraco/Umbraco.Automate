@@ -40,7 +40,7 @@ public class ContentUnpublishedTriggerTests
     {
         var schema = _trigger.GetSettingsSchema();
         schema.ShouldNotBeNull();
-        schema.Fields.ShouldContain(f => f.PropertyName == "ContentTypeAlias");
+        schema.Fields.ShouldContain(f => f.PropertyName == "ContentTypes");
     }
 
     [Fact]
