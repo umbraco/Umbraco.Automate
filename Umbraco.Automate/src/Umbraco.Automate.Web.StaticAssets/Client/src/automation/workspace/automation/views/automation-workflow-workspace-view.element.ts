@@ -55,7 +55,10 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const catalogueNames = await this.#buildCatalogueNames();
         this._nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogueNames);
         this._edges = modelToEdges(model.connections);
-        this._viewport = canvasState?.viewport;
+        // Only set viewport on initial load; after that the canvas manages its own position
+        if (!this._viewport) {
+            this._viewport = canvasState?.viewport;
+        }
     }
 
     async #buildCatalogueNames(): Promise<Map<string, string>> {

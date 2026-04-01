@@ -12,7 +12,8 @@ export function flowToTrigger(
     currentTrigger: TriggerConfigurationModel | null,
 ): TriggerConfigurationModel | null {
     const triggerNode = nodes.find((n) => n.id === TRIGGER_NODE_ID);
-    if (!triggerNode || !currentTrigger) return currentTrigger;
+    if (!triggerNode) return null;
+    if (!currentTrigger) return null;
 
     const data = triggerNode.data as TriggerNodeData;
     return {
