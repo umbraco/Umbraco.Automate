@@ -77,6 +77,11 @@ export class UaAutomationDetailRepository extends UmbDetailRepositoryBase<UaAuto
         }
         return result;
     }
+
+    async requestGroupById(groupId: string) {
+        const dataSource = new UaAutomationDetailServerDataSource(this);
+        return dataSource.readGroup(groupId);
+    }
 }
 
 export { UaAutomationDetailRepository as api };

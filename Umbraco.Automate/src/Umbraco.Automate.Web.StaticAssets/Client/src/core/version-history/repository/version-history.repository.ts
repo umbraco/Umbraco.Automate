@@ -18,18 +18,11 @@ export class UaVersionHistoryRepository {
         this.#entityType = entityType;
     }
 
-    /**
-     * Gets the version history for an entity.
-     * @param entityId - The entity ID.
-     * @param skip - Number of versions to skip (for pagination).
-     * @param take - Number of versions to return.
-     * @returns The version history response.
-     */
     async getVersionHistory(
         entityId: string,
         skip: number,
         take: number,
-    ): Promise<UaVersionHistoryResponse | undefined> {
+    ): Promise<{ data?: UaVersionHistoryResponse; error?: unknown }> {
         const { data, error } = await tryExecute(
             this.#host,
             VersionHistoryService.getVersionHistoryByEntityTypeByEntityId({
@@ -39,25 +32,17 @@ export class UaVersionHistoryRepository {
         );
 
         if (error || !data) {
-            console.error("Failed to load version history:", error);
-            return undefined;
+            return { error };
         }
 
-        return UaVersionHistoryTypeMapper.mapToVersionHistoryResponse(data);
+        return { data: UaVersionHistoryTypeMapper.mapToVersionHistoryResponse(data) };
     }
 
-    /**
-     * Compares two versions of an entity.
-     * @param entityId - The entity ID.
-     * @param fromVersion - The source version number.
-     * @param toVersion - The target version number.
-     * @returns The comparison response with property changes.
-     */
     async compareVersions(
         entityId: string,
         fromVersion: number,
         toVersion: number,
-    ): Promise<UaVersionComparisonResponse | undefined> {
+    ): Promise<{ data?: UaVersionComparisonResponse; error?: unknown }> {
         const { data, error } = await tryExecute(
             this.#host,
             VersionHistoryService.getVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersion({
@@ -71,20 +56,13 @@ export class UaVersionHistoryRepository {
         );
 
         if (error || !data) {
-            console.error("Failed to compare versions:", error);
-            return undefined;
+            return { error };
         }
 
-        return UaVersionHistoryTypeMapper.mapToComparisonResponse(data);
+        return { data: UaVersionHistoryTypeMapper.mapToComparisonResponse(data) };
     }
 
-    /**
-     * Rolls back an entity to a previous version.
-     * @param entityId - The entity ID.
-     * @param version - The version number to rollback to.
-     * @returns True if rollback was successful.
-     */
-    async rollback(entityId: string, version: number): Promise<boolean> {
+    async rollback(entityId: string, version: number): Promise<{ error?: unknown }> {
         const { error } = await tryExecute(
             this.#host,
             VersionHistoryService.postVersionHistoryByEntityTypeByEntityIdByEntityVersionRollback({
@@ -97,10 +75,9 @@ export class UaVersionHistoryRepository {
         );
 
         if (error) {
-            console.error("Failed to rollback:", error);
-            return false;
+            return { error };
         }
 
-        return true;
+        return {};
     }
 }

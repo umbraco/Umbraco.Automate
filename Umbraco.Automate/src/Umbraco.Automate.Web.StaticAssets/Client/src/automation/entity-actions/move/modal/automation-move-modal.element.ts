@@ -9,13 +9,13 @@ import type { UmbTreeElement, UmbTreeItemModelBase } from "@umbraco-cms/backoffi
 import { UmbRequestReloadChildrenOfEntityEvent } from "@umbraco-cms/backoffice/entity-action";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import type { UmbEntityUnique } from "@umbraco-cms/backoffice/entity";
-import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { AutomationsService, WorkspacesService } from "../../../../api/sdk.gen.js";
+import { UaWorkspaceCollectionServerDataSource } from "../../../../workspace-management/repository/collection/workspace-collection.server.data-source.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
 
 @customElement("ua-automation-move-modal")
 export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomationMoveModalData> {
     #detailRepository = new UaAutomationDetailRepository(this);
+    #workspaceSource = new UaWorkspaceCollectionServerDataSource(this);
     #workspaceIds = new Set<string>();
     #automationData?: UaAutomationDetailModel;
 
@@ -58,14 +58,11 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
         let total = 0;
 
         do {
-            const { data } = await tryExecute(
-                this,
-                WorkspacesService.getWorkspaces({ query: { skip, take: pageSize } }),
-            );
+            const { data } = await this.#workspaceSource.getCollection({ skip, take: pageSize });
             if (!data) break;
             total = data.total;
             for (const ws of data.items) {
-                this.#workspaceIds.add(ws.id);
+                this.#workspaceIds.add(ws.unique);
             }
             skip += pageSize;
         } while (skip < total);
@@ -99,10 +96,7 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
             automation.workspaceId = targetUnique;
         } else {
             // Moving to a group — resolve its workspace to handle cross-workspace moves
-            const { data: group } = await tryExecute(
-                this,
-                AutomationsService.getAutomationsGroupsByGroupId({ path: { groupId: targetUnique } }),
-            );
+            const { data: group } = await this.#detailRepository.requestGroupById(targetUnique);
             automation.groupId = targetUnique;
             if (group) {
                 automation.workspaceId = group.workspaceId;
@@ -135,7 +129,7 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
 
     render() {
         return html`
-            <umb-body-layout headline="Move Automation">
+            <umb-body-layout headline=${this.localize.term("uaAutomation_moveHeadline")}>
                 <uui-box>
                     <p>Select the destination for <strong>${this._automationName ?? "this automation"}</strong>.</p>
                     <uui-form>
@@ -172,7 +166,7 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
                     ?disabled=${!this._canSubmit}
                     slot="actions"
                     type="submit"
-                    label="Move"
+                    label=${this.localize.term("uaGeneral_move")}
                     look="primary"
                     color="positive"
                 ></uui-button>
