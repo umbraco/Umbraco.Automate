@@ -78,7 +78,7 @@ export class UaConnectionInfoWorkspaceViewElement extends UmbLitElement {
             <uui-select
                 .options=${options}
                 @change=${this.#onTypeChange}
-                label="Type"
+                label=${this.localize.term("uaLabels_type")}
             ></uui-select>
         `;
     }
@@ -88,8 +88,8 @@ export class UaConnectionInfoWorkspaceViewElement extends UmbLitElement {
 
         return html`
             <div class="container">
-                <uui-box headline="Connection Type">
-                    <umb-property-layout label="Type" orientation="vertical">
+                <uui-box headline=${this.localize.term("uaLabels_connectionType")}>
+                    <umb-property-layout label=${this.localize.term("uaLabels_type")} orientation="vertical">
                         <div slot="editor">
                             ${this.#renderTypeField()}
                         </div>
@@ -97,7 +97,7 @@ export class UaConnectionInfoWorkspaceViewElement extends UmbLitElement {
                 </uui-box>
 
                 ${this.#getSelectedConnectionType()?.settingsSchema?.fields?.length
-                    ? html`<uui-box class="settings" headline="Settings">
+                    ? html`<uui-box class="settings" headline=${this.localize.term("uaConnection_settings")}>
                           <ua-settings-form
                               no-box
                               .fields=${this.#getSelectedConnectionType()!.settingsSchema!.fields}
@@ -110,29 +110,29 @@ export class UaConnectionInfoWorkspaceViewElement extends UmbLitElement {
 
             <div class="container">
                 <uui-box headline=${this.localize.term("general_general")}>
-                    <umb-property-layout label="Id" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_id")} orientation="vertical">
                         <div slot="editor">
                             ${this._model.unique === UA_EMPTY_GUID
-                                ? html`<uui-tag color="default" look="placeholder">Unsaved</uui-tag>`
+                                ? html`<uui-tag color="default" look="placeholder">${this.localize.term("uaLabels_unsaved")}</uui-tag>`
                                 : this._model.unique}
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="Alias" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_alias")} orientation="vertical">
                         <div slot="editor">${this._model.alias || "-"}</div>
                     </umb-property-layout>
                 </uui-box>
 
-                <uui-box headline="History">
+                <uui-box headline=${this.localize.term("uaLabels_history")}>
                     ${this._model.dateCreated
                         ? html`
-                              <umb-property-layout label="Created" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_created")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
                               </umb-property-layout>
                           `
                         : ""}
                     ${this._model.dateModified
                         ? html`
-                              <umb-property-layout label="Modified" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_modified")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
                               </umb-property-layout>
                           `

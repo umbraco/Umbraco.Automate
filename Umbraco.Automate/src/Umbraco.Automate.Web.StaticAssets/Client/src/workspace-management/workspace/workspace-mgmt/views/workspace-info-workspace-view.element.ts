@@ -51,10 +51,10 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
 
         return html`
             <div class="container">
-                <uui-box headline="Membership">
+                <uui-box headline=${this.localize.term("uaLabels_membership")}>
                     <umb-property-layout
                         label=${this.localize.term("uaWorkspace_serviceAccountKey")}
-                        description="The API user identity used when running automations in this workspace."
+                        description=${this.localize.term("uaWorkspace_serviceAccountDescription")}
                         orientation="vertical"
                         mandatory
                     >
@@ -72,7 +72,7 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
 
                     <umb-property-layout
                         label=${this.localize.term("uaWorkspace_userGroups")}
-                        description="User groups that have access to automations in this workspace."
+                        description=${this.localize.term("uaWorkspace_userGroupsDescription")}
                         orientation="vertical"
                         mandatory
                     >
@@ -87,7 +87,7 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
 
                     <umb-property-layout
                         label=${this.localize.term("uaWorkspace_allowedConnections")}
-                        description="Connections that automations in this workspace are allowed to use."
+                        description=${this.localize.term("uaWorkspace_allowedConnectionsDescription")}
                         orientation="vertical"
                     >
                         <ua-input-connection
@@ -100,17 +100,17 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
             </div>
 
             <div class="container">
-                <uui-box headline="History">
+                <uui-box headline=${this.localize.term("uaLabels_history")}>
                     ${this._model.dateCreated
                         ? html`
-                              <umb-property-layout label="Created" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_created")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
                               </umb-property-layout>
                           `
                         : ""}
                     ${this._model.dateModified
                         ? html`
-                              <umb-property-layout label="Modified" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_modified")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
                               </umb-property-layout>
                           `
@@ -118,17 +118,17 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
                 </uui-box>
 
                 <uui-box headline=${this.localize.term("general_general")}>
-                    <umb-property-layout label="Id" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_id")} orientation="vertical">
                         <div slot="editor">
                             ${this._model.unique === UA_EMPTY_GUID
-                                ? html`<uui-tag color="default" look="placeholder">Unsaved</uui-tag>`
+                                ? html`<uui-tag color="default" look="placeholder">${this.localize.term("uaLabels_unsaved")}</uui-tag>`
                                 : this._model.unique}
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="Alias" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_alias")} orientation="vertical">
                         <div slot="editor">${this._model.alias || "-"}</div>
                     </umb-property-layout>
-                    <umb-property-layout label="Version" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_version")} orientation="vertical">
                         <div slot="editor">${this._model.version}</div>
                     </umb-property-layout>
                 </uui-box>

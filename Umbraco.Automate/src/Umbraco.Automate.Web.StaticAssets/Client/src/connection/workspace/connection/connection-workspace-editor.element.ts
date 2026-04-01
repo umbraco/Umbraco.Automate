@@ -81,14 +81,14 @@ export class UaConnectionWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         return html`
             <umb-workspace-editor alias="${UA_CONNECTION_WORKSPACE_ALIAS}">
                 <div id="header" slot="header">
-                    <uui-button href=${UA_CONNECTION_ROOT_WORKSPACE_PATH} label="Back to connections" compact>
+                    <uui-button href=${UA_CONNECTION_ROOT_WORKSPACE_PATH} label=${this.localize.term("uaConnection_backToList")} compact>
                         <uui-icon name="icon-arrow-left"></uui-icon>
                     </uui-button>
                     <uui-input
                         id="name"
                         .value=${this._model.name}
                         @input="${this.#onNameChange}"
-                        label="Name"
+                        label=${this.localize.term("uaLabels_name")}
                         placeholder=${this.localize.term("uaPlaceholders_enterName")}
                         required
                         maxlength="255"
@@ -98,7 +98,7 @@ export class UaConnectionWorkspaceEditorElement extends UmbFormControlMixin(UmbL
                             slot="append"
                             id="alias"
                             name="alias"
-                            label="Alias"
+                            label=${this.localize.term("uaLabels_alias")}
                             placeholder=${this.localize.term("uaPlaceholders_enterAlias")}
                             .value=${this._model.alias}
                             ?auto-width=${!!this._model.name}

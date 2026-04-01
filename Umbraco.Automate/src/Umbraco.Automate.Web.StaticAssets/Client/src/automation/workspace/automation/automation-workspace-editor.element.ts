@@ -87,14 +87,14 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         return html`
             <umb-workspace-editor alias="${UA_AUTOMATION_WORKSPACE_ALIAS}">
                 <div id="header" slot="header">
-                    <uui-button href=${UA_AUTOMATION_ROOT_WORKSPACE_PATH} label="Back to automations" compact>
+                    <uui-button href=${UA_AUTOMATION_ROOT_WORKSPACE_PATH} label=${this.localize.term("uaAutomation_backToList")} compact>
                         <uui-icon name="icon-arrow-left"></uui-icon>
                     </uui-button>
                     <uui-input
                         id="name"
                         .value=${this._model.name}
                         @input="${this.#onNameChange}"
-                        label="Name"
+                        label=${this.localize.term("uaLabels_name")}
                         placeholder=${this.localize.term("uaPlaceholders_enterName")}
                         required
                         maxlength="255"
@@ -104,7 +104,7 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
                             slot="append"
                             id="alias"
                             name="alias"
-                            label="Alias"
+                            label=${this.localize.term("uaLabels_alias")}
                             placeholder=${this.localize.term("uaPlaceholders_enterAlias")}
                             .value=${this._model.alias}
                             ?auto-width=${!!this._model.name}
@@ -120,8 +120,8 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
                     </uui-input>
 
                     <ua-status-selector
-                        active-label="Enabled"
-                        inactive-label="Disabled"
+                        active-label=${this.localize.term("uaLabels_enabled")}
+                        inactive-label=${this.localize.term("uaLabels_disabled")}
                         .value=${this._model.isEnabled}
                         @change=${this.#onEnabledChange}
                     ></ua-status-selector>
