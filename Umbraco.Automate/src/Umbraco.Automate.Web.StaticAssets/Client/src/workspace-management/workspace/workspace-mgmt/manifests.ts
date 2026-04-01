@@ -17,6 +17,24 @@ export const manifests: Array<UmbExtensionManifest> = [
     },
     {
         type: "workspaceView",
+        alias: "UmbracoAutomate.Workspace.WorkspaceMgmt.View.Settings",
+        name: "Workspace Settings Workspace View",
+        js: () => import("./views/workspace-settings-workspace-view.element.js"),
+        weight: 200,
+        meta: {
+            label: "Settings",
+            pathname: "settings",
+            icon: "icon-settings",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_WORKSPACE_MGMT_WORKSPACE_ALIAS,
+            },
+        ],
+    },
+    {
+        type: "workspaceView",
         alias: "UmbracoAutomate.Workspace.WorkspaceMgmt.View.Info",
         name: "Workspace Info Workspace View",
         js: () => import("./views/workspace-info-workspace-view.element.js"),
