@@ -6,11 +6,12 @@ import type {
     UmbTableItem,
     UmbTableConfig,
 } from "@umbraco-cms/backoffice/components";
+import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import { UaAutomationCollectionServerDataSource } from "../../automation/repository/collection/automation-collection.server.data-source.js";
 import { UaRunCollectionServerDataSource } from "../repository/collection/run-collection.server.data-source.js";
+import { UA_RUN_DETAIL_MODAL } from "../modals/run-detail-modal.token.js";
 import type { UaRunItemModel } from "../types.js";
 import { formatDateTime } from "../../core/index.js";
-import { UA_RUN_WORKSPACE_PATH } from "../workspace/run/paths.js";
 
 @customElement("ua-run-dashboard")
 export class UaRunDashboardElement extends UmbLitElement {
@@ -109,6 +110,12 @@ export class UaRunDashboardElement extends UmbLitElement {
         return `${minutes}m ${remainingSeconds}s`;
     }
 
+    async #openRunModal(runId: string) {
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager) return;
+        modalManager.open(this, UA_RUN_DETAIL_MODAL, { data: { runId } });
+    }
+
     #createTableItems(items: UaRunItemModel[]) {
         this._items = items.map((item) => ({
             id: item.unique,
@@ -116,9 +123,12 @@ export class UaRunDashboardElement extends UmbLitElement {
             data: [
                 {
                     columnAlias: "automationName",
-                    value: html`<a href="${UA_RUN_WORKSPACE_PATH}/edit/${item.unique}">
+                    value: html`<uui-button look="default" compact
+                        label=${item.automationName ?? item.automationId}
+                        @click=${() => this.#openRunModal(item.unique)}
+                    >
                         ${item.automationName ?? this._automations.get(item.automationId) ?? item.automationId}
-                    </a>`,
+                    </uui-button>`,
                 },
                 {
                     columnAlias: "status",
