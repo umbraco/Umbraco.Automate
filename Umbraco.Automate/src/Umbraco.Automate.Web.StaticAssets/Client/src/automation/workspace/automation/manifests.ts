@@ -113,16 +113,16 @@ export const manifests: Array<UmbExtensionManifest> = [
         ],
     },
     {
-        type: "workspaceAction",
+        type: "workspaceActionMenuItem",
         kind: "default",
-        alias: "UmbracoAutomate.WorkspaceAction.Automation.Unpublish",
-        name: "Unpublish Automation Workspace Action",
-        weight: 60,
+        alias: "UmbracoAutomate.WorkspaceActionMenuItem.Automation.Unpublish",
+        name: "Unpublish Automation Workspace Action Menu Item",
+        weight: 10,
+        forWorkspaceActions: "UmbracoAutomate.WorkspaceAction.Automation.SaveAndPublish",
         api: () => import("./actions/automation-unpublish.action.js"),
         meta: {
             label: "#uaGeneral_unpublish",
-            look: "default",
-            color: "warning",
+            icon: "icon-undo",
         },
         conditions: [
             {

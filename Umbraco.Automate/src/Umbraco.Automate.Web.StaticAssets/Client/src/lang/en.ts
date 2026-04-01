@@ -2,7 +2,7 @@ import type { UmbLocalizationDictionary } from "@umbraco-cms/backoffice/localiza
 
 export default {
     uaSections: {
-        automate: "Automate",
+        automate: "Automation",
     },
     uaGeneral: {
         select: "Select",
@@ -13,7 +13,7 @@ export default {
         delete: "Delete",
         move: "Move",
         save: "Save",
-        saveAndPublish: "Save and Publish",
+        saveAndPublish: "Save and publish",
         unpublish: "Unpublish",
     },
     uaLabels: {

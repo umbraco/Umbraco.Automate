@@ -6,7 +6,6 @@ import { umbBindToValidation, UmbFormControlMixin } from "@umbraco-cms/backoffic
 import { UA_CONNECTION_WORKSPACE_CONTEXT } from "./connection-workspace.context-token.js";
 import { UA_CONNECTION_WORKSPACE_ALIAS } from "../../constants.js";
 import type { UaConnectionDetailModel } from "../../types.js";
-import { UA_CONNECTION_ROOT_WORKSPACE_PATH } from "../connection-root/paths.js";
 
 @customElement("ua-connection-workspace-editor")
 export class UaConnectionWorkspaceEditorElement extends UmbFormControlMixin(UmbLitElement) {
@@ -81,9 +80,6 @@ export class UaConnectionWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         return html`
             <umb-workspace-editor alias="${UA_CONNECTION_WORKSPACE_ALIAS}">
                 <div id="header" slot="header">
-                    <uui-button href=${UA_CONNECTION_ROOT_WORKSPACE_PATH} label=${this.localize.term("uaConnection_backToList")} compact>
-                        <uui-icon name="icon-arrow-left"></uui-icon>
-                    </uui-button>
                     <uui-input
                         id="name"
                         .value=${this._model.name}

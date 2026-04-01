@@ -6,7 +6,6 @@ import { umbBindToValidation, UmbFormControlMixin } from "@umbraco-cms/backoffic
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "./automation-workspace.context-token.js";
 import { UA_AUTOMATION_WORKSPACE_ALIAS } from "../../constants.js";
 import type { UaAutomationDetailModel } from "../../types.js";
-import { UA_AUTOMATION_ROOT_WORKSPACE_PATH } from "../automation-root/paths.js";
 import "../../../core/components/status-selector/status-selector.element.js";
 
 @customElement("ua-automation-workspace-editor")
@@ -87,9 +86,6 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         return html`
             <umb-workspace-editor alias="${UA_AUTOMATION_WORKSPACE_ALIAS}">
                 <div id="header" slot="header">
-                    <uui-button href=${UA_AUTOMATION_ROOT_WORKSPACE_PATH} label=${this.localize.term("uaAutomation_backToList")} compact>
-                        <uui-icon name="icon-arrow-left"></uui-icon>
-                    </uui-button>
                     <uui-input
                         id="name"
                         .value=${this._model.name}
