@@ -1,6 +1,6 @@
 using Umbraco.Automate.Core.Automations;
 
-namespace Umbraco.Automate.Tests.Common.Builders;
+namespace Umbraco.Automate.Testing.Builders;
 
 /// <summary>
 /// Fluent builder for <see cref="StepConfiguration"/> test instances.

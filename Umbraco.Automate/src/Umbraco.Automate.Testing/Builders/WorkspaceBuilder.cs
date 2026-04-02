@@ -1,6 +1,6 @@
 using Umbraco.Automate.Core.Workspaces;
 
-namespace Umbraco.Automate.Tests.Common.Builders;
+namespace Umbraco.Automate.Testing.Builders;
 
 /// <summary>
 /// Fluent builder for <see cref="Workspace"/> test instances.

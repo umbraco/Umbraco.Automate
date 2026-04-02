@@ -1,6 +1,6 @@
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Workspaces;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
 
 namespace Umbraco.Automate.Tests.Integration;

@@ -7,7 +7,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Settings;
 
-namespace Umbraco.Automate.Tests.Common;
+namespace Umbraco.Automate.Testing;
 
 /// <summary>
 /// Fluent test harness for executing actions in isolation.

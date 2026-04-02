@@ -1,6 +1,6 @@
 using Umbraco.Automate.Core.Connections;
 
-namespace Umbraco.Automate.Tests.Common.Builders;
+namespace Umbraco.Automate.Testing.Builders;
 
 /// <summary>
 /// Fluent builder for <see cref="Connection"/> test instances.

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Title>Umbraco Automate Testing</Title>
+    <Description>Test harness and builders for unit testing Umbraco Automate actions and triggers in isolation</Description>
+    <PackageTags>umbraco automate automation testing</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Moq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -14,7 +14,7 @@ using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Tests.Unit.Execution;
