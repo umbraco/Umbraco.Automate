@@ -111,6 +111,14 @@ export default {
     uaDashboard: {
         overview: "Overview",
         recentActivity: "Recent Activity",
+        welcomeHeadline: "Welcome to Umbraco Automate",
+        welcomeIntro:
+            "Build powerful automations that respond to events in your Umbraco site — publish content, send notifications, call APIs, and more.",
+        welcomeBody:
+            "To get started, create a workspace from the Settings menu on the left. Workspaces group your automations and control who has access.",
+        welcomeBodyHasWorkspaces:
+            "Your workspace is ready. Select it from the Automations tree on the left to create your first automation.",
+        welcomeCta: "Create a Workspace",
     },
     uaVersionHistory: {
         history: "History",
