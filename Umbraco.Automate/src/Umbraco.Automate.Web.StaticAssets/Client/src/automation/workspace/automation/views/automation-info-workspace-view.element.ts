@@ -84,8 +84,30 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                               </umb-property-layout>
                           `
                         : ""}
+                    ${this.#renderWebhookUrl()}
                 </uui-box>
             </div>
+        `;
+    }
+
+    #renderWebhookUrl() {
+        if (!this._model?.trigger || this._model.trigger.triggerAlias !== "umbracoAutomate.webhook") return html``;
+        if (this._model.unique === UA_EMPTY_GUID) return html``;
+
+        const webhookUrl = `${window.location.origin}/automate/webhook/${this._model.unique}`;
+        return html`
+            <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
+                <div slot="editor" class="webhook-url">
+                    <code>${webhookUrl}</code>
+                    <uui-button
+                        compact
+                        look="outline"
+                        label="Copy"
+                        @click=${() => navigator.clipboard.writeText(webhookUrl)}>
+                        <uui-icon name="icon-documents"></uui-icon>
+                    </uui-button>
+                </div>
+            </umb-property-layout>
         `;
     }
 
@@ -146,6 +168,18 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
+            }
+
+            .webhook-url {
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-3);
+            }
+
+            .webhook-url code {
+                flex: 1;
+                word-break: break-all;
+                font-size: var(--uui-size-4);
             }
         `,
     ];

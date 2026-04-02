@@ -45,6 +45,7 @@ export default {
         history: "History",
         membership: "Membership",
         connectionType: "Connection Type",
+        webhookUrl: "Webhook URL",
         steps: "Steps",
         runInfo: "Run Info",
         search: "Search",
