@@ -90,22 +90,22 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                 ${isExpanded
                     ? html`
                           <div class="step-details">
-                              <umb-property-layout label="Started" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_started")} orientation="vertical">
                                   <div slot="editor">
                                       ${stepRun.startedUtc ? formatDateTime(stepRun.startedUtc) : "-"}
                                   </div>
                               </umb-property-layout>
-                              <umb-property-layout label="Completed" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_completed")} orientation="vertical">
                                   <div slot="editor">
                                       ${stepRun.completedUtc ? formatDateTime(stepRun.completedUtc) : "-"}
                                   </div>
                               </umb-property-layout>
-                              <umb-property-layout label="Retry Count" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_retryCount")} orientation="vertical">
                                   <div slot="editor">${stepRun.retryCount}</div>
                               </umb-property-layout>
                               ${stepRun.error
                                   ? html`
-                                        <umb-property-layout label="Error" orientation="vertical">
+                                        <umb-property-layout label=${this.localize.term("uaLabels_error")} orientation="vertical">
                                             <div slot="editor">
                                                 <pre class="error-output">${stepRun.error}</pre>
                                             </div>
@@ -125,7 +125,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
         return html`
             <div class="layout">
                 <div class="main">
-                    <uui-box headline="Steps">
+                    <uui-box headline=${this.localize.term("uaLabels_steps")}>
                         ${this._run.stepRuns.length === 0
                             ? html`<p class="empty">${this.localize.term("uaRun_noStepRuns")}</p>`
                             : repeat(
@@ -136,40 +136,40 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                     </uui-box>
                 </div>
                 <div class="sidebar">
-                    <uui-box headline="Run Info">
-                        <umb-property-layout label="Status" orientation="vertical">
+                    <uui-box headline=${this.localize.term("uaLabels_runInfo")}>
+                        <umb-property-layout label=${this.localize.term("uaLabels_status")} orientation="vertical">
                             <div slot="editor">
                                 <uui-tag color=${this.#statusColor(this._run.status)} look="secondary">
                                     ${this._run.status}
                                 </uui-tag>
                             </div>
                         </umb-property-layout>
-                        <umb-property-layout label="Started" orientation="vertical">
+                        <umb-property-layout label=${this.localize.term("uaLabels_started")} orientation="vertical">
                             <div slot="editor">
                                 ${this._run.startedUtc ? formatDateTime(this._run.startedUtc) : "-"}
                             </div>
                         </umb-property-layout>
-                        <umb-property-layout label="Completed" orientation="vertical">
+                        <umb-property-layout label=${this.localize.term("uaLabels_completed")} orientation="vertical">
                             <div slot="editor">
                                 ${this._run.completedUtc ? formatDateTime(this._run.completedUtc) : "-"}
                             </div>
                         </umb-property-layout>
-                        <umb-property-layout label="Initiated By" orientation="vertical">
+                        <umb-property-layout label=${this.localize.term("uaLabels_initiatedBy")} orientation="vertical">
                             <div slot="editor">${this._run.initiatedBy || "-"}</div>
                         </umb-property-layout>
-                        <umb-property-layout label="Automation Version" orientation="vertical">
+                        <umb-property-layout label=${this.localize.term("uaLabels_automationVersion")} orientation="vertical">
                             <div slot="editor">${this._run.automationVersion}</div>
                         </umb-property-layout>
                         ${this._run.correlationId
                             ? html`
-                                  <umb-property-layout label="Correlation ID" orientation="vertical">
+                                  <umb-property-layout label=${this.localize.term("uaLabels_correlationId")} orientation="vertical">
                                       <div slot="editor">${this._run.correlationId}</div>
                                   </umb-property-layout>
                               `
                             : nothing}
                         ${this._run.error
                             ? html`
-                                  <umb-property-layout label="Error" orientation="vertical">
+                                  <umb-property-layout label=${this.localize.term("uaLabels_error")} orientation="vertical">
                                       <div slot="editor">
                                           <pre class="error-output">${this._run.error}</pre>
                                       </div>

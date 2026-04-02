@@ -1,4 +1,4 @@
-import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, property } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 
@@ -11,7 +11,7 @@ export interface UaStatusCardData {
 
 @customElement("ua-status-cards")
 export class UaStatusCardsElement extends UmbLitElement {
-    @state()
+    @property({ attribute: false })
     cards: UaStatusCardData[] = [];
 
     override render() {

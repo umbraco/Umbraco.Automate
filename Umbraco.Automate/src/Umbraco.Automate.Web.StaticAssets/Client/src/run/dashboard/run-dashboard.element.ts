@@ -6,15 +6,18 @@ import type {
     UmbTableItem,
     UmbTableConfig,
 } from "@umbraco-cms/backoffice/components";
-import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { AutomationsService } from "../../api/sdk.gen.js";
-import { UaRunTypeMapper } from "../type-mapper.js";
+import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
+import { UaAutomationCollectionServerDataSource } from "../../automation/repository/collection/automation-collection.server.data-source.js";
+import { UaRunCollectionServerDataSource } from "../repository/collection/run-collection.server.data-source.js";
+import { UA_RUN_DETAIL_MODAL } from "../modals/run-detail-modal.token.js";
 import type { UaRunItemModel } from "../types.js";
 import { formatDateTime } from "../../core/index.js";
-import { UA_RUN_WORKSPACE_PATH } from "../workspace/run/paths.js";
 
 @customElement("ua-run-dashboard")
 export class UaRunDashboardElement extends UmbLitElement {
+    #automationSource = new UaAutomationCollectionServerDataSource(this);
+    #runSource = new UaRunCollectionServerDataSource(this);
+
     @state()
     private _tableConfig: UmbTableConfig = { allowSelection: false };
 
@@ -44,30 +47,20 @@ export class UaRunDashboardElement extends UmbLitElement {
         this._loading = true;
 
         // Load automations for name lookup
-        const { data: automationsData } = await tryExecute(
-            this,
-            AutomationsService.getAutomations({ query: { skip: 0, take: 500 } }),
-        );
+        const { data: automationsData } = await this.#automationSource.getCollection({ skip: 0, take: 500 });
         if (automationsData) {
-            this._automations = new Map(automationsData.items.map((a) => [a.id, a.name]));
+            this._automations = new Map(automationsData.items.map((a) => [a.unique, a.name]));
         }
 
         // Load runs from each automation
         const allRuns: UaRunItemModel[] = [];
         if (automationsData) {
             const runPromises = automationsData.items.map(async (a) => {
-                const { data } = await tryExecute(
-                    this,
-                    AutomationsService.getAutomationsByIdRuns({
-                        path: { id: a.id },
-                        query: { skip: 0, take: 20 },
-                    }),
-                );
+                const { data } = await this.#runSource.getCollection({ automationId: a.unique, skip: 0, take: 20 });
                 if (data) {
                     return data.items.map((r) => {
-                        const item = UaRunTypeMapper.toItemModel(r);
-                        item.automationName = a.name;
-                        return item;
+                        r.automationName = a.name;
+                        return r;
                     });
                 }
                 return [];
@@ -117,6 +110,12 @@ export class UaRunDashboardElement extends UmbLitElement {
         return `${minutes}m ${remainingSeconds}s`;
     }
 
+    async #openRunModal(runId: string) {
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager) return;
+        modalManager.open(this, UA_RUN_DETAIL_MODAL, { data: { runId } });
+    }
+
     #createTableItems(items: UaRunItemModel[]) {
         this._items = items.map((item) => ({
             id: item.unique,
@@ -124,9 +123,12 @@ export class UaRunDashboardElement extends UmbLitElement {
             data: [
                 {
                     columnAlias: "automationName",
-                    value: html`<a href="${UA_RUN_WORKSPACE_PATH}/edit/${item.unique}">
+                    value: html`<uui-button look="default" compact
+                        label=${item.automationName ?? item.automationId}
+                        @click=${() => this.#openRunModal(item.unique)}
+                    >
                         ${item.automationName ?? this._automations.get(item.automationId) ?? item.automationId}
-                    </a>`,
+                    </uui-button>`,
                 },
                 {
                     columnAlias: "status",

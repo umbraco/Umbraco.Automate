@@ -211,6 +211,7 @@ export default function AutomationCanvas({
             defaultEdgeOptions={defaultEdgeOptions}
             defaultViewport={viewport}
             fitView={!viewport}
+            fitViewOptions={{ padding: 0.3, maxZoom: 0.85 }}
             colorMode={colorMode}
             deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
             nodesConnectable={!readOnly}

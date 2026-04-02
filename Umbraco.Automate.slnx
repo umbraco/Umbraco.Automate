@@ -8,6 +8,7 @@
     <Project Path="Umbraco.Automate/src/Umbraco.Automate.Persistence.Sqlite/Umbraco.Automate.Persistence.Sqlite.csproj" />
     <Project Path="Umbraco.Automate/src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj" />
     <Project Path="Umbraco.Automate/src/Umbraco.Automate.Web/Umbraco.Automate.Web.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Testing/Umbraco.Automate.Testing.csproj" />
     <Project Path="Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj" />
   </Folder>
   <Folder Name="/Umbraco.Automate/tests/">

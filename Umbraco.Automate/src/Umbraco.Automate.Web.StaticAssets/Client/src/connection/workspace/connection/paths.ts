@@ -8,8 +8,8 @@ export const UA_CONNECTION_WORKSPACE_PATH = UMB_WORKSPACE_PATH_PATTERN.generateA
     entityType: UA_CONNECTION_ENTITY_TYPE,
 });
 
-export const UA_CREATE_CONNECTION_WORKSPACE_PATH_PATTERN = new UmbPathPattern<Record<string, never>>(
-    "create",
+export const UA_CREATE_CONNECTION_WORKSPACE_PATH_PATTERN = new UmbPathPattern<{ connectionType: string }>(
+    "create/:connectionType",
     UA_CONNECTION_WORKSPACE_PATH,
 );
 

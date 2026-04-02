@@ -56,8 +56,19 @@ export class UaConnectionTreeServerDataSource
         };
     }
 
-    async getAncestorsOf(_args: UmbTreeAncestorsOfRequestArgs) {
-        // No ancestors for flat items.
+    async getAncestorsOf(args: UmbTreeAncestorsOfRequestArgs) {
+        const { unique } = args.treeItem;
+        if (!unique) return { data: [] as UaConnectionTreeItemModel[] };
+
+        // Return the entity itself so the breadcrumb's slice(0, -1) preserves the tree root.
+        const [{ data: conn }, iconMap] = await Promise.all([
+            tryExecute(this, ConnectionsService.getConnectionsById({ path: { id: unique } })),
+            this.#getIconMap(),
+        ]);
+        if (conn) {
+            return { data: [this.#mapItem(conn, iconMap)] };
+        }
+
         return { data: [] as UaConnectionTreeItemModel[] };
     }
 

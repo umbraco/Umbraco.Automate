@@ -48,38 +48,38 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
             </div>
 
             <div class="container">
-                <uui-box headline="Info">
-                    <umb-property-layout label="Id" orientation="vertical">
+                <uui-box headline=${this.localize.term("uaLabels_info")}>
+                    <umb-property-layout label=${this.localize.term("uaLabels_id")} orientation="vertical">
                         <div slot="editor">
                             ${this._model.unique === UA_EMPTY_GUID
-                                ? html`<uui-tag color="default" look="placeholder">Unsaved</uui-tag>`
+                                ? html`<uui-tag color="default" look="placeholder">${this.localize.term("uaLabels_unsaved")}</uui-tag>`
                                 : this._model.unique}
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="Status" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_status")} orientation="vertical">
                         <div slot="editor">
                             <uui-tag color=${this.#statusColor(this._model.status)} look="secondary">
                                 ${this._model.status}
                             </uui-tag>
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="Enabled" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_enabled")} orientation="vertical">
                         <div slot="editor">
                             <uui-tag color=${this._model.isEnabled ? "positive" : "default"} look="secondary">
-                                ${this._model.isEnabled ? "Enabled" : "Disabled"}
+                                ${this._model.isEnabled ? this.localize.term("uaLabels_enabled") : this.localize.term("uaLabels_disabled")}
                             </uui-tag>
                         </div>
                     </umb-property-layout>
                     ${this._model.dateCreated
                         ? html`
-                              <umb-property-layout label="Date Created" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_dateCreated")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
                               </umb-property-layout>
                           `
                         : ""}
                     ${this._model.dateModified
                         ? html`
-                              <umb-property-layout label="Date Modified" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_dateModified")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
                               </umb-property-layout>
                           `

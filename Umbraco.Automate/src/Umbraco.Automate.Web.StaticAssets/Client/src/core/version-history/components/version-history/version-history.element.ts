@@ -108,7 +108,7 @@ export class UaVersionHistoryElement extends UmbLitElement {
         this._loading = true;
         try {
             const skip = (this._currentPage - 1) * PAGE_SIZE;
-            const response = await this.#versionRepository.getVersionHistory(this.entityId, skip, PAGE_SIZE);
+            const { data: response } = await this.#versionRepository.getVersionHistory(this.entityId, skip, PAGE_SIZE);
             if (response) {
                 this._versions = response.versions;
                 this._totalVersions = response.totalVersions;
@@ -145,7 +145,7 @@ export class UaVersionHistoryElement extends UmbLitElement {
     async #onCompareClick(version: number) {
         if (!this.entityId || !this.#modalManager || this._currentVersion === undefined) return;
 
-        const comparison = await this.#versionRepository.compareVersions(
+        const { data: comparison } = await this.#versionRepository.compareVersions(
             this.entityId,
             version,
             this._currentVersion,
@@ -162,8 +162,8 @@ export class UaVersionHistoryElement extends UmbLitElement {
 
         const result = await modalContext.onSubmit().catch(() => undefined);
         if (result?.rollback) {
-            const success = await this.#versionRepository.rollback(this.entityId, version);
-            if (success) {
+            const { error } = await this.#versionRepository.rollback(this.entityId, version);
+            if (!error) {
                 this.dispatchEvent(new CustomEvent("rollback", { bubbles: true, composed: true }));
                 await this.#loadVersionHistory();
             }
@@ -232,9 +232,9 @@ export class UaVersionHistoryElement extends UmbLitElement {
                 </div>
                 <div class="tags">
                     ${isCurrent
-                        ? html`<uui-tag look="primary">Current</uui-tag>`
+                        ? html`<uui-tag look="primary">${this.localize.term("uaLabels_current")}</uui-tag>`
                         : html`<uui-tag look="secondary">v${version.version}</uui-tag>`}
-                    ${isPublished ? html`<uui-tag look="primary" color="positive">Published</uui-tag>` : nothing}
+                    ${isPublished ? html`<uui-tag look="primary" color="positive">${this.localize.term("uaLabels_published")}</uui-tag>` : nothing}
                 </div>
                 ${!isCurrent
                     ? html`

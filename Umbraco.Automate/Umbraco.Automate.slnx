@@ -7,6 +7,7 @@
     <Project Path="src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj" />
     <Project Path="src/Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj" />
     <Project Path="src/Umbraco.Automate.Web/Umbraco.Automate.Web.csproj" />
+    <Project Path="src/Umbraco.Automate.Testing/Umbraco.Automate.Testing.csproj" />
     <Project Path="src/Umbraco.Automate/Umbraco.Automate.csproj" />
   </Folder>
   <Folder Name="/Tests/">

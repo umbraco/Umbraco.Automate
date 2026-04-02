@@ -1,8 +1,9 @@
 import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import { formatDateTime } from "../../../core/index.js";
-import { UA_RUN_WORKSPACE_PATH } from "../../../run/workspace/run/paths.js";
+import { UA_RUN_DETAIL_MODAL } from "../../../run/modals/run-detail-modal.token.js";
 
 export interface UaActivityItem {
     runId: string;
@@ -30,6 +31,12 @@ export class UaActivityListElement extends UmbLitElement {
         }
     }
 
+    async #openRunModal(runId: string) {
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager) return;
+        modalManager.open(this, UA_RUN_DETAIL_MODAL, { data: { runId } });
+    }
+
     override render() {
         if (this.items.length === 0) {
             return html`<p class="empty">${this.localize.term("uaRun_noRecentActivity")}</p>`;
@@ -39,7 +46,7 @@ export class UaActivityListElement extends UmbLitElement {
             <div class="list">
                 ${this.items.map(
                     (item) => html`
-                        <a class="activity-item" href="${UA_RUN_WORKSPACE_PATH}/edit/${item.runId}">
+                        <div class="activity-item" @click=${() => this.#openRunModal(item.runId)}>
                             <uui-tag color=${this.#statusColor(item.status)} look="secondary">
                                 ${item.status}
                             </uui-tag>
@@ -47,7 +54,7 @@ export class UaActivityListElement extends UmbLitElement {
                             <span class="activity-time">
                                 ${item.startedUtc ? formatDateTime(item.startedUtc) : "-"}
                             </span>
-                        </a>
+                        </div>
                     `,
                 )}
             </div>
@@ -68,7 +75,7 @@ export class UaActivityListElement extends UmbLitElement {
                 gap: var(--uui-size-space-3);
                 padding: var(--uui-size-space-3) var(--uui-size-space-4);
                 border-bottom: 1px solid var(--uui-color-border);
-                text-decoration: none;
+                cursor: pointer;
                 color: inherit;
             }
 

@@ -128,7 +128,7 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
                         placeholder=${this.localize.term("uaCatalogue_searchPlaceholder")}
                         @input=${this.#onSearchInput}
                         .value=${this._search}
-                        label="Search"
+                        label=${this.localize.term("uaLabels_search")}
                     >
                         <uui-icon name="icon-search" slot="prepend"></uui-icon>
                     </uui-input>

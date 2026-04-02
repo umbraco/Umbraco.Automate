@@ -86,6 +86,24 @@ public sealed class AncestorsAutomationController : AutomationControllerBase
             ancestors.AddRange(groupChain);
         }
 
+        // Include the automation itself as the final ancestor so the CMS breadcrumb's
+        // slice(0, -1) correctly preserves the workspace in the parent chain.
+        var automationParentId = automation.GroupId ?? automation.WorkspaceId;
+        var automationParentEntityType = automation.GroupId.HasValue
+            ? Constants.EntityType.AutomationGroup
+            : Constants.EntityType.Workspace;
+
+        ancestors.Add(new AutomationAncestorResponseModel
+        {
+            Id = automation.Id,
+            EntityType = Constants.EntityType.Automation,
+            Name = automation.Name,
+            ParentId = automationParentId,
+            ParentEntityType = automationParentEntityType,
+            HasChildren = false,
+            IsFolder = false,
+        });
+
         return Ok(ancestors);
     }
 

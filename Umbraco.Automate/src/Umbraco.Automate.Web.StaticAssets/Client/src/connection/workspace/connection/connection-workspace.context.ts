@@ -20,6 +20,7 @@ export class UaConnectionWorkspaceContext
     implements UmbRoutableWorkspaceContext
 {
     readonly routes = new UmbWorkspaceRouteManager(this);
+    readonly name = this._data.createObservablePartOfCurrent((data) => data?.name);
 
     constructor(host: UmbControllerHost) {
         super(host, {
@@ -28,15 +29,17 @@ export class UaConnectionWorkspaceContext
             detailRepositoryAlias: UA_CONNECTION_DETAIL_REPOSITORY_ALIAS,
         });
 
-        this.observe(this.data, (data) => this.view.setTitle(data?.name), null);
+        this.observe(this.name, (name) => this.view.setTitle(name), null);
 
         this.routes.setRoutes([
             {
-                path: "create",
+                path: "create/:connectionType",
                 component: UaConnectionWorkspaceEditorElement,
-                setup: async () => {
+                setup: async (_component, info) => {
+                    const connectionType = decodeURIComponent(info.match.params.connectionType);
                     await this.createScaffold({
                         parent: { unique: null, entityType: UA_CONNECTION_ROOT_ENTITY_TYPE },
+                        preset: { type: connectionType },
                     });
                     new UmbWorkspaceIsNewRedirectController(
                         this,

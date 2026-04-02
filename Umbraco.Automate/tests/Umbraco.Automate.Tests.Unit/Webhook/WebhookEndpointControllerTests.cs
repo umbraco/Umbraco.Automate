@@ -11,7 +11,7 @@ using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Web.Api.Webhook.Controllers;
 
 namespace Umbraco.Automate.Tests.Unit.Webhook;

@@ -106,4 +106,17 @@ export class UaAutomationDetailServerDataSource implements UmbDetailDataSource<U
 
         return {};
     }
+
+    async readGroup(groupId: string) {
+        const { data, error } = await tryExecute(
+            this.#host,
+            AutomationsService.getAutomationsGroupsByGroupId({ path: { groupId } }),
+        );
+
+        if (error || !data) {
+            return { error };
+        }
+
+        return { data };
+    }
 }

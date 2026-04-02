@@ -1,9 +1,8 @@
 import { css, customElement, html, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { AutomationsService } from "../../api/sdk.gen.js";
-import { UaRunTypeMapper } from "../../run/type-mapper.js";
+import { UaAutomationCollectionServerDataSource } from "../../automation/repository/collection/automation-collection.server.data-source.js";
+import { UaRunCollectionServerDataSource } from "../../run/repository/collection/run-collection.server.data-source.js";
 import type { UaStatusCardData } from "./components/status-cards.element.js";
 import type { UaActivityItem } from "./components/activity-list.element.js";
 import type { UaRunItemModel } from "../../run/types.js";
@@ -12,6 +11,9 @@ import "./components/activity-list.element.js";
 
 @customElement("ua-automate-dashboard")
 export class UaAutomateDashboardElement extends UmbLitElement {
+    #automationSource = new UaAutomationCollectionServerDataSource(this);
+    #runSource = new UaRunCollectionServerDataSource(this);
+
     @state()
     private _cards: UaStatusCardData[] = [];
 
@@ -30,10 +32,7 @@ export class UaAutomateDashboardElement extends UmbLitElement {
         this._loading = true;
 
         // Load automations
-        const { data: automationsData } = await tryExecute(
-            this,
-            AutomationsService.getAutomations({ query: { skip: 0, take: 500 } }),
-        );
+        const { data: automationsData } = await this.#automationSource.getCollection({ skip: 0, take: 500 });
 
         if (!automationsData) {
             this._loading = false;
@@ -47,16 +46,10 @@ export class UaAutomateDashboardElement extends UmbLitElement {
         // Load recent runs from all automations
         const allRuns: (UaRunItemModel & { automationName: string })[] = [];
         const runPromises = automationsData.items.map(async (a) => {
-            const { data } = await tryExecute(
-                this,
-                AutomationsService.getAutomationsByIdRuns({
-                    path: { id: a.id },
-                    query: { skip: 0, take: 10 },
-                }),
-            );
+            const { data } = await this.#runSource.getCollection({ automationId: a.unique, skip: 0, take: 10 });
             if (data) {
                 return data.items.map((r) => ({
-                    ...UaRunTypeMapper.toItemModel(r),
+                    ...r,
                     automationName: a.name,
                 }));
             }
@@ -105,7 +98,7 @@ export class UaAutomateDashboardElement extends UmbLitElement {
             <div class="uui-text">
                 <ua-status-cards .cards=${this._cards}></ua-status-cards>
 
-                <uui-box headline="Recent Activity" class="activity-box">
+                <uui-box headline=${this.localize.term("uaDashboard_recentActivity")} class="activity-box">
                     <ua-activity-list .items=${this._activity}></ua-activity-list>
                 </uui-box>
             </div>
