@@ -246,6 +246,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
             const updatedSteps = [...this._model.steps, newStep];
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
+
+            await this.#openNodeSettingsModal(newStepId);
         } catch {
             // Modal was dismissed
         }
@@ -266,6 +268,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 triggerAlias: item.alias,
                 settings: {},
             });
+
+            await this.#openTriggerSettingsModal();
         } catch {
             // Modal was dismissed
         }
@@ -287,8 +291,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 ? { x: lastNode.position.x, y: lastNode.position.y + 150 }
                 : { x: 250, y: 200 };
 
+            const newStepId = crypto.randomUUID();
             const newStep = {
-                id: crypto.randomUUID(),
+                id: newStepId,
                 actionAlias: item.alias,
                 name: item.name,
                 connectionId: null,
@@ -302,6 +307,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
             const updatedSteps = [...this._model.steps, newStep];
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
+
+            await this.#openNodeSettingsModal(newStepId);
         } catch {
             // Modal was dismissed
         }
