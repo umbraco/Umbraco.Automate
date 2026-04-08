@@ -1,9 +1,8 @@
-using System.Text.Json;
-using Json.Schema;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Notifications.Channels;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -37,7 +36,8 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Icon = source.Icon;
         target.ConnectionTypeAlias = source.ConnectionTypeAlias;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
+        target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
+        target.HasDynamicOutputSchema = source is IDynamicOutputSchemaProvider;
         target.Type = "action";
     }
 
@@ -51,7 +51,8 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Icon = source.Icon;
         target.ConnectionTypeAlias = source.ConnectionTypeAlias;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
+        target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
+        target.HasDynamicOutputSchema = source is IDynamicOutputSchemaProvider;
         target.Type = "trigger";
     }
 
@@ -65,7 +66,8 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Icon = source.Icon;
         target.ConnectionTypeAlias = source.ConnectionTypeAlias;
         target.SettingsSchema = source.GetSettingsSchema();
-        target.OutputSchema = SerializeOutputSchema(source.GetOutputSchema());
+        target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
+        target.HasDynamicOutputSchema = source is IDynamicOutputSchemaProvider;
         target.Type = "controlFlow";
     }
 
@@ -79,24 +81,6 @@ public class CatalogueMapDefinition : IMapDefinition
         target.SettingsSchema = source.GetSettingsSchema();
     }
 
-    private static readonly JsonSerializerOptions JsonSchemaSerializerOptions = new()
-    {
-        Converters = { new Json.Schema.SchemaJsonConverter() },
-    };
-
-    private static Dictionary<string, object?>? SerializeOutputSchema(JsonSchema? schema)
-    {
-        if (schema is null)
-        {
-            return null;
-        }
-
-        // Serialize via JsonSchema's own converter to get a proper JSON Schema document,
-        // then deserialize into a dictionary for clean API serialization and Swagger rendering.
-        var json = JsonSerializer.Serialize(schema, JsonSchemaSerializerOptions);
-        return JsonSerializer.Deserialize<Dictionary<string, object?>>(json);
-    }
-    
     // Umbraco.Code.MapAll
     private static void MapToConnectionTypeItem(IConnectionType source, ConnectionTypeItemResponseModel target, MapperContext context)
     {
