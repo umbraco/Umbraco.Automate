@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
+using Umbraco.Cms.Api.Common.Builders;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Controllers;
 
@@ -56,12 +57,10 @@ public sealed class ResolveStepTypeOutputSchemaController : CatalogueControllerB
 
         if (stepType is null)
         {
-            return NotFound(new ProblemDetails
-            {
-                Title = "Step type not found",
-                Detail = $"No step type with alias '{alias}' is registered.",
-                Status = StatusCodes.Status404NotFound,
-            });
+            return NotFound(new ProblemDetailsBuilder()
+                .WithTitle("Step type not found")
+                .WithDetail($"No step type with alias '{alias}' is registered.")
+                .Build());
         }
 
         var schema = stepType is IDynamicOutputSchemaProvider dynamicProvider
