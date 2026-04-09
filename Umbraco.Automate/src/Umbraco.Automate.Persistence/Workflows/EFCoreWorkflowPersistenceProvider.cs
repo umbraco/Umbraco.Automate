@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Umbraco.Automate.Core.Execution;
 using WorkflowCore.Interface;
@@ -14,6 +15,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 {
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly RunFinalizer _runFinalizer;
+    private readonly ILogger<EFCoreWorkflowPersistenceProvider> _logger;
 
     private static readonly JsonSerializerSettings JsonSettings = new()
     {
@@ -23,10 +25,12 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
     public EFCoreWorkflowPersistenceProvider(
         IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
-        RunFinalizer runFinalizer)
+        RunFinalizer runFinalizer,
+        ILogger<EFCoreWorkflowPersistenceProvider> logger)
     {
         _dbContextFactory = dbContextFactory;
         _runFinalizer = runFinalizer;
+        _logger = logger;
     }
 
     // === IPersistenceProvider ===
@@ -107,7 +111,14 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
-        return entity is not null ? ToDomain(entity) : throw new InvalidOperationException($"Workflow instance '{id}' not found.");
+        if (entity is null)
+            throw new InvalidOperationException($"Workflow instance '{id}' not found.");
+
+        var wf = ToDomain(entity);
+        _logger.LogDebug(
+            "GetWorkflowInstance {Id}: Status={Status}, PointersNull={PointersNull}, PointerCount={Count}",
+            id, wf.Status, wf.ExecutionPointers is null, wf.ExecutionPointers?.Count ?? -1);
+        return wf;
     }
 
     public async Task<IEnumerable<WorkflowInstance>> GetWorkflowInstances(IEnumerable<string> ids, CancellationToken cancellationToken)
@@ -228,7 +239,11 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
                 && e.ExternalToken == null)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(ToDomain).ToList();
+        var result = entities.Select(ToDomain).ToList();
+        _logger.LogDebug(
+            "GetSubscriptions: Name={Name}, Key={Key}, AsOf={AsOf}, Found={Count}",
+            eventName, eventKey, asOf, result.Count);
+        return result;
     }
 
     public async Task TerminateSubscription(string eventSubscriptionId, CancellationToken cancellationToken)
@@ -300,7 +315,14 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
-        return entity is not null ? ToDomain(entity) : throw new InvalidOperationException($"Event '{id}' not found.");
+        if (entity is null)
+            throw new InvalidOperationException($"Event '{id}' not found.");
+
+        var evt = ToDomain(entity);
+        _logger.LogDebug(
+            "GetEvent {Id}: Name={Name}, Key={Key}, DataType={DataType}, DataNull={DataNull}, Processed={Processed}",
+            id, evt.EventName, evt.EventKey, evt.EventData?.GetType().Name ?? "null", evt.EventData is null, evt.IsProcessed);
+        return evt;
     }
 
     public async Task<IEnumerable<string>> GetRunnableEvents(DateTime asAt, CancellationToken cancellationToken)

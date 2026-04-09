@@ -68,7 +68,9 @@ internal sealed class ActionStepBody : StepBodyAsync
         }
 
         // Resume path: workflow is resuming after WaitForEvent with the event data.
-        if (context.Item is not null)
+        // WorkflowCore's SeedSubscription sets EventData and EventPublished on the pointer.
+        // context.Item (pointer.ContextItem) is NOT populated — event data lives on pointer.EventData.
+        if (context.ExecutionPointer.EventPublished && context.ExecutionPointer.EventData is not null)
         {
             return await HandleResumeAsync(context, data, cancellationToken);
         }
@@ -239,16 +241,22 @@ internal sealed class ActionStepBody : StepBodyAsync
     {
         _logger.LogInformation("Step {StepId} resumed with event data", _stepConfig.Id);
 
-        // Deserialize the decision from the event data.
+        // Deserialize the decision from the execution pointer's event data.
+        // WorkflowCore's SeedSubscription sets EventData on the pointer, not ContextItem.
+        var eventData = context.ExecutionPointer.EventData;
         ApprovalDecision? decision = null;
-        if (context.Item is JsonElement jsonElement)
+        if (eventData is JsonElement jsonElement)
         {
             decision = JsonSerializer.Deserialize<ApprovalDecision>(
                 jsonElement.GetRawText(), Dispatch.JsonOptions.Default);
         }
-        else if (context.Item is ApprovalDecision directDecision)
+        else if (eventData is ApprovalDecision directDecision)
         {
             decision = directDecision;
+        }
+        else if (eventData is Newtonsoft.Json.Linq.JObject jObject)
+        {
+            decision = jObject.ToObject<ApprovalDecision>();
         }
 
         // Find the existing step run for this step.

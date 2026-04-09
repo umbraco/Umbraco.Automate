@@ -15,7 +15,13 @@ public sealed class AutomationSavingNotification(Automation target, EventMessage
 /// Notification fired after an automation has been saved.
 /// </summary>
 public sealed class AutomationSavedNotification(Automation target, EventMessages messages)
-    : ObjectNotification<Automation>(target, messages);
+    : ObjectNotification<Automation>(target, messages)
+{
+    /// <summary>
+    /// Gets the saved automation.
+    /// </summary>
+    public Automation Automation { get; } = target;
+}
 
 /// <summary>
 /// Notification fired before an automation is published. Can be cancelled.
@@ -51,7 +57,13 @@ public sealed class AutomationDeletingNotification(Automation target, EventMessa
 /// Notification fired after an automation has been deleted.
 /// </summary>
 public sealed class AutomationDeletedNotification(Automation target, EventMessages messages)
-    : ObjectNotification<Automation>(target, messages);
+    : ObjectNotification<Automation>(target, messages)
+{
+    /// <summary>
+    /// Gets the deleted automation.
+    /// </summary>
+    public Automation Automation { get; } = target;
+}
 
 /// <summary>
 /// Notification fired before an automation run starts. Can be cancelled.
