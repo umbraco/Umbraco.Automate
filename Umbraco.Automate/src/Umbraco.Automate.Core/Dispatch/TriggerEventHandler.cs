@@ -74,17 +74,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
         Dictionary<string, object?>? triggerOutputData = null;
         if (!string.IsNullOrEmpty(message.OutputData))
         {
-            var raw = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
-                message.OutputData, JsonOptions.Default);
-
-            if (raw is not null)
-            {
-                triggerOutputData = new Dictionary<string, object?>(raw.Count, StringComparer.OrdinalIgnoreCase);
-                foreach (var (key, element) in raw)
-                {
-                    triggerOutputData[key] = UnwrapJsonElement(element);
-                }
-            }
+            triggerOutputData = JsonOptions.DeserializeToUnwrappedDictionary(message.OutputData);
         }
 
         foreach (var automation in matching)
@@ -133,19 +123,4 @@ internal sealed class TriggerEventHandler : IMessageHandler
         return _serverRoleAccessor.CurrentServerRole is ServerRole.Single
             or ServerRole.SchedulingPublisher;
     }
-
-    /// <summary>
-    /// Converts a <see cref="JsonElement"/> to a plain .NET primitive so it survives
-    /// the Newtonsoft.Json round-trip used by the WorkflowCore persistence layer.
-    /// </summary>
-    private static object? UnwrapJsonElement(JsonElement element) => element.ValueKind switch
-    {
-        JsonValueKind.String => element.GetString(),
-        JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        JsonValueKind.Null or JsonValueKind.Undefined => null,
-        // Arrays and objects: preserve as raw JSON string for downstream consumers.
-        _ => element.GetRawText(),
-    };
 }
