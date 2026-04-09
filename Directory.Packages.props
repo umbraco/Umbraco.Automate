@@ -23,6 +23,11 @@
     <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[17.1.0, 17.999.999)" />
   </ItemGroup>
 
+  <!-- Umbraco Deploy -->
+  <ItemGroup>
+    <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.0.0, 17.999.999)" />
+  </ItemGroup>
+
   <!-- WorkflowCore (automation engine) -->
   <ItemGroup>
     <PackageVersion Include="WorkflowCore" Version="3.9.0" />
