@@ -178,6 +178,24 @@
     background: rgba(59, 130, 246, 0.25);
 }
 
+.ua-node--if .ua-node__header {
+    background: rgba(245, 158, 11, 0.15);
+    border-bottom-color: rgba(245, 158, 11, 0.25);
+}
+
+.ua-node--switch .ua-node__header {
+    background: rgba(139, 92, 246, 0.15);
+    border-bottom-color: rgba(139, 92, 246, 0.25);
+}
+
+.dark .ua-node--if .ua-node__header {
+    background: rgba(245, 158, 11, 0.25);
+}
+
+.dark .ua-node--switch .ua-node__header {
+    background: rgba(139, 92, 246, 0.25);
+}
+
 /* Handle overrides */
 .react-flow__handle {
     width: 10px;
