@@ -18,8 +18,7 @@ public abstract class DynamicOutputNotificationTriggerBase<TSettings, TNotificat
     /// Initializes a new instance of the <see cref="DynamicOutputNotificationTriggerBase{TSettings, TNotification}"/> class.
     /// </summary>
     protected DynamicOutputNotificationTriggerBase(TriggerInfrastructure infrastructure) : base(infrastructure)
-    {
-    }
+    { }
 
     /// <inheritdoc />
     public abstract IEnumerable<TriggerEvent> MapEvent(TNotification notification);
