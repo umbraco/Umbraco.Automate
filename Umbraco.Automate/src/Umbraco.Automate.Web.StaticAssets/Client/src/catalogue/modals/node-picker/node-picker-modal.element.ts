@@ -40,17 +40,31 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
         this._error = false;
 
         const mode = this.data?.mode ?? "action";
-        const result = mode === "trigger"
-            ? await this.#repository!.requestTriggers()
-            : await this.#repository!.requestActions();
+        let items: UaCatalogueItemModel[] = [];
 
-        if (result.error || !result.data) {
-            this._error = true;
-            this._loading = false;
-            return;
+        if (mode === "trigger") {
+            const result = await this.#repository!.requestTriggers();
+            if (result.error || !result.data) {
+                this._error = true;
+                this._loading = false;
+                return;
+            }
+            items = result.data;
+        } else {
+            // Load actions and control flows, merged into one picker
+            const [actionsResult, controlFlowsResult] = await Promise.all([
+                this.#repository!.requestActions(),
+                this.#repository!.requestControlFlows(),
+            ]);
+            if (actionsResult.error && controlFlowsResult.error) {
+                this._error = true;
+                this._loading = false;
+                return;
+            }
+            items = [...(actionsResult.data ?? []), ...(controlFlowsResult.data ?? [])];
         }
 
-        this._groups = this.#groupItems(result.data);
+        this._groups = this.#groupItems(items);
         this._filteredGroups = this._groups;
         this._loading = false;
     }

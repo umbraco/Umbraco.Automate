@@ -1,13 +1,14 @@
 import { UmbRepositoryBase } from "@umbraco-cms/backoffice/repository";
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { UaCatalogueServerDataSource } from "./catalogue.server.data-source.js";
-import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
+import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
 
 export class UaCatalogueRepository extends UmbRepositoryBase {
     #dataSource: UaCatalogueServerDataSource;
     #actionsCache: UaActionCatalogueItemModel[] | undefined;
     #triggersCache: UaTriggerCatalogueItemModel[] | undefined;
     #connectionTypesCache: UaConnectionTypeCatalogueItemModel[] | undefined;
+    #controlFlowsCache: UaControlFlowCatalogueItemModel[] | undefined;
 
     constructor(host: UmbControllerHost) {
         super(host);
@@ -50,10 +51,23 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
         return result;
     }
 
+    async requestControlFlows(): Promise<{ data?: UaControlFlowCatalogueItemModel[]; error?: unknown }> {
+        if (this.#controlFlowsCache) {
+            return { data: this.#controlFlowsCache };
+        }
+
+        const result = await this.#dataSource.getControlFlows();
+        if (result.data) {
+            this.#controlFlowsCache = result.data;
+        }
+        return result;
+    }
+
     clearCache() {
         this.#actionsCache = undefined;
         this.#triggersCache = undefined;
         this.#connectionTypesCache = undefined;
+        this.#controlFlowsCache = undefined;
     }
 }
 
