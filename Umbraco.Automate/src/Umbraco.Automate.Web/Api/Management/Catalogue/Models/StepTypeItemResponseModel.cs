@@ -34,6 +34,9 @@ public class StepTypeItemResponseModel
     /// <summary>The JSON Schema describing output data, or null if no output.</summary>
     public Dictionary<string, object?>? OutputSchema { get; set; }
 
+    /// <summary>Whether this step type supports dynamic output schema resolution based on settings.</summary>
+    public bool HasDynamicOutputSchema { get; set; }
+
     /// <summary>The step type kind: "action", "controlFlow", or "trigger".</summary>
     [Required]
     public string Type { get; set; } = string.Empty;
