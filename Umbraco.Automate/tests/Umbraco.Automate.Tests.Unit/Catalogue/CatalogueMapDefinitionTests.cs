@@ -2,7 +2,6 @@ using Json.Schema;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -63,7 +62,8 @@ public class CatalogueMapDefinitionTests
     [Fact]
     public void MapToActionItem_DynamicAction_OutputSchemaIsNull()
     {
-        // DynamicAction uses TOutput=object, so static GetOutputSchema() returns null
+        // DynamicOutputActionBase uses TOutput=object via ActionBase<TSettings>,
+        // so static GetOutputSchema() returns null.
         var action = new DynamicAction(ActionDeps);
 
         var result = _mapper.Map<IAction, ActionItemResponseModel>(action);
@@ -105,13 +105,13 @@ public class CatalogueMapDefinitionTests
 
     [Action("test.dynamic", "Dynamic Action")]
     private class DynamicAction(ActionInfrastructure infrastructure)
-        : ActionBase<object, object>(infrastructure), IDynamicOutputSchemaProvider
+        : DynamicOutputActionBase<object>(infrastructure)
     {
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => throw new NotImplementedException();
 
-        Task<JsonSchema?> IDynamicOutputSchemaProvider.GetOutputSchemaAsync(
-            Dictionary<string, object?>? settings, CancellationToken cancellationToken)
+        protected override Task<JsonSchema?> GetOutputSchemaAsync(
+            object? settings, CancellationToken cancellationToken)
             => Task.FromResult<JsonSchema?>(null);
     }
 

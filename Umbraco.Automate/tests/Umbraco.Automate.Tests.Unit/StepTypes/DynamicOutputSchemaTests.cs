@@ -2,7 +2,6 @@ using Json.Schema;
 using Json.Schema.Generation;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Tests.Unit.StepTypes;
 
@@ -11,19 +10,19 @@ public class DynamicOutputSchemaTests
     private static readonly ActionInfrastructure ActionDeps = CreateActionInfrastructure();
 
     [Fact]
-    public void StaticAction_DoesNotImplementDynamicProvider()
+    public void StaticAction_HasDynamicOutputSchema_IsFalse()
     {
         var action = new StaticAction(ActionDeps);
 
-        (action is IDynamicOutputSchemaProvider).ShouldBeFalse();
+        action.HasDynamicOutputSchema.ShouldBeFalse();
     }
 
     [Fact]
-    public void DynamicAction_ImplementsDynamicProvider()
+    public void DynamicAction_HasDynamicOutputSchema_IsTrue()
     {
         var action = new DynamicAction(ActionDeps);
 
-        (action is IDynamicOutputSchemaProvider).ShouldBeTrue();
+        action.HasDynamicOutputSchema.ShouldBeTrue();
     }
 
     [Fact]
@@ -40,13 +39,25 @@ public class DynamicOutputSchemaTests
     }
 
     [Fact]
+    public async Task StaticAction_GetOutputSchemaAsync_ReturnsSameAsStaticSchema()
+    {
+        IStepType action = new StaticAction(ActionDeps);
+
+        var schema = await action.GetOutputSchemaAsync(null);
+
+        schema.ShouldNotBeNull();
+        var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
+        properties.ShouldNotBeNull();
+        properties.Keys.ShouldContain("name");
+    }
+
+    [Fact]
     public async Task DynamicAction_GetOutputSchemaAsync_ReturnsSettingsDependentSchema()
     {
-        var action = new DynamicAction(ActionDeps);
-        var provider = (IDynamicOutputSchemaProvider)action;
+        IStepType action = new DynamicAction(ActionDeps);
 
         var settings = new Dictionary<string, object?> { ["schemaType"] = "detailed" };
-        var schema = await provider.GetOutputSchemaAsync(settings);
+        var schema = await action.GetOutputSchemaAsync(settings);
 
         schema.ShouldNotBeNull();
         var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
@@ -57,10 +68,9 @@ public class DynamicOutputSchemaTests
     [Fact]
     public async Task DynamicAction_GetOutputSchemaAsync_NullSettings_ReturnsNull()
     {
-        var action = new DynamicAction(ActionDeps);
-        var provider = (IDynamicOutputSchemaProvider)action;
+        IStepType action = new DynamicAction(ActionDeps);
 
-        var schema = await provider.GetOutputSchemaAsync(null);
+        var schema = await action.GetOutputSchemaAsync(null);
 
         schema.ShouldBeNull();
     }
@@ -68,10 +78,9 @@ public class DynamicOutputSchemaTests
     [Fact]
     public async Task DynamicAction_GetOutputSchemaAsync_EmptySettings_ReturnsNull()
     {
-        var action = new DynamicAction(ActionDeps);
-        var provider = (IDynamicOutputSchemaProvider)action;
+        IStepType action = new DynamicAction(ActionDeps);
 
-        var schema = await provider.GetOutputSchemaAsync([]);
+        var schema = await action.GetOutputSchemaAsync([]);
 
         schema.ShouldBeNull();
     }
@@ -118,16 +127,15 @@ public class DynamicOutputSchemaTests
 
     [Action("test.dynamic", "Dynamic Action")]
     private class DynamicAction(ActionInfrastructure infrastructure)
-        : ActionBase<DynamicSettings, object>(infrastructure), IDynamicOutputSchemaProvider
+        : DynamicOutputActionBase<DynamicSettings>(infrastructure)
     {
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => throw new NotImplementedException();
 
-        Task<JsonSchema?> IDynamicOutputSchemaProvider.GetOutputSchemaAsync(
-            Dictionary<string, object?>? settings, CancellationToken cancellationToken)
+        protected override Task<JsonSchema?> GetOutputSchemaAsync(
+            DynamicSettings? settings, CancellationToken cancellationToken)
         {
-            var typed = settings is { Count: > 0 } ? ResolveSettings(settings) : null;
-            if (typed?.SchemaType is null)
+            if (settings?.SchemaType is null)
             {
                 return Task.FromResult<JsonSchema?>(null);
             }

@@ -63,9 +63,7 @@ public sealed class ResolveStepTypeOutputSchemaController : CatalogueControllerB
                 .Build());
         }
 
-        var schema = stepType is IDynamicOutputSchemaProvider dynamicProvider
-            ? await dynamicProvider.GetOutputSchemaAsync(requestModel.Settings, cancellationToken)
-            : stepType.GetOutputSchema();
+        var schema = await stepType.GetOutputSchemaAsync(requestModel.Settings, cancellationToken);
 
         return Ok(OutputSchemaSerializer.Serialize(schema));
     }

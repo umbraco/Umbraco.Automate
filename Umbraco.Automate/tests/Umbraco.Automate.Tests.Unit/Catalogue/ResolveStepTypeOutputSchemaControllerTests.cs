@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Controllers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
@@ -45,7 +44,7 @@ public class ResolveStepTypeOutputSchemaControllerTests
     }
 
     [Fact]
-    public async Task ResolveOutputSchema_DynamicAction_WithSettings_CallsDynamicProvider()
+    public async Task ResolveOutputSchema_DynamicAction_WithSettings_ReturnsDynamicSchema()
     {
         var action = new DynamicAction(ActionDeps);
         var controller = CreateController(actions: [action]);
@@ -151,16 +150,15 @@ public class ResolveStepTypeOutputSchemaControllerTests
 
     [Action("test.dynamic", "Dynamic Action")]
     private class DynamicAction(ActionInfrastructure infrastructure)
-        : ActionBase<DynamicSettings, object>(infrastructure), IDynamicOutputSchemaProvider
+        : DynamicOutputActionBase<DynamicSettings>(infrastructure)
     {
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => throw new NotImplementedException();
 
-        Task<JsonSchema?> IDynamicOutputSchemaProvider.GetOutputSchemaAsync(
-            Dictionary<string, object?>? settings, CancellationToken cancellationToken)
+        protected override Task<JsonSchema?> GetOutputSchemaAsync(
+            DynamicSettings? settings, CancellationToken cancellationToken)
         {
-            var typed = settings is { Count: > 0 } ? ResolveSettings(settings) : null;
-            if (typed?.SchemaType is null)
+            if (settings?.SchemaType is null)
             {
                 return Task.FromResult<JsonSchema?>(null);
             }

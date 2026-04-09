@@ -68,4 +68,23 @@ public interface IStepType : IDiscoverable
     /// Returns null if the step type produces no output.
     /// </summary>
     JsonSchema? GetOutputSchema();
+
+    /// <summary>
+    /// Gets whether this step type supports dynamic output schema resolution based on settings.
+    /// When true, the output schema depends on the step's configured settings and should be
+    /// resolved via <see cref="GetOutputSchemaAsync"/> rather than <see cref="GetOutputSchema"/>.
+    /// </summary>
+    bool HasDynamicOutputSchema { get; }
+
+    /// <summary>
+    /// Resolves the output JSON Schema, optionally using the step's configured settings for
+    /// step types that support dynamic output schemas. For static step types, returns the same
+    /// result as <see cref="GetOutputSchema"/>.
+    /// </summary>
+    /// <param name="settings">The step's configured settings dictionary, or null if unconfigured.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A JSON Schema describing the output data structure, or null if no output.</returns>
+    Task<JsonSchema?> GetOutputSchemaAsync(
+        Dictionary<string, object?>? settings,
+        CancellationToken cancellationToken = default);
 }
