@@ -153,6 +153,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
         builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
         builder.Services.AddWorkflow();
+        builder.Services.AddSingleton<WorkflowDefinitionRecovery>();
         builder.Services.AddHostedService<WorkflowHostLifecycle>();
 
         return builder;
