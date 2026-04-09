@@ -148,6 +148,18 @@ public class EditableModelResolverTests
         exception.Message.ShouldContain("not found");
     }
 
+    [Fact]
+    public void ResolveModel_WithBindingExpression_LeavesValueUnresolved()
+    {
+        var settings = new FakeSettings { ApiToken = "${ trigger.contentName }" };
+        var resolver = CreateResolver();
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.ApiToken.ShouldBe("${ trigger.contentName }");
+    }
+
     #endregion
 
     #region ResolveModel<TModel> — Non-string config variables
