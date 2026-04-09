@@ -1,28 +1,27 @@
 using Json.Schema;
 using Umbraco.Automate.Core.StepTypes;
 
-namespace Umbraco.Automate.Core.Actions;
+namespace Umbraco.Automate.Core.Triggers;
 
 /// <summary>
-/// Base class for actions whose output schema depends on runtime configuration.
-/// Use this instead of <see cref="ActionBase{TSettings}"/> when the output shape
-/// is determined by the step's settings (e.g. an AI agent action where each agent
-/// has its own user-defined output schema).
+/// Base class for triggers whose output schema depends on runtime configuration.
+/// Use this instead of <see cref="TriggerBase{TSettings, TOutput}"/> when the output shape
+/// is determined by the trigger's settings.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type.</typeparam>
-public abstract class DynamicOutputActionBase<TSettings> : ActionBase<TSettings, object>
+public abstract class DynamicOutputTriggerBase<TSettings> : TriggerBase<TSettings, object>
     where TSettings : class, new()
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="DynamicOutputActionBase{TSettings}"/> class.
+    /// Initializes a new instance of the <see cref="DynamicOutputTriggerBase{TSettings}"/> class.
     /// </summary>
-    protected DynamicOutputActionBase(ActionInfrastructure infrastructure) : base(infrastructure) { }
+    protected DynamicOutputTriggerBase(TriggerInfrastructure infrastructure) : base(infrastructure) { }
 
     /// <inheritdoc />
     public override bool HasDynamicOutputSchema => true;
 
     /// <summary>
-    /// Resolves the output JSON Schema based on the step's typed settings.
+    /// Resolves the output JSON Schema based on the trigger's typed settings.
     /// </summary>
     /// <param name="settings">The resolved typed settings, or null if unconfigured.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

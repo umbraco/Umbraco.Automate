@@ -2,6 +2,7 @@ using Json.Schema;
 using Json.Schema.Generation;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Tests.Unit.StepTypes;
 
