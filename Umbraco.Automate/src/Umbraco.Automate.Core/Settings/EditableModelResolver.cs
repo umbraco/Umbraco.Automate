@@ -111,6 +111,12 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             return value;
         }
 
+        // Skip binding expressions (${ ... }) — they are resolved later by SettingsBindingResolver.
+        if (strValue.StartsWith("${"))
+        {
+            return value;
+        }
+
         var configKey = strValue[ConfigPrefix.Length..];
         var configValue = _configuration[configKey];
 

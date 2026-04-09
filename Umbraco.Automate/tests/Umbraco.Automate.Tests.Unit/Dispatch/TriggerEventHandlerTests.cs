@@ -6,7 +6,7 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Versioning;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Sync;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;

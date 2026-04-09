@@ -21,7 +21,7 @@ export class UaWorkspaceTreeRepository
         const data: UaWorkspaceTreeRootModel = {
             unique: null,
             entityType: UA_WORKSPACE_ROOT_ENTITY_TYPE,
-            name: "Workspaces",
+            name: "Automations",
             icon: "icon-layout-masonry",
             hasChildren,
             isFolder: true,

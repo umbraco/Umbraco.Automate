@@ -6,11 +6,12 @@ import type {
     UmbTableItem,
     UmbTableConfig,
 } from "@umbraco-cms/backoffice/components";
+import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import { UaRunCollectionRepository } from "../../../../run/repository/collection/run-collection.repository.js";
+import { UA_RUN_DETAIL_MODAL } from "../../../../run/modals/run-detail-modal.token.js";
 import type { UaRunItemModel } from "../../../../run/types.js";
 import { formatDateTime } from "../../../../core/index.js";
-import { UA_RUN_WORKSPACE_PATH } from "../../../../run/workspace/run/paths.js";
 
 @customElement("ua-automation-runs-workspace-view")
 export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
@@ -45,6 +46,12 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
                 }
             });
         });
+    }
+
+    async #openRunModal(runId: string) {
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager) return;
+        modalManager.open(this, UA_RUN_DETAIL_MODAL, { data: { runId } });
     }
 
     async #loadRuns(automationId: string) {
@@ -92,9 +99,12 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
             data: [
                 {
                     columnAlias: "run",
-                    value: html`<a href="${UA_RUN_WORKSPACE_PATH}/edit/${item.unique}">
+                    value: html`<uui-button look="default" compact
+                        label=${item.unique.substring(0, 8)}
+                        @click=${() => this.#openRunModal(item.unique)}
+                    >
                         ${item.unique.substring(0, 8)}...
-                    </a>`,
+                    </uui-button>`,
                 },
                 {
                     columnAlias: "status",

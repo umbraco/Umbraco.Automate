@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
 import type { Node, Edge, Viewport, ColorMode } from "@xyflow/react";
 import AutomationCanvas from "./AutomationCanvas.js";
-import type { CanvasChangeDetail, AddNodeRequestDetail } from "./types.js";
+import type { CanvasChangeDetail, AddNodeRequestDetail, NodeDeleteRequestDetail } from "./types.js";
 import { UMB_THEME_CONTEXT } from "@umbraco-cms/backoffice/themes";
 
 // Import CSS as strings (Vite ?inline) so we can inject into shadow DOM.
@@ -87,6 +87,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 readOnly: this.readOnly,
                 onCanvasChange: this.#onCanvasChange,
                 onAddNodeRequest: this.#onAddNodeRequest,
+                onDeleteRequest: this.#onDeleteRequest,
             }),
         );
     }
@@ -99,6 +100,18 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 detail,
             }),
         );
+    };
+
+    #onDeleteRequest = (nodes: import("@xyflow/react").Node[]): Promise<boolean> => {
+        return new Promise<boolean>((resolve) => {
+            this.dispatchEvent(
+                new CustomEvent<NodeDeleteRequestDetail>("ua:node-delete-request", {
+                    bubbles: true,
+                    composed: true,
+                    detail: { nodes, resolve },
+                }),
+            );
+        });
     };
 
     #onAddNodeRequest = (detail: AddNodeRequestDetail) => {

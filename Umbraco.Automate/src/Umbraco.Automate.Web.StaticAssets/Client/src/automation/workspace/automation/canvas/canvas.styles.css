@@ -73,20 +73,16 @@
     cursor: pointer;
     padding: 2px;
     line-height: 1;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     width: 24px;
     height: 24px;
     border-radius: var(--uui-border-radius, 3px);
-    color: var(--uui-color-danger, #dc2626);
+    color: var(--uui-color-text, #1b264f);
     opacity: 0.6;
     font-size: 12px;
-    transition: opacity 120ms ease, background 120ms ease;
-}
-
-.ua-node:hover .ua-node__delete-btn {
-    display: flex;
+    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
 }
 
 .ua-node__delete-btn:hover {
@@ -161,6 +157,25 @@
     background: var(--uui-color-danger, #dc2626);
     color: #fff;
     border-color: var(--uui-color-danger, #dc2626);
+}
+
+/* Node type colors */
+.ua-node--trigger .ua-node__header {
+    background: rgba(99, 102, 241, 0.15);
+    border-bottom-color: rgba(99, 102, 241, 0.25);
+}
+
+.ua-node--action .ua-node__header {
+    background: rgba(59, 130, 246, 0.15);
+    border-bottom-color: rgba(59, 130, 246, 0.25);
+}
+
+.dark .ua-node--trigger .ua-node__header {
+    background: rgba(99, 102, 241, 0.25);
+}
+
+.dark .ua-node--action .ua-node__header {
+    background: rgba(59, 130, 246, 0.25);
 }
 
 /* Handle overrides */

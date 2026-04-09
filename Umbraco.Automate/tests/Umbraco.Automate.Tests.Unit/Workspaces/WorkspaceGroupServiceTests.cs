@@ -1,6 +1,6 @@
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Workspaces;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 
 namespace Umbraco.Automate.Tests.Unit.Workspaces;
 

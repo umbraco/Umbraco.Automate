@@ -355,9 +355,11 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         var outputJson = JsonSerializer.Serialize(outputData, Dispatch.JsonOptions.Default);
         stepRun.OutputData = outputJson;
-        var outputDict = JsonSerializer.Deserialize<Dictionary<string, object?>>(
-            outputJson, Dispatch.JsonOptions.Default) ?? [];
-        data.StepOutputs[_stepConfig.Id] = outputDict;
+
+        // Deserialize to a case-insensitive dictionary with plain .NET types (not JsonElement)
+        // so values survive the WorkflowCore Newtonsoft.Json persistence round-trip and are
+        // accessible to BindingEvaluator.ResolvePath.
+        data.StepOutputs[_stepConfig.Id] = Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
     }
 
     private async Task<ConfiguredConnection?> ResolveConnectionByTypeAsync(

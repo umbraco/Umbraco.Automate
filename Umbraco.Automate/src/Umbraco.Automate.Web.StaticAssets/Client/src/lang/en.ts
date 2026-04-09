@@ -2,7 +2,7 @@ import type { UmbLocalizationDictionary } from "@umbraco-cms/backoffice/localiza
 
 export default {
     uaSections: {
-        automate: "Automate",
+        automate: "Automation",
     },
     uaGeneral: {
         select: "Select",
@@ -11,8 +11,9 @@ export default {
         createAutomation: "Automation",
         createFolder: "Folder",
         delete: "Delete",
+        move: "Move",
         save: "Save",
-        saveAndPublish: "Save and Publish",
+        saveAndPublish: "Save and publish",
         unpublish: "Unpublish",
     },
     uaLabels: {
@@ -25,6 +26,30 @@ export default {
         published: "Published",
         inactive: "Inactive",
         requestedAt: "Requested At",
+        id: "Id",
+        type: "Type",
+        version: "Version",
+        created: "Created",
+        modified: "Modified",
+        dateCreated: "Date Created",
+        dateModified: "Date Modified",
+        started: "Started",
+        completed: "Completed",
+        retryCount: "Retry Count",
+        error: "Error",
+        initiatedBy: "Initiated By",
+        automationVersion: "Automation Version",
+        correlationId: "Correlation ID",
+        unsaved: "Unsaved",
+        current: "Current",
+        info: "Info",
+        history: "History",
+        membership: "Membership",
+        connectionType: "Connection Type",
+        webhookUrl: "Webhook URL",
+        steps: "Steps",
+        runInfo: "Run Info",
+        search: "Search",
     },
     uaPlaceholders: {
         enterName: "Enter a name...",
@@ -40,6 +65,12 @@ export default {
         deleteConfirm: "Are you sure you want to delete this automation?",
         bulkDeleteConfirm: (count: number) =>
             `Are you sure you want to delete ${count} automation(s)?`,
+        moveHeadline: "Move Automation",
+        backToList: "Back to automations",
+    },
+    uaCanvas: {
+        nodeDeleteConfirm: (label: string) =>
+            `Are you sure you want to delete "${label}"?`,
     },
     uaCatalogue: {
         selectTrigger: "Select Trigger",
@@ -62,8 +93,11 @@ export default {
         bulkDeleteConfirm: (count: number) =>
             `Are you sure you want to delete ${count} workspace(s)?`,
         serviceAccountKey: "Service Account Key",
+        serviceAccountDescription: "The API user identity used when running automations in this workspace.",
         userGroups: "User Groups",
+        userGroupsDescription: "User groups that have access to automations in this workspace.",
         allowedConnections: "Allowed Connections",
+        allowedConnectionsDescription: "Connections that automations in this workspace are allowed to use.",
     },
     uaConnection: {
         deleteConfirm: "Are you sure you want to delete this connection?",
@@ -74,6 +108,7 @@ export default {
         addSetting: "Add Setting",
         key: "Key",
         value: "Value",
+        backToList: "Back to connections",
     },
     uaApproval: {
         dashboardTitle: "Approvals",
@@ -88,6 +123,15 @@ export default {
     },
     uaDashboard: {
         overview: "Overview",
+        recentActivity: "Recent Activity",
+        welcomeHeadline: "Welcome to Umbraco Automate",
+        welcomeIntro:
+            "Build powerful automations that respond to events in your Umbraco site — publish content, send notifications, call APIs, and more.",
+        welcomeBody:
+            "To get started, create a workspace from the Settings menu on the left. Workspaces group your automations and control who has access.",
+        welcomeBodyHasWorkspaces:
+            "Your workspace is ready. Select it from the Automations tree on the left to create your first automation.",
+        welcomeCta: "Create a Workspace",
     },
     uaConditionBuilder: {
         addCondition: "Add condition",

@@ -8,6 +8,8 @@ export interface UaDeleteActionArgs {
     headline: string;
     confirmMessage: string;
     getRepository: (host: UmbControllerHost) => UmbDetailRepository<unknown>;
+    /** Path to navigate to after successful deletion. If not provided, navigates to the section root. */
+    navigateTo?: string;
 }
 
 export abstract class UaDeleteActionBase extends UmbEntityActionBase<never> {
@@ -18,7 +20,7 @@ export abstract class UaDeleteActionBase extends UmbEntityActionBase<never> {
             throw new Error("Cannot delete without unique identifier.");
         }
 
-        const { headline, confirmMessage, getRepository } = this.getArgs();
+        const { headline, confirmMessage, getRepository, navigateTo } = this.getArgs();
 
         await umbConfirmModal(this, {
             headline,
@@ -38,5 +40,9 @@ export abstract class UaDeleteActionBase extends UmbEntityActionBase<never> {
             });
             throw error;
         }
+
+        // Navigate away from the deleted entity
+        const target = navigateTo ?? "/umbraco/section/automate";
+        history.pushState(null, "", target);
     }
 }

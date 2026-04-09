@@ -12,7 +12,7 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 

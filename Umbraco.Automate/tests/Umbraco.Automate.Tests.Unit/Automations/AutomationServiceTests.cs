@@ -8,7 +8,7 @@ using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
 
@@ -67,7 +67,7 @@ public class AutomationServiceTests
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
-        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
 
         var result = await _service.PublishAutomationAsync(id);
@@ -85,7 +85,7 @@ public class AutomationServiceTests
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
-        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
 
         var result = await _service.UnpublishAutomationAsync(id);
@@ -247,7 +247,7 @@ public class AutomationServiceTests
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
-        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+        _repo.Setup(r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
 
         var result = await _service.PublishAutomationAsync(id);

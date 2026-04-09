@@ -26,7 +26,7 @@ Each product has its own solution file, CLAUDE.md, and can be built independentl
 ### Prerequisites
 
 - .NET 10.0 SDK
-- Node.js 20.x
+- Node.js 22.x
 - Git
 
 ### Demo Site

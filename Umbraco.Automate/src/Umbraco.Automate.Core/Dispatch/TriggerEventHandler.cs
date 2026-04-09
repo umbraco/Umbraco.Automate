@@ -69,11 +69,12 @@ internal sealed class TriggerEventHandler : IMessageHandler
         }
 
         // Deserialize trigger output data for the run context.
+        // Unwrap JsonElement values to primitives so they survive the Newtonsoft.Json
+        // round-trip used by the WorkflowCore persistence provider.
         Dictionary<string, object?>? triggerOutputData = null;
         if (!string.IsNullOrEmpty(message.OutputData))
         {
-            triggerOutputData = JsonSerializer.Deserialize<Dictionary<string, object?>>(
-                message.OutputData, JsonOptions.Default);
+            triggerOutputData = JsonOptions.DeserializeToUnwrappedDictionary(message.OutputData);
         }
 
         foreach (var automation in matching)

@@ -5,7 +5,7 @@ using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Persistence.Automations;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 
 namespace Umbraco.Automate.Tests.Unit.Persistence;
 

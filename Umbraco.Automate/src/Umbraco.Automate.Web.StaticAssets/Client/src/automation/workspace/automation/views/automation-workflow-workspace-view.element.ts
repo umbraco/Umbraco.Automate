@@ -1,13 +1,13 @@
 import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
+import { UMB_MODAL_MANAGER_CONTEXT, UMB_CONFIRM_MODAL } from "@umbraco-cms/backoffice/modal";
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
 import { modelToNodes, modelToEdges } from "../canvas/utils/model-to-flow.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
-import type { CanvasState, CanvasChangeDetail, AddNodeRequestDetail, NodeSettingsOpenDetail } from "../canvas/types.js";
+import type { CanvasState, CanvasChangeDetail, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
 import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-settings-modal.token.js";
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
@@ -55,7 +55,10 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const catalogueNames = await this.#buildCatalogueNames();
         this._nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogueNames);
         this._edges = modelToEdges(model.connections);
-        this._viewport = canvasState?.viewport;
+        // Only set viewport on initial load; after that the canvas manages its own position
+        if (!this._viewport) {
+            this._viewport = canvasState?.viewport;
+        }
     }
 
     async #buildCatalogueNames(): Promise<Map<string, string>> {
@@ -192,6 +195,40 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         return null;
     }
 
+    async #onNodeDeleteRequest(event: CustomEvent<NodeDeleteRequestDetail>) {
+        const { nodes, resolve } = event.detail;
+        if (nodes.length === 0) {
+            resolve(true);
+            return;
+        }
+
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager) {
+            resolve(false);
+            return;
+        }
+
+        const label = nodes.length === 1
+            ? (nodes[0].data as { label?: string }).label ?? nodes[0].type ?? "node"
+            : `${nodes.length} nodes`;
+
+        const modal = modalManager.open(this, UMB_CONFIRM_MODAL, {
+            data: {
+                headline: this.localize.term("uaGeneral_delete"),
+                content: this.localize.term("uaCanvas_nodeDeleteConfirm", label),
+                color: "danger",
+                confirmLabel: this.localize.term("uaGeneral_delete"),
+            },
+        });
+
+        try {
+            await modal.onSubmit();
+            resolve(true);
+        } catch {
+            resolve(false);
+        }
+    }
+
     async #onAddNodeRequest(event: CustomEvent<AddNodeRequestDetail>) {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
@@ -219,6 +256,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
             const updatedSteps = [...this._model.steps, newStep];
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
+
+            await this.#openNodeSettingsModal(newStepId);
         } catch {
             // Modal was dismissed
         }
@@ -239,6 +278,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 triggerAlias: item.alias,
                 settings: {},
             });
+
+            await this.#openTriggerSettingsModal();
         } catch {
             // Modal was dismissed
         }
@@ -260,8 +301,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 ? { x: lastNode.position.x, y: lastNode.position.y + 150 }
                 : { x: 250, y: 200 };
 
+            const newStepId = crypto.randomUUID();
             const newStep = {
-                id: crypto.randomUUID(),
+                id: newStepId,
                 actionAlias: item.alias,
                 name: item.name,
                 connectionId: null,
@@ -275,6 +317,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
             const updatedSteps = [...this._model.steps, newStep];
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
+
+            await this.#openNodeSettingsModal(newStepId);
         } catch {
             // Modal was dismissed
         }
@@ -311,6 +355,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                     @ua:canvas-change=${this.#onCanvasChange}
                     @ua:add-node-request=${this.#onAddNodeRequest}
                     @ua:node-settings-open=${this.#onNodeSettingsOpen}
+                    @ua:node-delete-request=${this.#onNodeDeleteRequest}
                 ></ua-automation-canvas>
             </div>
         `;

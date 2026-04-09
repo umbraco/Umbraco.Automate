@@ -1,0 +1,113 @@
+# Reusable template for packing a single Umbraco.Automate product
+# Uses pre-built outputs from the Build stage
+#
+# Parameters:
+#   product: Product name (e.g., "Umbraco.Automate", "Umbraco.Automate.OpenIddict")
+#   condition: Optional condition for all steps (default: true)
+#   useProjectReferences: Whether to use project references instead of NuGet packages (default: false)
+#
+# Prerequisites:
+#   - Build outputs must be downloaded to $(Build.SourcesDirectory)
+#   - For tier 2/3 products, core packages must be in ./artifacts/nupkg
+#
+# Outputs:
+#   - NuGet packages in ./artifacts/nupkg
+#   - npm packages in ./artifacts/npm (if product has frontend with types export)
+
+parameters:
+    - name: product
+      type: string
+    - name: condition
+      type: string
+      default: "true"
+    - name: useProjectReferences
+      type: boolean
+      default: false
+
+steps:
+    - script: dotnet tool install --global nbgv || true
+      displayName: Install NBGV
+      condition: ${{ parameters.condition }}
+
+    - script: nbgv cloud
+      displayName: Set version
+      condition: ${{ parameters.condition }}
+      workingDirectory: ${{ parameters.product }}
+
+    - script: dotnet restore ${{ parameters.product }}/${{ parameters.product }}.slnx --configfile NuGet.CI.config -p:UseProjectReferences=${{ parameters.useProjectReferences }} -p:DisableCloudBuildNumber=true
+      displayName: Restore packages
+      condition: ${{ parameters.condition }}
+
+    - script: |
+          dotnet pack ${{ parameters.product }}/${{ parameters.product }}.slnx \
+            --configuration Release \
+            --no-build \
+            --output ./artifacts/nupkg \
+            -p:UseProjectReferences=${{ parameters.useProjectReferences }} \
+            -p:DisableCloudBuildNumber=true
+      displayName: Pack ${{ parameters.product }} (NuGet)
+      condition: ${{ parameters.condition }}
+
+    # npm pack for frontend types (auto-detects if package.json exports types)
+    - script: |
+          set -e
+
+          PRODUCT="${{ parameters.product }}"
+
+          # Try standard path first (Web.StaticAssets), then fall back to direct project path
+          CLIENT_DIR="$PRODUCT/src/$PRODUCT.Web.StaticAssets/Client"
+          if [ ! -d "$CLIENT_DIR" ]; then
+            CLIENT_DIR="$PRODUCT/src/$PRODUCT/Client"
+          fi
+
+          PACKAGE_JSON="$CLIENT_DIR/package.json"
+
+          # Check if frontend client folder exists
+          if [ ! -d "$CLIENT_DIR" ]; then
+            echo "No frontend client folder found - skipping npm pack"
+            exit 0
+          fi
+
+          echo "Found frontend client folder at $CLIENT_DIR"
+
+          # Check if package.json exists
+          if [ ! -f "$PACKAGE_JSON" ]; then
+            echo "No package.json found at $PACKAGE_JSON - skipping npm pack"
+            exit 0
+          fi
+
+          # Check if package.json has "types" field (exports types)
+          HAS_TYPES=$(node -e "
+            const pkg = require('./$PACKAGE_JSON');
+            console.log(pkg.types ? 'true' : 'false');
+          ")
+
+          if [ "$HAS_TYPES" != "true" ]; then
+            echo "package.json does not export types - skipping npm pack"
+            exit 0
+          fi
+
+          echo "Package exports types - running npm pack"
+
+          # Get version from NBGV
+          VERSION=$(cd "$PRODUCT" && nbgv get-version -v NuGetPackageVersion)
+          echo "Using version: $VERSION"
+
+          # Navigate to frontend client folder
+          cd "$CLIENT_DIR"
+
+          # Update package.json version and cleanse for publishing
+          # Uses peerDependencyVersions from root package.json to resolve workspace references
+          node $(Build.SourcesDirectory)/scripts/build/cleanse-package-json.js "$VERSION" "$PRODUCT" "$(Build.SourcesDirectory)"
+
+          # Create artifacts/npm directory
+          mkdir -p $(Build.SourcesDirectory)/artifacts/npm
+
+          # Run npm pack
+          npm pack --pack-destination $(Build.SourcesDirectory)/artifacts/npm
+
+          echo ""
+          echo "npm packages created:"
+          ls -la $(Build.SourcesDirectory)/artifacts/npm/
+      displayName: Pack ${{ parameters.product }} (npm)
+      condition: ${{ parameters.condition }}

@@ -3,7 +3,7 @@ using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 
 namespace Umbraco.Automate.Tests.Unit.Workspaces;
 

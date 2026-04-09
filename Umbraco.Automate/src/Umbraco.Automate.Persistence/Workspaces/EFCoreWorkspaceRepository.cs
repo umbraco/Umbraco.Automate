@@ -23,6 +23,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         WorkspaceEntity? entity = await db.Workspaces
             .Include(w => w.UserGroups)
             .Include(w => w.AllowedConnections)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == id, cancellationToken);
 
         return entity is null ? null : WorkspaceFactory.BuildDomain(entity);
@@ -35,6 +36,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         WorkspaceEntity? entity = await db.Workspaces
             .Include(w => w.UserGroups)
             .Include(w => w.AllowedConnections)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Alias == alias, cancellationToken);
 
         return entity is null ? null : WorkspaceFactory.BuildDomain(entity);
@@ -47,6 +49,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         var entities = await db.Workspaces
             .Include(w => w.UserGroups)
             .Include(w => w.AllowedConnections)
+            .AsSplitQuery()
             .OrderBy(w => w.Name)
             .ToListAsync(cancellationToken);
 
@@ -64,7 +67,8 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
 
         IQueryable<WorkspaceEntity> query = db.Workspaces
             .Include(w => w.UserGroups)
-            .Include(w => w.AllowedConnections);
+            .Include(w => w.AllowedConnections)
+            .AsSplitQuery();
 
         if (userGroupKeys is { Count: > 0 })
         {
@@ -93,6 +97,7 @@ internal sealed class EFCoreWorkspaceRepository : IWorkspaceRepository
         WorkspaceEntity? existing = await db.Workspaces
             .Include(w => w.UserGroups)
             .Include(w => w.AllowedConnections)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(w => w.Id == workspace.Id, cancellationToken);
 
         if (existing is null)

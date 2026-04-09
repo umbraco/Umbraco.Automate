@@ -13,16 +13,17 @@ internal static class BindingDataBuilder
     /// <returns>A dictionary suitable for binding evaluation.</returns>
     public static Dictionary<string, object?> Build(AutomationWorkflowData data)
     {
+        var stepsDict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (stepId, outputs) in data.StepOutputs)
+        {
+            stepsDict[stepId.ToString()] = outputs;
+        }
+
         var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["trigger"] = data.TriggerOutput,
+            ["steps"] = stepsDict,
         };
-
-        // Add step outputs keyed by step ID.
-        foreach (var (stepId, outputs) in data.StepOutputs)
-        {
-            bindingData[$"steps.{stepId}"] = outputs;
-        }
 
         return bindingData;
     }

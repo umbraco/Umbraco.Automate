@@ -48,44 +48,66 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
             </div>
 
             <div class="container">
-                <uui-box headline="Info">
-                    <umb-property-layout label="Id" orientation="vertical">
+                <uui-box headline=${this.localize.term("uaLabels_info")}>
+                    <umb-property-layout label=${this.localize.term("uaLabels_id")} orientation="vertical">
                         <div slot="editor">
                             ${this._model.unique === UA_EMPTY_GUID
-                                ? html`<uui-tag color="default" look="placeholder">Unsaved</uui-tag>`
+                                ? html`<uui-tag color="default" look="placeholder">${this.localize.term("uaLabels_unsaved")}</uui-tag>`
                                 : this._model.unique}
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="Status" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_status")} orientation="vertical">
                         <div slot="editor">
                             <uui-tag color=${this.#statusColor(this._model.status)} look="secondary">
                                 ${this._model.status}
                             </uui-tag>
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label="Enabled" orientation="vertical">
+                    <umb-property-layout label=${this.localize.term("uaLabels_enabled")} orientation="vertical">
                         <div slot="editor">
                             <uui-tag color=${this._model.isEnabled ? "positive" : "default"} look="secondary">
-                                ${this._model.isEnabled ? "Enabled" : "Disabled"}
+                                ${this._model.isEnabled ? this.localize.term("uaLabels_enabled") : this.localize.term("uaLabels_disabled")}
                             </uui-tag>
                         </div>
                     </umb-property-layout>
                     ${this._model.dateCreated
                         ? html`
-                              <umb-property-layout label="Date Created" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_dateCreated")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
                               </umb-property-layout>
                           `
                         : ""}
                     ${this._model.dateModified
                         ? html`
-                              <umb-property-layout label="Date Modified" orientation="vertical">
+                              <umb-property-layout label=${this.localize.term("uaLabels_dateModified")} orientation="vertical">
                                   <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
                               </umb-property-layout>
                           `
                         : ""}
+                    ${this.#renderWebhookUrl()}
                 </uui-box>
             </div>
+        `;
+    }
+
+    #renderWebhookUrl() {
+        if (!this._model?.trigger || this._model.trigger.triggerAlias !== "umbracoAutomate.webhook") return html``;
+        if (this._model.unique === UA_EMPTY_GUID) return html``;
+
+        const webhookUrl = `${window.location.origin}/automate/webhook/${this._model.unique}`;
+        return html`
+            <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
+                <div slot="editor" class="webhook-url">
+                    <code>${webhookUrl}</code>
+                    <uui-button
+                        compact
+                        look="outline"
+                        label="Copy"
+                        @click=${() => navigator.clipboard.writeText(webhookUrl)}>
+                        <uui-icon name="icon-documents"></uui-icon>
+                    </uui-button>
+                </div>
+            </umb-property-layout>
         `;
     }
 
@@ -146,6 +168,18 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
+            }
+
+            .webhook-url {
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-3);
+            }
+
+            .webhook-url code {
+                flex: 1;
+                word-break: break-all;
+                font-size: var(--uui-size-4);
             }
         `,
     ];

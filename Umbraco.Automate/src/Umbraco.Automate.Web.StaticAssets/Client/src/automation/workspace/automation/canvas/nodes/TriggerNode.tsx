@@ -42,7 +42,7 @@ function TriggerNode({ data, id }: NodeProps) {
                             title="Delete"
                             type="button"
                         >
-                            ✕
+                            <uui-icon name="icon-trash"></uui-icon>
                         </button>
                         <button
                             className="ua-node__settings-btn"

@@ -23,7 +23,7 @@ using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
-using Umbraco.Automate.Tests.Common.Builders;
+using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Sync;
 using WorkflowCore.Interface;

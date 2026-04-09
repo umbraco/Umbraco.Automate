@@ -11,15 +11,18 @@ namespace Umbraco.Automate.Core.Execution;
 internal sealed class WorkflowHostLifecycle : BackgroundService
 {
     private readonly IWorkflowHost _workflowHost;
+    private readonly WorkflowDefinitionRecovery _definitionRecovery;
     private readonly AutomateReadinessSignal _readinessSignal;
     private readonly ILogger<WorkflowHostLifecycle> _logger;
 
     public WorkflowHostLifecycle(
         IWorkflowHost workflowHost,
+        WorkflowDefinitionRecovery definitionRecovery,
         AutomateReadinessSignal readinessSignal,
         ILogger<WorkflowHostLifecycle> logger)
     {
         _workflowHost = workflowHost;
+        _definitionRecovery = definitionRecovery;
         _readinessSignal = readinessSignal;
         _logger = logger;
     }
@@ -27,6 +30,10 @@ internal sealed class WorkflowHostLifecycle : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await _readinessSignal.WaitAsync(stoppingToken);
+
+        // Re-register workflow definitions for in-flight instances before starting the host,
+        // so WorkflowCore's poller can resume them without "not registered" errors.
+        await _definitionRecovery.RecoverAsync(stoppingToken);
 
         _logger.LogInformation("Starting WorkflowCore host");
         _workflowHost.Start();

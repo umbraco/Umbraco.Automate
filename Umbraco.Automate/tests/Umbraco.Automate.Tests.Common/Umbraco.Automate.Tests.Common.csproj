@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
     <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence\Umbraco.Automate.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\Umbraco.Automate.Testing\Umbraco.Automate.Testing.csproj" />
   </ItemGroup>
 
 </Project>

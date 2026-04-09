@@ -17,7 +17,7 @@ export class UaWorkspaceViewWorkspaceContext extends UaRoutableWorkspaceContext 
 
         this.observe(
             asObservable?.(),
-            (detail) => this.view.setTitle(detail?.name),
+            (detail) => this.setName(detail?.name),
             null,
         );
     }

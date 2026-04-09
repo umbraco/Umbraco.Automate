@@ -69,13 +69,32 @@ Push-Location "demo"
 dotnet new umbraco --force -n $SiteName --friendly-name "Administrator" --email "admin@example.com" --password "password1234" --development-database-type SQLite
 Pop-Location
 
-# Step 4: Install Clean starter kit
+# Step 4: Add dedicated Automate connection string
+# Umbraco.Automate requires umbracoAutomateDbDSN — add it to appsettings.Development.json
+Write-Host "Adding Umbraco Automate connection string..." -ForegroundColor Green
+$devSettingsPath = "demo\$SiteName\appsettings.Development.json"
+$devSettings = Get-Content $devSettingsPath -Raw | ConvertFrom-Json
+
+# Ensure ConnectionStrings section exists
+if (-not $devSettings.ConnectionStrings) {
+    $devSettings | Add-Member -NotePropertyName "ConnectionStrings" -NotePropertyValue ([PSCustomObject]@{})
+}
+
+# Add the dedicated Automate connection string (SQLite, separate database file)
+$devSettings.ConnectionStrings | Add-Member -NotePropertyName "umbracoAutomateDbDSN" `
+    -NotePropertyValue "Data Source=|DataDirectory|/UmbracoAutomate.sqlite.db;Cache=Shared;Foreign Keys=True;Pooling=True" -Force
+$devSettings.ConnectionStrings | Add-Member -NotePropertyName "umbracoAutomateDbDSN_ProviderName" `
+    -NotePropertyValue "Microsoft.Data.Sqlite" -Force
+
+$devSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $devSettingsPath -Encoding utf8 -Force
+
+# Step 5: Install Clean starter kit
 Write-Host "Installing Clean starter kit..." -ForegroundColor Green
 Push-Location "demo\$SiteName"
 dotnet add package Clean
 Pop-Location
 
-# Step 5: Configure NuGet sources and PackageSourceMapping
+# Step 6: Configure NuGet sources and PackageSourceMapping
 Write-Host "Configuring NuGet sources and package routing..." -ForegroundColor Green
 Push-Location "demo\$SiteName"
 
@@ -134,7 +153,7 @@ $configContent | Out-File -FilePath $nugetConfig -Encoding utf8 -Force
 
 Pop-Location
 
-# Step 6: Install Umbraco.Automate packages from feed
+# Step 7: Install Umbraco.Automate packages from feed
 Write-Host "Installing Umbraco.Automate packages from $Feed feed..." -ForegroundColor Green
 Push-Location "demo\$SiteName"
 
