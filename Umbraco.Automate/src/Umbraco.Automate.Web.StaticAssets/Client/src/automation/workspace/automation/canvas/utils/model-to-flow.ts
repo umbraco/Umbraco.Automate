@@ -9,6 +9,15 @@ import type { CanvasState, TriggerNodeData, ActionNodeData } from "../types.js";
 const TRIGGER_NODE_ID = "__trigger__";
 const DEFAULT_TRIGGER_POSITION = { x: 250, y: 50 };
 
+const IF_ALIAS = "umbracoAutomate.if";
+const SWITCH_ALIAS = "umbracoAutomate.switch";
+
+function getNodeType(actionAlias: string): string {
+    if (actionAlias === IF_ALIAS) return "if";
+    if (actionAlias === SWITCH_ALIAS) return "switch";
+    return "action";
+}
+
 export function modelToNodes(
     trigger: TriggerConfigurationModel | null,
     steps: StepConfigurationModel[],
@@ -32,18 +41,29 @@ export function modelToNodes(
     }
 
     for (const step of steps) {
+        const nodeType = getNodeType(step.actionAlias);
+        const label = step.name === step.actionAlias
+            ? (catalogueNames?.get(step.actionAlias) ?? step.name)
+            : step.name;
+
+        const data: ActionNodeData = {
+            stepId: step.id,
+            actionAlias: step.actionAlias,
+            label,
+            settings: step.settings,
+        };
+
+        // For switch nodes, extract case names from settings so the node can render dynamic handles
+        if (nodeType === "switch") {
+            const cases = step.settings?.Cases as Array<{ Name: string }> | undefined;
+            data.cases = cases?.map((c) => c.Name) ?? [];
+        }
+
         nodes.push({
             id: step.id,
-            type: "action",
+            type: nodeType,
             position: { x: step.position.x, y: step.position.y },
-            data: {
-                stepId: step.id,
-                actionAlias: step.actionAlias,
-                label: step.name === step.actionAlias
-                    ? (catalogueNames?.get(step.actionAlias) ?? step.name)
-                    : step.name,
-                settings: step.settings,
-            } satisfies ActionNodeData,
+            data,
         });
     }
 

@@ -117,6 +117,22 @@
     text-overflow: ellipsis;
 }
 
+/* Handle labels for branching nodes */
+.ua-node__handle-labels {
+    display: flex;
+    justify-content: space-around;
+    padding: 2px 8px 6px;
+    font-size: 10px;
+    color: var(--uui-color-text-alt, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ua-node__handle-label {
+    text-align: center;
+    flex: 1;
+}
+
 /* Edge label */
 .ua-edge__label {
     font-size: 11px;
@@ -166,4 +182,31 @@
 
 .dark .ua-node:hover {
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* Run status overlays */
+.run-status-completed .ua-node {
+    border-color: #22c55e;
+}
+
+.run-status-running .ua-node {
+    border-color: #f59e0b;
+}
+
+.run-status-failed .ua-node {
+    border-color: #ef4444;
+}
+
+.run-status-waitingforinput .ua-node {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+}
+
+.run-status-pending .ua-node {
+    opacity: 0.5;
+}
+
+.run-status-skipped .ua-node {
+    opacity: 0.4;
+    border-style: dashed;
 }

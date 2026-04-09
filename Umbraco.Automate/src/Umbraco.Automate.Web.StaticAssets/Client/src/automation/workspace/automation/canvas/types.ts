@@ -10,6 +10,7 @@ export interface ActionNodeData {
     actionAlias: string;
     label: string;
     settings: Record<string, unknown>;
+    cases?: string[];
     [key: string]: unknown;
 }
 
