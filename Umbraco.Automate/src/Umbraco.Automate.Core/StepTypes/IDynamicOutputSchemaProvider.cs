@@ -8,16 +8,11 @@ namespace Umbraco.Automate.Core.StepTypes;
 /// the step's configured settings (e.g. an AI agent action whose output schema is user-defined).
 /// </summary>
 /// <remarks>
-/// <para>
 /// When a step type implements this interface, the catalogue API exposes
 /// <c>hasDynamicOutputSchema: true</c> so the frontend knows to resolve the schema
 /// via a dedicated endpoint rather than relying on the static catalogue schema.
-/// </para>
-/// <para>
-/// Step types extending <see cref="StepTypeBase{TSettings,TOutput,TAttribute,TInfrastructure}"/>
-/// should override the typed <c>GetOutputSchemaAsync(TSettings?, CancellationToken)</c> virtual
-/// method and use the <c>ResolveOutputSchemaAsync</c> helper for the explicit interface bridge.
-/// </para>
+/// Use <see cref="IStepType.ResolveSettings"/> to convert the raw settings dictionary
+/// to a typed settings instance when needed.
 /// </remarks>
 public interface IDynamicOutputSchemaProvider
 {

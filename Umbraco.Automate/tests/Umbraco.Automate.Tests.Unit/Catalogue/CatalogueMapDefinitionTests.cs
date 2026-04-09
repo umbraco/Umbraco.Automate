@@ -112,7 +112,7 @@ public class CatalogueMapDefinitionTests
 
         Task<JsonSchema?> IDynamicOutputSchemaProvider.GetOutputSchemaAsync(
             Dictionary<string, object?>? settings, CancellationToken cancellationToken)
-            => ResolveOutputSchemaAsync(settings, cancellationToken);
+            => Task.FromResult<JsonSchema?>(null);
     }
 
     #endregion

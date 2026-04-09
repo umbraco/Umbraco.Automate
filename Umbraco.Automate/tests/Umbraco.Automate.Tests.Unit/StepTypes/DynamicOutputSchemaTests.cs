@@ -1,21 +1,14 @@
 using Json.Schema;
 using Json.Schema.Generation;
-using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
-using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
-using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Tests.Unit.StepTypes;
 
 public class DynamicOutputSchemaTests
 {
     private static readonly ActionInfrastructure ActionDeps = CreateActionInfrastructure();
-
-    private static readonly TriggerInfrastructure TriggerDeps = new(
-        Mock.Of<IEditableModelResolver>(),
-        Options.Create(new DeduplicationOptions()));
 
     [Fact]
     public void StaticAction_DoesNotImplementDynamicProvider()
@@ -83,21 +76,6 @@ public class DynamicOutputSchemaTests
         schema.ShouldBeNull();
     }
 
-    [Fact]
-    public async Task DefaultVirtual_GetOutputSchemaAsync_ReturnsSameAsStaticSchema()
-    {
-        var trigger = new StaticTrigger(TriggerDeps);
-
-        // Access the default virtual via the protected bridge on a non-dynamic step type.
-        // Since StaticTrigger doesn't override GetOutputSchemaAsync, both should match.
-        var staticSchema = trigger.GetOutputSchema();
-
-        staticSchema.ShouldNotBeNull();
-        var properties = staticSchema.GetKeyword<PropertiesKeyword>()?.Properties;
-        properties.ShouldNotBeNull();
-        properties.Keys.ShouldContain("value");
-    }
-
     private static ActionInfrastructure CreateActionInfrastructure()
     {
         var resolver = new Mock<IEditableModelResolver>();
@@ -125,11 +103,6 @@ public class DynamicOutputSchemaTests
         public string Name { get; set; } = string.Empty;
     }
 
-    private class StaticTriggerOutput
-    {
-        public int Value { get; set; }
-    }
-
     [Action("test.static", "Static Action")]
     private class StaticAction(ActionInfrastructure infrastructure)
         : ActionBase<object, StaticOutput>(infrastructure)
@@ -152,17 +125,13 @@ public class DynamicOutputSchemaTests
 
         Task<JsonSchema?> IDynamicOutputSchemaProvider.GetOutputSchemaAsync(
             Dictionary<string, object?>? settings, CancellationToken cancellationToken)
-            => ResolveOutputSchemaAsync(settings, cancellationToken);
-
-        protected override Task<JsonSchema?> GetOutputSchemaAsync(
-            DynamicSettings? settings, CancellationToken cancellationToken)
         {
-            if (settings?.SchemaType is null)
+            var typed = settings is { Count: > 0 } ? ResolveSettings(settings) : null;
+            if (typed?.SchemaType is null)
             {
                 return Task.FromResult<JsonSchema?>(null);
             }
 
-            // Build a schema dynamically based on settings
             var builder = new JsonSchemaBuilder()
                 .Type(SchemaValueType.Object)
                 .Properties(
@@ -171,10 +140,6 @@ public class DynamicOutputSchemaTests
             return Task.FromResult<JsonSchema?>(builder.Build());
         }
     }
-
-    [Trigger("test.staticTrigger", "Static Trigger")]
-    private class StaticTrigger(TriggerInfrastructure infrastructure)
-        : TriggerBase<object, StaticTriggerOutput>(infrastructure);
 
     #endregion
 }

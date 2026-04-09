@@ -158,12 +158,9 @@ public class ResolveStepTypeOutputSchemaControllerTests
 
         Task<JsonSchema?> IDynamicOutputSchemaProvider.GetOutputSchemaAsync(
             Dictionary<string, object?>? settings, CancellationToken cancellationToken)
-            => ResolveOutputSchemaAsync(settings, cancellationToken);
-
-        protected override Task<JsonSchema?> GetOutputSchemaAsync(
-            DynamicSettings? settings, CancellationToken cancellationToken)
         {
-            if (settings?.SchemaType is null)
+            var typed = settings is { Count: > 0 } ? ResolveSettings(settings) : null;
+            if (typed?.SchemaType is null)
             {
                 return Task.FromResult<JsonSchema?>(null);
             }

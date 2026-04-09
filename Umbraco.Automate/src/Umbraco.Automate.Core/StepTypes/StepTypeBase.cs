@@ -90,30 +90,6 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
     }
 
     /// <summary>
-    /// Override to provide a dynamic output schema based on the step's typed settings.
-    /// The default implementation returns the static CLR-based schema from <see cref="GetOutputSchema"/>.
-    /// </summary>
-    /// <param name="settings">The resolved typed settings, or null if unconfigured.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A JSON Schema describing the output, or null if no output is produced.</returns>
-    protected virtual Task<JsonSchema?> GetOutputSchemaAsync(TSettings? settings, CancellationToken cancellationToken = default)
-        => Task.FromResult(GetOutputSchema());
-
-    /// <summary>
-    /// Resolves settings from an untyped dictionary and delegates to the typed
-    /// <see cref="GetOutputSchemaAsync(TSettings?, CancellationToken)"/> virtual method.
-    /// Use this as the bridge when implementing <see cref="IDynamicOutputSchemaProvider"/>.
-    /// </summary>
-    /// <param name="settings">The raw settings dictionary, or null if unconfigured.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A JSON Schema describing the output, or null if no output is produced.</returns>
-    protected Task<JsonSchema?> ResolveOutputSchemaAsync(Dictionary<string, object?>? settings, CancellationToken cancellationToken = default)
-    {
-        var typed = settings is { Count: > 0 } ? ResolveSettings(settings) : null;
-        return GetOutputSchemaAsync(typed, cancellationToken);
-    }
-
-    /// <summary>
     /// Resolves settings from a raw dictionary to a typed <typeparamref name="TSettings"/> instance,
     /// applying configuration variable substitution and validation.
     /// </summary>
