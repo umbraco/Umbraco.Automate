@@ -146,9 +146,11 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
                     <uui-icon name=${isExpanded ? "icon-navigation-down" : "icon-navigation-right"}></uui-icon>
                     <umb-icon name=${icon}></umb-icon>
                     <span class="channel-name">${name}</span>
-                    <span class="channel-detail">${channel.notifyOn}</span>
+                    <span class="channel-detail">
+                        <uui-tag look="secondary" color="default">${channel.notifyOn}</uui-tag>
+                    </span>
                     ${!channel.isEnabled
-                        ? html`<uui-tag look="secondary" color="default">Disabled</uui-tag>`
+                        ? html`<uui-tag look="secondary" color="warning">Disabled</uui-tag>`
                         : nothing}
                     <uui-button
                         class="channel-delete"
@@ -266,6 +268,7 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
                 border: none;
                 background: var(--uui-color-surface);
                 cursor: pointer;
+                font-family: inherit;
                 font-size: var(--uui-type-default-size);
                 color: var(--uui-color-text);
             }
