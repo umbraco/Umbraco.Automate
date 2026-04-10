@@ -1,6 +1,9 @@
 import { UmbRepositoryBase } from "@umbraco-cms/backoffice/repository";
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
+import { tryExecute } from "@umbraco-cms/backoffice/resources";
+import { CatalogueService } from "../../api/sdk.gen.js";
 import { UaCatalogueServerDataSource } from "./catalogue.server.data-source.js";
+import type { NotificationChannelItemResponseModel } from "../../api/types.gen.js";
 import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
 
 export class UaCatalogueRepository extends UmbRepositoryBase {
@@ -61,6 +64,14 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
             this.#controlFlowsCache = result.data;
         }
         return result;
+    }
+
+    async requestNotificationChannels(): Promise<{ data?: NotificationChannelItemResponseModel[]; error?: unknown }> {
+        const { data, error } = await tryExecute(
+            this,
+            CatalogueService.getCatalogueNotificationChannels(),
+        );
+        return { data: data ?? undefined, error };
     }
 
     clearCache() {

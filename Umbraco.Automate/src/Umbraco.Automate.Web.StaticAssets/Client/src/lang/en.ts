@@ -98,6 +98,14 @@ export default {
         noStepRuns: "No step runs recorded for this execution.",
         noRecentActivity: "No recent activity.",
     },
+    uaNotifications: {
+        headline: "Notification Channels",
+        description: "Configure which notification channels fire when this automation completes, fails, or is suspended.",
+        channel: "Channel",
+        notifyOn: "Notify on",
+        addChannel: "Add notification channel",
+        noChannels: "No notification channels configured.",
+    },
     uaWorkspace: {
         deleteConfirm: "Are you sure you want to delete this workspace?",
         bulkDeleteConfirm: (count: number) =>

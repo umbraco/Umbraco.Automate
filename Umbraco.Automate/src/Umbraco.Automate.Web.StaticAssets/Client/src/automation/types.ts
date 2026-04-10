@@ -1,5 +1,6 @@
 import type { UmbEntityModel } from "@umbraco-cms/backoffice/entity";
 import type {
+    AutomationNotificationSettingsModel,
     AutomationStatusModel,
     TriggerConfigurationModel,
     StepConfigurationModel,
@@ -22,6 +23,7 @@ export interface UaAutomationDetailModel extends UmbEntityModel {
     steps: StepConfigurationModel[];
     connections: StepConnectionModel[];
     canvasState: string | null;
+    notificationSettings: AutomationNotificationSettingsModel | null;
     version: number;
     dateCreated: string;
     dateModified: string;

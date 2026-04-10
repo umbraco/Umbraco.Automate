@@ -31,6 +31,7 @@ export class UaAutomationDetailServerDataSource implements UmbDetailDataSource<U
             steps: [],
             connections: [],
             canvasState: null,
+            notificationSettings: null,
             version: 0,
             dateCreated: new Date().toISOString(),
             dateModified: new Date().toISOString(),

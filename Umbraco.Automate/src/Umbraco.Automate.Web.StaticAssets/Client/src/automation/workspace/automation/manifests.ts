@@ -58,6 +58,28 @@ export const manifests: Array<UmbExtensionManifest> = [
     },
     {
         type: "workspaceView",
+        alias: "UmbracoAutomate.Workspace.Automation.View.Notifications",
+        name: "Automation Notifications Workspace View",
+        js: () => import("./views/automation-notifications-workspace-view.element.js"),
+        weight: 120,
+        meta: {
+            label: "Notifications",
+            pathname: "notifications",
+            icon: "icon-message",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+            {
+                alias: UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
+                match: false,
+            },
+        ],
+    },
+    {
+        type: "workspaceView",
         alias: "UmbracoAutomate.Workspace.Automation.View.Info",
         name: "Automation Info Workspace View",
         js: () => import("./views/automation-info-workspace-view.element.js"),

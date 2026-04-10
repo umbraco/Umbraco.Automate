@@ -23,6 +23,7 @@ export const UaAutomationTypeMapper = {
             steps: response.steps,
             connections: response.connections,
             canvasState: response.canvasState ?? null,
+            notificationSettings: response.notificationSettings ?? null,
             version: response.version,
             dateCreated: response.dateCreated,
             dateModified: response.dateModified,
@@ -56,6 +57,7 @@ export const UaAutomationTypeMapper = {
             steps: model.steps,
             connections: model.connections,
             canvasState: model.canvasState,
+            notificationSettings: model.notificationSettings,
             version: model.version,
         };
     },
@@ -70,6 +72,7 @@ export const UaAutomationTypeMapper = {
             steps: model.steps,
             connections: model.connections,
             canvasState: model.canvasState,
+            notificationSettings: model.notificationSettings,
             version: model.version,
         };
     },
