@@ -1,8 +1,9 @@
 import { css, html, customElement, property, repeat, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import type { UmbPropertyEditorUiElement } from "@umbraco-cms/backoffice/property-editor";
+import type { UmbPropertyEditorUiElement, UmbPropertyEditorConfigCollection } from "@umbraco-cms/backoffice/property-editor";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
+import type { BindingSource } from "../../utils/binding-context.utils.js";
 import type { ConditionSet } from "../condition-builder/condition-builder.element.js";
 import "../condition-builder/condition-builder.element.js";
 
@@ -28,6 +29,17 @@ function createEmptyCase(): SwitchCase {
 export class UaSwitchCaseBuilderElement extends UmbLitElement implements UmbPropertyEditorUiElement {
     @property({ attribute: false })
     value: SwitchCase[] = [];
+
+    @property({ type: Array })
+    bindingSources: BindingSource[] = [];
+
+    public set config(config: UmbPropertyEditorConfigCollection | undefined) {
+        if (!config) return;
+        const sources = config.getValueByAlias<BindingSource[]>("bindingSources");
+        if (sources) {
+            this.bindingSources = sources;
+        }
+    }
 
     #cloneValue(): SwitchCase[] {
         return structuredClone(this.value);
@@ -90,6 +102,7 @@ export class UaSwitchCaseBuilderElement extends UmbLitElement implements UmbProp
                 ></uui-input>
                 <ua-condition-builder
                     .value=${caseItem.Conditions}
+                    .bindingSources=${this.bindingSources}
                     @change=${(e: Event) => this.#onConditionsChange(caseIndex, e)}
                 ></ua-condition-builder>
             </uui-box>

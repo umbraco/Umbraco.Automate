@@ -1,10 +1,9 @@
 import { css, html, customElement, property, repeat, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import type { UmbPropertyEditorUiElement } from "@umbraco-cms/backoffice/property-editor";
+import type { UmbPropertyEditorUiElement, UmbPropertyEditorConfigCollection } from "@umbraco-cms/backoffice/property-editor";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
-import "../binding-picker/binding-picker-button.element.js";
 
 export type ConditionOperator =
     | "Equals"
@@ -79,6 +78,14 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
     @property({ type: Array })
     bindingSources: BindingSource[] = [];
 
+    public set config(config: UmbPropertyEditorConfigCollection | undefined) {
+        if (!config) return;
+        const sources = config.getValueByAlias<BindingSource[]>("bindingSources");
+        if (sources) {
+            this.bindingSources = sources;
+        }
+    }
+
     #cloneValue(): ConditionSet {
         const val = this.value ?? createDefaultValue();
         const clone = structuredClone(val);
@@ -98,24 +105,6 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
         const input = e.target as HTMLInputElement;
         const newValue = this.#cloneValue();
         newValue.Groups[groupIndex].Conditions[conditionIndex].LeftOperand = input.value;
-        this.#emitChange(newValue);
-    }
-
-    #onBindingSelectLeft(groupIndex: number, conditionIndex: number, e: CustomEvent<{ expression: string }>) {
-        const newValue = this.#cloneValue();
-        const condition = newValue.Groups[groupIndex].Conditions[conditionIndex];
-        condition.LeftOperand = condition.LeftOperand
-            ? `${condition.LeftOperand}${e.detail.expression}`
-            : e.detail.expression;
-        this.#emitChange(newValue);
-    }
-
-    #onBindingSelectRight(groupIndex: number, conditionIndex: number, e: CustomEvent<{ expression: string }>) {
-        const newValue = this.#cloneValue();
-        const condition = newValue.Groups[groupIndex].Conditions[conditionIndex];
-        condition.RightOperand = condition.RightOperand
-            ? `${condition.RightOperand}${e.detail.expression}`
-            : e.detail.expression;
         this.#emitChange(newValue);
     }
 
@@ -161,6 +150,25 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
         this.#emitChange(newValue);
     }
 
+    #getBindingOptions(selectedValue: string): Array<{ name: string; value: string; selected: boolean }> {
+        const options: Array<{ name: string; value: string; selected: boolean }> = [
+            { name: this.localize.term("uaConditionBuilder_selectBinding"), value: "", selected: !selectedValue },
+        ];
+
+        for (const source of this.bindingSources) {
+            for (const leaf of source.leaves) {
+                const expression = `\${ ${source.bindingPrefix}.${leaf.path} }`;
+                options.push({
+                    name: `${source.label} — ${leaf.path}`,
+                    value: expression,
+                    selected: expression === selectedValue,
+                });
+            }
+        }
+
+        return options;
+    }
+
     #renderCondition(groupIndex: number, conditionIndex: number, condition: Condition, conditionCount: number) {
         const isUnary = UNARY_OPERATORS.includes(condition.Operator);
         const operatorOptions = OPERATOR_OPTIONS.map((opt) => ({
@@ -172,20 +180,19 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
 
         return html`
             <div class="condition-row">
-                <div class="operand-wrapper">
-                    <uui-input
-                        class="operand-input"
-                        placeholder=${this.localize.term("uaConditionBuilder_leftOperandPlaceholder")}
-                        .value=${condition.LeftOperand}
-                        @change=${(e: Event) => this.#onLeftOperandChange(groupIndex, conditionIndex, e)}
-                    ></uui-input>
-                    ${hasBindingSources
-                        ? html`<ua-binding-picker-button
-                              .sources=${this.bindingSources}
-                              @ua:binding-select=${(e: CustomEvent<{ expression: string }>) => this.#onBindingSelectLeft(groupIndex, conditionIndex, e)}
-                          ></ua-binding-picker-button>`
-                        : nothing}
-                </div>
+                ${hasBindingSources
+                    ? html`<uui-select
+                          class="operand-input"
+                          label=${this.localize.term("uaConditionBuilder_leftOperandPlaceholder")}
+                          .options=${this.#getBindingOptions(condition.LeftOperand)}
+                          @change=${(e: Event) => this.#onLeftOperandChange(groupIndex, conditionIndex, e)}
+                      ></uui-select>`
+                    : html`<uui-input
+                          class="operand-input"
+                          placeholder=${this.localize.term("uaConditionBuilder_leftOperandPlaceholder")}
+                          .value=${condition.LeftOperand}
+                          @change=${(e: Event) => this.#onLeftOperandChange(groupIndex, conditionIndex, e)}
+                      ></uui-input>`}
 
                 <uui-select
                     class="operator-select"
@@ -196,20 +203,12 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
                 ${isUnary
                     ? nothing
                     : html`
-                          <div class="operand-wrapper">
-                              <uui-input
-                                  class="operand-input"
-                                  placeholder=${this.localize.term("uaConditionBuilder_rightOperandPlaceholder")}
-                                  .value=${condition.RightOperand}
-                                  @change=${(e: Event) => this.#onRightOperandChange(groupIndex, conditionIndex, e)}
-                              ></uui-input>
-                              ${hasBindingSources
-                                  ? html`<ua-binding-picker-button
-                                        .sources=${this.bindingSources}
-                                        @ua:binding-select=${(e: CustomEvent<{ expression: string }>) => this.#onBindingSelectRight(groupIndex, conditionIndex, e)}
-                                    ></ua-binding-picker-button>`
-                                  : nothing}
-                          </div>
+                          <uui-input
+                              class="operand-input"
+                              placeholder=${this.localize.term("uaConditionBuilder_rightOperandPlaceholder")}
+                              .value=${condition.RightOperand}
+                              @change=${(e: Event) => this.#onRightOperandChange(groupIndex, conditionIndex, e)}
+                          ></uui-input>
                       `}
 
                 ${conditionCount > 1
@@ -336,19 +335,9 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
                 gap: var(--uui-size-space-3);
             }
 
-            .operand-wrapper {
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                flex: 1;
-            }
-
-            .operand-input {
-                flex: 1;
-            }
-
+            .operand-input,
             .operator-select {
-                min-width: 140px;
+                flex: 1;
             }
 
             .remove-btn,
