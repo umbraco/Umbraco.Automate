@@ -188,6 +188,7 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
                               ${fields.length > 0
                                   ? html`
                                         <ua-settings-form
+                                            no-box
                                             .fields=${fields}
                                             .values=${channel.settings}
                                             @ua:settings-change=${(e: CustomEvent<{ settings: Record<string, unknown> }>) => this.#onSettingsChange(index, e)}
