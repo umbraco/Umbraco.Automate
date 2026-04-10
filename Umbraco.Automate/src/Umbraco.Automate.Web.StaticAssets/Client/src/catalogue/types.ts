@@ -15,10 +15,13 @@ export interface UaTriggerCatalogueItemModel extends UaCatalogueItemModel {
 
 export interface UaActionCatalogueItemModel extends UaCatalogueItemModel {
     connectionTypeAlias: string | null;
+    outputSchema: { [key: string]: unknown } | null;
 }
 
 export interface UaConnectionTypeCatalogueItemModel extends UaCatalogueItemModel {}
 
-export interface UaControlFlowCatalogueItemModel extends UaCatalogueItemModel {}
+export interface UaControlFlowCatalogueItemModel extends UaCatalogueItemModel {
+    outputSchema: { [key: string]: unknown } | null;
+}
 
 export type UaCatalogueMode = "trigger" | "action";

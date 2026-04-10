@@ -3,6 +3,8 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
 import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.js";
+import type { BindingSource } from "../../utils/binding-context.utils.js";
+import { BINDING_TEXT_BOX_UI_ALIAS } from "../binding-text-box/manifests.js";
 
 export interface SettingsChangeDetail {
     settings: Record<string, unknown>;
@@ -23,6 +25,9 @@ export class UaSettingsFormElement extends UmbLitElement {
 
     @property({ type: Boolean, attribute: "no-box" })
     noBox = false;
+
+    @property({ type: Array })
+    bindingSources: BindingSource[] = [];
 
     @state()
     private _propertyValues: UmbPropertyValueData[] = [];
@@ -130,14 +135,38 @@ export class UaSettingsFormElement extends UmbLitElement {
         return Object.entries(config).map(([alias, value]) => ({ alias, value }));
     }
 
+    #resolveEditorAlias(field: EditableModelFieldDescriptorModel): string {
+        // When bindings are available and the field supports them, swap the default
+        // TextBox for our binding-aware variant that shows the picker button inline.
+        if (field.supportsBindings && this.bindingSources.length > 0) {
+            const alias = field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox";
+            if (alias === "Umb.PropertyEditorUi.TextBox") {
+                return BINDING_TEXT_BOX_UI_ALIAS;
+            }
+        }
+        return field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox";
+    }
+
+    #buildFieldConfig(field: EditableModelFieldDescriptorModel): Array<{ alias: string; value: unknown }> {
+        const config = field.editorConfig ? this.#toPropertyConfig(field.editorConfig) : [];
+
+        // Inject binding sources into the property editor config so the
+        // binding text box can render its picker button.
+        if (field.supportsBindings && this.bindingSources.length > 0) {
+            config.push({ alias: "bindingSources", value: this.bindingSources });
+        }
+
+        return config;
+    }
+
     #renderField(field: EditableModelFieldDescriptorModel) {
         return html`
             <umb-property
                 label=${this.localize.string(field.label)}
-                description=${this.localize.string(field.description ?? "")}
+                description=${field.description ?? ""}
                 alias=${field.key}
-                property-editor-ui-alias=${field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox"}
-                .config=${field.editorConfig ? this.#toPropertyConfig(field.editorConfig) : []}
+                property-editor-ui-alias=${this.#resolveEditorAlias(field)}
+                .config=${this.#buildFieldConfig(field)}
                 .validation=${{
                 mandatory: field.isRequired,
                 mandatoryMessage: field.isRequired

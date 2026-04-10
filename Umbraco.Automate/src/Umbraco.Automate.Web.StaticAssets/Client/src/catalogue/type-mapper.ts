@@ -11,6 +11,7 @@ export const UaCatalogueTypeMapper = {
             icon: response.icon ?? null,
             settingsSchema: response.settingsSchema ?? null,
             connectionTypeAlias: response.connectionTypeAlias ?? null,
+            outputSchema: response.outputSchema ?? null,
         };
     },
 
@@ -45,6 +46,7 @@ export const UaCatalogueTypeMapper = {
             group: response.group ?? null,
             icon: response.icon ?? null,
             settingsSchema: response.settingsSchema ?? null,
+            outputSchema: response.outputSchema ?? null,
         };
     },
 };

@@ -161,6 +161,11 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 actionName: catalogueItem.name,
                 settings: step.settings,
                 schema: catalogueItem.schema,
+                automationContext: {
+                    trigger: this._model.trigger ?? null,
+                    steps: this._model.steps,
+                    connections: this._model.connections,
+                },
             },
         });
 
