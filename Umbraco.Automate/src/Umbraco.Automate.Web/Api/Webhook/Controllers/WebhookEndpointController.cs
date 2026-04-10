@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +8,7 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Cms.Api.Common.Attributes;
 
@@ -24,13 +24,10 @@ namespace Umbraco.Automate.Web.Api.Webhook.Controllers;
 [ApiExplorerSettings(GroupName = "Webhooks")]
 public sealed class WebhookEndpointController : ControllerBase
 {
-    internal const string SecretHeaderName = "X-Webhook-Secret";
-    internal const string SecretQueryParam = "secret";
-    internal const string SignatureHeaderName = "X-Webhook-Signature";
-
     private readonly IAutomationService _automationService;
     private readonly ITriggerDispatcher _dispatcher;
     private readonly TriggerCollection _triggers;
+    private readonly WebhookAuthenticatorCollection _authenticators;
     private readonly IOptions<WebhookOptions> _webhookOptions;
     private readonly ILogger<WebhookEndpointController> _logger;
 
@@ -39,12 +36,14 @@ public sealed class WebhookEndpointController : ControllerBase
         IAutomationService automationService,
         ITriggerDispatcher dispatcher,
         TriggerCollection triggers,
+        WebhookAuthenticatorCollection authenticators,
         IOptions<WebhookOptions> webhookOptions,
         ILogger<WebhookEndpointController> logger)
     {
         _automationService = automationService;
         _dispatcher = dispatcher;
         _triggers = triggers;
+        _authenticators = authenticators;
         _webhookOptions = webhookOptions;
         _logger = logger;
     }
@@ -113,13 +112,26 @@ public sealed class WebhookEndpointController : ControllerBase
             });
         }
 
-        // Plain secret validation (when signature mode is off).
-        // Checked before body reading since it doesn't need the body.
-        if (!string.IsNullOrEmpty(triggerSettings?.Secret)
-            && !triggerSettings.ValidateSignature
-            && !ValidateSecret(triggerSettings.Secret))
+        // Pre-body authentication for authenticators that don't need the body (e.g. plain-secret).
+        // Custom authenticator takes precedence over the built-in ValidateSignature toggle.
+        var authenticator = ResolveAuthenticator(triggerSettings);
+        if (authenticator is not null
+            && !string.IsNullOrEmpty(triggerSettings?.Secret)
+            && authenticator.Alias == "plain-secret")
         {
-            return Unauthorized();
+            var preBodyContext = new WebhookAuthenticationContext
+            {
+                Request = Request,
+                Body = null,
+                Secret = triggerSettings.Secret,
+            };
+            if (!authenticator.Validate(preBodyContext))
+            {
+                return Unauthorized();
+            }
+
+            // Already validated — skip post-body check.
+            authenticator = null;
         }
 
         // Validate payload size before reading into memory.
@@ -177,13 +189,19 @@ public sealed class WebhookEndpointController : ControllerBase
             }
         }
 
-        // HMAC-SHA256 signature validation (when signature mode is on).
-        // Must happen after body reading since the signature covers the body.
-        if (!string.IsNullOrEmpty(triggerSettings?.Secret)
-            && triggerSettings.ValidateSignature
-            && !ValidateSignature(triggerSettings.Secret, body ?? string.Empty))
+        // Post-body authentication (HMAC-SHA256 or custom authenticators that need the body).
+        if (authenticator is not null && !string.IsNullOrEmpty(triggerSettings?.Secret))
         {
-            return Unauthorized();
+            var postBodyContext = new WebhookAuthenticationContext
+            {
+                Request = Request,
+                Body = body,
+                Secret = triggerSettings.Secret,
+            };
+            if (!authenticator.Validate(postBodyContext))
+            {
+                return Unauthorized();
+            }
         }
 
         var output = new WebhookTriggerOutput
@@ -213,60 +231,37 @@ public sealed class WebhookEndpointController : ControllerBase
         return Accepted();
     }
 
-    private bool ValidateSecret(string expectedSecret)
+    /// <summary>
+    /// Resolves the appropriate authenticator based on trigger settings.
+    /// Custom authenticator alias takes precedence, then falls back to built-in
+    /// plain-secret or hmac-sha256 based on the ValidateSignature flag.
+    /// </summary>
+    private IWebhookAuthenticator? ResolveAuthenticator(WebhookTriggerSettings? settings)
     {
-        // Check header first, then query param fallback.
-        var providedSecret = Request.Headers[SecretHeaderName].FirstOrDefault()
-                             ?? Request.Query[SecretQueryParam].FirstOrDefault();
-
-        if (string.IsNullOrEmpty(providedSecret))
+        if (string.IsNullOrEmpty(settings?.Secret))
         {
-            return false;
+            return null;
         }
 
-        // Constant-time comparison to prevent timing attacks.
-        return CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(expectedSecret),
-            System.Text.Encoding.UTF8.GetBytes(providedSecret));
-    }
-
-    private bool ValidateSignature(string secret, string body)
-    {
-        // Expect header format: "sha256=<hex>"
-        var header = Request.Headers[SignatureHeaderName].FirstOrDefault();
-        if (string.IsNullOrEmpty(header) || !header.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
+        // Custom authenticator alias takes precedence.
+        if (!string.IsNullOrEmpty(settings.AuthenticatorAlias))
         {
-            return false;
+            var custom = _authenticators.GetByAlias(settings.AuthenticatorAlias);
+            if (custom is null)
+            {
+                _logger.LogWarning(
+                    "Webhook authenticator '{Alias}' not found, falling back to built-in",
+                    settings.AuthenticatorAlias);
+            }
+            else
+            {
+                return custom;
+            }
         }
 
-        var providedHex = header["sha256=".Length..];
-
-        // Validate hex length before parsing (SHA-256 = 64 hex chars).
-        if (providedHex.Length != 64)
-        {
-            return false;
-        }
-
-        byte[] providedBytes;
-        try
-        {
-            providedBytes = Convert.FromHexString(providedHex);
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-
-        var expectedBytes = ComputeHmacSha256Bytes(body, secret);
-
-        // Constant-time comparison on raw bytes to prevent timing attacks.
-        return CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes);
-    }
-
-    private static byte[] ComputeHmacSha256Bytes(string payload, string secret)
-    {
-        var keyBytes = System.Text.Encoding.UTF8.GetBytes(secret);
-        var payloadBytes = System.Text.Encoding.UTF8.GetBytes(payload);
-        return HMACSHA256.HashData(keyBytes, payloadBytes);
+        // Fall back to built-in based on ValidateSignature toggle.
+        return settings.ValidateSignature
+            ? _authenticators.GetByAlias("hmac-sha256")
+            : _authenticators.GetByAlias("plain-secret");
     }
 }

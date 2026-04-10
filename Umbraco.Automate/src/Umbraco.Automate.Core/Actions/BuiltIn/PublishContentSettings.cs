@@ -8,9 +8,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class PublishContentSettings
 {
     /// <summary>
-    /// Gets or sets the key (GUID) of the content item to publish. Supports binding syntax.
+    /// Gets or sets the key (GUID) of the content item to publish.
     /// </summary>
-    [Field(Label = "Content Key", Description = "The key of the content item to publish. Supports ${ binding } syntax.", SupportsBindings = true)]
+    [Field(Label = "Content Key", Description = "The key of the content item to publish.", SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>

@@ -25,6 +25,7 @@ export default {
         draft: "Draft",
         published: "Published",
         inactive: "Inactive",
+        requestedAt: "Requested At",
         id: "Id",
         type: "Type",
         version: "Version",
@@ -78,6 +79,12 @@ export default {
         noResults: "No items found",
         loadError: "Failed to load catalogue items",
     },
+    uaBindings: {
+        insertExpression: "Insert Binding Expression",
+        filterPlaceholder: "Filter bindings...",
+        noData: "No binding data available.",
+        noResults: "No matching bindings found.",
+    },
     uaSettings: {
         noSettings: "This item has no configurable settings.",
     },
@@ -109,6 +116,17 @@ export default {
         value: "Value",
         backToList: "Back to connections",
     },
+    uaApproval: {
+        dashboardTitle: "Approvals",
+        approve: "Approve",
+        reject: "Reject",
+        comment: "Comment",
+        commentPlaceholder: "Add an optional comment...",
+        promptLabel: "Approval Request",
+        noApprovals: "No pending approvals.",
+        decisionSuccess: "Decision submitted successfully.",
+        decisionError: "Failed to submit decision.",
+    },
     uaDashboard: {
         overview: "Overview",
         recentActivity: "Recent Activity",
@@ -120,6 +138,24 @@ export default {
         welcomeBodyHasWorkspaces:
             "Your workspace is ready. Select it from the Automations tree on the left to create your first automation.",
         welcomeCta: "Create a Workspace",
+    },
+    uaConditionBuilder: {
+        addCondition: "Add condition",
+        addGroup: "Add group",
+        removeCondition: "Remove condition",
+        removeGroup: "Remove group",
+        selectBinding: "Select a binding...",
+        leftOperandPlaceholder: "Value or ${binding}",
+        rightOperandPlaceholder: "Value",
+        and: "AND",
+        or: "OR",
+    },
+    uaSwitchCaseBuilder: {
+        addCase: "Add case",
+        removeCase: "Remove case",
+        caseNamePlaceholder: "e.g. high-priority",
+        caseName: "Case name",
+        defaultInfo: "Cases are evaluated in order. The first matching case wins. A 'default' outcome handles unmatched conditions.",
     },
     uaVersionHistory: {
         history: "History",

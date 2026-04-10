@@ -13,7 +13,8 @@ public sealed class WhileControlFlowSettings
     /// </summary>
     [Field(Label = "Conditions",
         Description = "Define conditions that must be true for the loop to continue.",
-        EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.ConditionBuilder")]
+        EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.ConditionBuilder",
+        SupportsBindings = true)]
     public ConditionSet Conditions { get; set; } = new();
 
     /// <summary>

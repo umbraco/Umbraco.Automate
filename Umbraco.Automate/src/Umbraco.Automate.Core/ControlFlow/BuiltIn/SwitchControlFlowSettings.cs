@@ -14,6 +14,7 @@ public sealed class SwitchControlFlowSettings
     /// </summary>
     [Field(Label = "Cases",
         Description = "Define named cases with conditions. Cases are evaluated in order; the first match wins. A 'default' outcome is used when no case matches.",
-        EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.SwitchCaseBuilder")]
+        EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.SwitchCaseBuilder",
+        SupportsBindings = true)]
     public List<SwitchCase> Cases { get; set; } = [];
 }

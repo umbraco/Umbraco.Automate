@@ -14,7 +14,13 @@ public sealed class WorkspaceSavingNotification(Workspace target, EventMessages 
 /// Notification fired after a workspace has been saved.
 /// </summary>
 public sealed class WorkspaceSavedNotification(Workspace target, EventMessages messages)
-    : ObjectNotification<Workspace>(target, messages);
+    : ObjectNotification<Workspace>(target, messages)
+{
+    /// <summary>
+    /// Gets the saved workspace.
+    /// </summary>
+    public Workspace Workspace { get; } = target;
+}
 
 /// <summary>
 /// Notification fired before a workspace is deleted. Can be cancelled.
@@ -26,4 +32,10 @@ public sealed class WorkspaceDeletingNotification(Workspace target, EventMessage
 /// Notification fired after a workspace has been deleted.
 /// </summary>
 public sealed class WorkspaceDeletedNotification(Workspace target, EventMessages messages)
-    : ObjectNotification<Workspace>(target, messages);
+    : ObjectNotification<Workspace>(target, messages)
+{
+    /// <summary>
+    /// Gets the deleted workspace.
+    /// </summary>
+    public Workspace Workspace { get; } = target;
+}

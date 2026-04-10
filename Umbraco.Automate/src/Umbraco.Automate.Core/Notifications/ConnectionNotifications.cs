@@ -14,7 +14,13 @@ public sealed class ConnectionSavingNotification(Connection target, EventMessage
 /// Notification fired after a connection has been saved.
 /// </summary>
 public sealed class ConnectionSavedNotification(Connection target, EventMessages messages)
-    : ObjectNotification<Connection>(target, messages);
+    : ObjectNotification<Connection>(target, messages)
+{
+    /// <summary>
+    /// Gets the saved connection.
+    /// </summary>
+    public Connection Connection { get; } = target;
+}
 
 /// <summary>
 /// Notification fired before a connection is deleted. Can be cancelled.
@@ -26,4 +32,10 @@ public sealed class ConnectionDeletingNotification(Connection target, EventMessa
 /// Notification fired after a connection has been deleted.
 /// </summary>
 public sealed class ConnectionDeletedNotification(Connection target, EventMessages messages)
-    : ObjectNotification<Connection>(target, messages);
+    : ObjectNotification<Connection>(target, messages)
+{
+    /// <summary>
+    /// Gets the deleted connection.
+    /// </summary>
+    public Connection Connection { get; } = target;
+}

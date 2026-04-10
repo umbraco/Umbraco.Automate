@@ -63,15 +63,19 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
     async #buildCatalogueNames(): Promise<Map<string, string>> {
         const names = new Map<string, string>();
-        const [triggers, actions] = await Promise.all([
+        const [triggers, actions, controlFlows] = await Promise.all([
             this.#catalogueRepository.requestTriggers(),
             this.#catalogueRepository.requestActions(),
+            this.#catalogueRepository.requestControlFlows(),
         ]);
         for (const t of triggers.data ?? []) {
             names.set(t.alias, t.name);
         }
         for (const a of actions.data ?? []) {
             names.set(a.alias, a.name);
+        }
+        for (const cf of controlFlows.data ?? []) {
+            names.set(cf.alias, cf.name);
         }
         return names;
     }
@@ -157,6 +161,11 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 actionName: catalogueItem.name,
                 settings: step.settings,
                 schema: catalogueItem.schema,
+                automationContext: {
+                    trigger: this._model.trigger ?? null,
+                    steps: this._model.steps,
+                    connections: this._model.connections,
+                },
             },
         });
 
@@ -179,10 +188,16 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     }
 
     async #getActionCatalogueItem(alias: string): Promise<{ name: string; schema: EditableModelSchemaModel } | null> {
-        const { data } = await this.#catalogueRepository.requestActions();
-        const action = data?.find((a) => a.alias === alias);
-        if (!action?.settingsSchema) return null;
-        return { name: action.name, schema: action.settingsSchema };
+        // Check actions first, then control flows
+        const { data: actions } = await this.#catalogueRepository.requestActions();
+        const action = actions?.find((a) => a.alias === alias);
+        if (action?.settingsSchema) return { name: action.name, schema: action.settingsSchema };
+
+        const { data: controlFlows } = await this.#catalogueRepository.requestControlFlows();
+        const cf = controlFlows?.find((c) => c.alias === alias);
+        if (cf?.settingsSchema) return { name: cf.name, schema: cf.settingsSchema };
+
+        return null;
     }
 
     async #onNodeDeleteRequest(event: CustomEvent<NodeDeleteRequestDetail>) {
@@ -223,7 +238,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
         const modal = modalManager.open(this, UA_NODE_PICKER_MODAL, {
-            data: { mode: "action" },
+            data: { mode: "action", workspaceId: this._model?.workspaceId },
         });
 
         try {
@@ -257,7 +272,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
         const modal = modalManager.open(this, UA_NODE_PICKER_MODAL, {
-            data: { mode: "trigger" },
+            data: { mode: "trigger", workspaceId: this._model?.workspaceId },
         });
 
         try {
@@ -279,7 +294,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
         const modal = modalManager.open(this, UA_NODE_PICKER_MODAL, {
-            data: { mode: "action" },
+            data: { mode: "action", workspaceId: this._model?.workspaceId },
         });
 
         try {

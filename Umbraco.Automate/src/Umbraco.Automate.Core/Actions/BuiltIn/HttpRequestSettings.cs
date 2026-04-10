@@ -10,7 +10,7 @@ public sealed class HttpRequestSettings
     /// <summary>
     /// Gets or sets the request URL.
     /// </summary>
-    [Field(Label = "URL", Description = "The URL to send the request to. Supports ${ binding } syntax.", SupportsBindings = true)]
+    [Field(Label = "URL", Description = "The URL to send the request to.", SupportsBindings = true)]
     public string Url { get; set; } = string.Empty;
 
     /// <summary>
@@ -22,7 +22,7 @@ public sealed class HttpRequestSettings
     /// <summary>
     /// Gets or sets the request body (for POST, PUT, PATCH).
     /// </summary>
-    [Field(Label = "Body", Description = "The request body content. Supports ${ binding } syntax.", SortOrder = 2, SupportsBindings = true)]
+    [Field(Label = "Body", Description = "The request body content.", SortOrder = 2, SupportsBindings = true)]
     public string? Body { get; set; }
 
     /// <summary>
@@ -34,6 +34,6 @@ public sealed class HttpRequestSettings
     /// <summary>
     /// Gets or sets custom headers as a JSON object string (key-value pairs).
     /// </summary>
-    [Field(Label = "Headers", Description = "Custom headers as JSON object (e.g. {\"Authorization\": \"Bearer token\"}). Supports ${ binding } syntax.", SortOrder = 4, IsSensitive = true, SupportsBindings = true)]
+    [Field(Label = "Headers", Description = "Custom headers as JSON object (e.g. {\"Authorization\": \"Bearer token\"}).", SortOrder = 4, IsSensitive = true, SupportsBindings = true)]
     public string? Headers { get; set; }
 }

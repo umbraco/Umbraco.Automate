@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
@@ -20,12 +21,15 @@ internal static class JsonOptions
     /// <summary>
     /// Options for settings deserialization where JSON from the frontend (camelCase)
     /// is mapped to PascalCase POCO models. Case-insensitive to bridge the naming gap.
+    /// Includes string enum converter for settings that contain enum-typed properties
+    /// (e.g. ConditionOperator in IfControlFlowSettings).
     /// </summary>
     public static readonly JsonSerializerOptions Settings = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
         WriteIndented = false,
+        Converters = { new JsonStringEnumConverter() },
     };
 
     /// <summary>

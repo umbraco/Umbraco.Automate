@@ -6,7 +6,7 @@ export const UA_NODE_SETTINGS_MODAL = new UmbModalToken<UaNodeSettingsModalData,
     {
         modal: {
             type: "sidebar",
-            size: "small",
+            size: "medium",
         },
     },
 );

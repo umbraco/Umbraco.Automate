@@ -49,13 +49,20 @@ export function flowToSteps(
 const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
 
 export function flowToConnections(edges: Edge[]): StepConnectionModel[] {
-    return edges.map((edge) => ({
-        sourceStepId: edge.source === TRIGGER_NODE_ID ? EMPTY_GUID : edge.source,
-        sourceHandle: edge.sourceHandle ?? null,
-        targetStepId: edge.target,
-        targetHandle: edge.targetHandle ?? null,
-        outcome: (edge.label as string) ?? null,
-    }));
+    return edges.map((edge) => {
+        const conn: StepConnectionModel & Record<string, unknown> = {
+            sourceStepId: edge.source === TRIGGER_NODE_ID ? EMPTY_GUID : edge.source,
+            sourceHandle: edge.sourceHandle ?? null,
+            targetStepId: edge.target,
+            targetHandle: edge.targetHandle ?? null,
+            outcome: (edge.label as string) ?? null,
+        };
+        const filter = (edge.data as Record<string, unknown> | undefined)?.filter;
+        if (filter) {
+            conn.filter = filter;
+        }
+        return conn;
+    });
 }
 
 export function flowToCanvasState(

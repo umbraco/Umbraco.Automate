@@ -123,16 +123,18 @@ export default function AutomationCanvas({
     const edgesRef = useRef(edges);
     edgesRef.current = edges;
 
-    // Prevent self-loops and cycles. Reconnection from an already-connected node is
-    // allowed because onConnect replaces the existing edge (single linear path enforcement).
+    // Prevent self-loops and cycles. For branching nodes (If/Switch), each source handle
+    // can have one outgoing edge. For regular nodes, only one outgoing edge total.
     const isValidConnection = useCallback(
         (connection: Edge | Connection) => {
             if (connection.source === connection.target) return false;
 
             // Walk the edge chain from target forward — if we reach source, it's a cycle.
-            // Exclude edges that would be replaced by this connection (same source or same target).
+            // Exclude edges that would be replaced by this connection (same source+handle or same target).
             const remaining = edgesRef.current.filter(
-                (e) => e.source !== connection.source && e.target !== connection.target,
+                (e) =>
+                    !(e.source === connection.source && (e.sourceHandle ?? null) === (connection.sourceHandle ?? null)) &&
+                    e.target !== connection.target,
             );
             let current: string | null = connection.target;
             const visited = new Set<string>();
@@ -151,13 +153,17 @@ export default function AutomationCanvas({
     const onConnect: OnConnect = useCallback(
         (params) => {
             setEdges((eds) => {
-                // Remove any existing edge from the same source or to the same target
-                // so a new connection replaces the old one (single linear path).
+                // Remove any existing edge from the same source+handle or to the same target.
+                // For branching nodes (If/Switch), each handle can have one connection.
                 const filtered = eds.filter(
-                    (e) => e.source !== params.source && e.target !== params.target,
+                    (e) =>
+                        !(e.source === params.source && (e.sourceHandle ?? null) === (params.sourceHandle ?? null)) &&
+                        e.target !== params.target,
                 );
 
-                const updated = addEdge({ ...params, type: "automation", animated: true }, filtered);
+                // Auto-label edges from named handles (If: true/false, Switch: case names)
+                const label = params.sourceHandle ?? undefined;
+                const updated = addEdge({ ...params, type: "automation", animated: true, label }, filtered);
                 setNodes((currentNodes) => {
                     emitChange(currentNodes, updated);
                     return currentNodes;
@@ -222,9 +228,14 @@ export default function AutomationCanvas({
             <Background />
             <Controls />
             <MiniMap
-                nodeColor={(node) =>
-                    node.type === "trigger" ? "#6366f1" : "#3b82f6"
-                }
+                nodeColor={(node) => {
+                    switch (node.type) {
+                        case "trigger": return "#6366f1";
+                        case "if": return "#f59e0b";
+                        case "switch": return "#8b5cf6";
+                        default: return "#3b82f6";
+                    }
+                }}
                 zoomable
                 pannable
             />

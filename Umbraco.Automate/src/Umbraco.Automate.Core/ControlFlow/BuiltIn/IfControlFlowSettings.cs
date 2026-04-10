@@ -13,6 +13,7 @@ public sealed class IfControlFlowSettings
     /// </summary>
     [Field(Label = "Conditions",
         Description = "Define conditions to determine which branch to follow.",
-        EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.ConditionBuilder")]
+        EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.ConditionBuilder",
+        SupportsBindings = true)]
     public ConditionSet Conditions { get; set; } = new();
 }

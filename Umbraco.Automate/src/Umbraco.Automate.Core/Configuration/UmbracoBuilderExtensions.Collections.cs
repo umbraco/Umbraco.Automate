@@ -13,6 +13,7 @@ using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Validation;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
@@ -21,6 +22,8 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.Scheduling;
+using Umbraco.Automate.Core.Triggers.Webhooks;
+using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -69,6 +72,9 @@ public static partial class UmbracoBuilderExtensions
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<IConnectionType, ConnectionTypeAttribute>(cache: true));
         builder.AutomateNotificationChannels()
             .Add(() => builder.TypeLoader.GetTypesWithAttribute<INotificationChannel, NotificationChannelAttribute>(cache: true));
+        builder.AutomateWebhookAuthenticators()
+            .Add<PlainSecretWebhookAuthenticator>()
+            .Add<HmacSha256WebhookAuthenticator>();
         builder.AutomateBindingFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>()
@@ -80,8 +86,10 @@ public static partial class UmbracoBuilderExtensions
         // Wire run-completed notification → notification channel dispatcher
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
 
-        // Action middleware — ordered pipeline (validation before audit so invalid configs aren't audit-trailed)
+        // Action middleware — ordered pipeline (dry-run first to prevent side effects,
+        // then validation before audit so invalid configs aren't audit-trailed)
         builder.AutomateActionMiddleware()
+            .Append<DryRunMiddleware>()
             .Append<ErrorHandlingMiddleware>()
             .Append<StepRunLoggingMiddleware>()
             .Append<SettingsValidationMiddleware>()
@@ -156,6 +164,9 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<WorkflowDefinitionRecovery>();
         builder.Services.AddHostedService<WorkflowHostLifecycle>();
 
+        // Startup validation
+        builder.Services.AddHostedService<AutomationStartupValidator>();
+
         return builder;
     }
 
@@ -200,6 +211,13 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static NotificationChannelCollectionBuilder AutomateNotificationChannels(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<NotificationChannelCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the webhook authenticator collection builder. Add custom authenticators for
+    /// provider-specific webhook validation (e.g. GitHub, Stripe).
+    /// </summary>
+    public static WebhookAuthenticatorCollectionBuilder AutomateWebhookAuthenticators(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<WebhookAuthenticatorCollectionBuilder>();
 
     /// <summary>
     /// Gets the versionable entity adapter collection builder.

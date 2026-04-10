@@ -8,9 +8,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class UnpublishContentActionSettings
 {
     /// <summary>
-    /// Gets or sets the key (GUID) of the content item to unpublish. Supports binding syntax.
+    /// Gets or sets the key (GUID) of the content item to unpublish.
     /// </summary>
-    [Field(Label = "Content Key", Description = "The key of the content item to unpublish. Supports ${ binding } syntax.", SupportsBindings = true)]
+    [Field(Label = "Content Key", Description = "The key of the content item to unpublish.", SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>

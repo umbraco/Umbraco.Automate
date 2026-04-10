@@ -113,6 +113,22 @@
     text-overflow: ellipsis;
 }
 
+/* Handle labels for branching nodes */
+.ua-node__handle-labels {
+    display: flex;
+    justify-content: space-around;
+    padding: 2px 8px 6px;
+    font-size: 10px;
+    color: var(--uui-color-text-alt, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ua-node__handle-label {
+    text-align: center;
+    flex: 1;
+}
+
 /* Edge label */
 .ua-edge__label {
     font-size: 11px;
@@ -143,6 +159,46 @@
     border-color: var(--uui-color-danger, #dc2626);
 }
 
+/* Edge actions container */
+.ua-edge__actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+/* Filter badge */
+.ua-edge__filter-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    background: var(--uui-color-warning, #f59e0b);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
+}
+
+.ua-edge__filter-badge:hover {
+    background: var(--uui-color-warning-emphasis, #d97706);
+}
+
+.ua-edge__filter-badge--add {
+    background: var(--uui-color-surface, #fff);
+    color: var(--uui-color-text, #303033);
+    font-size: 10px;
+}
+
+.ua-edge__filter-badge--add:hover {
+    background: var(--uui-color-warning, #f59e0b);
+    color: #fff;
+}
+
 /* Node type colors */
 .ua-node--trigger .ua-node__header {
     background: rgba(99, 102, 241, 0.15);
@@ -160,6 +216,24 @@
 
 .dark .ua-node--action .ua-node__header {
     background: rgba(59, 130, 246, 0.25);
+}
+
+.ua-node--if .ua-node__header {
+    background: rgba(245, 158, 11, 0.15);
+    border-bottom-color: rgba(245, 158, 11, 0.25);
+}
+
+.ua-node--switch .ua-node__header {
+    background: rgba(139, 92, 246, 0.15);
+    border-bottom-color: rgba(139, 92, 246, 0.25);
+}
+
+.dark .ua-node--if .ua-node__header {
+    background: rgba(245, 158, 11, 0.25);
+}
+
+.dark .ua-node--switch .ua-node__header {
+    background: rgba(139, 92, 246, 0.25);
 }
 
 /* Handle overrides */
@@ -181,4 +255,31 @@
 
 .dark .ua-node:hover {
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* Run status overlays */
+.run-status-completed .ua-node {
+    border-color: #22c55e;
+}
+
+.run-status-running .ua-node {
+    border-color: #f59e0b;
+}
+
+.run-status-failed .ua-node {
+    border-color: #ef4444;
+}
+
+.run-status-waitingforinput .ua-node {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+}
+
+.run-status-pending .ua-node {
+    opacity: 0.5;
+}
+
+.run-status-skipped .ua-node {
+    opacity: 0.4;
+    border-style: dashed;
 }

@@ -2,8 +2,9 @@ import { css, html, customElement, state, repeat, when } from "@umbraco-cms/back
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UaCatalogueRepository } from "../../repository/catalogue.repository.js";
-import type { UaCatalogueItemModel } from "../../types.js";
+import type { UaActionCatalogueItemModel, UaCatalogueItemModel } from "../../types.js";
 import type { UaNodePickerModalData, UaNodePickerModalValue } from "./types.js";
+import { ConnectionsService, WorkspacesService } from "../../../api/sdk.gen.js";
 
 interface CatalogueGroup {
     name: string;
@@ -40,19 +41,70 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
         this._error = false;
 
         const mode = this.data?.mode ?? "action";
-        const result = mode === "trigger"
-            ? await this.#repository!.requestTriggers()
-            : await this.#repository!.requestActions();
+        let items: UaCatalogueItemModel[] = [];
 
-        if (result.error || !result.data) {
-            this._error = true;
-            this._loading = false;
-            return;
+        if (mode === "trigger") {
+            const result = await this.#repository!.requestTriggers();
+            if (result.error || !result.data) {
+                this._error = true;
+                this._loading = false;
+                return;
+            }
+            items = result.data;
+        } else {
+            // Load actions and control flows, merged into one picker
+            const [actionsResult, controlFlowsResult] = await Promise.all([
+                this.#repository!.requestActions(),
+                this.#repository!.requestControlFlows(),
+            ]);
+            if (actionsResult.error && controlFlowsResult.error) {
+                this._error = true;
+                this._loading = false;
+                return;
+            }
+            items = [...(actionsResult.data ?? []), ...(controlFlowsResult.data ?? [])];
+
+            // Filter out actions that require a connection type not available in the workspace.
+            const availableTypes = await this.#resolveAvailableConnectionTypes();
+            if (availableTypes) {
+                items = items.filter((item) => {
+                    const alias = (item as UaActionCatalogueItemModel).connectionTypeAlias;
+                    return !alias || availableTypes.has(alias);
+                });
+            }
         }
 
-        this._groups = this.#groupItems(result.data);
+        this._groups = this.#groupItems(items);
         this._filteredGroups = this._groups;
         this._loading = false;
+    }
+
+    /**
+     * Resolves the set of connection type aliases available in the workspace.
+     * Returns null if no workspaceId was provided (no filtering).
+     */
+    async #resolveAvailableConnectionTypes(): Promise<Set<string> | null> {
+        const workspaceId = this.data?.workspaceId;
+        if (!workspaceId) return null;
+
+        try {
+            const { data: workspace } = await WorkspacesService.getWorkspacesById({ path: { id: workspaceId } });
+            if (!workspace?.allowedConnections?.length) return new Set();
+
+            const { data: connections } = await ConnectionsService.getConnections({ query: { skip: 0, take: 1000 } });
+            if (!connections?.items) return new Set();
+
+            const allowedIds = new Set(workspace.allowedConnections);
+            const types = new Set<string>();
+            for (const conn of connections.items) {
+                if (allowedIds.has(conn.id)) {
+                    types.add(conn.type);
+                }
+            }
+            return types;
+        } catch {
+            return null; // On error, don't filter — show everything.
+        }
     }
 
     #groupItems(items: UaCatalogueItemModel[]): CatalogueGroup[] {

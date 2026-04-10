@@ -50,7 +50,13 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IWorkspaceRepository, EFCoreWorkspaceRepository>();
         builder.Services.AddSingleton<IConnectionRepository, EFCoreConnectionRepository>();
         builder.Services.AddSingleton<IAutomationRunRepository, EFCoreAutomationRunRepository>();
-        builder.Services.AddSingleton<IPersistenceProvider, EFCoreWorkflowPersistenceProvider>();
+        // WorkflowCore's EventConsumer, WorkflowConsumer etc. inject the sub-interfaces directly,
+        // not IPersistenceProvider. We must register all four so our EF provider is used everywhere.
+        builder.Services.AddSingleton<EFCoreWorkflowPersistenceProvider>();
+        builder.Services.AddSingleton<IPersistenceProvider>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
+        builder.Services.AddSingleton<IWorkflowRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
+        builder.Services.AddSingleton<ISubscriptionRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
+        builder.Services.AddSingleton<IEventRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
         builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
         builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
