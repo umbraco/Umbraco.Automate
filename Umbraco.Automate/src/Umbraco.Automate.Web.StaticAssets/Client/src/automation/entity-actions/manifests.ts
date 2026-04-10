@@ -58,5 +58,19 @@ export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
             label: "#actions_delete",
         },
     },
+    // Export automation as JSON
+    {
+        type: "entityAction",
+        kind: "default",
+        alias: "UmbracoAutomate.EntityAction.Automation.Export",
+        name: "Export Automation Entity Action",
+        weight: 50,
+        api: () => import("./automation-export.action.js"),
+        forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
+        meta: {
+            icon: "icon-download-alt",
+            label: "#uaGeneral_export",
+        },
+    },
     ...automationMoveManifests,
 ];
