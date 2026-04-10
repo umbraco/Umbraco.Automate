@@ -8,6 +8,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
@@ -84,8 +85,9 @@ internal sealed class ActionStepBody : StepBodyAsync
         AutomationWorkflowData data,
         CancellationToken cancellationToken)
     {
-        // Build binding data context: trigger output + all prior step outputs.
-        var bindingData = BindingDataBuilder.Build(data);
+        // Build binding data context: trigger output + all prior step outputs + loop iteration.
+        var iterationContext = context.Item as ForEachIterationContext;
+        var bindingData = BindingDataBuilder.Build(data, iterationContext);
 
         // Resolve input mappings via bindings.
         var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
