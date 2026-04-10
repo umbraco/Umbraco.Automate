@@ -8,9 +8,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class LogMessageSettings
 {
     /// <summary>
-    /// Gets or sets the message to log. Supports binding syntax.
+    /// Gets or sets the message to log.
     /// </summary>
-    [Field(Label = "Message", Description = "The message to write to the log. Supports ${ binding } syntax.", SupportsBindings = true)]
+    [Field(Label = "Message", Description = "The message to write to the log.", SupportsBindings = true)]
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
