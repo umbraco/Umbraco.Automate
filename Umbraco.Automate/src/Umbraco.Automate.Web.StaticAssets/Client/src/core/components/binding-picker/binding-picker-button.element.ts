@@ -48,11 +48,13 @@ export class UaBindingPickerButtonElement extends UmbLitElement {
 
         .popover {
             margin: 0;
-            padding: 0;
+            padding: var(--uui-size-space-3);
             border: 1px solid var(--uui-color-border, #d8d7d9);
             border-radius: var(--uui-border-radius, 3px);
             background: var(--uui-color-surface, #fff);
             box-shadow: var(--uui-shadow-depth-3, 0 3px 10px rgba(0, 0, 0, 0.2));
+            max-height: 400px;
+            overflow-y: auto;
         }
     `;
 }

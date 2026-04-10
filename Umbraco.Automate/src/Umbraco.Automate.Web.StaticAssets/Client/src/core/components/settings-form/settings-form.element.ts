@@ -166,6 +166,7 @@ export class UaSettingsFormElement extends UmbLitElement {
                 description=${field.description ?? ""}
                 alias=${field.key}
                 property-editor-ui-alias=${this.#resolveEditorAlias(field)}
+                .appearance=${{ labelOnTop: true }}
                 .config=${this.#buildFieldConfig(field)}
                 .validation=${{
                 mandatory: field.isRequired,

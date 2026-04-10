@@ -238,7 +238,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
         const modal = modalManager.open(this, UA_NODE_PICKER_MODAL, {
-            data: { mode: "action" },
+            data: { mode: "action", workspaceId: this._model?.workspaceId },
         });
 
         try {
@@ -272,7 +272,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
         const modal = modalManager.open(this, UA_NODE_PICKER_MODAL, {
-            data: { mode: "trigger" },
+            data: { mode: "trigger", workspaceId: this._model?.workspaceId },
         });
 
         try {
@@ -294,7 +294,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager) return;
         const modal = modalManager.open(this, UA_NODE_PICKER_MODAL, {
-            data: { mode: "action" },
+            data: { mode: "action", workspaceId: this._model?.workspaceId },
         });
 
         try {

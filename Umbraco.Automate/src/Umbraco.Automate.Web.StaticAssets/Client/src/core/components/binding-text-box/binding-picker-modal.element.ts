@@ -13,7 +13,7 @@ export class UaBindingPickerModalElement extends UmbModalBaseElement<
         this.modalContext?.submit();
     }
 
-    #onCancel() {
+    #onClose() {
         this.modalContext?.reject();
     }
 
@@ -21,15 +21,15 @@ export class UaBindingPickerModalElement extends UmbModalBaseElement<
         if (!this.data) return html``;
 
         return html`
-            <umb-body-layout headline="Insert binding expression">
+            <umb-body-layout headline=${this.localize.term("uaBindings_insertExpression")}>
                 <ua-binding-picker
                     .sources=${this.data.sources}
                     @ua:binding-select=${this.#onBindingSelect}
                 ></ua-binding-picker>
                 <div slot="actions">
                     <uui-button
-                        label="Cancel"
-                        @click=${this.#onCancel}
+                        label=${this.localize.term("uaGeneral_close")}
+                        @click=${this.#onClose}
                     ></uui-button>
                 </div>
             </umb-body-layout>

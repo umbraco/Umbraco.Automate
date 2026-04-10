@@ -79,6 +79,12 @@ export default {
         noResults: "No items found",
         loadError: "Failed to load catalogue items",
     },
+    uaBindings: {
+        insertExpression: "Insert Binding Expression",
+        filterPlaceholder: "Filter bindings...",
+        noData: "No binding data available.",
+        noResults: "No matching bindings found.",
+    },
     uaSettings: {
         noSettings: "This item has no configurable settings.",
     },
@@ -138,6 +144,7 @@ export default {
         addGroup: "Add group",
         removeCondition: "Remove condition",
         removeGroup: "Remove group",
+        selectBinding: "Select a binding...",
         leftOperandPlaceholder: "Value or ${binding}",
         rightOperandPlaceholder: "Value",
         and: "AND",
