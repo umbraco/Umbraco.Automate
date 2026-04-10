@@ -38,3 +38,26 @@ export interface NodeDeleteRequestDetail {
     nodes: import("@xyflow/react").Node[];
     resolve: (confirmed: boolean) => void;
 }
+
+export interface EdgeFilterData {
+    filter?: ConditionSetModel | null;
+}
+
+export interface ConditionSetModel {
+    groups: ConditionGroupModel[];
+}
+
+export interface ConditionGroupModel {
+    conditions: ConditionModel[];
+}
+
+export interface ConditionModel {
+    leftOperand: string;
+    operator: string;
+    rightOperand: string;
+}
+
+export interface EdgeFilterOpenDetail {
+    edgeId: string;
+    filter: ConditionSetModel | null;
+}

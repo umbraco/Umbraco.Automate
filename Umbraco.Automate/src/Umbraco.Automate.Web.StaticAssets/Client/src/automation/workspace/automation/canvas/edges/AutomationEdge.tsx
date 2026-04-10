@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import {
     BaseEdge,
     EdgeLabelRenderer,
@@ -6,6 +6,7 @@ import {
     useReactFlow,
     type EdgeProps,
 } from "@xyflow/react";
+import type { EdgeFilterData } from "../types.js";
 
 function AutomationEdge({
     id,
@@ -17,6 +18,7 @@ function AutomationEdge({
     targetPosition,
     selected,
     label,
+    data,
     markerEnd,
 }: EdgeProps) {
     const [edgePath, labelX, labelY] = getSmoothStepPath({
@@ -34,6 +36,14 @@ function AutomationEdge({
         deleteElements({ edges: [{ id }] });
     };
 
+    const edgeData = data as EdgeFilterData | undefined;
+    const hasFilter = edgeData?.filter && edgeData.filter.groups.length > 0;
+
+    const onFilterClick = useCallback(() => {
+        const detail = { edgeId: id, filter: edgeData?.filter ?? null };
+        document.dispatchEvent(new CustomEvent("ua:edge-filter-open", { detail }));
+    }, [id, edgeData?.filter]);
+
     return (
         <>
             <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} interactionWidth={20} />
@@ -50,23 +60,47 @@ function AutomationEdge({
                     </textPath>
                 </text>
             )}
-            {selected && (
-                <EdgeLabelRenderer>
-                    <button
-                        className="ua-edge__delete-btn"
-                        style={{
-                            position: "absolute",
-                            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-                            pointerEvents: "all",
-                        }}
-                        onClick={onDelete}
-                        title="Delete connection"
-                        type="button"
-                    >
-                        ✕
-                    </button>
-                </EdgeLabelRenderer>
-            )}
+            <EdgeLabelRenderer>
+                <div
+                    className="ua-edge__actions"
+                    style={{
+                        position: "absolute",
+                        transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + (label ? 16 : 0)}px)`,
+                        pointerEvents: "all",
+                    }}
+                >
+                    {hasFilter && (
+                        <button
+                            className="ua-edge__filter-badge"
+                            onClick={onFilterClick}
+                            title="Edit filter"
+                            type="button"
+                        >
+                            ⚡
+                        </button>
+                    )}
+                    {selected && !hasFilter && (
+                        <button
+                            className="ua-edge__filter-badge ua-edge__filter-badge--add"
+                            onClick={onFilterClick}
+                            title="Add filter"
+                            type="button"
+                        >
+                            +⚡
+                        </button>
+                    )}
+                    {selected && (
+                        <button
+                            className="ua-edge__delete-btn"
+                            onClick={onDelete}
+                            title="Delete connection"
+                            type="button"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+            </EdgeLabelRenderer>
         </>
     );
 }

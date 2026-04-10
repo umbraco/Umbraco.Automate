@@ -83,6 +83,9 @@ export function modelToEdges(
         targetHandle: conn.targetHandle ?? undefined,
         type: "automation",
         label: conn.outcome ?? undefined,
+        data: {
+            filter: (conn as Record<string, unknown>).filter ?? null,
+        },
     }));
 }
 
