@@ -113,6 +113,70 @@ export const manifests: Array<UmbExtensionManifest> = [
         ],
     },
     {
+        type: "workspaceAction",
+        kind: "default",
+        alias: "UmbracoAutomate.WorkspaceAction.Automation.Export",
+        name: "Export Automation Workspace Action",
+        weight: 20,
+        api: () => import("./actions/automation-export.action.js"),
+        meta: {
+            label: "#uaGeneral_export",
+            look: "secondary",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+            {
+                alias: UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
+                match: false,
+            },
+        ],
+    },
+    {
+        type: "workspaceActionMenuItem",
+        kind: "default",
+        alias: "UmbracoAutomate.WorkspaceActionMenuItem.Automation.DryRun",
+        name: "Dry Run Automation Workspace Action Menu Item",
+        weight: 20,
+        forWorkspaceActions: "UmbracoAutomate.WorkspaceAction.Automation.SaveAndPublish",
+        api: () => import("./actions/automation-dry-run.action.js"),
+        meta: {
+            label: "#uaGeneral_dryRun",
+            icon: "icon-lab",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+            {
+                alias: UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
+                match: false,
+            },
+        ],
+    },
+    {
+        type: "workspaceActionMenuItem",
+        kind: "default",
+        alias: "UmbracoAutomate.WorkspaceActionMenuItem.Automation.Import",
+        name: "Import Automation Workspace Action Menu Item",
+        weight: 5,
+        forWorkspaceActions: "UmbracoAutomate.WorkspaceAction.Automation.SaveAndPublish",
+        api: () => import("./actions/automation-import.action.js"),
+        meta: {
+            label: "#uaGeneral_import",
+            icon: "icon-download-alt",
+        },
+        conditions: [
+            {
+                alias: UMB_WORKSPACE_CONDITION_ALIAS,
+                match: UA_AUTOMATION_WORKSPACE_ALIAS,
+            },
+        ],
+    },
+    {
         type: "workspaceActionMenuItem",
         kind: "default",
         alias: "UmbracoAutomate.WorkspaceActionMenuItem.Automation.Unpublish",
