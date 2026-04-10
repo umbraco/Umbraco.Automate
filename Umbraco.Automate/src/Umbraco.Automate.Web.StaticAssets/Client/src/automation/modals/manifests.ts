@@ -17,10 +17,4 @@ export const automationModalManifests: Array<UmbExtensionManifest> = [
         name: "Automate Edge Filter Modal",
         js: () => import("./edge-filter/edge-filter-modal.element.js"),
     },
-    {
-        type: "modal",
-        alias: "UmbracoAutomate.Modal.NotificationChannelSettings",
-        name: "Automate Notification Channel Settings Modal",
-        js: () => import("./notification-channel-settings/notification-channel-settings-modal.element.js"),
-    },
 ];

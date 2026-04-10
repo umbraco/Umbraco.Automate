@@ -1,11 +1,18 @@
-import { css, html, customElement, state, repeat, nothing } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, state, repeat } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import { UMB_MODAL_MANAGER_CONTEXT, UMB_ITEM_PICKER_MODAL } from "@umbraco-cms/backoffice/modal";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import { UA_NOTIFICATION_CHANNEL_SETTINGS_MODAL } from "../../../modals/notification-channel-settings/notification-channel-settings-modal.token.js";
-import type { ChannelConfigurationModel, NotificationChannelItemResponseModel } from "../../../../api/types.gen.js";
+import type { ChannelConfigurationModel, NotifyOnModel, NotificationChannelItemResponseModel } from "../../../../api/types.gen.js";
+
+const NOTIFY_ON_OPTIONS: Array<{ name: string; value: NotifyOnModel }> = [
+    { name: "Never", value: "Never" },
+    { name: "Failed", value: "Failed" },
+    { name: "Suspended", value: "Suspended" },
+    { name: "Failed or Suspended", value: "FailedOrSuspended" },
+    { name: "Completed", value: "Completed" },
+    { name: "Recovered", value: "Recovered" },
+];
 
 @customElement("ua-automation-notifications-workspace-view")
 export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement {
@@ -40,87 +47,52 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
         this._availableChannels = data ?? [];
     }
 
-    #getCatalogueItem(alias: string): NotificationChannelItemResponseModel | undefined {
-        return this._availableChannels.find((c) => c.alias === alias);
-    }
+    #addChannel() {
+        if (this._availableChannels.length === 0) return;
 
-    async #addChannel() {
-        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-        if (!modalManager) return;
-
+        // Find first channel not already configured
         const configured = new Set(this._channels.map((c) => c.channelAlias));
-        const available = this._availableChannels.filter((c) => !configured.has(c.alias));
-        if (available.length === 0) return;
+        const available = this._availableChannels.find((c) => !configured.has(c.alias));
+        if (!available) return;
 
-        const picker = modalManager.open(this, UMB_ITEM_PICKER_MODAL, {
-            data: {
-                headline: this.localize.term("uaNotifications_addChannel"),
-                items: available.map((c) => ({
-                    label: c.name,
-                    value: c.alias,
-                    icon: c.icon ?? "icon-message",
-                    description: c.description ?? undefined,
-                })),
-            },
-        });
-
-        try {
-            const { value } = await picker.onSubmit();
-            const channelAlias = value;
-            const catalogueItem = this.#getCatalogueItem(channelAlias);
-            if (!catalogueItem) return;
-
-            const newChannel: ChannelConfigurationModel = {
-                channelAlias,
+        this._channels = [
+            ...this._channels,
+            {
+                channelAlias: available.alias,
                 settings: {},
                 isEnabled: true,
                 notifyOn: "Failed",
-            };
-
-            // Open settings modal immediately for the new channel
-            const settingsModal = modalManager.open(this, UA_NOTIFICATION_CHANNEL_SETTINGS_MODAL, {
-                data: {
-                    channel: newChannel,
-                    catalogueItem,
-                },
-            });
-
-            const { channel: configured } = await settingsModal.onSubmit();
-            this._channels = [...this._channels, configured];
-            this.#persist();
-        } catch {
-            // Picker or settings modal dismissed
-        }
-    }
-
-    async #editChannel(index: number) {
-        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-        if (!modalManager) return;
-
-        const channel = this._channels[index];
-        const catalogueItem = this.#getCatalogueItem(channel.channelAlias);
-        if (!catalogueItem) return;
-
-        const modal = modalManager.open(this, UA_NOTIFICATION_CHANNEL_SETTINGS_MODAL, {
-            data: {
-                channel: structuredClone(channel),
-                catalogueItem,
             },
-        });
-
-        try {
-            const { channel: updated } = await modal.onSubmit();
-            const updatedChannels = [...this._channels];
-            updatedChannels[index] = updated;
-            this._channels = updatedChannels;
-            this.#persist();
-        } catch {
-            // Modal dismissed
-        }
+        ];
+        this.#persist();
     }
 
     #removeChannel(index: number) {
         this._channels = this._channels.filter((_, i) => i !== index);
+        this.#persist();
+    }
+
+    #onChannelAliasChange(index: number, e: Event) {
+        const select = e.target as HTMLSelectElement;
+        const updated = [...this._channels];
+        updated[index] = { ...updated[index], channelAlias: select.value };
+        this._channels = updated;
+        this.#persist();
+    }
+
+    #onNotifyOnChange(index: number, e: Event) {
+        const select = e.target as HTMLSelectElement;
+        const updated = [...this._channels];
+        updated[index] = { ...updated[index], notifyOn: select.value as NotifyOnModel };
+        this._channels = updated;
+        this.#persist();
+    }
+
+    #onEnabledChange(index: number, e: Event) {
+        const toggle = e.target as HTMLInputElement;
+        const updated = [...this._channels];
+        updated[index] = { ...updated[index], isEnabled: toggle.checked };
+        this._channels = updated;
         this.#persist();
     }
 
@@ -131,32 +103,47 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
     }
 
     #renderChannel(channel: ChannelConfigurationModel, index: number) {
-        const item = this.#getCatalogueItem(channel.channelAlias);
-        const name = item?.name ?? channel.channelAlias;
-        const icon = item?.icon ?? "icon-message";
-        const detail = channel.isEnabled
-            ? `Notify on: ${channel.notifyOn}`
-            : "Disabled";
-
         return html`
-            <uui-ref-node
-                name=${name}
-                detail=${detail}
-                @open=${() => this.#editChannel(index)}
-            >
-                <umb-icon slot="icon" name=${icon}></umb-icon>
-                ${!channel.isEnabled
-                    ? html`<uui-tag slot="tag" look="secondary" color="default">Disabled</uui-tag>`
-                    : nothing}
-                <uui-action-bar slot="actions">
+            <uui-box>
+                <div class="channel-row">
+                    <div class="channel-field">
+                        <label>${this.localize.term("uaNotifications_channel")}</label>
+                        <uui-select
+                            .options=${this._availableChannels.map((c) => ({
+                                name: c.name,
+                                value: c.alias,
+                                selected: c.alias === channel.channelAlias,
+                            }))}
+                            @change=${(e: Event) => this.#onChannelAliasChange(index, e)}
+                        ></uui-select>
+                    </div>
+                    <div class="channel-field">
+                        <label>${this.localize.term("uaNotifications_notifyOn")}</label>
+                        <uui-select
+                            .options=${NOTIFY_ON_OPTIONS.map((o) => ({
+                                ...o,
+                                selected: o.value === channel.notifyOn,
+                            }))}
+                            @change=${(e: Event) => this.#onNotifyOnChange(index, e)}
+                        ></uui-select>
+                    </div>
+                    <div class="channel-field">
+                        <label>${this.localize.term("uaLabels_enabled")}</label>
+                        <uui-toggle
+                            ?checked=${channel.isEnabled}
+                            @change=${(e: Event) => this.#onEnabledChange(index, e)}
+                        ></uui-toggle>
+                    </div>
                     <uui-button
+                        look="secondary"
+                        compact
                         label=${this.localize.term("uaGeneral_delete")}
                         @click=${() => this.#removeChannel(index)}
                     >
                         <uui-icon name="icon-trash"></uui-icon>
                     </uui-button>
-                </uui-action-bar>
-            </uui-ref-node>
+                </div>
+            </uui-box>
         `;
     }
 
@@ -168,13 +155,13 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
 
                     ${this._channels.length > 0
                         ? html`
-                              <uui-ref-list>
+                              <div class="channels">
                                   ${repeat(
                                       this._channels,
                                       (_, i) => i,
                                       (channel, index) => this.#renderChannel(channel, index),
                                   )}
-                              </uui-ref-list>
+                              </div>
                           `
                         : html`<p class="empty">${this.localize.term("uaNotifications_noChannels")}</p>`}
 
@@ -203,8 +190,30 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
                 margin: 0 0 var(--uui-size-space-5);
             }
 
-            uui-ref-list {
+            .channels {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-space-4);
                 margin-bottom: var(--uui-size-space-5);
+            }
+
+            .channel-row {
+                display: flex;
+                align-items: flex-end;
+                gap: var(--uui-size-space-4);
+            }
+
+            .channel-field {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-space-2);
+                flex: 1;
+            }
+
+            .channel-field label {
+                font-size: var(--uui-type-small-size);
+                font-weight: 600;
+                color: var(--uui-color-text-alt);
             }
 
             .empty {
