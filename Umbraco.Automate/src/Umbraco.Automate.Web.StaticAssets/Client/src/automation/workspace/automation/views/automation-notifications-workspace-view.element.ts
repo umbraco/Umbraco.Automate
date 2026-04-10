@@ -129,6 +129,21 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
         });
     }
 
+    #notifyOnColor(notifyOn: NotifyOnModel): string {
+        switch (notifyOn) {
+            case "Failed":
+            case "FailedOrSuspended":
+                return "danger";
+            case "Suspended":
+                return "warning";
+            case "Completed":
+            case "Recovered":
+                return "positive";
+            default:
+                return "default";
+        }
+    }
+
     #renderChannel(channel: ChannelConfigurationModel, index: number) {
         const item = this.#getCatalogueItem(channel.channelAlias);
         const name = item?.name ?? channel.channelAlias;
@@ -147,7 +162,7 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
                     <umb-icon name=${icon}></umb-icon>
                     <span class="channel-name">${name}</span>
                     <span class="channel-detail">
-                        <uui-tag look="secondary" color="default">${channel.notifyOn}</uui-tag>
+                        <uui-tag look="secondary" color=${this.#notifyOnColor(channel.notifyOn)}>${channel.notifyOn}</uui-tag>
                     </span>
                     ${!channel.isEnabled
                         ? html`<uui-tag look="secondary" color="warning">Disabled</uui-tag>`
