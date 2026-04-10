@@ -53,6 +53,12 @@ public sealed class AutomationExecutionContext
     public required IReadOnlyList<Guid> AllowedConnections { get; init; }
 
     /// <summary>
+    /// Gets whether this run is executing in dry-run mode. When true, actions should
+    /// describe what they would do without producing side effects.
+    /// </summary>
+    public bool IsDryRun { get; init; }
+
+    /// <summary>
     /// Formats the <c>PerformingDetails</c> string for the CMS audit trail.
     /// </summary>
     public string FormatPerformingDetails()

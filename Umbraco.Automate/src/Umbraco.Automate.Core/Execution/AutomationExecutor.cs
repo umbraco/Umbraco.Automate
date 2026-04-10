@@ -48,7 +48,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         string initiatorType,
         string? initiatorId,
         Dictionary<string, object?>? triggerOutputData,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isDryRun = false)
     {
         // Check rate limits before creating the run record.
         await _rateLimitService.CheckRateLimitAsync(automation.Id, cancellationToken);
@@ -90,6 +91,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             InitiatorType = initiatorType,
             InitiatorId = initiatorId,
             AllowedConnections = workspace.AllowedConnections.ToList(),
+            IsDryRun = isDryRun,
         };
 
         using var _ = ExecutionContextAccessor.Set(executionContext);
