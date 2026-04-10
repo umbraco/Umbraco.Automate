@@ -15,6 +15,9 @@ export default {
         save: "Save",
         saveAndPublish: "Save and publish",
         unpublish: "Unpublish",
+        export: "Export",
+        import: "Import",
+        dryRun: "Dry Run",
     },
     uaLabels: {
         name: "Name",
@@ -90,6 +93,7 @@ export default {
     },
     uaRun: {
         dashboardTitle: "Runs",
+        replay: "Replay",
         noRuns: "No runs found.",
         noStepRuns: "No step runs recorded for this execution.",
         noRecentActivity: "No recent activity.",
@@ -138,6 +142,10 @@ export default {
         welcomeBodyHasWorkspaces:
             "Your workspace is ready. Select it from the Automations tree on the left to create your first automation.",
         welcomeCta: "Create a Workspace",
+    },
+    uaEdgeFilter: {
+        headline: "Edge Conditions",
+        removeFilter: "Remove filter",
     },
     uaConditionBuilder: {
         addCondition: "Add condition",

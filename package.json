@@ -8,6 +8,7 @@
         "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/Client"
     ],
     "scripts": {
+        "install:workspaces": "npm install --workspaces",
         "build": "npm run build --workspaces",
         "watch": "npm run watch --workspaces",
         "changelog": "node scripts/generate-changelog.js",

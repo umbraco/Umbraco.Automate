@@ -1,9 +1,10 @@
-import { css, html, customElement, state, nothing, repeat } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, state, nothing, repeat, when } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UaRunDetailServerDataSource } from "../repository/detail/run-detail.server.data-source.js";
 import { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repository.js";
 import { formatDateTime } from "../../core/index.js";
+import { client } from "../../api/client.gen.js";
 import type { UaRunDetailModel, UaStepRunModel } from "../types.js";
 import type { UaRunDetailModalData } from "./run-detail-modal.token.js";
 
@@ -17,6 +18,9 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
     @state()
     private _loading = true;
+
+    @state()
+    private _replaying = false;
 
     @state()
     private _expandedStep?: string;
@@ -77,6 +81,22 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         return `${minutes}m ${remainingSeconds}s`;
+    }
+
+    async #onReplay() {
+        if (!this._run) return;
+        this._replaying = true;
+        try {
+            await client.post({
+                url: `/umbraco/automate/management/api/v1/runs/${this._run.unique}/replay`,
+                security: [{ scheme: "bearer", type: "http" }],
+            });
+            this.modalContext?.submit();
+        } catch {
+            // Replay failed — stay on modal
+        } finally {
+            this._replaying = false;
+        }
     }
 
     #toggleStep(stepId: string) {
@@ -142,6 +162,21 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                       : html`<p class="center">${this.localize.term("uaRun_noRuns")}</p>`}
 
                 <div slot="actions">
+                    ${when(
+                        this._run && (this._run.status === "Failed" || this._run.status === "Completed"),
+                        () => html`
+                            <uui-button
+                                look="primary"
+                                label=${this.localize.term("uaRun_replay")}
+                                ?state=${this._replaying ? "waiting" : undefined}
+                                ?disabled=${this._replaying}
+                                @click=${this.#onReplay}
+                            >
+                                <uui-icon name="icon-redo"></uui-icon>
+                                ${this.localize.term("uaRun_replay")}
+                            </uui-button>
+                        `,
+                    )}
                     <uui-button
                         label=${this.localize.term("uaGeneral_close")}
                         @click=${() => this.modalContext?.reject()}

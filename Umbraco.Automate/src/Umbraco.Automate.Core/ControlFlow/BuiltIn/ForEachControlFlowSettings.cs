@@ -20,6 +20,7 @@ public sealed class ForEachControlFlowSettings
     /// </summary>
     [Field(Label = "Run in parallel",
         Description = "When enabled, all iterations execute simultaneously instead of sequentially.",
-        SortOrder = 1)]
+        SortOrder = 1,
+        EditorUiAlias = "Umb.PropertyEditorUi.Toggle")]
     public bool RunParallel { get; set; }
 }

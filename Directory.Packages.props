@@ -26,6 +26,7 @@
   <!-- Umbraco Deploy -->
   <ItemGroup>
     <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.0.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Deploy.UI" Version="[17.0.0, 17.999.999)" />
   </ItemGroup>
 
   <!-- WorkflowCore (automation engine) -->
