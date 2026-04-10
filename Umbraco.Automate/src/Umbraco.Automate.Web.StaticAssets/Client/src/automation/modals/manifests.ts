@@ -11,4 +11,10 @@ export const automationModalManifests: Array<UmbExtensionManifest> = [
         name: "Automate Trigger Settings Modal",
         js: () => import("./trigger-settings/trigger-settings-modal.element.js"),
     },
+    {
+        type: "modal",
+        alias: "UmbracoAutomate.Modal.EdgeFilter",
+        name: "Automate Edge Filter Modal",
+        js: () => import("./edge-filter/edge-filter-modal.element.js"),
+    },
 ];

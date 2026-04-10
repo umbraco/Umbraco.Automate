@@ -7,10 +7,11 @@ import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context
 import type { UaAutomationDetailModel } from "../../../types.js";
 import { modelToNodes, modelToEdges } from "../canvas/utils/model-to-flow.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
-import type { CanvasState, CanvasChangeDetail, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail } from "../canvas/types.js";
+import type { CanvasState, CanvasChangeDetail, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
 import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-settings-modal.token.js";
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
+import { UA_EDGE_FILTER_MODAL } from "../../../modals/edge-filter/edge-filter-modal.token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import type { EditableModelSchemaModel } from "../../../../api/types.gen.js";
 import "../canvas/ua-automation-canvas.element.js";
@@ -33,6 +34,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     @state()
     private _model?: UaAutomationDetailModel;
 
+    #boundEdgeFilterOpen = this.#onEdgeFilterOpen.bind(this);
+
     constructor() {
         super();
         this.#catalogueRepository = new UaCatalogueRepository(this);
@@ -48,6 +51,16 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 }
             });
         });
+    }
+
+    override connectedCallback() {
+        super.connectedCallback();
+        document.addEventListener("ua:edge-filter-open", this.#boundEdgeFilterOpen as unknown as EventListener);
+    }
+
+    override disconnectedCallback() {
+        super.disconnectedCallback();
+        document.removeEventListener("ua:edge-filter-open", this.#boundEdgeFilterOpen as unknown as EventListener);
     }
 
     async #syncFromModel(model: UaAutomationDetailModel) {
@@ -324,6 +337,34 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
 
             await this.#openNodeSettingsModal(newStepId);
+        } catch {
+            // Modal was dismissed
+        }
+    }
+
+    async #onEdgeFilterOpen(event: CustomEvent<EdgeFilterOpenDetail>) {
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager || !this._model) return;
+
+        const { edgeId, filter } = event.detail;
+
+        const modal = modalManager.open(this, UA_EDGE_FILTER_MODAL, {
+            data: { filter },
+        });
+
+        try {
+            const { filter: updatedFilter } = await modal.onSubmit();
+
+            // Update the connection's filter
+            const updatedConnections = this._model.connections.map((conn) => {
+                const connEdgeId = `${conn.sourceStepId}-${conn.sourceHandle ?? "default"}-${conn.targetStepId}-${conn.targetHandle ?? "default"}`;
+                if (connEdgeId === edgeId) {
+                    return { ...conn, filter: updatedFilter };
+                }
+                return conn;
+            });
+
+            this.#workspaceContext?.updateProperty("connections", updatedConnections);
         } catch {
             // Modal was dismissed
         }
