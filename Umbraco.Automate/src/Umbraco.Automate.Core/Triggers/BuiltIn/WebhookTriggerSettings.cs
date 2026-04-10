@@ -32,4 +32,12 @@ public sealed class WebhookTriggerSettings
     /// </summary>
     [Field(Label = "Validate Signature", Description = "Use HMAC-SHA256 body signing instead of a plain secret header.")]
     public bool ValidateSignature { get; set; }
+
+    /// <summary>
+    /// Gets or sets the alias of a custom <see cref="Webhooks.IWebhookAuthenticator"/> to use
+    /// instead of the built-in plain-secret / HMAC-SHA256 authentication.
+    /// When set, <see cref="ValidateSignature"/> is ignored and the named authenticator handles all validation.
+    /// </summary>
+    [Field(Label = "Authentication Strategy", Description = "Optional custom authenticator alias (e.g. 'github', 'stripe'). Leave empty to use the built-in secret/signature validation.")]
+    public string? AuthenticatorAlias { get; set; }
 }

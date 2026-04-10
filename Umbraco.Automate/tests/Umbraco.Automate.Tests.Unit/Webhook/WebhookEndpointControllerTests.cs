@@ -11,6 +11,8 @@ using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
+using Umbraco.Automate.Core.Triggers.Webhooks;
+using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Web.Api.Webhook.Controllers;
 
@@ -32,10 +34,18 @@ public class WebhookEndpointControllerTests
             return new ITrigger[] { new WebhookTrigger(deps) };
         });
 
+        var authenticators = new WebhookAuthenticatorCollection(() =>
+            new IWebhookAuthenticator[]
+            {
+                new PlainSecretWebhookAuthenticator(),
+                new HmacSha256WebhookAuthenticator(),
+            });
+
         _controller = new WebhookEndpointController(
             _automationService.Object,
             _dispatcher.Object,
             triggers,
+            authenticators,
             Options.Create(new WebhookOptions()),
             Mock.Of<ILogger<WebhookEndpointController>>());
 
