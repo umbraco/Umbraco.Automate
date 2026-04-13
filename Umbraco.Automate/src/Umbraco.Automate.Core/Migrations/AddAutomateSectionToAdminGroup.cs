@@ -12,7 +12,7 @@ namespace Umbraco.Automate.Core.Migrations;
 /// </remarks>
 public class AddAutomateSectionToAdminGroup : AsyncMigrationBase
 {
-    private const string UserGroup2AppTable = Cms.Core.Constants.DatabaseSchema.Tables.UserGroup2App;
+    private const string UserGroup2AppTable = Umbraco.Cms.Core.Constants.DatabaseSchema.Tables.UserGroup2App;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AddAutomateSectionToAdminGroup"/> class.

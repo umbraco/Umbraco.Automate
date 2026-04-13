@@ -2,6 +2,7 @@ using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
@@ -118,6 +119,9 @@ public static partial class UmbracoBuilderExtensions
 
         // Diagnostics / metrics
         builder.Services.AddSingleton<AutomateMetrics>();
+
+        // CMS integration helpers
+        builder.Services.AddSingleton<IContentValueNormaliser, ContentValueNormaliser>();
 
         // Core services
         builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
