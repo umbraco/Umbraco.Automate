@@ -162,7 +162,12 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             query = query.Where(e => e.CreateTime <= createdTo.Value);
         }
 
-        var entities = await query.Skip(skip).Take(take).ToListAsync();
+        var entities = await query
+            .OrderBy(e => e.CreateTime)
+            .ThenBy(e => e.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
         return entities.Select(ToDomain).ToList();
     }
 
