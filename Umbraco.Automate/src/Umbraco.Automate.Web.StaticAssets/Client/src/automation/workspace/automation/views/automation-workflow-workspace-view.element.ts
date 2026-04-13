@@ -13,8 +13,11 @@ import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-setti
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
 import { UA_EDGE_FILTER_MODAL } from "../../../modals/edge-filter/edge-filter-modal.token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import type { EditableModelSchemaModel } from "../../../../api/types.gen.js";
+import type { AutomationRunResponseModel, EditableModelSchemaModel } from "../../../../api/types.gen.js";
 import "../canvas/ua-automation-canvas.element.js";
+
+const TRIGGER_NODE_ID = "__trigger__";
+const DRY_RUN_OVERLAY_DURATION_MS = 8000;
 
 @customElement("ua-automation-workflow-workspace-view")
 export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
@@ -34,6 +37,13 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     @state()
     private _model?: UaAutomationDetailModel;
 
+    @state()
+    private _dryRunActive = false;
+
+    @state()
+    private _dryRunRun?: AutomationRunResponseModel;
+
+    #dryRunTimer?: ReturnType<typeof setTimeout>;
     #boundEdgeFilterOpen = this.#onEdgeFilterOpen.bind(this);
 
     constructor() {
@@ -46,8 +56,18 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             this.observe(context.data, (model) => {
                 if (!model) return;
                 this._model = model;
-                if (!this.#isCanvasUpdate) {
+                if (!this.#isCanvasUpdate && !this._dryRunActive) {
                     this.#syncFromModel(model);
+                }
+            });
+            this.observe(context.dryRunResult, (run) => {
+                this._dryRunRun = run ?? undefined;
+                this._dryRunActive = !!run;
+                if (run) {
+                    this.#applyDryRunOverlay(run);
+                    this.#scheduleDryRunClear();
+                } else if (this._model) {
+                    this.#syncFromModel(this._model);
                 }
             });
         });
@@ -61,6 +81,41 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     override disconnectedCallback() {
         super.disconnectedCallback();
         document.removeEventListener("ua:edge-filter-open", this.#boundEdgeFilterOpen as unknown as EventListener);
+        clearTimeout(this.#dryRunTimer);
+    }
+
+    #applyDryRunOverlay(run: AutomationRunResponseModel) {
+        this._nodes = this._nodes.map((node) => {
+            if (node.id === TRIGGER_NODE_ID) {
+                const triggerStatus =
+                    run.status === "Failed" && run.stepRuns.length === 0 ? "Failed" : "Completed";
+                return {
+                    ...node,
+                    className: `run-status-${triggerStatus.toLowerCase()}`,
+                    data: { ...node.data, runStatus: triggerStatus },
+                };
+            }
+
+            const stepRun = run.stepRuns.find((sr) => sr.stepId === node.id);
+            const status = stepRun?.status ?? "Pending";
+            return {
+                ...node,
+                className: `run-status-${status.toLowerCase()}`,
+                data: { ...node.data, runStatus: status, stepRun },
+            };
+        });
+    }
+
+    #scheduleDryRunClear() {
+        clearTimeout(this.#dryRunTimer);
+        this.#dryRunTimer = setTimeout(() => {
+            this.#workspaceContext?.clearDryRunOverlay();
+        }, DRY_RUN_OVERLAY_DURATION_MS);
+    }
+
+    #dismissDryRun() {
+        clearTimeout(this.#dryRunTimer);
+        this.#workspaceContext?.clearDryRunOverlay();
     }
 
     async #syncFromModel(model: UaAutomationDetailModel) {
@@ -373,28 +428,48 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     override render() {
         return html`
             <div id="toolbar">
-                ${!this._model?.trigger
-                    ? html`<uui-button
+                ${this._dryRunActive
+                    ? html`<div class="dry-run-banner">
+                          <uui-icon name="icon-lab"></uui-icon>
+                          <span
+                              >Dry run
+                              ${this._dryRunRun?.status === "Completed"
+                                  ? "completed"
+                                  : "failed"}</span
+                          >
+                          ${this._dryRunRun?.error
+                              ? html`<small>${this._dryRunRun.error}</small>`
+                              : ""}
+                          <uui-button
+                              look="outline"
+                              compact
+                              label="Dismiss"
+                              @click=${this.#dismissDryRun}
+                          ></uui-button>
+                      </div>`
+                    : html`${!this._model?.trigger
+                          ? html`<uui-button
+                                look="outline"
+                                color="positive"
+                                label=${this.localize.term("uaCatalogue_selectTrigger")}
+                                @click=${this.#onAddTrigger}
+                            >
+                                <uui-icon name="icon-flash"></uui-icon>
+                                Add Trigger
+                            </uui-button>`
+                          : ""}
+                      <uui-button
                           look="outline"
-                          color="positive"
-                          label=${this.localize.term("uaCatalogue_selectTrigger")}
-                          @click=${this.#onAddTrigger}
+                          label=${this.localize.term("uaCatalogue_selectAction")}
+                          @click=${this.#onAddAction}
                       >
-                          <uui-icon name="icon-flash"></uui-icon>
-                          Add Trigger
-                      </uui-button>`
-                    : ""}
-                <uui-button
-                    look="outline"
-                    label=${this.localize.term("uaCatalogue_selectAction")}
-                    @click=${this.#onAddAction}
-                >
-                    <uui-icon name="icon-circuits"></uui-icon>
-                    Add Action
-                </uui-button>
+                          <uui-icon name="icon-circuits"></uui-icon>
+                          Add Action
+                      </uui-button>`}
             </div>
             <div id="canvas">
                 <ua-automation-canvas
+                    ?read-only=${this._dryRunActive}
                     .nodes=${this._nodes}
                     .edges=${this._edges}
                     .viewport=${this._viewport}
@@ -427,6 +502,23 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             #canvas {
                 flex: 1;
                 min-height: 0;
+            }
+
+            .dry-run-banner {
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-3);
+                flex: 1;
+                font-weight: 600;
+            }
+
+            .dry-run-banner small {
+                font-weight: 400;
+                opacity: 0.8;
+            }
+
+            .dry-run-banner uui-button {
+                margin-left: auto;
             }
         `,
     ];
