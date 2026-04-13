@@ -106,6 +106,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Execution.
+        services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 

@@ -63,6 +63,7 @@ public class WorkflowCompilerTests
             conditionEvaluator,
             Mock.Of<IAutomationRunRepository>(),
             Mock.Of<IConnectionService>(),
+            new DefaultStepErrorClassifier(),
             new AutomateMetrics(meterFactory.Object),
             sp,
             Mock.Of<ILogger<WorkflowCompiler>>());

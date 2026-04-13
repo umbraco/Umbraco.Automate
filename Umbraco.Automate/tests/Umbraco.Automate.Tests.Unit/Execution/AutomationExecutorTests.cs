@@ -61,6 +61,7 @@ public class AutomationExecutorTests
             conditionEvaluator,
             _runRepo.Object,
             Mock.Of<IConnectionService>(),
+            new DefaultStepErrorClassifier(),
             metrics,
             sp,
             Mock.Of<ILogger<WorkflowCompiler>>());

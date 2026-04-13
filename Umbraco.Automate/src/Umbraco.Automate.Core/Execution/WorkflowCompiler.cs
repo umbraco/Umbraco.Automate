@@ -34,6 +34,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
+    private readonly IStepErrorClassifier _errorClassifier;
     private readonly AutomateMetrics _metrics;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<WorkflowCompiler> _logger;
@@ -47,6 +48,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
+        IStepErrorClassifier errorClassifier,
         AutomateMetrics metrics,
         IServiceProvider serviceProvider,
         ILogger<WorkflowCompiler> logger)
@@ -59,6 +61,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
         _connectionService = connectionService;
+        _errorClassifier = errorClassifier;
         _metrics = metrics;
         _serviceProvider = serviceProvider;
         _logger = logger;
@@ -141,6 +144,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 _settingsBindingResolver,
                 _runRepository,
                 _connectionService,
+                _errorClassifier,
                 _serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>(),
                 _metrics,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());

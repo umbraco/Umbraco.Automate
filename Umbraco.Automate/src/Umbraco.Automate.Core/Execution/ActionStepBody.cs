@@ -29,6 +29,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
+    private readonly IStepErrorClassifier _errorClassifier;
     private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<ActionStepBody> _logger;
@@ -41,6 +42,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
+        IStepErrorClassifier errorClassifier,
         IOptions<ExecutionOptions> executionOptions,
         AutomateMetrics metrics,
         ILogger<ActionStepBody> logger)
@@ -52,6 +54,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
+        _errorClassifier = errorClassifier;
         _executionOptions = executionOptions;
         _metrics = metrics;
         _logger = logger;
@@ -89,32 +92,45 @@ internal sealed class ActionStepBody : StepBodyAsync
         var iterationContext = context.Item as ForEachIterationContext;
         var bindingData = BindingDataBuilder.Build(data, iterationContext);
 
-        // Resolve input mappings via bindings.
-        var resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
+        // Setup phase — resolve inputs, settings, bindings, and connections before we
+        // invoke the middleware pipeline. These operations can throw on misconfiguration
+        // (bad bindings, missing required settings, invalid connection reference). If we
+        // let them escape, WorkflowCore will retry the step body indefinitely. Catch them
+        // here, classify, and turn them into a properly-recorded step failure.
+        Dictionary<string, object?> resolvedInputs;
+        object? settings;
+        ConfiguredConnection? connection;
 
-        // Resolve settings for the action (deserialize, resolve $config refs, validate).
-        object? settings = null;
-        if (_action.SettingsType is not null && _stepConfig.Settings.Count > 0)
+        try
         {
-            settings = _action.ResolveSettings(_stepConfig.Settings);
-        }
+            resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
 
-        // Evaluate ${ } bindings in settings properties marked with SupportsBindings.
-        if (settings is not null)
-        {
-            _settingsBindingResolver.ResolveBindings(settings, bindingData);
-        }
+            settings = null;
+            if (_action.SettingsType is not null && _stepConfig.Settings.Count > 0)
+            {
+                settings = _action.ResolveSettings(_stepConfig.Settings);
+            }
 
-        // Resolve connection for this step.
-        // Priority: explicit step connectionId > auto-resolve by action's connection type alias.
-        ConfiguredConnection? connection = null;
-        if (_stepConfig.ConnectionId is { } connectionId)
-        {
-            connection = await _connectionService.GetConfiguredConnectionAsync(connectionId, cancellationToken);
+            if (settings is not null)
+            {
+                _settingsBindingResolver.ResolveBindings(settings, bindingData);
+            }
+
+            // Resolve connection for this step.
+            // Priority: explicit step connectionId > auto-resolve by action's connection type alias.
+            connection = null;
+            if (_stepConfig.ConnectionId is { } connectionId)
+            {
+                connection = await _connectionService.GetConfiguredConnectionAsync(connectionId, cancellationToken);
+            }
+            else if (_action.ConnectionTypeAlias is { } typeAlias)
+            {
+                connection = await ResolveConnectionByTypeAsync(typeAlias, data.ExecutionContext, cancellationToken);
+            }
         }
-        else if (_action.ConnectionTypeAlias is { } typeAlias)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            connection = await ResolveConnectionByTypeAsync(typeAlias, data.ExecutionContext, cancellationToken);
+            return await HandleSetupFailureAsync(ex, data, cancellationToken);
         }
 
         // Create a linked CancellationTokenSource that enforces the step timeout.
@@ -220,7 +236,10 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
-        // If the step failed and error behavior is Terminate, throw to abort the workflow.
+        // If the step failed, decide what to do based on the configured error behavior and
+        // the error classifier. The pipeline has already wrapped any exception in a failed
+        // ActionResult, so this step will not be retried by WorkflowCore regardless — we
+        // just need to decide whether to abort the workflow (Terminate) or move on (Next).
         if (result.Status == ActionResultStatus.Failed && _stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
         {
             _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
@@ -231,6 +250,63 @@ internal sealed class ActionStepBody : StepBodyAsync
         if (result.Status == ActionResultStatus.Success && result.Outcome is not null)
         {
             return ExecutionResult.Outcome(result.Outcome);
+        }
+
+        return ExecutionResult.Next();
+    }
+
+    /// <summary>
+    /// Handles an exception raised during the pre-pipeline setup phase (input mapping,
+    /// settings resolution, connection resolution). These exceptions don't flow through
+    /// <see cref="ErrorHandlingMiddleware"/>, so if they're allowed to escape the step
+    /// body WorkflowCore will retry indefinitely. Instead we classify the exception:
+    /// terminal categories (misconfiguration, auth) stop the step without retry; transient
+    /// categories are rethrown so WorkflowCore's retry mechanism can kick in.
+    /// </summary>
+    private async Task<ExecutionResult> HandleSetupFailureAsync(
+        Exception exception,
+        AutomationWorkflowData data,
+        CancellationToken cancellationToken)
+    {
+        var category = _errorClassifier.Classify(exception);
+        var isTerminal = _errorClassifier.IsTerminal(category);
+
+        _logger.Log(
+            isTerminal ? LogLevel.Error : LogLevel.Warning,
+            exception,
+            "Step {StepId} setup failed ({Category}) for action '{ActionAlias}' in run {RunId}. Terminal: {IsTerminal}",
+            _stepConfig.Id, category, _action.Alias, data.RunId, isTerminal);
+
+        var now = DateTime.UtcNow;
+        var stepRun = new StepRun
+        {
+            Id = Guid.NewGuid(),
+            RunId = data.RunId,
+            StepId = _stepConfig.Id,
+            ActionAlias = _action.Alias,
+            Status = StepRunStatus.Failed,
+            StartedUtc = now,
+            CompletedUtc = now,
+            Duration = TimeSpan.Zero,
+            Error = exception.Message,
+            ErrorCategory = category,
+        };
+
+        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        _metrics.StepFailed(_action.Alias);
+
+        // Transient setup failures (e.g. database unavailable while resolving a connection)
+        // should retry — let the exception escape so WorkflowCore's retry policy applies.
+        if (!isTerminal)
+        {
+            throw exception;
+        }
+
+        // Terminal failure: either abort the workflow or skip past the failed step,
+        // depending on the configured ErrorBehavior — but never retry.
+        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
+        {
+            throw exception;
         }
 
         return ExecutionResult.Next();
