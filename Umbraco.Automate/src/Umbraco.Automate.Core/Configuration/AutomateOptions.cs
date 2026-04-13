@@ -40,9 +40,18 @@ public sealed class ExecutionOptions
     public TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
-    /// Gets or sets the default retry count for failed steps.
+    /// Gets or sets the default maximum number of retries for a failed step when the
+    /// step's own <see cref="StepConfiguration.MaxRetries"/> is not set.
+    /// Prevents a transient failure from retrying indefinitely.
     /// </summary>
-    public int DefaultRetryCount { get; set; } = 3;
+    public int DefaultMaxRetries { get; set; } = 10;
+
+    /// <summary>
+    /// Gets or sets the default retry interval for a failed step when the step's own
+    /// <see cref="StepConfiguration.RetryInterval"/> is not set. Without this, WorkflowCore
+    /// falls back to its built-in 60-second default.
+    /// </summary>
+    public TimeSpan DefaultRetryInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Gets or sets the maximum number of concurrent runs.

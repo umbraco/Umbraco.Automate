@@ -150,7 +150,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
             var workflowStep = new ActionWorkflowStep(stepBody);
-            ApplyErrorBehavior(workflowStep, stepConfig);
+            ApplyErrorBehavior(workflowStep, stepConfig, _serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>().Value);
             return workflowStep;
         }
 
@@ -222,12 +222,14 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     /// Without this, WorkflowCore falls back to the workflow's <c>DefaultErrorBehavior</c> (Retry)
     /// and retries every throwing step indefinitely — including ones where retry cannot help.
     /// Our <see cref="StepErrorBehavior"/> values intentionally mirror WorkflowCore's
-    /// <see cref="WorkflowErrorHandling"/> so the cast is safe.
+    /// <see cref="WorkflowErrorHandling"/> so the cast is safe. The retry interval falls back
+    /// to <see cref="ExecutionOptions.DefaultRetryInterval"/> when not set per-step, overriding
+    /// WorkflowCore's built-in 60-second default.
     /// </summary>
-    private static void ApplyErrorBehavior(WorkflowStep workflowStep, StepConfiguration stepConfig)
+    private static void ApplyErrorBehavior(WorkflowStep workflowStep, StepConfiguration stepConfig, ExecutionOptions executionOptions)
     {
         workflowStep.ErrorBehavior = (WorkflowErrorHandling)stepConfig.ErrorBehavior;
-        workflowStep.RetryInterval = stepConfig.RetryInterval;
+        workflowStep.RetryInterval = stepConfig.RetryInterval ?? executionOptions.DefaultRetryInterval;
     }
 
     private static void WireTransitions(

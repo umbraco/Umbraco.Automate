@@ -284,13 +284,14 @@ internal sealed class ActionStepBody : StepBodyAsync
             return ExecutionResult.Next();
         }
 
-        // Transient failure. If MaxRetries is configured and exhausted, stop retrying and
-        // move on so the workflow doesn't loop forever on the same step.
-        if (_stepConfig.MaxRetries is { } max && context.ExecutionPointer.RetryCount >= max)
+        // Transient failure. Cap retries at the step's configured MaxRetries, falling back
+        // to ExecutionOptions.DefaultMaxRetries so we don't loop forever on the same step.
+        var maxRetries = _stepConfig.MaxRetries ?? _executionOptions.Value.DefaultMaxRetries;
+        if (context.ExecutionPointer.RetryCount >= maxRetries)
         {
             _logger.LogError(
-                "Step {StepId} exhausted MaxRetries ({MaxRetries}) — skipping past failure",
-                _stepConfig.Id, max);
+                "Step {StepId} exhausted retry budget ({MaxRetries}) — skipping past failure",
+                _stepConfig.Id, maxRetries);
             return ExecutionResult.Next();
         }
 
