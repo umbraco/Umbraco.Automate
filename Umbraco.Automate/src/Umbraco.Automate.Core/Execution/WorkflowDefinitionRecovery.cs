@@ -40,32 +40,38 @@ internal sealed class WorkflowDefinitionRecovery
 
     /// <summary>
     /// Finds all in-flight workflow instances and registers their definitions.
+    /// Instances whose definitions cannot be recovered are terminated to prevent
+    /// WorkflowCore's poller from logging "not registered" errors indefinitely.
     /// </summary>
     public async Task RecoverAsync(CancellationToken cancellationToken)
     {
-        var definitionIds = await GetInFlightDefinitionIdsAsync(cancellationToken);
-        if (definitionIds.Count == 0)
+        var instancesByDefinition = await GetInFlightInstancesByDefinitionAsync(cancellationToken);
+        if (instancesByDefinition.Count == 0)
         {
             return;
         }
 
-        _logger.LogInformation("Recovering {Count} workflow definition(s) for in-flight instances", definitionIds.Count);
+        _logger.LogInformation("Recovering {Count} workflow definition(s) for in-flight instances", instancesByDefinition.Count);
 
-        foreach (var (workflowId, version) in definitionIds)
+        foreach (var (key, instances) in instancesByDefinition)
         {
-            if (_registry.IsRegistered(workflowId, version))
+            if (_registry.IsRegistered(key.WorkflowId, key.Version))
             {
                 continue;
             }
 
-            await TryRegisterDefinitionAsync(workflowId, version, cancellationToken);
+            var recovered = await TryRegisterDefinitionAsync(key.WorkflowId, key.Version, cancellationToken);
+            if (!recovered)
+            {
+                await TerminateOrphanedInstancesAsync(instances, key.WorkflowId, cancellationToken);
+            }
         }
     }
 
-    private async Task<HashSet<(string WorkflowId, int Version)>> GetInFlightDefinitionIdsAsync(
+    private async Task<Dictionary<(string WorkflowId, int Version), List<WorkflowInstance>>> GetInFlightInstancesByDefinitionAsync(
         CancellationToken cancellationToken)
     {
-        var result = new HashSet<(string, int)>();
+        var result = new Dictionary<(string, int), List<WorkflowInstance>>();
 
         // Query runnable and suspended instances — these are the ones WorkflowCore's poller will try to process.
         foreach (var status in new[] { WorkflowStatus.Runnable, WorkflowStatus.Suspended })
@@ -75,20 +81,28 @@ internal sealed class WorkflowDefinitionRecovery
 
             foreach (var instance in instances)
             {
-                result.Add((instance.WorkflowDefinitionId, instance.Version));
+                var key = (instance.WorkflowDefinitionId, instance.Version);
+                if (!result.TryGetValue(key, out var list))
+                {
+                    list = [];
+                    result[key] = list;
+                }
+
+                list.Add(instance);
             }
         }
 
         return result;
     }
 
-    private async Task TryRegisterDefinitionAsync(string workflowId, int version, CancellationToken cancellationToken)
+    /// <returns><c>true</c> if the definition was successfully registered; otherwise <c>false</c>.</returns>
+    private async Task<bool> TryRegisterDefinitionAsync(string workflowId, int version, CancellationToken cancellationToken)
     {
         var match = WorkflowIdPattern.Match(workflowId);
         if (!match.Success)
         {
             _logger.LogWarning("Cannot parse automation ID from workflow definition '{WorkflowId}', skipping recovery", workflowId);
-            return;
+            return false;
         }
 
         var automationId = Guid.Parse(match.Groups["id"].Value);
@@ -105,7 +119,7 @@ internal sealed class WorkflowDefinitionRecovery
             _logger.LogWarning(
                 "Automation {AutomationId} not found, cannot recover workflow definition '{WorkflowId}'",
                 automationId, workflowId);
-            return;
+            return false;
         }
 
         try
@@ -116,12 +130,38 @@ internal sealed class WorkflowDefinitionRecovery
             _logger.LogInformation(
                 "Recovered workflow definition '{WorkflowId}' for automation '{AutomationName}'",
                 workflowId, automation.Name);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "Failed to recover workflow definition '{WorkflowId}' for automation {AutomationId}",
                 workflowId, automationId);
+            return false;
+        }
+    }
+
+    private async Task TerminateOrphanedInstancesAsync(
+        List<WorkflowInstance> instances, string workflowId, CancellationToken cancellationToken)
+    {
+        foreach (var instance in instances)
+        {
+            try
+            {
+                instance.Status = WorkflowStatus.Terminated;
+                instance.CompleteTime = DateTime.UtcNow;
+                await _persistence.PersistWorkflow(instance, cancellationToken);
+
+                _logger.LogWarning(
+                    "Terminated orphaned workflow instance '{InstanceId}' for unrecoverable definition '{WorkflowId}'",
+                    instance.Id, workflowId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to terminate orphaned workflow instance '{InstanceId}' for definition '{WorkflowId}'",
+                    instance.Id, workflowId);
+            }
         }
     }
 }

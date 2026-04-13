@@ -11,8 +11,9 @@ namespace Umbraco.Automate.Persistence.Notifications;
 /// On application startup, marks any automation runs left in <see cref="AutomationRunStatus.Running"/>
 /// or <see cref="AutomationRunStatus.Pending"/> as <see cref="AutomationRunStatus.Failed"/>.
 /// These represent workflows that were in-flight when the previous process stopped.
-/// Only runs on <see cref="ServerRole.Single"/> or <see cref="ServerRole.SchedulingPublisher"/>
-/// nodes — subscribers must not mark runs as failed that may still be executing elsewhere.
+/// Skipped on <see cref="ServerRole.Subscriber"/> nodes — subscribers must not mark runs
+/// as failed that may still be executing elsewhere. Runs on all other roles including
+/// <see cref="ServerRole.Unknown"/> (role election may not have completed at startup).
 /// </summary>
 internal sealed class StuckRunRecoveryNotificationHandler
     : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
@@ -41,10 +42,10 @@ internal sealed class StuckRunRecoveryNotificationHandler
         UmbracoApplicationStartedNotification notification,
         CancellationToken cancellationToken)
     {
-        if (_serverRoleAccessor.CurrentServerRole is not (ServerRole.Single or ServerRole.SchedulingPublisher))
+        if (_serverRoleAccessor.CurrentServerRole is ServerRole.Subscriber)
         {
             _logger.LogDebug(
-                "Stuck run recovery skipped — this node ({ServerRole}) is not the scheduling publisher",
+                "Stuck run recovery skipped — this node ({ServerRole}) is a subscriber",
                 _serverRoleAccessor.CurrentServerRole);
             return;
         }
@@ -67,20 +68,65 @@ internal sealed class StuckRunRecoveryNotificationHandler
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        var recovered = await db.AutomationRuns
+        var stuckStepStatuses = new[] { (int)StepRunStatus.Pending, (int)StepRunStatus.Running };
+
+        // 1. Recover stuck runs and their step runs.
+        var stuckRunIds = await db.AutomationRuns
             .Where(r => NonTerminalStatuses.Contains(r.Status) && !durableRunIds.Contains(r.Id))
+            .Select(r => r.Id)
+            .ToListAsync(cancellationToken);
+
+        var recoveredSteps = 0;
+        var recoveredRuns = 0;
+
+        if (stuckRunIds.Count > 0)
+        {
+            recoveredSteps = await db.StepRuns
+                .Where(sr => stuckRunIds.Contains(sr.RunId) && stuckStepStatuses.Contains(sr.Status))
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(sr => sr.Status, (int)StepRunStatus.Failed)
+                        .SetProperty(sr => sr.CompletedUtc, now)
+                        .SetProperty(sr => sr.Error, "Recovered after application restart — workflow was interrupted"),
+                    cancellationToken);
+
+            recoveredRuns = await db.AutomationRuns
+                .Where(r => stuckRunIds.Contains(r.Id))
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(r => r.Status, (int)AutomationRunStatus.Failed)
+                        .SetProperty(r => r.CompletedUtc, now)
+                        .SetProperty(r => r.Error, "Recovered after application restart — workflow was interrupted"),
+                    cancellationToken);
+        }
+
+        // 2. Recover orphaned step runs whose parent run already reached a terminal state
+        //    but the steps were left in Running/Pending (e.g. from retries that threw before
+        //    updating step status).
+        var terminalRunStatuses = new[]
+        {
+            (int)AutomationRunStatus.Completed,
+            (int)AutomationRunStatus.Failed,
+            (int)AutomationRunStatus.Cancelled,
+        };
+
+        var orphanedSteps = await db.StepRuns
+            .Where(sr => stuckStepStatuses.Contains(sr.Status)
+                && db.AutomationRuns.Any(r => r.Id == sr.RunId && terminalRunStatuses.Contains(r.Status)))
             .ExecuteUpdateAsync(
                 s => s
-                    .SetProperty(r => r.Status, (int)AutomationRunStatus.Failed)
-                    .SetProperty(r => r.CompletedUtc, now)
-                    .SetProperty(r => r.Error, "Recovered after application restart — workflow was interrupted"),
+                    .SetProperty(sr => sr.Status, (int)StepRunStatus.Failed)
+                    .SetProperty(sr => sr.CompletedUtc, now)
+                    .SetProperty(sr => sr.Error, "Recovered after application restart — parent run already completed"),
                 cancellationToken);
 
-        if (recovered > 0)
+        recoveredSteps += orphanedSteps;
+
+        if (recoveredRuns > 0 || recoveredSteps > 0)
         {
             _logger.LogWarning(
-                "Recovered {Count} stuck automation run(s) from previous process",
-                recovered);
+                "Recovered {RunCount} stuck automation run(s) and {StepCount} stuck step run(s) from previous process",
+                recoveredRuns, recoveredSteps);
         }
     }
 }
