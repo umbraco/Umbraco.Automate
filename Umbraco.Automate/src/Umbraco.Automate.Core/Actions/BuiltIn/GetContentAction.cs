@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Cms;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 
@@ -30,6 +31,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     private readonly IPublishedContentCache _publishedContentCache;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly IPublishedUrlProvider _urlProvider;
+    private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IContentValueNormaliser _normaliser;
     private readonly ILogger<GetContentAction> _logger;
 
@@ -41,6 +43,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         IPublishedContentCache publishedContentCache,
         IUmbracoContextFactory umbracoContextFactory,
         IPublishedUrlProvider urlProvider,
+        IUserIdKeyResolver userIdKeyResolver,
         IContentValueNormaliser normaliser,
         ILogger<GetContentAction> logger)
         : base(infrastructure)
@@ -48,6 +51,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         _publishedContentCache = publishedContentCache;
         _umbracoContextFactory = umbracoContextFactory;
         _urlProvider = urlProvider;
+        _userIdKeyResolver = userIdKeyResolver;
         _normaliser = normaliser;
         _logger = logger;
     }
@@ -80,7 +84,20 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         }
 
         var culture = NormaliseCulture(settings.Culture, content);
-        return Success(Project(content, culture));
+        var creatorKey = await TryResolveUserKeyAsync(content.CreatorId);
+        var writerKey = await TryResolveUserKeyAsync(content.WriterId);
+
+        return Success(Project(content, culture, creatorKey, writerKey));
+    }
+
+    // IPublishedContent exposes user references as ints. We resolve them to Guid keys
+    // because keys are the stable cross-system identifier we expose elsewhere in
+    // automation outputs. TryGetAsync returns a failed Attempt if the user has been
+    // deleted — surface that as null rather than failing the action.
+    private async Task<Guid?> TryResolveUserKeyAsync(int userId)
+    {
+        var attempt = await _userIdKeyResolver.TryGetAsync(userId);
+        return attempt.Success ? attempt.Result : null;
     }
 
     private static string? NormaliseCulture(string? requested, IPublishedContent content)
@@ -95,7 +112,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
             : content.Cultures.Keys.FirstOrDefault();
     }
 
-    private GetContentOutput Project(IPublishedContent content, string? culture)
+    private GetContentOutput Project(IPublishedContent content, string? culture, Guid? creatorKey, Guid? writerKey)
         => new()
         {
             ContentKey = content.Key,
@@ -111,6 +128,8 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
             AvailableCultures = content.Cultures.Keys.ToArray(),
             CreateDate = content.CreateDate,
             UpdateDate = content.UpdateDate,
+            CreatorKey = creatorKey,
+            WriterKey = writerKey,
             Properties = _normaliser.NormaliseProperties(content, culture),
         };
 

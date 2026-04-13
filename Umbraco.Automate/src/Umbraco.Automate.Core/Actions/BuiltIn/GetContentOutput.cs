@@ -45,6 +45,18 @@ public sealed class GetContentOutput
     public DateTime UpdateDate { get; init; }
 
     /// <summary>
+    /// Gets the key of the user who created the content item, if resolvable.
+    /// Null if the user has been deleted.
+    /// </summary>
+    public Guid? CreatorKey { get; init; }
+
+    /// <summary>
+    /// Gets the key of the user who last edited the content item, if resolvable.
+    /// Null if the user has been deleted.
+    /// </summary>
+    public Guid? WriterKey { get; init; }
+
+    /// <summary>
     /// Gets the property values keyed by property alias, normalised for binding
     /// access. See <see cref="Cms.IContentValueNormaliser"/> for normalisation rules.
     /// </summary>

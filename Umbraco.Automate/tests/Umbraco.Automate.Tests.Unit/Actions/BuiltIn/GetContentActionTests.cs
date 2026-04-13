@@ -9,6 +9,7 @@ using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
@@ -18,6 +19,7 @@ public class GetContentActionTests
     private readonly Mock<IPublishedContentCache> _cache = new();
     private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
     private readonly Mock<IPublishedUrlProvider> _urlProvider = new();
+    private readonly Mock<IUserIdKeyResolver> _userIdKeyResolver = new();
     private readonly Mock<IContentValueNormaliser> _normaliser = new();
     private readonly GetContentAction _action;
 
@@ -30,11 +32,18 @@ public class GetContentActionTests
                 isRoot: false,
                 Mock.Of<IUmbracoContextAccessor>()));
 
+        // Default: any user id resolves to a failed attempt (treated as "deleted user").
+        // Tests that care about a specific resolution override per-user-id.
+        _userIdKeyResolver
+            .Setup(x => x.TryGetAsync(It.IsAny<int>()))
+            .ReturnsAsync(Attempt<Guid>.Fail());
+
         _action = new GetContentAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _cache.Object,
             _contextFactory.Object,
             _urlProvider.Object,
+            _userIdKeyResolver.Object,
             _normaliser.Object,
             Mock.Of<ILogger<GetContentAction>>());
     }
@@ -93,10 +102,15 @@ public class GetContentActionTests
     {
         var contentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        var content = MockPublishedContent(contentKey, "About", "page", contentTypeKey);
+        var creatorKey = Guid.NewGuid();
+        var writerKey = Guid.NewGuid();
+        var content = MockPublishedContent(contentKey, "About", "page", contentTypeKey, creatorId: 5, writerId: 7);
 
         _cache.Setup(x => x.GetByIdAsync(contentKey, It.IsAny<bool?>()))
             .ReturnsAsync(content.Object);
+
+        _userIdKeyResolver.Setup(x => x.TryGetAsync(5)).ReturnsAsync(Attempt<Guid>.Succeed(creatorKey));
+        _userIdKeyResolver.Setup(x => x.TryGetAsync(7)).ReturnsAsync(Attempt<Guid>.Succeed(writerKey));
 
         var properties = new Dictionary<string, object?> { ["title"] = "Hello" };
         _normaliser.Setup(x => x.NormaliseProperties(content.Object, null))
@@ -115,15 +129,39 @@ public class GetContentActionTests
         output.Name.ShouldBe("About");
         output.ContentTypeAlias.ShouldBe("page");
         output.ContentTypeKey.ShouldBe(contentTypeKey);
+        output.CreatorKey.ShouldBe(creatorKey);
+        output.WriterKey.ShouldBe(writerKey);
         output.Properties.ShouldContainKey("title");
         output.Properties["title"].ShouldBe("Hello");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DeletedUser_ReturnsNullCreatorKey()
+    {
+        var contentKey = Guid.NewGuid();
+        // Default resolver setup returns failed Attempt for any int — simulating a deleted user.
+        var content = MockPublishedContent(contentKey, "About", "page", Guid.NewGuid(), creatorId: 99, writerId: 99);
+
+        _cache.Setup(x => x.GetByIdAsync(contentKey, It.IsAny<bool?>()))
+            .ReturnsAsync(content.Object);
+
+        var context = CreateContext(new GetContentSettings { ContentKey = contentKey.ToString() });
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        var output = result.OutputData as GetContentOutput;
+        output!.CreatorKey.ShouldBeNull();
+        output.WriterKey.ShouldBeNull();
     }
 
     private static Mock<IPublishedContent> MockPublishedContent(
         Guid key,
         string name,
         string typeAlias,
-        Guid contentTypeKey)
+        Guid contentTypeKey,
+        int creatorId = 0,
+        int writerId = 0)
     {
         var contentType = new Mock<IPublishedContentType>();
         contentType.SetupGet(x => x.Alias).Returns(typeAlias);
@@ -139,6 +177,8 @@ public class GetContentActionTests
         content.SetupGet(x => x.Properties).Returns(Array.Empty<IPublishedProperty>());
         content.SetupGet(x => x.CreateDate).Returns(DateTime.UtcNow);
         content.SetupGet(x => x.UpdateDate).Returns(DateTime.UtcNow);
+        content.SetupGet(x => x.CreatorId).Returns(creatorId);
+        content.SetupGet(x => x.WriterId).Returns(writerId);
         return content;
     }
 
