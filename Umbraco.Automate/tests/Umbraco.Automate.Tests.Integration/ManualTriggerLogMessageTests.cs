@@ -64,7 +64,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
 
         var triggers = new TriggerCollection(() =>
         {
-            var deps = new TriggerInfrastructure(modelResolver, Options.Create(new DeduplicationOptions()));
+            var deps = new TriggerInfrastructure(modelResolver);
             return new ITrigger[] { new ManualTrigger(deps) };
         });
 

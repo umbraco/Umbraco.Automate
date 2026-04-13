@@ -11,9 +11,7 @@ namespace Umbraco.Automate.Tests.Unit.Triggers;
 
 public class TriggerBaseTests
 {
-    private static readonly TriggerInfrastructure Dependencies = new(
-        Mock.Of<IEditableModelResolver>(),
-        Options.Create(new DeduplicationOptions()));
+    private static readonly TriggerInfrastructure Dependencies = new(Mock.Of<IEditableModelResolver>());
 
     [Fact]
     public void ReadsMetadataFromAttribute()

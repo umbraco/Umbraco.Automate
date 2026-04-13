@@ -15,9 +15,7 @@ namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 public class ContentBatchPublishedTriggerTests
 {
     private readonly ContentBatchPublishedTrigger _trigger = new(
-        new TriggerInfrastructure(
-            Mock.Of<IEditableModelResolver>(),
-            Options.Create(new DeduplicationOptions { WindowMinutes = 5 })));
+        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
 
     [Fact]
     public void HasCorrectAlias()

@@ -29,7 +29,7 @@ public sealed class ContentSavedTrigger
             {
                 TriggerAlias = Alias,
                 InitiatorType = "system",
-                IdempotencyKey = GenerateIdempotencyKey(content.Key),
+                IdempotencyKey = GenerateIdempotencyKey(content.Key, content.VersionId),
                 Output = new ContentSavedTriggerOutput
                 {
                     ContentKey = content.Key,

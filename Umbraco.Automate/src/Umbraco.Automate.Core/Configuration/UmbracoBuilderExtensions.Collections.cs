@@ -59,8 +59,6 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
         builder.Services.Configure<RateLimitingOptions>(
             builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
-        builder.Services.Configure<DeduplicationOptions>(
-            builder.Config.GetSection("Umbraco:Automate:Deduplication"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()

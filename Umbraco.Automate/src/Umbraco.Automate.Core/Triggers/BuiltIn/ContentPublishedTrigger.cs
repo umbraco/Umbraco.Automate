@@ -29,7 +29,10 @@ public sealed class ContentPublishedTrigger
             {
                 TriggerAlias = Alias,
                 InitiatorType = "system",
-                IdempotencyKey = GenerateIdempotencyKey(content.Key),
+                // Key on the version that just got published: rapid successive publishes
+                // get distinct PublishedVersionIds and therefore distinct keys, while a
+                // duplicate notification for the same publish collapses to one message.
+                IdempotencyKey = GenerateIdempotencyKey(content.Key, content.PublishedVersionId),
                 Output = new ContentPublishedTriggerOutput
                 {
                     ContentKey = content.Key,

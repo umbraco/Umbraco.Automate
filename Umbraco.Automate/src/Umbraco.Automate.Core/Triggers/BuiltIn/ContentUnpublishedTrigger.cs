@@ -29,7 +29,11 @@ public sealed class ContentUnpublishedTrigger
             {
                 TriggerAlias = Alias,
                 InitiatorType = "system",
-                IdempotencyKey = GenerateIdempotencyKey(content.Key),
+                // The content was just unpublished — PublishedVersionId identifies the
+                // version that was live up until this event. Two unpublish notifications
+                // for the same event share this id; a re-publish-then-unpublish produces
+                // a new id, so the second event is not deduped.
+                IdempotencyKey = GenerateIdempotencyKey(content.Key, content.PublishedVersionId),
                 Output = new ContentUnpublishedTriggerOutput
                 {
                     ContentKey = content.Key,
