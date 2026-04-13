@@ -130,7 +130,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            return await HandleSetupFailureAsync(ex, data, cancellationToken);
+            return await HandleSetupFailureAsync(ex, data, context, cancellationToken);
         }
 
         // Create a linked CancellationTokenSource that enforces the step timeout.
@@ -236,14 +236,12 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
-        // If the step failed, decide what to do based on the configured error behavior and
-        // the error classifier. The pipeline has already wrapped any exception in a failed
-        // ActionResult, so this step will not be retried by WorkflowCore regardless — we
-        // just need to decide whether to abort the workflow (Terminate) or move on (Next).
-        if (result.Status == ActionResultStatus.Failed && _stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
+        // Pipeline-caught failures: decide retry/terminate/skip based on the configured
+        // ErrorBehavior (applied via WorkflowCore on the WorkflowStep) and the classifier.
+        if (result.Status == ActionResultStatus.Failed)
         {
-            _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
-            throw result.Exception ?? new InvalidOperationException($"Step '{_stepConfig.Name}' failed.");
+            var exception = result.Exception ?? new InvalidOperationException($"Step '{_stepConfig.Name}' failed.");
+            return DecideFailureOutcome(exception, result.ErrorCategory ?? StepRunErrorCategory.Unknown, context);
         }
 
         // If the action returned a named outcome, route via WorkflowCore's outcome matching.
@@ -256,26 +254,69 @@ internal sealed class ActionStepBody : StepBodyAsync
     }
 
     /// <summary>
+    /// Decides how to surface a step failure to WorkflowCore. The step's
+    /// <see cref="StepErrorBehavior"/> is wired onto the <c>WorkflowStep</c> at compile
+    /// time, so WorkflowCore handles retry/suspend/terminate/compensate when we throw.
+    /// We only need to decide whether to throw (let WorkflowCore apply the behavior) or
+    /// short-circuit with <see cref="ExecutionResult.Next"/> — the latter when retrying
+    /// makes no sense (terminal category) or would exceed the configured budget.
+    /// </summary>
+    private ExecutionResult DecideFailureOutcome(
+        Exception exception,
+        StepRunErrorCategory category,
+        IStepExecutionContext context)
+    {
+        // Terminate always aborts the workflow — WorkflowCore's Terminate handler stops
+        // execution and does not retry, because we set the step's ErrorBehavior.
+        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
+        {
+            _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
+            throw exception;
+        }
+
+        // Terminal category + non-Terminate behavior: retrying cannot change the outcome
+        // (bad settings, missing auth, etc.). Skip past the failed step without retry.
+        if (_errorClassifier.IsTerminal(category))
+        {
+            _logger.LogError(
+                "Step {StepId} failed with terminal category {Category} — skipping without retry",
+                _stepConfig.Id, category);
+            return ExecutionResult.Next();
+        }
+
+        // Transient failure. If MaxRetries is configured and exhausted, stop retrying and
+        // move on so the workflow doesn't loop forever on the same step.
+        if (_stepConfig.MaxRetries is { } max && context.ExecutionPointer.RetryCount >= max)
+        {
+            _logger.LogError(
+                "Step {StepId} exhausted MaxRetries ({MaxRetries}) — skipping past failure",
+                _stepConfig.Id, max);
+            return ExecutionResult.Next();
+        }
+
+        // Throw so WorkflowCore applies the configured ErrorBehavior (Retry with interval,
+        // Suspend, or Compensate) via the step-level settings set at compile time.
+        throw exception;
+    }
+
+    /// <summary>
     /// Handles an exception raised during the pre-pipeline setup phase (input mapping,
     /// settings resolution, connection resolution). These exceptions don't flow through
-    /// <see cref="ErrorHandlingMiddleware"/>, so if they're allowed to escape the step
-    /// body WorkflowCore will retry indefinitely. Instead we classify the exception:
-    /// terminal categories (misconfiguration, auth) stop the step without retry; transient
-    /// categories are rethrown so WorkflowCore's retry mechanism can kick in.
+    /// <see cref="ErrorHandlingMiddleware"/>, so we classify them here, record the step
+    /// run, and route the failure through the same decision logic as pipeline failures.
     /// </summary>
     private async Task<ExecutionResult> HandleSetupFailureAsync(
         Exception exception,
         AutomationWorkflowData data,
+        IStepExecutionContext context,
         CancellationToken cancellationToken)
     {
         var category = _errorClassifier.Classify(exception);
-        var isTerminal = _errorClassifier.IsTerminal(category);
 
-        _logger.Log(
-            isTerminal ? LogLevel.Error : LogLevel.Warning,
+        _logger.LogError(
             exception,
-            "Step {StepId} setup failed ({Category}) for action '{ActionAlias}' in run {RunId}. Terminal: {IsTerminal}",
-            _stepConfig.Id, category, _action.Alias, data.RunId, isTerminal);
+            "Step {StepId} setup failed ({Category}) for action '{ActionAlias}' in run {RunId}",
+            _stepConfig.Id, category, _action.Alias, data.RunId);
 
         var now = DateTime.UtcNow;
         var stepRun = new StepRun
@@ -295,21 +336,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
         _metrics.StepFailed(_action.Alias);
 
-        // Transient setup failures (e.g. database unavailable while resolving a connection)
-        // should retry — let the exception escape so WorkflowCore's retry policy applies.
-        if (!isTerminal)
-        {
-            throw exception;
-        }
-
-        // Terminal failure: either abort the workflow or skip past the failed step,
-        // depending on the configured ErrorBehavior — but never retry.
-        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
-        {
-            throw exception;
-        }
-
-        return ExecutionResult.Next();
+        return DecideFailureOutcome(exception, category, context);
     }
 
     private async Task<ExecutionResult> HandleResumeAsync(

@@ -149,7 +149,9 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 _metrics,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
-            return new ActionWorkflowStep(stepBody);
+            var workflowStep = new ActionWorkflowStep(stepBody);
+            ApplyErrorBehavior(workflowStep, stepConfig);
+            return workflowStep;
         }
 
         // Try control flow collection.
@@ -213,6 +215,19 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         }
 
         return controlFlow.ResolveSettings(stepConfig.Settings) as TSettings;
+    }
+
+    /// <summary>
+    /// Applies the step's configured error behavior to the WorkflowCore <see cref="WorkflowStep"/>.
+    /// Without this, WorkflowCore falls back to the workflow's <c>DefaultErrorBehavior</c> (Retry)
+    /// and retries every throwing step indefinitely — including ones where retry cannot help.
+    /// Our <see cref="StepErrorBehavior"/> values intentionally mirror WorkflowCore's
+    /// <see cref="WorkflowErrorHandling"/> so the cast is safe.
+    /// </summary>
+    private static void ApplyErrorBehavior(WorkflowStep workflowStep, StepConfiguration stepConfig)
+    {
+        workflowStep.ErrorBehavior = (WorkflowErrorHandling)stepConfig.ErrorBehavior;
+        workflowStep.RetryInterval = stepConfig.RetryInterval;
     }
 
     private static void WireTransitions(
