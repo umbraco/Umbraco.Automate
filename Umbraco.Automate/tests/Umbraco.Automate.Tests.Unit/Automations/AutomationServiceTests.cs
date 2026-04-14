@@ -1,4 +1,5 @@
 using System.Data;
+using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
@@ -270,5 +271,147 @@ public class AutomationServiceTests
 
         await Should.ThrowAsync<OperationCanceledException>(
             () => _service.PublishAutomationAsync(id));
+    }
+
+    // --- Step alias validation ---
+
+    [Fact]
+    public async Task CreateAutomationAsync_DuplicateStepAliases_ThrowsValidationException()
+    {
+        var automation = new AutomationBuilder()
+            .WithAlias("test")
+            .WithName("Test")
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.logMessage")
+                .WithName("Step 1")
+                .WithAlias("myAlias"))
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.logMessage")
+                .WithName("Step 2")
+                .WithAlias("myAlias"))
+            .Build();
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.CreateAutomationAsync(automation));
+
+        ex.Errors.ShouldContain(e => e.Contains("Duplicate"));
+    }
+
+    [Fact]
+    public async Task CreateAutomationAsync_ReservedStepAlias_ThrowsValidationException()
+    {
+        var automation = new AutomationBuilder()
+            .WithAlias("test")
+            .WithName("Test")
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.logMessage")
+                .WithName("Step 1")
+                .WithAlias("trigger"))
+            .Build();
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.CreateAutomationAsync(automation));
+
+        ex.Errors.ShouldContain(e => e.Contains("reserved"));
+    }
+
+    [Fact]
+    public async Task CreateAutomationAsync_InvalidAliasFormat_ThrowsValidationException()
+    {
+        var automation = new AutomationBuilder()
+            .WithAlias("test")
+            .WithName("Test")
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.logMessage")
+                .WithName("Step 1")
+                .WithAlias("http-request"))
+            .Build();
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.CreateAutomationAsync(automation));
+
+        ex.Errors.ShouldContain(e => e.Contains("invalid alias"));
+    }
+
+    [Fact]
+    public async Task CreateAutomationAsync_NullAliases_AutoGeneratesFromActionAlias()
+    {
+        Automation? saved = null;
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback<Automation, Guid?, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var automation = new AutomationBuilder()
+            .WithAlias("test")
+            .WithName("Test")
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.httpRequest")
+                .WithName("Fetch Data"))
+            .Build();
+
+        await _service.CreateAutomationAsync(automation);
+
+        saved.ShouldNotBeNull();
+        saved.Steps[0].Alias.ShouldBe("httpRequest");
+    }
+
+    [Fact]
+    public async Task CreateAutomationAsync_DuplicateActionAliases_GeneratesUniqueAliases()
+    {
+        Automation? saved = null;
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback<Automation, Guid?, CancellationToken>((a, _, _) => saved = a)
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var automation = new AutomationBuilder()
+            .WithAlias("test")
+            .WithName("Test")
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.httpRequest")
+                .WithName("Fetch 1"))
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.httpRequest")
+                .WithName("Fetch 2"))
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.httpRequest")
+                .WithName("Fetch 3"))
+            .Build();
+
+        await _service.CreateAutomationAsync(automation);
+
+        saved.ShouldNotBeNull();
+        saved.Steps[0].Alias.ShouldBe("httpRequest");
+        saved.Steps[1].Alias.ShouldBe("httpRequest2");
+        saved.Steps[2].Alias.ShouldBe("httpRequest3");
+    }
+
+    // --- GenerateUniqueAlias unit tests ---
+
+    [Fact]
+    public void GenerateUniqueAlias_ExtractsLastSegment()
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var alias = AutomationService.GenerateUniqueAlias("umbracoAutomate.httpRequest", used);
+
+        alias.ShouldBe("httpRequest");
+    }
+
+    [Fact]
+    public void GenerateUniqueAlias_DeduplicatesWithNumber()
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "httpRequest" };
+        var alias = AutomationService.GenerateUniqueAlias("umbracoAutomate.httpRequest", used);
+
+        alias.ShouldBe("httpRequest2");
+    }
+
+    [Fact]
+    public void GenerateUniqueAlias_SkipsReservedWords()
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var alias = AutomationService.GenerateUniqueAlias("custom.trigger", used);
+
+        // "trigger" is reserved, so it should get a suffix
+        alias.ShouldBe("trigger2");
     }
 }

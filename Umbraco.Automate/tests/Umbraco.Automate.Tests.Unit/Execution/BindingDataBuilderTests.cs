@@ -152,4 +152,98 @@ public class BindingDataBuilderTests
         var item = loop["item"].ShouldBeOfType<Dictionary<string, object?>>();
         item["name"].ShouldBe("Already Parsed");
     }
+
+    // --- Step alias tests ---
+
+    [Fact]
+    public void Build_WithStepAliases_RegistersBothGuidAndAliasKeys()
+    {
+        var stepId = Guid.NewGuid();
+        var outputs = new Dictionary<string, object?> { ["statusCode"] = 200 };
+
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            StepOutputs = new Dictionary<Guid, Dictionary<string, object?>> { [stepId] = outputs },
+            StepAliases = new Dictionary<Guid, string> { [stepId] = "httpRequest" },
+        };
+
+        var result = BindingDataBuilder.Build(data);
+
+        var steps = result["steps"].ShouldBeOfType<Dictionary<string, object?>>();
+        steps[stepId.ToString()].ShouldBeSameAs(outputs);
+        steps["httpRequest"].ShouldBeSameAs(outputs);
+    }
+
+    [Fact]
+    public void Build_WithoutStepAliases_OnlyGuidKey()
+    {
+        var stepId = Guid.NewGuid();
+        var outputs = new Dictionary<string, object?> { ["statusCode"] = 200 };
+
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            StepOutputs = new Dictionary<Guid, Dictionary<string, object?>> { [stepId] = outputs },
+        };
+
+        var result = BindingDataBuilder.Build(data);
+
+        var steps = result["steps"].ShouldBeOfType<Dictionary<string, object?>>();
+        steps.ShouldContainKey(stepId.ToString());
+        steps.Count.ShouldBe(1);
+    }
+
+    // --- Previous tests ---
+
+    [Fact]
+    public void Build_WithLastCompletedStepId_AddsPreviousKey()
+    {
+        var stepId = Guid.NewGuid();
+        var outputs = new Dictionary<string, object?> { ["messageId"] = "msg-123" };
+
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            StepOutputs = new Dictionary<Guid, Dictionary<string, object?>> { [stepId] = outputs },
+            LastCompletedStepId = stepId,
+        };
+
+        var result = BindingDataBuilder.Build(data);
+
+        result.ShouldContainKey("previous");
+        result["previous"].ShouldBeSameAs(outputs);
+    }
+
+    [Fact]
+    public void Build_WithoutLastCompletedStepId_NoPreviousKey()
+    {
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+        };
+
+        var result = BindingDataBuilder.Build(data);
+
+        result.ShouldNotContainKey("previous");
+    }
+
+    [Fact]
+    public void Build_WithLastCompletedStepId_NoMatchingOutputs_NoPreviousKey()
+    {
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            LastCompletedStepId = Guid.NewGuid(), // No matching output
+        };
+
+        var result = BindingDataBuilder.Build(data);
+
+        result.ShouldNotContainKey("previous");
+    }
 }
