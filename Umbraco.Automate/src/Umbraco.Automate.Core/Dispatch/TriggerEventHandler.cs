@@ -47,7 +47,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
         if (!ShouldProcessOnThisNode())
         {
-            _logger.LogDebug(
+            _logger.LogInformation(
                 "Skipping trigger event {TriggerAlias} — this node ({ServerRole}) is not the designated executor",
                 message.TriggerAlias, _serverRoleAccessor.CurrentServerRole);
             return;
@@ -64,7 +64,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
         if (matching.Count == 0)
         {
-            _logger.LogDebug("No matching automations for trigger {TriggerAlias}", message.TriggerAlias);
+            _logger.LogInformation(
+                "No published & enabled automations matched trigger {TriggerAlias} — event dropped",
+                message.TriggerAlias);
             return;
         }
 
