@@ -5,6 +5,7 @@ import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-c
 import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.js";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
 import { BINDING_TEXT_BOX_UI_ALIAS } from "../binding-text-box/manifests.js";
+import { BINDING_TEXT_AREA_UI_ALIAS } from "../binding-text-area/manifests.js";
 
 export interface SettingsChangeDetail {
     settings: Record<string, unknown>;
@@ -142,6 +143,9 @@ export class UaSettingsFormElement extends UmbLitElement {
             const alias = field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox";
             if (alias === "Umb.PropertyEditorUi.TextBox") {
                 return BINDING_TEXT_BOX_UI_ALIAS;
+            }
+            if (alias === "Umb.PropertyEditorUi.TextArea") {
+                return BINDING_TEXT_AREA_UI_ALIAS;
             }
         }
         return field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox";
