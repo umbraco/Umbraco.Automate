@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Shouldly;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Bindings.Filters;
+using Umbraco.Automate.Core.Dispatch;
 
 namespace Umbraco.Automate.Tests.Unit.Bindings;
 
@@ -23,12 +25,33 @@ public class BindingEvaluatorTests
             ["contentKey"] = Guid.Empty,
             ["body"] = "<p>Some <b>HTML</b> content</p>",
             ["empty"] = null,
+            ["cultures"] = new List<object?> { "en-US", "da-DK", "de-DE" },
+            ["items"] = new List<object?>
+            {
+                new Dictionary<string, object?> { ["name"] = "First", ["id"] = (long)1 },
+                new Dictionary<string, object?> { ["name"] = "Second", ["id"] = (long)2 },
+            },
+            ["headers"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/json",
+                ["X-Custom"] = "value",
+            },
         },
         ["steps"] = new Dictionary<string, object?>
         {
             ["sendEmail"] = new Dictionary<string, object?>
             {
                 ["messageId"] = "msg-123",
+            },
+            ["getContent"] = new Dictionary<string, object?>
+            {
+                ["name"] = "Test Page",
+                ["properties"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["subtitle"] = "Hello",
+                    ["body"] = "World",
+                },
+                ["availableCultures"] = new List<object?> { "en-US", "da-DK" },
             },
         },
     };
@@ -111,5 +134,235 @@ public class BindingEvaluatorTests
         var result = BindingEvaluator.ResolvePath("trigger.missing", _data);
 
         result.ShouldBeNull();
+    }
+
+    // --- Nested dictionary traversal ---
+
+    [Fact]
+    public void ResolvePath_NestedDictionary_TraversesMultipleLevels()
+    {
+        var result = BindingEvaluator.ResolvePath("steps.getContent.properties.subtitle", _data);
+
+        result.ShouldBe("Hello");
+    }
+
+    [Fact]
+    public void Evaluate_NestedDictionaryProperty()
+    {
+        var result = _evaluator.Evaluate("${ steps.getContent.properties.subtitle }", _data);
+
+        result.ShouldBe("Hello");
+    }
+
+    // --- Array index access ---
+
+    [Fact]
+    public void ResolvePath_ArrayIndex_ReturnsElement()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.cultures[0]", _data);
+
+        result.ShouldBe("en-US");
+    }
+
+    [Fact]
+    public void ResolvePath_ArrayIndex_SecondElement()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.cultures[1]", _data);
+
+        result.ShouldBe("da-DK");
+    }
+
+    [Fact]
+    public void ResolvePath_ArrayIndex_OutOfBounds_ReturnsNull()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.cultures[99]", _data);
+
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public void ResolvePath_ArrayIndex_ThenNestedProperty()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.items[0].name", _data);
+
+        result.ShouldBe("First");
+    }
+
+    [Fact]
+    public void ResolvePath_ArrayIndex_SecondItem_NestedProperty()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.items[1].id", _data);
+
+        result.ShouldBe((long)2);
+    }
+
+    [Fact]
+    public void Evaluate_ArrayIndexInTemplate()
+    {
+        var result = _evaluator.Evaluate("First culture: ${ trigger.cultures[0] }", _data);
+
+        result.ShouldBe("First culture: en-US");
+    }
+
+    // --- Bare numeric index ---
+
+    [Fact]
+    public void ResolvePath_BareNumericIndex()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.cultures.0", _data);
+
+        result.ShouldBe("en-US");
+    }
+
+    // --- Dictionary key access via brackets ---
+
+    [Fact]
+    public void ResolvePath_DictionaryKeyAccess_DoubleQuotes()
+    {
+        var result = BindingEvaluator.ResolvePath("""trigger.headers["Content-Type"]""", _data);
+
+        result.ShouldBe("application/json");
+    }
+
+    [Fact]
+    public void ResolvePath_DictionaryKeyAccess_SingleQuotes()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.headers['X-Custom']", _data);
+
+        result.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Evaluate_DictionaryKeyAccessInTemplate()
+    {
+        var result = _evaluator.Evaluate("""Type: ${ trigger.headers["Content-Type"] }""", _data);
+
+        result.ShouldBe("Type: application/json");
+    }
+
+    // --- Length / count pseudo-property ---
+
+    [Fact]
+    public void ResolvePath_Length_ReturnsListCount()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.cultures.length", _data);
+
+        result.ShouldBe(3);
+    }
+
+    [Fact]
+    public void ResolvePath_Count_ReturnsListCount()
+    {
+        var result = BindingEvaluator.ResolvePath("trigger.items.count", _data);
+
+        result.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Evaluate_LengthInTemplate()
+    {
+        var result = _evaluator.Evaluate("${ trigger.cultures.length } cultures", _data);
+
+        result.ShouldBe("3 cultures");
+    }
+
+    // --- Stringify ---
+
+    [Fact]
+    public void Evaluate_ListValue_SerializesToJsonArray()
+    {
+        var result = _evaluator.Evaluate("${ trigger.cultures }", _data);
+
+        result.ShouldBe("""["en-US","da-DK","de-DE"]""");
+    }
+
+    [Fact]
+    public void Evaluate_DictionaryValue_SerializesToJsonObject()
+    {
+        var result = _evaluator.Evaluate("${ steps.getContent.properties }", _data);
+
+        result.ShouldContain("subtitle");
+        result.ShouldContain("Hello");
+    }
+
+    // --- JSON string fallback (EnsureUnwrapped) ---
+
+    [Fact]
+    public void ResolvePath_JsonStringFallback_ObjectTraversal()
+    {
+        // Simulates a value that survived as a raw JSON string (e.g. from Newtonsoft round-trip).
+        var data = new Dictionary<string, object?>
+        {
+            ["step"] = new Dictionary<string, object?>
+            {
+                ["output"] = """{"subtitle":"Hello","body":"World"}""",
+            },
+        };
+
+        var result = BindingEvaluator.ResolvePath("step.output.subtitle", data);
+
+        result.ShouldBe("Hello");
+    }
+
+    [Fact]
+    public void ResolvePath_JsonStringFallback_ArrayIndex()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["step"] = new Dictionary<string, object?>
+            {
+                ["items"] = """["alpha","beta","gamma"]""",
+            },
+        };
+
+        var result = BindingEvaluator.ResolvePath("step.items[1]", data);
+
+        result.ShouldBe("beta");
+    }
+
+    // --- End-to-end: simulates GetContentOutput serialization round-trip ---
+
+    [Fact]
+    public void ResolvePath_GetContentOutput_RoundTrip()
+    {
+        // Simulate what ActionStepBody.StoreOutputData does:
+        // serialize GetContentOutput → JSON → DeserializeToUnwrappedDictionary.
+        var outputJson = JsonSerializer.Serialize(new
+        {
+            ContentKey = Guid.Empty,
+            Name = "Test Page",
+            Properties = new Dictionary<string, object?>
+            {
+                ["subtitle"] = "My Subtitle",
+                ["tags"] = new[] { "tag1", "tag2" },
+            },
+            AvailableCultures = new[] { "en-US", "da-DK" },
+        }, JsonOptions.Default);
+
+        var stepOutputs = JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
+
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?>
+            {
+                ["abc-123"] = stepOutputs,
+            },
+        };
+
+        // Nested property access.
+        BindingEvaluator.ResolvePath("steps.abc-123.properties.subtitle", data)
+            .ShouldBe("My Subtitle");
+
+        // Array index on a property within the nested dict.
+        BindingEvaluator.ResolvePath("steps.abc-123.properties.tags[0]", data)
+            .ShouldBe("tag1");
+
+        // Array index on a top-level array.
+        BindingEvaluator.ResolvePath("steps.abc-123.availableCultures[1]", data)
+            .ShouldBe("da-DK");
+
+        // Array length.
+        BindingEvaluator.ResolvePath("steps.abc-123.availableCultures.length", data)
+            .ShouldBe(2);
     }
 }
