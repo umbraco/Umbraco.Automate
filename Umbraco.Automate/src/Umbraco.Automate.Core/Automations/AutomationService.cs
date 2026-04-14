@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
@@ -98,6 +99,7 @@ internal sealed class AutomationService : IAutomationService
         }
 
         EnsureWebhookSecret(automation);
+        EnsureStepAliases(automation);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -122,6 +124,7 @@ internal sealed class AutomationService : IAutomationService
     public async Task<Automation> UpdateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         EnsureWebhookSecret(automation);
+        EnsureStepAliases(automation);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -735,6 +738,117 @@ internal sealed class AutomationService : IAutomationService
         }
 
         return map;
+    }
+
+    #endregion
+
+    #region Step aliases
+
+    private static readonly Regex StepAliasRegex = new("^[a-zA-Z][a-zA-Z0-9]*$", RegexOptions.Compiled);
+
+    private static readonly HashSet<string> ReservedBindingKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "trigger",
+        "steps",
+        "loop",
+        "previous",
+    };
+
+    /// <summary>
+    /// Validates explicit step aliases and auto-generates aliases for steps that lack one.
+    /// Mutates <paramref name="automation"/> in-place.
+    /// </summary>
+    private static void EnsureStepAliases(Automation automation)
+    {
+        if (automation.Steps.Count == 0)
+        {
+            return;
+        }
+
+        var usedAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // First pass: validate explicitly set aliases.
+        var errors = new List<string>();
+
+        foreach (var step in automation.Steps)
+        {
+            if (string.IsNullOrEmpty(step.Alias))
+            {
+                continue;
+            }
+
+            ValidateStepAlias(step, errors);
+
+            if (!usedAliases.Add(step.Alias))
+            {
+                errors.Add($"Duplicate step alias '{step.Alias}' on step '{step.Name}'.");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new AutomationValidationException("Step alias validation failed.", errors);
+        }
+
+        // Second pass: auto-generate missing aliases.
+        foreach (var step in automation.Steps)
+        {
+            if (!string.IsNullOrEmpty(step.Alias))
+            {
+                continue;
+            }
+
+            step.Alias = GenerateUniqueAlias(step.ActionAlias, usedAliases);
+            usedAliases.Add(step.Alias);
+        }
+    }
+
+    private static void ValidateStepAlias(StepConfiguration step, List<string> errors)
+    {
+        if (!StepAliasRegex.IsMatch(step.Alias!))
+        {
+            errors.Add($"Step '{step.Name}' has invalid alias '{step.Alias}'. Aliases must start with a letter and contain only letters and digits.");
+        }
+
+        if (ReservedBindingKeys.Contains(step.Alias!))
+        {
+            errors.Add($"Step '{step.Name}' uses reserved alias '{step.Alias}'.");
+        }
+
+        if (Guid.TryParse(step.Alias, out _))
+        {
+            errors.Add($"Step '{step.Name}' alias '{step.Alias}' cannot be a GUID.");
+        }
+    }
+
+    /// <summary>
+    /// Generates a unique alias from an action alias (e.g. "umbracoAutomate.httpRequest" → "httpRequest").
+    /// Appends an incrementing number if the base name is already taken.
+    /// </summary>
+    internal static string GenerateUniqueAlias(string actionAlias, ISet<string> usedAliases)
+    {
+        var baseName = actionAlias;
+        var lastDot = actionAlias.LastIndexOf('.');
+        if (lastDot >= 0 && lastDot < actionAlias.Length - 1)
+        {
+            baseName = actionAlias[(lastDot + 1)..];
+        }
+
+        if (!usedAliases.Contains(baseName) && !ReservedBindingKeys.Contains(baseName))
+        {
+            return baseName;
+        }
+
+        for (var i = 2; i < 1000; i++)
+        {
+            var candidate = $"{baseName}{i}";
+            if (!usedAliases.Contains(candidate) && !ReservedBindingKeys.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException($"Unable to generate unique alias for action '{actionAlias}'.");
     }
 
     #endregion
