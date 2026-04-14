@@ -21,6 +21,12 @@ internal static class BindingDataBuilder
         foreach (var (stepId, outputs) in data.StepOutputs)
         {
             stepsDict[stepId.ToString()] = outputs;
+
+            // Also register by alias so both ${steps.GUID.field} and ${steps.alias.field} work.
+            if (data.StepAliases.TryGetValue(stepId, out var alias))
+            {
+                stepsDict[alias] = outputs;
+            }
         }
 
         var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -28,6 +34,13 @@ internal static class BindingDataBuilder
             ["trigger"] = data.TriggerOutput,
             ["steps"] = stepsDict,
         };
+
+        // Add "previous" key pointing to the last completed step's outputs.
+        if (data.LastCompletedStepId.HasValue
+            && data.StepOutputs.TryGetValue(data.LastCompletedStepId.Value, out var previousOutputs))
+        {
+            bindingData["previous"] = previousOutputs;
+        }
 
         if (iterationContext is not null)
         {

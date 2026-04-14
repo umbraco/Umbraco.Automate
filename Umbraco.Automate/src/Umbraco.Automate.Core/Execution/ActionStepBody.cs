@@ -466,6 +466,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         // so values survive the WorkflowCore Newtonsoft.Json persistence round-trip and are
         // accessible to BindingEvaluator.ResolvePath.
         data.StepOutputs[_stepConfig.Id] = Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
+        data.LastCompletedStepId = _stepConfig.Id;
     }
 
     private async Task<ConfiguredConnection?> ResolveConnectionByTypeAsync(

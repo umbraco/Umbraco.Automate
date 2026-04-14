@@ -33,6 +33,18 @@ public sealed class AutomationWorkflowData
     public Dictionary<Guid, Dictionary<string, object?>> StepOutputs { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets a mapping from step ID to step alias.
+    /// Populated at workflow start from the automation definition.
+    /// </summary>
+    public Dictionary<Guid, string> StepAliases { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the ID of the most recently completed step that produced output.
+    /// Used by <see cref="BindingDataBuilder"/> to populate the <c>previous</c> binding key.
+    /// </summary>
+    public Guid? LastCompletedStepId { get; set; }
+
+    /// <summary>
     /// Gets or sets the execution context carrying the service account identity and workspace info.
     /// </summary>
     public AutomationExecutionContext? ExecutionContext { get; set; }

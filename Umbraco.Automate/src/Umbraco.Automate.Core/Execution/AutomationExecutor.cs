@@ -113,6 +113,9 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             AutomationId = automation.Id,
             AutomationAlias = automation.Alias,
             TriggerOutput = triggerOutputData ?? [],
+            StepAliases = automation.Steps
+                .Where(s => !string.IsNullOrEmpty(s.Alias))
+                .ToDictionary(s => s.Id, s => s.Alias!),
             ExecutionContext = executionContext,
         };
 
