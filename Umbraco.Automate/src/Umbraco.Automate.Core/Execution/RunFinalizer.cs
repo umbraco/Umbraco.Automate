@@ -59,13 +59,24 @@ internal sealed class RunFinalizer
                 return;
             }
 
+            // Clean up step runs left in Running status (e.g. from retries that threw
+            // before the step status could be updated).
+            var now = DateTime.UtcNow;
+            foreach (var stepRun in run.StepRuns.Where(sr => sr.Status == StepRunStatus.Running))
+            {
+                stepRun.Status = StepRunStatus.Failed;
+                stepRun.CompletedUtc = now;
+                stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
+                stepRun.Error = "Step was still running when the workflow reached a terminal state";
+            }
+
             var hasFailedStep = run.StepRuns.Any(sr => sr.Status == StepRunStatus.Failed);
 
             run.Status = workflow.Status == WorkflowStatus.Terminated || hasFailedStep
                 ? AutomationRunStatus.Failed
                 : AutomationRunStatus.Completed;
 
-            run.CompletedUtc = DateTime.UtcNow;
+            run.CompletedUtc = now;
 
             if (workflow.Status == WorkflowStatus.Terminated)
             {

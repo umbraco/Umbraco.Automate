@@ -39,22 +39,11 @@ export interface NodeDeleteRequestDetail {
     resolve: (confirmed: boolean) => void;
 }
 
+export type { ConditionSetModel, ConditionGroupModel, ConditionModel } from "../../../../api/types.gen.js";
+import type { ConditionSetModel } from "../../../../api/types.gen.js";
+
 export interface EdgeFilterData {
     filter?: ConditionSetModel | null;
-}
-
-export interface ConditionSetModel {
-    groups: ConditionGroupModel[];
-}
-
-export interface ConditionGroupModel {
-    conditions: ConditionModel[];
-}
-
-export interface ConditionModel {
-    leftOperand: string;
-    operator: string;
-    rightOperand: string;
 }
 
 export interface EdgeFilterOpenDetail {

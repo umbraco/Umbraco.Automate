@@ -22,7 +22,7 @@ internal sealed class DryRunMiddleware : IActionMiddleware
             ["actionAlias"] = context.ActionAlias,
             ["settingsType"] = context.Settings?.GetType().Name,
             ["hasConnection"] = context.Connection is not null,
-            ["connectionType"] = context.Connection?.ConnectionType,
+            ["connectionType"] = context.Connection?.Type,
             ["inputDataKeys"] = context.InputData.Keys.ToArray(),
         };
 

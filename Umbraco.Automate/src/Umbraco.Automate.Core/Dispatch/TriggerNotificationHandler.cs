@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
@@ -20,7 +22,9 @@ namespace Umbraco.Automate.Core.Dispatch;
 internal sealed class TriggerNotificationHandler<TNotification>(
     IEnumerable<INotificationTrigger<TNotification>> triggers,
     ITriggerDispatcher dispatcher,
-    IRuntimeState runtimeState) : INotificationAsyncHandler<TNotification>
+    ITriggerSubscriptionRegistry subscriptionRegistry,
+    IRuntimeState runtimeState,
+    ILogger<TriggerNotificationHandler<TNotification>> logger) : INotificationAsyncHandler<TNotification>
     where TNotification : INotification
 {
     /// <inheritdoc />
@@ -34,6 +38,23 @@ internal sealed class TriggerNotificationHandler<TNotification>(
 
         foreach (var trigger in triggers)
         {
+            // Skip triggers that no published+enabled automation subscribes to. Without
+            // this check we'd write an outbox row per CMS notification (contentSaved,
+            // contentBatchSaved, contentBatchPublished, …) only for the consumer to find
+            // no match and drop it — wasted I/O and outbox churn.
+            //
+            // All trigger implementations also implement ITrigger (via TriggerBase) so the
+            // cast is safe; if a custom trigger ever bypasses TriggerBase, fall through and
+            // dispatch as before rather than refusing to fire.
+            if (trigger is IStepType stepType
+                && !await subscriptionRegistry.HasSubscribersAsync(stepType.Alias, cancellationToken))
+            {
+                logger.LogDebug(
+                    "Skipping trigger {TriggerAlias} — no published, enabled automations are subscribed",
+                    stepType.Alias);
+                continue;
+            }
+
             foreach (var evt in trigger.MapEvent(notification))
             {
                 await dispatcher.DispatchAsync(evt, cancellationToken);

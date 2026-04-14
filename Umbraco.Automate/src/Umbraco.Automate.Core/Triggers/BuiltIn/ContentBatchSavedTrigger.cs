@@ -23,7 +23,13 @@ public sealed class ContentBatchSavedTrigger
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(ContentSavedNotification notification)
     {
-        var items = notification.SavedEntities.Select(content => new ContentSavedTriggerOutput
+        var entities = notification.SavedEntities.ToList();
+        if (entities.Count == 0)
+        {
+            yield break;
+        }
+
+        var items = entities.Select(content => new ContentSavedTriggerOutput
         {
             ContentKey = content.Key,
             ContentName = content.Name,
@@ -31,15 +37,15 @@ public sealed class ContentBatchSavedTrigger
             ContentTypeAlias = content.ContentType?.Alias,
         }).ToList();
 
-        if (items.Count == 0)
-        {
-            yield break;
-        }
+        var batchIdentity = entities
+            .Select(c => (c.Key, c.VersionId))
+            .ToList();
 
         yield return new TriggerEvent<BatchTriggerOutput<ContentSavedTriggerOutput>>
         {
             TriggerAlias = Alias,
             InitiatorType = "system",
+            IdempotencyKey = IdempotencyKeyFactory.ForContentBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentSavedTriggerOutput>
             {
                 Items = items,

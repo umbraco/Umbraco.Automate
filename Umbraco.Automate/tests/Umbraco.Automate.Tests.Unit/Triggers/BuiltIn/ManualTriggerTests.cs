@@ -11,9 +11,7 @@ namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 public class ManualTriggerTests
 {
     private readonly ManualTrigger _trigger = new(
-        new TriggerInfrastructure(
-            Mock.Of<IEditableModelResolver>(),
-            Options.Create(new DeduplicationOptions())));
+        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
 
     [Fact]
     public void HasCorrectAlias()

@@ -65,7 +65,7 @@ public sealed class DryRunAutomationController : AutomationControllerBase
                 .Build());
         }
 
-        await _executor.ExecuteAsync(
+        var runId = await _executor.ExecuteAsync(
             automation,
             "dry-run",
             null,
@@ -73,6 +73,6 @@ public sealed class DryRunAutomationController : AutomationControllerBase
             cancellationToken,
             isDryRun: true);
 
-        return Accepted();
+        return Accepted(new { runId });
     }
 }

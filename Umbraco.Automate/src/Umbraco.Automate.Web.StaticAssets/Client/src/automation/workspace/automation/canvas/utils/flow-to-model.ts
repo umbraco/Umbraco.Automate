@@ -57,7 +57,7 @@ export function flowToConnections(edges: Edge[]): StepConnectionModel[] {
             targetHandle: edge.targetHandle ?? null,
             outcome: (edge.label as string) ?? null,
         };
-        const filter = (edge.data as Record<string, unknown> | undefined)?.filter;
+        const filter = (edge.data as Record<string, unknown> | undefined)?.filter as StepConnectionModel["filter"];
         if (filter) {
             conn.filter = filter;
         }

@@ -59,8 +59,6 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
         builder.Services.Configure<RateLimitingOptions>(
             builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
-        builder.Services.Configure<DeduplicationOptions>(
-            builder.Config.GetSection("Umbraco:Automate:Deduplication"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -83,6 +81,16 @@ public static partial class UmbracoBuilderExtensions
 
         // Wire notification triggers → TriggerNotificationHandler<T> for each notification type
         builder.RegisterTriggerNotificationHandlers();
+
+        // Trigger subscription cache — lets the notification handler skip outbox writes for
+        // triggers that no published+enabled automation listens for. Invalidated by lifecycle
+        // notifications below.
+        builder.Services.AddSingleton<TriggerSubscriptionRegistry>();
+        builder.Services.AddSingleton<ITriggerSubscriptionRegistry>(sp => sp.GetRequiredService<TriggerSubscriptionRegistry>());
+        builder.AddNotificationAsyncHandler<AutomationSavedNotification, TriggerSubscriptionInvalidator>();
+        builder.AddNotificationAsyncHandler<AutomationPublishedNotification, TriggerSubscriptionInvalidator>();
+        builder.AddNotificationAsyncHandler<AutomationUnpublishedNotification, TriggerSubscriptionInvalidator>();
+        builder.AddNotificationAsyncHandler<AutomationDeletedNotification, TriggerSubscriptionInvalidator>();
 
         // Wire run-completed notification → notification channel dispatcher
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
@@ -158,6 +166,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IExecutionNodeEligibility, ExecutionNodeEligibility>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
+        builder.Services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         builder.Services.AddSingleton<RunFinalizer>();
 
         // WorkflowCore engine with outbox-backed queue.

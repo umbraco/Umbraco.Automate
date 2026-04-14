@@ -15,6 +15,7 @@ export type ActionItemResponseModel = {
     outputSchema?: {
         [key: string]: unknown;
     } | null;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
@@ -134,6 +135,22 @@ export type ChannelConfigurationModel = {
     notifyOn: NotifyOnModel;
 };
 
+export type ConditionGroupModel = {
+    conditions: Array<ConditionModel>;
+};
+
+export type ConditionModel = {
+    leftOperand: string;
+    operator: ConditionOperatorModel;
+    rightOperand: string;
+};
+
+export type ConditionOperatorModel = 'Equals' | 'NotEquals' | 'Contains' | 'NotContains' | 'StartsWith' | 'EndsWith' | 'GreaterThan' | 'LessThan' | 'GreaterThanOrEquals' | 'LessThanOrEquals' | 'IsEmpty' | 'IsNotEmpty';
+
+export type ConditionSetModel = {
+    groups: Array<ConditionGroupModel>;
+};
+
 export type ConnectionItemResponseModel = {
     id: string;
     alias: string;
@@ -183,6 +200,7 @@ export type ControlFlowItemResponseModel = {
     outputSchema?: {
         [key: string]: unknown;
     } | null;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
@@ -338,6 +356,12 @@ export type ProblemDetails = {
     [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
 };
 
+export type ResolveOutputSchemaRequestModel = {
+    settings: {
+        [key: string]: unknown;
+    };
+};
+
 export type RunSummaryModel = {
     totalRuns: number;
     byStatus: {
@@ -374,6 +398,7 @@ export type StepConnectionModel = {
     targetStepId: string;
     targetHandle?: string | null;
     outcome?: string | null;
+    filter?: ConditionSetModel | null;
 };
 
 export type StepErrorBehaviorModel = 'Retry' | 'Suspend' | 'Terminate' | 'Compensate';
@@ -408,6 +433,7 @@ export type StepTypeItemResponseModel = {
     outputSchema?: {
         [key: string]: unknown;
     } | null;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
@@ -429,6 +455,7 @@ export type TriggerItemResponseModel = {
     outputSchema?: {
         [key: string]: unknown;
     } | null;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
@@ -736,6 +763,39 @@ export type GetAutomationsByIdAncestorsResponses = {
 };
 
 export type GetAutomationsByIdAncestorsResponse = GetAutomationsByIdAncestorsResponses[keyof GetAutomationsByIdAncestorsResponses];
+
+export type PostAutomationsByIdDryRunData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/dry-run';
+};
+
+export type PostAutomationsByIdDryRunErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PostAutomationsByIdDryRunError = PostAutomationsByIdDryRunErrors[keyof PostAutomationsByIdDryRunErrors];
+
+export type PostAutomationsByIdDryRunResponses = {
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
 
 export type GetAutomationsByIdExportData = {
     body?: never;
@@ -1105,6 +1165,39 @@ export type GetCatalogueStepTypesResponses = {
 
 export type GetCatalogueStepTypesResponse = GetCatalogueStepTypesResponses[keyof GetCatalogueStepTypesResponses];
 
+export type PostCatalogueStepTypesByAliasOutputSchemaData = {
+    body?: ResolveOutputSchemaRequestModel;
+    path: {
+        alias: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/catalogue/step-types/{alias}/output-schema';
+};
+
+export type PostCatalogueStepTypesByAliasOutputSchemaErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostCatalogueStepTypesByAliasOutputSchemaError = PostCatalogueStepTypesByAliasOutputSchemaErrors[keyof PostCatalogueStepTypesByAliasOutputSchemaErrors];
+
+export type PostCatalogueStepTypesByAliasOutputSchemaResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type PostCatalogueStepTypesByAliasOutputSchemaResponse = PostCatalogueStepTypesByAliasOutputSchemaResponses[keyof PostCatalogueStepTypesByAliasOutputSchemaResponses];
+
 export type GetCatalogueTriggersData = {
     body?: never;
     path?: never;
@@ -1360,6 +1453,39 @@ export type GetRunsByIdResponses = {
 };
 
 export type GetRunsByIdResponse = GetRunsByIdResponses[keyof GetRunsByIdResponses];
+
+export type PostRunsByIdReplayData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/replay';
+};
+
+export type PostRunsByIdReplayErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PostRunsByIdReplayError = PostRunsByIdReplayErrors[keyof PostRunsByIdReplayErrors];
+
+export type PostRunsByIdReplayResponses = {
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
 
 export type GetVersionHistoryByEntityTypeByEntityIdData = {
     body?: never;
