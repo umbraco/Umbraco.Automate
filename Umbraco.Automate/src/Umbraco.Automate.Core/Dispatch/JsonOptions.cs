@@ -33,8 +33,11 @@ internal static class JsonOptions
     };
 
     /// <summary>
-    /// Converts a <see cref="JsonElement"/> to a plain .NET primitive so it survives
+    /// Converts a <see cref="JsonElement"/> to a plain .NET type so it survives
     /// the Newtonsoft.Json round-trip used by the WorkflowCore persistence layer.
+    /// Objects become case-insensitive dictionaries and arrays become lists,
+    /// both recursively, so <see cref="Bindings.BindingEvaluator"/> can traverse
+    /// nested paths like <c>steps.GUID.properties.subtitle</c>.
     /// </summary>
     public static object? UnwrapJsonElement(JsonElement element) => element.ValueKind switch
     {
@@ -43,9 +46,32 @@ internal static class JsonOptions
         JsonValueKind.True => true,
         JsonValueKind.False => false,
         JsonValueKind.Null or JsonValueKind.Undefined => null,
-        // Arrays and objects: preserve as raw JSON string for downstream consumers.
+        JsonValueKind.Object => UnwrapJsonObject(element),
+        JsonValueKind.Array => UnwrapJsonArray(element),
         _ => element.GetRawText(),
     };
+
+    private static Dictionary<string, object?> UnwrapJsonObject(JsonElement element)
+    {
+        var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in element.EnumerateObject())
+        {
+            dict[property.Name] = UnwrapJsonElement(property.Value);
+        }
+
+        return dict;
+    }
+
+    private static List<object?> UnwrapJsonArray(JsonElement element)
+    {
+        var list = new List<object?>();
+        foreach (var item in element.EnumerateArray())
+        {
+            list.Add(UnwrapJsonElement(item));
+        }
+
+        return list;
+    }
 
     /// <summary>
     /// Deserializes a JSON string into a case-insensitive dictionary with unwrapped primitive values.

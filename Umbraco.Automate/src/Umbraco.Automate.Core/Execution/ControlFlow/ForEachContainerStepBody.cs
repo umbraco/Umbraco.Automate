@@ -112,7 +112,7 @@ internal sealed class ForEachContainerStepBody : StepBody
             if (doc.RootElement.ValueKind == JsonValueKind.Array)
             {
                 return doc.RootElement.EnumerateArray()
-                    .Select(e => (object?)e.ToString())
+                    .Select(e => Dispatch.JsonOptions.UnwrapJsonElement(e))
                     .ToList();
             }
         }
