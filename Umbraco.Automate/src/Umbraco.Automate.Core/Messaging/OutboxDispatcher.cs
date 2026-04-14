@@ -88,7 +88,8 @@ internal sealed class OutboxDispatcher : BackgroundService
         CancellationTokenSource drainCts,
         CancellationToken stoppingToken)
     {
-        var topics = handlersByTopic.Keys.ToList();
+        // Track previous eligibility set so we only log on transitions, not every poll.
+        var lastEligibleTopics = new HashSet<string>(StringComparer.Ordinal);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -96,7 +97,24 @@ internal sealed class OutboxDispatcher : BackgroundService
             {
                 await UpdateOutboxDepthAsync(stoppingToken);
 
-                var message = await _store.ClaimNextAsync(topics, _instanceId, stoppingToken);
+                // Filter topics by handler eligibility each poll. A handler that returns
+                // CanProcessNow() == false (e.g. server role is Unknown during startup, or
+                // this node is a Subscriber in SchedulerOnly mode) is excluded so its
+                // messages remain in Pending for an eligible node to claim.
+                var eligibleTopics = handlersByTopic
+                    .Where(kvp => kvp.Value.CanProcessNow())
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                LogEligibilityTransitions(lastEligibleTopics, eligibleTopics, handlersByTopic.Keys);
+
+                if (eligibleTopics.Count == 0)
+                {
+                    await Task.Delay(options.PollInterval, stoppingToken);
+                    continue;
+                }
+
+                var message = await _store.ClaimNextAsync(eligibleTopics, _instanceId, stoppingToken);
 
                 if (message is null)
                 {
@@ -167,6 +185,16 @@ internal sealed class OutboxDispatcher : BackgroundService
             await _store.MarkCompletedAsync(message.Id, cancellationToken);
             _metrics.OutboxMessageCompleted(message.Topic);
         }
+        catch (NodeNotEligibleException)
+        {
+            // The handler became ineligible between the claim filter and HandleAsync —
+            // release the claim back to Pending without consuming a retry slot, so the
+            // message stays available for an eligible node (or this node on a later poll).
+            _logger.LogInformation(
+                "Releasing message {MessageId} on topic {Topic} — node is no longer eligible to process it",
+                message.Id, message.Topic);
+            await _store.ReleaseClaimAsync(message.Id, cancellationToken);
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Handler failed for message {MessageId} on topic {Topic} (attempt {Attempt})",
@@ -183,6 +211,35 @@ internal sealed class OutboxDispatcher : BackgroundService
                 var delay = options.BaseRetryDelay * Math.Pow(2, message.RetryCount);
                 var nextRetry = DateTime.UtcNow.Add(delay);
                 await _store.MarkFailedAsync(message.Id, ex.Message, nextRetry, cancellationToken);
+            }
+        }
+    }
+
+    private void LogEligibilityTransitions(
+        HashSet<string> lastEligibleTopics,
+        IEnumerable<string> currentEligibleTopics,
+        IEnumerable<string> allTopics)
+    {
+        var current = new HashSet<string>(currentEligibleTopics, StringComparer.Ordinal);
+
+        // Newly eligible (became processable this iteration)
+        foreach (var topic in current)
+        {
+            if (lastEligibleTopics.Add(topic))
+            {
+                _logger.LogInformation(
+                    "Topic {Topic} is now eligible for processing on this node", topic);
+            }
+        }
+
+        // Newly ineligible (was eligible last iteration, no longer is)
+        foreach (var topic in allTopics)
+        {
+            if (!current.Contains(topic) && lastEligibleTopics.Remove(topic))
+            {
+                _logger.LogInformation(
+                    "Topic {Topic} is no longer eligible for processing on this node — messages will remain pending",
+                    topic);
             }
         }
     }

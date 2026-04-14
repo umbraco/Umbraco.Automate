@@ -155,6 +155,7 @@ public static partial class UmbracoBuilderExtensions
 
         // Automation execution
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
+        builder.Services.AddSingleton<IExecutionNodeEligibility, ExecutionNodeEligibility>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
         builder.Services.AddSingleton<RunFinalizer>();
