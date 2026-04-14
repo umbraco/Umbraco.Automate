@@ -34,6 +34,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
+    private readonly IStepErrorClassifier _errorClassifier;
     private readonly AutomateMetrics _metrics;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<WorkflowCompiler> _logger;
@@ -47,6 +48,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
+        IStepErrorClassifier errorClassifier,
         AutomateMetrics metrics,
         IServiceProvider serviceProvider,
         ILogger<WorkflowCompiler> logger)
@@ -59,6 +61,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
         _connectionService = connectionService;
+        _errorClassifier = errorClassifier;
         _metrics = metrics;
         _serviceProvider = serviceProvider;
         _logger = logger;
@@ -141,11 +144,14 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 _settingsBindingResolver,
                 _runRepository,
                 _connectionService,
+                _errorClassifier,
                 _serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>(),
                 _metrics,
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
-            return new ActionWorkflowStep(stepBody);
+            var workflowStep = new ActionWorkflowStep(stepBody);
+            ApplyErrorBehavior(workflowStep, stepConfig, _serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>().Value);
+            return workflowStep;
         }
 
         // Try control flow collection.
@@ -209,6 +215,21 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         }
 
         return controlFlow.ResolveSettings(stepConfig.Settings) as TSettings;
+    }
+
+    /// <summary>
+    /// Applies the step's configured error behavior to the WorkflowCore <see cref="WorkflowStep"/>.
+    /// Without this, WorkflowCore falls back to the workflow's <c>DefaultErrorBehavior</c> (Retry)
+    /// and retries every throwing step indefinitely — including ones where retry cannot help.
+    /// Our <see cref="StepErrorBehavior"/> values intentionally mirror WorkflowCore's
+    /// <see cref="WorkflowErrorHandling"/> so the cast is safe. The retry interval falls back
+    /// to <see cref="ExecutionOptions.DefaultRetryInterval"/> when not set per-step, overriding
+    /// WorkflowCore's built-in 60-second default.
+    /// </summary>
+    private static void ApplyErrorBehavior(WorkflowStep workflowStep, StepConfiguration stepConfig, ExecutionOptions executionOptions)
+    {
+        workflowStep.ErrorBehavior = (WorkflowErrorHandling)stepConfig.ErrorBehavior;
+        workflowStep.RetryInterval = stepConfig.RetryInterval ?? executionOptions.DefaultRetryInterval;
     }
 
     private static void WireTransitions(

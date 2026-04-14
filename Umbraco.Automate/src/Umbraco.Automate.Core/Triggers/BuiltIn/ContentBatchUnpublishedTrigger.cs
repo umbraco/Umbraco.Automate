@@ -23,7 +23,13 @@ public sealed class ContentBatchUnpublishedTrigger
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(ContentUnpublishedNotification notification)
     {
-        var items = notification.UnpublishedEntities.Select(content => new ContentUnpublishedTriggerOutput
+        var entities = notification.UnpublishedEntities.ToList();
+        if (entities.Count == 0)
+        {
+            yield break;
+        }
+
+        var items = entities.Select(content => new ContentUnpublishedTriggerOutput
         {
             ContentKey = content.Key,
             ContentName = content.Name,
@@ -31,15 +37,17 @@ public sealed class ContentBatchUnpublishedTrigger
             ContentTypeAlias = content.ContentType?.Alias,
         }).ToList();
 
-        if (items.Count == 0)
-        {
-            yield break;
-        }
+        // Use PublishedVersionId to identify what was unpublished — same logic as the
+        // single-content unpublish trigger.
+        var batchIdentity = entities
+            .Select(c => (c.Key, c.PublishedVersionId))
+            .ToList();
 
         yield return new TriggerEvent<BatchTriggerOutput<ContentUnpublishedTriggerOutput>>
         {
             TriggerAlias = Alias,
             InitiatorType = "system",
+            IdempotencyKey = IdempotencyKeyFactory.ForContentBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentUnpublishedTriggerOutput>
             {
                 Items = items,

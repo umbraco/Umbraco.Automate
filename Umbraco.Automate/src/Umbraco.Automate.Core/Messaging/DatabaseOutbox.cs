@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Dispatch;
 
@@ -12,12 +13,18 @@ internal sealed class DatabaseOutbox : IOutbox
     private readonly IOutboxStore _store;
     private readonly IOptions<OutboxOptions> _options;
     private readonly AutomateReadinessSignal _readinessSignal;
+    private readonly ILogger<DatabaseOutbox> _logger;
 
-    public DatabaseOutbox(IOutboxStore store, IOptions<OutboxOptions> options, AutomateReadinessSignal readinessSignal)
+    public DatabaseOutbox(
+        IOutboxStore store,
+        IOptions<OutboxOptions> options,
+        AutomateReadinessSignal readinessSignal,
+        ILogger<DatabaseOutbox> logger)
     {
         _store = store;
         _options = options;
         _readinessSignal = readinessSignal;
+        _logger = logger;
     }
 
     public async Task PublishAsync(string topic, object message, CancellationToken cancellationToken, string? idempotencyKey = null)
@@ -26,6 +33,9 @@ internal sealed class DatabaseOutbox : IOutbox
         // published during Umbraco's own migration seeding, before Automate tables exist).
         if (!_readinessSignal.IsReady)
         {
+            _logger.LogWarning(
+                "Dropping outbox message for topic {Topic} (key {IdempotencyKey}) — readiness signal not set",
+                topic, idempotencyKey ?? "<none>");
             return;
         }
 

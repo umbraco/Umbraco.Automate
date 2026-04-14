@@ -59,8 +59,6 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
         builder.Services.Configure<RateLimitingOptions>(
             builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
-        builder.Services.Configure<DeduplicationOptions>(
-            builder.Config.GetSection("Umbraco:Automate:Deduplication"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -157,6 +155,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
+        builder.Services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         builder.Services.AddSingleton<RunFinalizer>();
 
         // WorkflowCore engine with outbox-backed queue.

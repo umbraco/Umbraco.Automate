@@ -23,7 +23,13 @@ public sealed class ContentBatchPublishedTrigger
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(ContentPublishedNotification notification)
     {
-        var items = notification.PublishedEntities.Select(content => new ContentPublishedTriggerOutput
+        var entities = notification.PublishedEntities.ToList();
+        if (entities.Count == 0)
+        {
+            yield break;
+        }
+
+        var items = entities.Select(content => new ContentPublishedTriggerOutput
         {
             ContentKey = content.Key,
             ContentName = content.Name,
@@ -31,15 +37,17 @@ public sealed class ContentBatchPublishedTrigger
             ContentTypeAlias = content.ContentType?.Alias,
         }).ToList();
 
-        if (items.Count == 0)
-        {
-            yield break;
-        }
+        // Hash the (key, publishedVersionId) tuples so a duplicate notification for the same
+        // batch dedupes; any change in membership or version produces a fresh key.
+        var batchIdentity = entities
+            .Select(c => (c.Key, c.PublishedVersionId))
+            .ToList();
 
         yield return new TriggerEvent<BatchTriggerOutput<ContentPublishedTriggerOutput>>
         {
             TriggerAlias = Alias,
             InitiatorType = "system",
+            IdempotencyKey = IdempotencyKeyFactory.ForContentBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentPublishedTriggerOutput>
             {
                 Items = items,

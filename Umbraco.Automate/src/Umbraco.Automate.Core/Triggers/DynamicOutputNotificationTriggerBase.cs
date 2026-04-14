@@ -25,16 +25,11 @@ public abstract class DynamicOutputNotificationTriggerBase<TSettings, TNotificat
 
     /// <summary>
     /// Generates a deterministic idempotency key for a content-based trigger event.
+    /// A duplicate notification for the same (content, version) collapses to the same
+    /// key and is deduped by the outbox; genuinely separate events produce distinct keys.
     /// </summary>
     /// <param name="contentKey">The content item's unique key.</param>
-    /// <returns>An idempotency key in the format <c>{alias}:{contentKey}:{windowBoundary}</c>.</returns>
-    protected string GenerateIdempotencyKey(Guid contentKey)
-    {
-        var windowMinutes = Infrastructure.DeduplicationOptions.WindowMinutes;
-        var boundary = windowMinutes > 0
-            ? new DateTime(DateTime.UtcNow.Ticks - (DateTime.UtcNow.Ticks % TimeSpan.FromMinutes(windowMinutes).Ticks), DateTimeKind.Utc).ToString("O")
-            : DateTime.UtcNow.ToString("O");
-
-        return $"{Alias}:{contentKey}:{boundary}";
-    }
+    /// <param name="versionId">The CMS version id that represents the event (publish/save/unpublish).</param>
+    protected string GenerateIdempotencyKey(Guid contentKey, int versionId)
+        => IdempotencyKeyFactory.ForContentEvent(Alias, contentKey, versionId);
 }
