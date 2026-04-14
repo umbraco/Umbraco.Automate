@@ -115,6 +115,11 @@ public sealed class ExportStepModel
     public required string Name { get; init; }
 
     /// <summary>
+    /// Gets or sets the step alias for binding expressions.
+    /// </summary>
+    public string? Alias { get; init; }
+
+    /// <summary>
     /// Gets or sets the connection alias (resolved from the connection ID). Null if the step doesn't use a connection.
     /// </summary>
     public string? ConnectionAlias { get; init; }

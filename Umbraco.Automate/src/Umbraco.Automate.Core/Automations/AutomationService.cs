@@ -446,6 +446,7 @@ internal sealed class AutomationService : IAutomationService
             Id = s.Id,
             ActionAlias = s.ActionAlias,
             Name = s.Name,
+            Alias = s.Alias,
             ConnectionId = s.ConnectionAlias is not null && connectionAliasToId.TryGetValue(s.ConnectionAlias, out var connId)
                 ? connId
                 : null,
@@ -516,6 +517,7 @@ internal sealed class AutomationService : IAutomationService
             Id = step.Id,
             ActionAlias = step.ActionAlias,
             Name = step.Name,
+            Alias = step.Alias,
             ConnectionAlias = connectionAlias,
             Settings = strippedSettings,
             InputMappings = step.InputMappings,

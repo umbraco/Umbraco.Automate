@@ -21,6 +21,13 @@ public sealed class StepConfiguration
     public required string Name { get; set; }
 
     /// <summary>
+    /// Gets or sets the optional step alias for use in binding expressions.
+    /// When set, bindings can reference this step as <c>${ steps.alias.field }</c>
+    /// instead of <c>${ steps.guid.field }</c>.
+    /// </summary>
+    public string? Alias { get; set; }
+
+    /// <summary>
     /// Gets or sets the optional named connection ID for this step.
     /// </summary>
     public Guid? ConnectionId { get; set; }

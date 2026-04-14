@@ -10,6 +10,7 @@ public class StepConfigurationBuilder
     private Guid _id = Guid.NewGuid();
     private string _actionAlias = "umbracoAutomate.logMessage";
     private string _name = "Test Step";
+    private string? _alias;
     private Dictionary<string, object?> _settings = [];
     private Dictionary<string, string> _inputMappings = [];
     private Guid? _connectionId;
@@ -19,6 +20,7 @@ public class StepConfigurationBuilder
     public StepConfigurationBuilder WithConnectionId(Guid? connectionId) { _connectionId = connectionId; return this; }
     public StepConfigurationBuilder WithActionAlias(string alias) { _actionAlias = alias; return this; }
     public StepConfigurationBuilder WithName(string name) { _name = name; return this; }
+    public StepConfigurationBuilder WithAlias(string? alias) { _alias = alias; return this; }
     public StepConfigurationBuilder WithErrorBehavior(StepErrorBehavior behavior) { _errorBehavior = behavior; return this; }
 
     public StepConfigurationBuilder WithSetting(string key, object? value)
@@ -59,6 +61,7 @@ public class StepConfigurationBuilder
         Id = _id,
         ActionAlias = _actionAlias,
         Name = _name,
+        Alias = _alias,
         ConnectionId = _connectionId,
         Settings = _settings,
         InputMappings = _inputMappings,
