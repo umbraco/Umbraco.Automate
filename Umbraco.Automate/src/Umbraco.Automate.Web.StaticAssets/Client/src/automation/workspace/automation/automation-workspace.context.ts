@@ -6,7 +6,6 @@ import {
     UmbWorkspaceIsNewRedirectControllerAlias,
 } from "@umbraco-cms/backoffice/workspace";
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
-import { UmbObjectState } from "@umbraco-cms/backoffice/observable-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice/entity-action";
@@ -18,7 +17,6 @@ import {
 import { UA_WORKSPACE_ENTITY_TYPE } from "../../../workspace-management/constants.js";
 import { UA_AUTOMATION_DETAIL_REPOSITORY_ALIAS } from "../../repository/constants.js";
 import type { UaAutomationDetailModel } from "../../types.js";
-import type { AutomationRunResponseModel } from "../../../api/types.gen.js";
 import { UA_EMPTY_GUID } from "../../../core/index.js";
 import { UaAutomationWorkspaceEditorElement } from "./automation-workspace-editor.element.js";
 import { AutomationsService } from "../../../api/sdk.gen.js";
@@ -29,9 +27,6 @@ export class UaAutomationWorkspaceContext
 {
     readonly routes = new UmbWorkspaceRouteManager(this);
     readonly name = this._data.createObservablePartOfCurrent((data) => data?.name);
-
-    #dryRunState = new UmbObjectState<AutomationRunResponseModel | null>(null);
-    readonly dryRunResult = this.#dryRunState.asObservable();
 
     #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
 
@@ -93,14 +88,6 @@ export class UaAutomationWorkspaceContext
                 },
             },
         ]);
-    }
-
-    showDryRunOverlay(run: AutomationRunResponseModel) {
-        this.#dryRunState.setValue(run);
-    }
-
-    clearDryRunOverlay() {
-        this.#dryRunState.setValue(null);
     }
 
     updateProperty<K extends keyof UaAutomationDetailModel>(key: K, value: UaAutomationDetailModel[K]) {
