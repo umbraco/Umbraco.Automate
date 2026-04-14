@@ -60,12 +60,7 @@ export class UaWorkspaceDetailServerDataSource implements UmbDetailDataSource<Ua
         const locationHeader = response?.headers?.get("Location") ?? "";
         const unique = locationHeader.split("/").pop() ?? "";
 
-        return {
-            data: {
-                ...model,
-                unique,
-            },
-        };
+        return this.read(unique);
     }
 
     async update(model: UaWorkspaceDetailModel) {

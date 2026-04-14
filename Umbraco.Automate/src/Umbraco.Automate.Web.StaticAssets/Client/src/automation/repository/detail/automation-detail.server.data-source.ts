@@ -69,12 +69,7 @@ export class UaAutomationDetailServerDataSource implements UmbDetailDataSource<U
         const locationHeader = response?.headers?.get("Location") ?? "";
         const unique = locationHeader.split("/").pop() ?? "";
 
-        return {
-            data: {
-                ...model,
-                unique,
-            },
-        };
+        return this.read(unique);
     }
 
     async update(model: UaAutomationDetailModel) {
