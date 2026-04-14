@@ -43,7 +43,10 @@ internal static class BindingDataBuilder
 
     /// <summary>
     /// Resolves a ForEach iteration item to a binding-compatible value.
-    /// JSON object strings are parsed into dictionaries for nested path traversal.
+    /// JSON strings are parsed into structured types (dictionaries, lists, or primitives)
+    /// for nested path traversal. This remains necessary as a defence against the
+    /// Newtonsoft.Json round-trip in WorkflowCore persistence, which can turn structured
+    /// data back into JSON strings after workflow suspension and resumption.
     /// </summary>
     private static object? ResolveIterationItem(object? item)
     {
@@ -52,14 +55,10 @@ internal static class BindingDataBuilder
             return item;
         }
 
-        // Try to parse as a JSON object so ${loop.item.property} path traversal works.
         try
         {
             using var doc = JsonDocument.Parse(jsonString);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object)
-            {
-                return Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(jsonString);
-            }
+            return Dispatch.JsonOptions.UnwrapJsonElement(doc.RootElement);
         }
         catch (JsonException)
         {
