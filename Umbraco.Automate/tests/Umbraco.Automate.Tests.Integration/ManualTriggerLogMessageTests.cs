@@ -25,7 +25,6 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
-using Umbraco.Cms.Core.Sync;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -131,15 +130,14 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
 
         var versionService = new Mock<IEntityVersionService>();
 
-        var serverRoleAccessor = new Mock<IServerRoleAccessor>();
-        serverRoleAccessor.Setup(s => s.CurrentServerRole).Returns(ServerRole.Single);
+        var nodeEligibility = new Mock<IExecutionNodeEligibility>();
+        nodeEligibility.Setup(e => e.CanExecuteWorkflows()).Returns(true);
 
         _handler = new TriggerEventHandler(
             automationService.Object,
             versionService.Object,
             _provider.GetRequiredService<IAutomationExecutor>(),
-            serverRoleAccessor.Object,
-            Options.Create(new ExecutionOptions()),
+            nodeEligibility.Object,
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }
 

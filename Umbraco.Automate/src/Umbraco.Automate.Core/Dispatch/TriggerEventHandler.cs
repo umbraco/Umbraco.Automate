@@ -1,12 +1,9 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Versioning;
-using Umbraco.Cms.Core.Sync;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
@@ -18,40 +15,39 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly IAutomationService _automationService;
     private readonly IEntityVersionService _versionService;
     private readonly IAutomationExecutor _executor;
-    private readonly IServerRoleAccessor _serverRoleAccessor;
-    private readonly IOptions<ExecutionOptions> _executionOptions;
+    private readonly IExecutionNodeEligibility _nodeEligibility;
     private readonly ILogger<TriggerEventHandler> _logger;
 
     public TriggerEventHandler(
         IAutomationService automationService,
         IEntityVersionService versionService,
         IAutomationExecutor executor,
-        IServerRoleAccessor serverRoleAccessor,
-        IOptions<ExecutionOptions> executionOptions,
+        IExecutionNodeEligibility nodeEligibility,
         ILogger<TriggerEventHandler> logger)
     {
         _automationService = automationService;
         _versionService = versionService;
         _executor = executor;
-        _serverRoleAccessor = serverRoleAccessor;
-        _executionOptions = executionOptions;
+        _nodeEligibility = nodeEligibility;
         _logger = logger;
     }
 
     public string Topic => OutboxTriggerDispatcher.TopicName;
 
+    public bool CanProcessNow() => _nodeEligibility.CanExecuteWorkflows();
+
     public async Task HandleAsync(string body, CancellationToken cancellationToken)
     {
+        // Defensive: if eligibility flipped between the dispatcher's pre-claim check and
+        // now, throw so the dispatcher retries on backoff (rather than silently completing
+        // the message and losing the trigger event).
+        if (!_nodeEligibility.CanExecuteWorkflows())
+        {
+            throw new NodeNotEligibleException(Topic);
+        }
+
         var message = JsonSerializer.Deserialize<TriggerEventMessage>(body, JsonOptions.Default)
                       ?? throw new InvalidOperationException("Failed to deserialize TriggerEventMessage");
-
-        if (!ShouldProcessOnThisNode())
-        {
-            _logger.LogInformation(
-                "Skipping trigger event {TriggerAlias} — this node ({ServerRole}) is not the designated executor",
-                message.TriggerAlias, _serverRoleAccessor.CurrentServerRole);
-            return;
-        }
 
         _logger.LogDebug("Received trigger event for {TriggerAlias}", message.TriggerAlias);
 
@@ -112,17 +108,5 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 triggerOutputData,
                 cancellationToken);
         }
-    }
-
-    private bool ShouldProcessOnThisNode()
-    {
-        if (_executionOptions.Value.Mode == ExecutionMode.Distributed)
-        {
-            return true;
-        }
-
-        // SchedulerOnly: only process on Single or SchedulingPublisher nodes.
-        return _serverRoleAccessor.CurrentServerRole is ServerRole.Single
-            or ServerRole.SchedulingPublisher;
     }
 }

@@ -133,6 +133,21 @@ internal sealed class EFCoreOutboxStore : IOutboxStore
         }
     }
 
+    public async Task ReleaseClaimAsync(long messageId, CancellationToken cancellationToken)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var entity = await db.OutboxMessages.FindAsync([messageId], cancellationToken);
+        if (entity is not null)
+        {
+            entity.Status = (int)MessageStatus.Pending;
+            entity.ClaimedByInstance = null;
+            entity.ClaimedUtc = null;
+            // Intentionally do not touch RetryCount — releasing the claim is not a failure.
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     public async Task MarkDeadLetteredAsync(long messageId, string error, CancellationToken cancellationToken)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
