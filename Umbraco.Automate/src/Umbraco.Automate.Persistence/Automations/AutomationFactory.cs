@@ -55,6 +55,7 @@ internal sealed class AutomationFactory
             Steps = definition?.Steps ?? [],
             Connections = definition?.Connections ?? [],
             CanvasState = definition?.CanvasState,
+            NotificationSettings = definition?.NotificationSettings,
             Version = entity.Version,
             DateCreated = entity.DateCreated,
             DateModified = entity.DateModified,
@@ -130,6 +131,7 @@ internal sealed class AutomationFactory
             Steps = steps,
             Connections = automation.Connections,
             CanvasState = automation.CanvasState,
+            NotificationSettings = automation.NotificationSettings,
         };
 
         return JsonSerializer.Serialize(dto, JsonOptions);

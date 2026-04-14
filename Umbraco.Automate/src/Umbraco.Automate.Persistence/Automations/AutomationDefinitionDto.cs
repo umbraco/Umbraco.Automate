@@ -14,4 +14,6 @@ internal sealed class AutomationDefinitionDto
     public IList<StepConnection> Connections { get; set; } = [];
 
     public string? CanvasState { get; set; }
+
+    public AutomationNotificationSettings? NotificationSettings { get; set; }
 }
