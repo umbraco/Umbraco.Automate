@@ -3,6 +3,7 @@ import type { UaCatalogueRepository } from "../../catalogue/repository/catalogue
 import { type BindingLeaf, computePredecessors, flattenJsonSchema } from "./binding-schema.utils.js";
 
 const FOR_EACH_ALIAS = "umbracoAutomate.forEach";
+const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
 
 export interface BindingSource {
     /** Unique identifier (e.g. "trigger" or step GUID) */
@@ -81,9 +82,38 @@ export async function buildBindingSources(
             id: predId,
             label: step.name || catalogueItem.name,
             icon: catalogueItem.icon ?? "icon-settings",
-            bindingPrefix: `steps.${predId}`,
+            bindingPrefix: `steps.${step.alias || predId}`,
             leaves,
         });
+    }
+
+    // "Previous" source — only when the step has exactly 1 direct predecessor (unambiguous).
+    const directPredecessors = connections
+        .filter((c) => c.targetStepId === currentStepId)
+        .map((c) => c.sourceStepId)
+        .filter((id) => id && id !== EMPTY_GUID);
+
+    if (directPredecessors.length === 1) {
+        const predStep = steps.find((s) => s.id === directPredecessors[0]);
+        if (predStep) {
+            const predAction = actions.find((a) => a.alias === predStep.actionAlias);
+            const predControlFlow = controlFlows.find((c) => c.alias === predStep.actionAlias);
+            const predCatalogue = predAction ?? predControlFlow;
+            const predOutputSchema = (predAction?.outputSchema ?? predControlFlow?.outputSchema) as Record<string, unknown> | null;
+
+            if (predOutputSchema && predCatalogue) {
+                const prevLeaves = flattenJsonSchema(predOutputSchema);
+                if (prevLeaves.length > 0) {
+                    sources.push({
+                        id: "previous",
+                        label: `Previous (${predStep.name || predCatalogue.name})`,
+                        icon: "icon-arrow-left",
+                        bindingPrefix: "previous",
+                        leaves: prevLeaves,
+                    });
+                }
+            }
+        }
     }
 
     // Loop item source — if the step is inside a ForEach, resolve the item schema.
@@ -158,8 +188,8 @@ function resolveLoopItemSchema(
         schema = triggerOutputSchema;
         pathStart = 1;
     } else if (segments[0] === "steps" && segments.length >= 3) {
-        const stepId = segments[1];
-        const step = steps.find((s) => s.id === stepId);
+        const stepRef = segments[1];
+        const step = steps.find((s) => s.id === stepRef || s.alias === stepRef);
         if (step) {
             const actionItem = actions.find((a) => a.alias === step.actionAlias);
             const controlFlowItem = controlFlows.find((c) => c.alias === step.actionAlias);

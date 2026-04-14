@@ -35,6 +35,7 @@ export function flowToSteps(
                 id: node.id,
                 actionAlias: data.actionAlias,
                 name: data.label,
+                alias: existing?.alias ?? null,
                 connectionId: existing?.connectionId ?? null,
                 settings: data.settings,
                 inputMappings: existing?.inputMappings ?? {},
