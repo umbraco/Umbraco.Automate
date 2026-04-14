@@ -44,6 +44,7 @@ export const UaRunTypeMapper = {
             completedUtc: response.completedUtc ?? null,
             initiatedBy: response.initiatedBy,
             durationMs,
+            error: response.error ?? null,
         };
     },
 };

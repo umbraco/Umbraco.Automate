@@ -108,9 +108,14 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
                 },
                 {
                     columnAlias: "status",
-                    value: html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">
-                        ${item.status}
-                    </uui-tag>`,
+                    value: html`<div class="status-cell">
+                        <uui-tag color=${this.#statusColor(item.status)} look="secondary">
+                            ${item.status}
+                        </uui-tag>
+                        ${item.error
+                            ? html`<span class="status-error">${item.error}</span>`
+                            : ""}
+                    </div>`,
                 },
                 {
                     columnAlias: "startedUtc",
@@ -167,6 +172,21 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
                 align-items: center;
                 padding: var(--uui-size-layout-3);
                 color: var(--uui-color-text-alt);
+            }
+
+            .status-cell {
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-3);
+            }
+
+            .status-error {
+                color: var(--uui-color-danger-standalone);
+                font-size: var(--uui-size-4);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                max-width: 300px;
             }
 
             .content {

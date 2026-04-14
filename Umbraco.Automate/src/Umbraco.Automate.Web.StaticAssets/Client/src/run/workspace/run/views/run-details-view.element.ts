@@ -26,7 +26,13 @@ export class UaRunDetailsViewElement extends UmbLitElement {
             if (!context) return;
             this.observe(context.run, (run) => {
                 this._run = run;
-                if (run) this.#loadActionNames();
+                if (run) {
+                    this.#loadActionNames();
+                    const firstFailed = run.stepRuns.find((sr) => sr.status === "Failed");
+                    if (firstFailed) {
+                        this._expandedStep = firstFailed.id;
+                    }
+                }
             });
         });
     }

@@ -39,4 +39,5 @@ export interface UaRunItemModel {
     completedUtc: string | null;
     initiatedBy: string;
     durationMs: number | null;
+    error: string | null;
 }

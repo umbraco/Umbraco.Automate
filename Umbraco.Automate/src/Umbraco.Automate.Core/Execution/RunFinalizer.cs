@@ -83,6 +83,13 @@ internal sealed class RunFinalizer
                 run.Error = "Workflow terminated";
             }
 
+            // Propagate the first step error to the run if no run-level error is set yet.
+            if (run.Error is null && hasFailedStep)
+            {
+                var firstFailed = run.StepRuns.First(sr => sr.Status == StepRunStatus.Failed);
+                run.Error = firstFailed.Error;
+            }
+
             await _runRepository.SaveAsync(run, cancellationToken);
 
             using (ICoreScope scope = _scopeProvider.CreateCoreScope())

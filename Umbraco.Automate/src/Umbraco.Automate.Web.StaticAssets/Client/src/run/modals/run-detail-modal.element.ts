@@ -45,6 +45,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
         if (run) {
             this._run = run;
+            const firstFailed = run.stepRuns.find((sr) => sr.status === "Failed");
+            if (firstFailed) {
+                this._expandedStep = firstFailed.id;
+            }
         }
 
         if (actions) {
