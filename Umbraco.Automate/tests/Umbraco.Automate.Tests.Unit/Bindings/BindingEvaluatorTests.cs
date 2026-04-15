@@ -320,6 +320,36 @@ public class BindingEvaluatorTests
         result.ShouldBe("beta");
     }
 
+    // --- Previous binding ---
+
+    [Fact]
+    public void Evaluate_PreviousBinding_ResolvesLastStepOutput()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["trigger"] = new Dictionary<string, object?> { ["name"] = "test" },
+            ["steps"] = new Dictionary<string, object?>(),
+            ["previous"] = new Dictionary<string, object?>
+            {
+                ["statusCode"] = (long)200,
+                ["body"] = "OK",
+            },
+        };
+
+        var result = _evaluator.Evaluate("Status: ${ previous.statusCode }", data);
+
+        result.ShouldBe("Status: 200");
+    }
+
+    [Fact]
+    public void Evaluate_StepAlias_ResolvesOutputField()
+    {
+        // The steps dict already uses string keys, so aliases work via normal key lookup.
+        var result = _evaluator.Evaluate("${ steps.sendEmail.messageId }", _data);
+
+        result.ShouldBe("msg-123");
+    }
+
     // --- End-to-end: simulates GetContentOutput serialization round-trip ---
 
     [Fact]

@@ -179,6 +179,7 @@ internal sealed class AutomationFactory
             Id = step.Id,
             ActionAlias = step.ActionAlias,
             Name = step.Name,
+            Alias = step.Alias,
             ConnectionId = step.ConnectionId,
             Settings = encryptedSettings,
             InputMappings = step.InputMappings,

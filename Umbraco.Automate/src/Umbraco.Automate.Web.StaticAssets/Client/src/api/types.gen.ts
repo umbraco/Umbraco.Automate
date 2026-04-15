@@ -379,6 +379,7 @@ export type StepConfigurationModel = {
     id: string;
     actionAlias: string;
     name: string;
+    alias?: string | null;
     connectionId?: string | null;
     settings: {
         [key: string]: unknown;

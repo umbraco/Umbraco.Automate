@@ -263,6 +263,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 id: newStepId,
                 actionAlias: item.alias,
                 name: item.name,
+                alias: this.#generateStepAlias(item.alias),
                 connectionId: null,
                 settings: {},
                 inputMappings: {},
@@ -324,6 +325,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 id: newStepId,
                 actionAlias: item.alias,
                 name: item.name,
+                alias: this.#generateStepAlias(item.alias),
                 connectionId: null,
                 settings: {},
                 inputMappings: {},
@@ -340,6 +342,35 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         } catch {
             // Modal was dismissed
         }
+    }
+
+    /**
+     * Generates a unique step alias from an action alias.
+     * Extracts the last segment (e.g. "umbracoAutomate.httpRequest" → "httpRequest")
+     * and appends an incrementing number if the base name is already used.
+     */
+    #generateStepAlias(actionAlias: string): string {
+        const lastDot = actionAlias.lastIndexOf(".");
+        const baseName = lastDot >= 0 ? actionAlias.substring(lastDot + 1) : actionAlias;
+
+        const usedAliases = new Set(
+            (this._model?.steps ?? [])
+                .map((s) => s.alias?.toLowerCase())
+                .filter(Boolean),
+        );
+
+        if (!usedAliases.has(baseName.toLowerCase())) {
+            return baseName;
+        }
+
+        for (let i = 2; i < 1000; i++) {
+            const candidate = `${baseName}${i}`;
+            if (!usedAliases.has(candidate.toLowerCase())) {
+                return candidate;
+            }
+        }
+
+        return `${baseName}${Date.now()}`;
     }
 
     async #onEdgeFilterOpen(event: CustomEvent<EdgeFilterOpenDetail>) {

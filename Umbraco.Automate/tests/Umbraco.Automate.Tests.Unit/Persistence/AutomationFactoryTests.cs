@@ -87,6 +87,27 @@ public class AutomationFactoryTests
     }
 
     [Fact]
+    public void BuildEntity_AndBuildDomain_RoundTrips_StepAlias()
+    {
+        var factory = CreatePassthroughFactory();
+
+        var automation = new AutomationBuilder()
+            .WithAlias("aliasTest")
+            .WithName("Alias Test")
+            .AddStep(new StepConfigurationBuilder()
+                .WithActionAlias("umbracoAutomate.httpRequest")
+                .WithName("Fetch Data")
+                .WithAlias("httpRequest"))
+            .Build();
+
+        AutomationEntity entity = factory.BuildEntity(automation);
+        Automation roundTripped = factory.BuildDomain(entity);
+
+        roundTripped.Steps.Count.ShouldBe(1);
+        roundTripped.Steps[0].Alias.ShouldBe("httpRequest");
+    }
+
+    [Fact]
     public void BuildDomain_NullDefinition_ReturnsEmptyCollections()
     {
         var factory = CreatePassthroughFactory();
