@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
+using Umbraco.Cms.Core.Security;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Extensions;
@@ -96,15 +97,19 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
 
         // Action middleware — ordered pipeline (dry-run first to prevent side effects,
+        // then identity swap before the action so CMS services see the service account,
         // then validation before audit so invalid configs aren't audit-trailed)
         builder.AutomateActionMiddleware()
             .Append<DryRunMiddleware>()
             .Append<ErrorHandlingMiddleware>()
             .Append<StepRunLoggingMiddleware>()
+            .Append<BackOfficeIdentityMiddleware>()
             .Append<SettingsValidationMiddleware>()
             .Append<AuditTrailMiddleware>();
 
-        // Security
+        // Security — replace Umbraco's default IBackOfficeSecurityAccessor with our
+        // implementation that supports AsyncLocal-based identity in background contexts.
+        builder.Services.AddSingleton<IBackOfficeSecurityAccessor, AutomateBackOfficeSecurityAccessor>();
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
 
         // Settings infrastructure

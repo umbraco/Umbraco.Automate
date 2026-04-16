@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Models.ContentPublishing;
+using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
 
@@ -15,6 +16,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class PublishContentAction : ActionBase<PublishContentSettings, PublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly ILogger<PublishContentAction> _logger;
 
     /// <summary>
@@ -23,10 +25,12 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
     public PublishContentAction(
         ActionInfrastructure infrastructure,
         IContentPublishingService contentPublishingService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         ILogger<PublishContentAction> logger)
         : base(infrastructure)
     {
         _contentPublishingService = contentPublishingService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _logger = logger;
     }
 
@@ -49,8 +53,9 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
             context.AutomationId, context.RunId, contentKey,
             culturesToPublish.Count == 0 ? "invariant" : string.Join(", ", culturesToPublish.Select(c => c.Culture ?? "*")));
 
-        var userKey = context.ExecutionContext?.ServiceAccountKey
-            ?? Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key
+            ?? context.ExecutionContext?.ServiceAccountKey
+            ?? throw new InvalidOperationException("No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
 
         var result = await _contentPublishingService.PublishAsync(contentKey, culturesToPublish, userKey);
 

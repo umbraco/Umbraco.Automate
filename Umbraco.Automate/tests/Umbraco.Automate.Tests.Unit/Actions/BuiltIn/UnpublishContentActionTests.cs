@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
 
@@ -21,6 +22,7 @@ public class UnpublishContentActionTests
         _action = new UnpublishContentAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _publishingService.Object,
+            Mock.Of<IBackOfficeSecurityAccessor>(),
             Mock.Of<ILogger<UnpublishContentAction>>());
     }
 
