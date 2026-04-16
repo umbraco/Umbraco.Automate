@@ -1,4 +1,5 @@
 import { UA_SECTION_ALIAS } from "../../section/constants.js";
+import { UA_WORKSPACES_EXIST_CONDITION_ALIAS } from "../../section/conditions/workspaces-exist.condition.js";
 
 const dashboard: UmbExtensionManifest = {
     type: "dashboard",
@@ -14,6 +15,9 @@ const dashboard: UmbExtensionManifest = {
         {
             alias: "Umb.Condition.SectionAlias",
             match: UA_SECTION_ALIAS,
+        },
+        {
+            alias: UA_WORKSPACES_EXIST_CONDITION_ALIAS,
         },
     ],
 };
