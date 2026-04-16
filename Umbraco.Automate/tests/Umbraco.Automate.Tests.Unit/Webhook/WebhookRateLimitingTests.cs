@@ -1,7 +1,5 @@
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Http;
 using Umbraco.Automate.Core.Configuration;
-using Umbraco.Automate.Web;
 
 namespace Umbraco.Automate.Tests.Unit.Webhook;
 
@@ -101,26 +99,6 @@ public class WebhookRateLimitingTests
     }
 
     [Fact]
-    public void RejectionStatusCode_Is429()
-    {
-        // Verify the configured rejection status code matches 429 Too Many Requests.
-        // This is a configuration-level test ensuring the constant is correct.
-        StatusCodes.Status429TooManyRequests.ShouldBe(429);
-    }
-
-    [Fact]
-    public async Task OnRejected_SetsRetryAfterHeader()
-    {
-        // Verify that the OnRejected callback sets the Retry-After header.
-        var httpContext = new DefaultHttpContext();
-
-        // Simulate what the OnRejected callback does.
-        httpContext.Response.Headers.RetryAfter = "60";
-
-        httpContext.Response.Headers.RetryAfter.ToString().ShouldBe("60");
-    }
-
-    [Fact]
     public void DefaultRateLimitPerMinute_Is100()
     {
         var options = new WebhookOptions();
@@ -128,8 +106,24 @@ public class WebhookRateLimitingTests
     }
 
     [Fact]
-    public void RateLimitPolicyConstant_HasExpectedValue()
+    public async Task PermitsRenew_AfterWindowExpires()
     {
-        Constants.WebhookApi.RateLimitPolicy.ShouldBe("automate-webhook-rate-limit");
+        // Use a very short window so the test doesn't wait long.
+        using var limiter = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 1,
+            Window = TimeSpan.FromMilliseconds(100),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 1, // queue one request so it waits for the window to expire
+            AutoReplenishment = true,
+        });
+
+        // First request succeeds.
+        using var first = await limiter.AcquireAsync();
+        first.IsAcquired.ShouldBeTrue();
+
+        // Second request should queue and succeed after the window expires.
+        using var second = await limiter.AcquireAsync();
+        second.IsAcquired.ShouldBeTrue();
     }
 }
