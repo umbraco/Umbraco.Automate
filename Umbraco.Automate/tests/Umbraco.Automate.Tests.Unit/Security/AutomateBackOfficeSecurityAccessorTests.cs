@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Security;
@@ -10,23 +9,35 @@ namespace Umbraco.Automate.Tests.Unit.Security;
 public class AutomateBackOfficeSecurityAccessorTests
 {
     [Fact]
-    public void BackOfficeSecurity_NoAsyncLocal_NoHttpContext_ReturnsNull()
+    public void BackOfficeSecurity_NoAsyncLocal_InnerReturnsNull_ReturnsNull()
     {
-        var httpContextAccessor = new Mock<IHttpContextAccessor>();
-        httpContextAccessor.Setup(h => h.HttpContext).Returns((HttpContext?)null);
+        var inner = new Mock<IBackOfficeSecurityAccessor>();
+        inner.Setup(a => a.BackOfficeSecurity).Returns((IBackOfficeSecurity?)null);
 
-        var accessor = new AutomateBackOfficeSecurityAccessor(httpContextAccessor.Object);
+        var accessor = new AutomateBackOfficeSecurityAccessor(inner.Object);
 
         accessor.BackOfficeSecurity.ShouldBeNull();
     }
 
     [Fact]
+    public void BackOfficeSecurity_NoAsyncLocal_DelegatesToInner()
+    {
+        var innerSecurity = Mock.Of<IBackOfficeSecurity>();
+        var inner = new Mock<IBackOfficeSecurityAccessor>();
+        inner.Setup(a => a.BackOfficeSecurity).Returns(innerSecurity);
+
+        var accessor = new AutomateBackOfficeSecurityAccessor(inner.Object);
+
+        accessor.BackOfficeSecurity.ShouldBeSameAs(innerSecurity);
+    }
+
+    [Fact]
     public void Set_SetsAsyncLocalValue()
     {
-        var httpContextAccessor = new Mock<IHttpContextAccessor>();
-        httpContextAccessor.Setup(h => h.HttpContext).Returns((HttpContext?)null);
+        var inner = new Mock<IBackOfficeSecurityAccessor>();
+        inner.Setup(a => a.BackOfficeSecurity).Returns((IBackOfficeSecurity?)null);
 
-        var accessor = new AutomateBackOfficeSecurityAccessor(httpContextAccessor.Object);
+        var accessor = new AutomateBackOfficeSecurityAccessor(inner.Object);
 
         var user = Mock.Of<IUser>(u => u.Key == Guid.NewGuid());
         var security = new AutomateBackOfficeSecurity(user);
@@ -40,10 +51,10 @@ public class AutomateBackOfficeSecurityAccessorTests
     [Fact]
     public void Set_DisposeClearsValue()
     {
-        var httpContextAccessor = new Mock<IHttpContextAccessor>();
-        httpContextAccessor.Setup(h => h.HttpContext).Returns((HttpContext?)null);
+        var inner = new Mock<IBackOfficeSecurityAccessor>();
+        inner.Setup(a => a.BackOfficeSecurity).Returns((IBackOfficeSecurity?)null);
 
-        var accessor = new AutomateBackOfficeSecurityAccessor(httpContextAccessor.Object);
+        var accessor = new AutomateBackOfficeSecurityAccessor(inner.Object);
 
         var user = Mock.Of<IUser>(u => u.Key == Guid.NewGuid());
         var security = new AutomateBackOfficeSecurity(user);
@@ -56,27 +67,20 @@ public class AutomateBackOfficeSecurityAccessorTests
     }
 
     [Fact]
-    public void AsyncLocal_TakesPrecedenceOverHttpContext()
+    public void AsyncLocal_TakesPrecedenceOverInner()
     {
-        // Arrange: HTTP context has its own IBackOfficeSecurity
-        var httpUser = Mock.Of<IUser>(u => u.Key == Guid.NewGuid());
-        var httpSecurity = new Mock<IBackOfficeSecurity>();
-        httpSecurity.Setup(s => s.CurrentUser).Returns(httpUser);
+        // Arrange: inner accessor returns an existing security context
+        var innerUser = Mock.Of<IUser>(u => u.Key == Guid.NewGuid());
+        var innerSecurity = new Mock<IBackOfficeSecurity>();
+        innerSecurity.Setup(s => s.CurrentUser).Returns(innerUser);
 
-        var serviceProvider = new Mock<IServiceProvider>();
-        serviceProvider.Setup(sp => sp.GetService(typeof(IBackOfficeSecurity)))
-            .Returns(httpSecurity.Object);
+        var inner = new Mock<IBackOfficeSecurityAccessor>();
+        inner.Setup(a => a.BackOfficeSecurity).Returns(innerSecurity.Object);
 
-        var httpContext = new Mock<HttpContext>();
-        httpContext.Setup(c => c.RequestServices).Returns(serviceProvider.Object);
+        var accessor = new AutomateBackOfficeSecurityAccessor(inner.Object);
 
-        var httpContextAccessor = new Mock<IHttpContextAccessor>();
-        httpContextAccessor.Setup(h => h.HttpContext).Returns(httpContext.Object);
-
-        var accessor = new AutomateBackOfficeSecurityAccessor(httpContextAccessor.Object);
-
-        // Without AsyncLocal, should return HTTP context's security
-        accessor.BackOfficeSecurity.ShouldBeSameAs(httpSecurity.Object);
+        // Without AsyncLocal, should return inner's security
+        accessor.BackOfficeSecurity.ShouldBeSameAs(innerSecurity.Object);
 
         // With AsyncLocal set, should return the automation security
         var automationUser = Mock.Of<IUser>(u => u.Key == Guid.NewGuid());
@@ -85,5 +89,22 @@ public class AutomateBackOfficeSecurityAccessorTests
         using var scope = AutomateBackOfficeSecurityAccessor.Set(automationSecurity);
         accessor.BackOfficeSecurity.ShouldBeSameAs(automationSecurity);
         accessor.BackOfficeSecurity!.CurrentUser.ShouldBeSameAs(automationUser);
+    }
+
+    [Fact]
+    public void AfterDispose_FallsBackToInner()
+    {
+        var innerSecurity = Mock.Of<IBackOfficeSecurity>();
+        var inner = new Mock<IBackOfficeSecurityAccessor>();
+        inner.Setup(a => a.BackOfficeSecurity).Returns(innerSecurity);
+
+        var accessor = new AutomateBackOfficeSecurityAccessor(inner.Object);
+
+        var user = Mock.Of<IUser>(u => u.Key == Guid.NewGuid());
+        var scope = AutomateBackOfficeSecurityAccessor.Set(new AutomateBackOfficeSecurity(user));
+        scope.Dispose();
+
+        // After dispose, should fall back to the inner accessor
+        accessor.BackOfficeSecurity.ShouldBeSameAs(innerSecurity);
     }
 }

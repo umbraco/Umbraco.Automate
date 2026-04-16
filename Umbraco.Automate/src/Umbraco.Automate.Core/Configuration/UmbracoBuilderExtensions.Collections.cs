@@ -28,7 +28,6 @@ using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Cms.Core.DependencyInjection;
-using Umbraco.Cms.Core.Security;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Extensions;
@@ -107,9 +106,10 @@ public static partial class UmbracoBuilderExtensions
             .Append<SettingsValidationMiddleware>()
             .Append<AuditTrailMiddleware>();
 
-        // Security — replace Umbraco's default IBackOfficeSecurityAccessor with our
-        // implementation that supports AsyncLocal-based identity in background contexts.
-        builder.Services.AddSingleton<IBackOfficeSecurityAccessor, AutomateBackOfficeSecurityAccessor>();
+        // Security — decorate Umbraco's IBackOfficeSecurityAccessor so that during
+        // automation runs the AsyncLocal-based service principal identity takes precedence,
+        // while outside of runs the original accessor is used unchanged.
+        builder.Services.DecorateBackOfficeSecurityAccessor();
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
 
         // Settings infrastructure
