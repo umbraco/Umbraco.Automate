@@ -165,8 +165,15 @@ internal sealed class AutomationService : IAutomationService
         }
 
         automation.PublishedVersion = automation.Version;
+
+        // Only enable on first publish (Draft → Published). Re-publishing an already-published
+        // automation preserves the user's enabled/disabled choice.
+        if (automation.Status != AutomationStatus.Published)
+        {
+            automation.IsEnabled = true;
+        }
+
         automation.Status = AutomationStatus.Published;
-        automation.IsEnabled = true;
 
         var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
 
