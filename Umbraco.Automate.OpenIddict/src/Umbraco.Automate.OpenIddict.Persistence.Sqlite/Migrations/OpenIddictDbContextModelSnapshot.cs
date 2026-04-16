@@ -52,6 +52,9 @@ namespace Umbraco.Automate.OpenIddict.Persistence.Sqlite.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("UserAccessToken")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Provider");

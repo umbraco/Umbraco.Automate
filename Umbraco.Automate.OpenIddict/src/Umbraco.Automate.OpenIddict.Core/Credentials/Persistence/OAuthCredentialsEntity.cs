@@ -13,6 +13,8 @@ internal sealed class OAuthCredentialsEntity
 
     public string? RefreshToken { get; set; }
 
+    public string? UserAccessToken { get; set; }
+
     public DateTime? ExpiresUtc { get; set; }
 
     public string? Scopes { get; set; }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.OpenIddict.Credentials.Persistence;
 
@@ -11,9 +12,11 @@ using Umbraco.Automate.OpenIddict.Credentials.Persistence;
 namespace Umbraco.Automate.OpenIddict.Persistence.SqlServer.Migrations
 {
     [DbContext(typeof(OpenIddictDbContext))]
-    partial class OpenIddictDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260416140045_UmbracoAutomateOpenIddict_AddUserAccessToken")]
+    partial class UmbracoAutomateOpenIddict_AddUserAccessToken
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
