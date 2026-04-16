@@ -27,6 +27,7 @@ export class UaAutomationWorkspaceContext
 {
     readonly routes = new UmbWorkspaceRouteManager(this);
     readonly name = this._data.createObservablePartOfCurrent((data) => data?.name);
+    readonly description = this._data.createObservablePartOfCurrent((data) => data?.description);
 
     #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
 

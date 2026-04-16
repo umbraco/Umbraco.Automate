@@ -68,6 +68,12 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         this._aliasLocked = !this._aliasLocked;
     }
 
+    #onDescriptionChange(event: UUIInputEvent) {
+        event.stopPropagation();
+        const target = event.composedPath()[0] as UUIInputElement;
+        this.#workspaceContext?.updateProperty("description", target.value.toString());
+    }
+
     #onEnabledChange(event: CustomEvent<{ value: boolean }>) {
         event.stopPropagation();
         this.#workspaceContext?.updateProperty("isEnabled", event.detail.value);
@@ -86,34 +92,44 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         return html`
             <umb-workspace-editor alias="${UA_AUTOMATION_WORKSPACE_ALIAS}">
                 <div id="header" slot="header">
-                    <uui-input
-                        id="name"
-                        .value=${this._model.name}
-                        @input="${this.#onNameChange}"
-                        label=${this.localize.term("uaLabels_name")}
-                        placeholder=${this.localize.term("uaPlaceholders_enterName")}
-                        required
-                        maxlength="255"
-                        ${umbBindToValidation(this, "$.name", this._model.name)}
-                    >
-                        <uui-input-lock
-                            slot="append"
-                            id="alias"
-                            name="alias"
-                            label=${this.localize.term("uaLabels_alias")}
-                            placeholder=${this.localize.term("uaPlaceholders_enterAlias")}
-                            .value=${this._model.alias}
-                            ?auto-width=${!!this._model.name}
-                            ?locked=${this._aliasLocked}
-                            ?readonly=${this._aliasLocked || !this._isNew}
-                            @input=${this.#onAliasChange}
-                            @lock-change=${this.#onToggleAliasLock}
+                    <div id="editors">
+                        <uui-input
+                            id="name"
+                            .value=${this._model.name}
+                            @input="${this.#onNameChange}"
+                            label=${this.localize.term("uaLabels_name")}
+                            placeholder=${this.localize.term("uaPlaceholders_enterName")}
                             required
-                            maxlength="100"
-                            pattern="^[a-z0-9\\-]+$"
-                            ${umbBindToValidation(this, "$.alias", this._model.alias)}
-                        ></uui-input-lock>
-                    </uui-input>
+                            maxlength="255"
+                            ${umbBindToValidation(this, "$.name", this._model.name)}
+                        >
+                            <uui-input-lock
+                                slot="append"
+                                id="alias"
+                                name="alias"
+                                label=${this.localize.term("uaLabels_alias")}
+                                placeholder=${this.localize.term("uaPlaceholders_enterAlias")}
+                                .value=${this._model.alias}
+                                ?auto-width=${!!this._model.name}
+                                ?locked=${this._aliasLocked}
+                                ?readonly=${this._aliasLocked || !this._isNew}
+                                @input=${this.#onAliasChange}
+                                @lock-change=${this.#onToggleAliasLock}
+                                required
+                                maxlength="100"
+                                pattern="^[a-z0-9\\-]+$"
+                                ${umbBindToValidation(this, "$.alias", this._model.alias)}
+                            ></uui-input-lock>
+                        </uui-input>
+
+                        <uui-input
+                            id="description"
+                            .value=${this._model.description ?? ""}
+                            .label=${this.localize.term("placeholders_enterDescription")}
+                            .placeholder=${this.localize.term("placeholders_enterDescription")}
+                            @input=${this.#onDescriptionChange}
+                        ></uui-input>
+                    </div>
 
                     <ua-status-selector
                         active-label=${this.localize.term("uaLabels_enabled")}
@@ -148,10 +164,26 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
                 align-items: center;
             }
 
+            #editors {
+                display: flex;
+                flex: 1 1 auto;
+                flex-direction: column;
+                gap: 1px;
+            }
+
             #name {
                 width: 100%;
-                flex: 1 1 auto;
-                align-items: center;
+                z-index: 1;
+            }
+
+            #description {
+                width: 100%;
+                --uui-input-height: var(--uui-size-8);
+                --uui-input-border-color: transparent;
+            }
+
+            #description:hover {
+                --uui-input-border-color: var(--uui-color-border);
             }
 
             #footer {
