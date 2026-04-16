@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
 
@@ -14,6 +15,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSettings, UnpublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly ILogger<UnpublishContentAction> _logger;
 
     /// <summary>
@@ -22,10 +24,12 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
     public UnpublishContentAction(
         ActionInfrastructure infrastructure,
         IContentPublishingService contentPublishingService,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         ILogger<UnpublishContentAction> logger)
         : base(infrastructure)
     {
         _contentPublishingService = contentPublishingService;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _logger = logger;
     }
 
@@ -48,8 +52,9 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
             context.AutomationId, context.RunId, contentKey,
             cultures is null ? "invariant" : string.Join(", ", cultures));
 
-        var userKey = context.ExecutionContext?.ServiceAccountKey
-            ?? Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key
+            ?? context.ExecutionContext?.ServiceAccountKey
+            ?? throw new InvalidOperationException("No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
 
         var result = await _contentPublishingService.UnpublishAsync(contentKey, cultures, userKey);
 
