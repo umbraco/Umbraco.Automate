@@ -319,7 +319,9 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     }
 
     /// <summary>
-    /// Orders steps by their connections using topological sort.
+    /// Orders steps by their connections using topological sort, excluding steps
+    /// that are not reachable from the trigger. The trigger is represented by
+    /// <see cref="Guid.Empty"/> as the <see cref="StepConnection.SourceStepId"/>.
     /// Falls back to original order if no connections exist.
     /// </summary>
     internal static List<StepConfiguration> TopologicalSort(
@@ -331,11 +333,52 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             return [..steps];
         }
 
+        // Build full adjacency graph including the trigger (Guid.Empty) so we can
+        // determine which steps are reachable from the trigger.
+        var fullAdjacency = new Dictionary<Guid, List<Guid>>();
+        foreach (var step in steps)
+        {
+            fullAdjacency[step.Id] = [];
+        }
+
+        fullAdjacency[Guid.Empty] = [];
+
+        foreach (var conn in connections)
+        {
+            if (fullAdjacency.ContainsKey(conn.SourceStepId) && fullAdjacency.ContainsKey(conn.TargetStepId))
+            {
+                fullAdjacency[conn.SourceStepId].Add(conn.TargetStepId);
+            }
+        }
+
+        // BFS from the trigger to find reachable steps.
+        var reachable = new HashSet<Guid>();
+        var bfsQueue = new Queue<Guid>();
+        bfsQueue.Enqueue(Guid.Empty);
+
+        while (bfsQueue.Count > 0)
+        {
+            var id = bfsQueue.Dequeue();
+            foreach (var neighbor in fullAdjacency[id])
+            {
+                if (reachable.Add(neighbor))
+                {
+                    bfsQueue.Enqueue(neighbor);
+                }
+            }
+        }
+
+        // Build adjacency and in-degree for reachable steps only.
         var adjacency = new Dictionary<Guid, List<Guid>>();
         var inDegree = new Dictionary<Guid, int>();
 
         foreach (var step in steps)
         {
+            if (!reachable.Contains(step.Id))
+            {
+                continue;
+            }
+
             adjacency[step.Id] = [];
             inDegree[step.Id] = 0;
         }
@@ -371,10 +414,11 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             }
         }
 
-        // If topological sort didn't include all steps (cycle), fall back.
-        if (result.Count < steps.Count)
+        // If topological sort didn't include all reachable steps (cycle), fall back
+        // to reachable steps in their original order.
+        if (result.Count < adjacency.Count)
         {
-            return [..steps];
+            return steps.Where(s => reachable.Contains(s.Id)).ToList();
         }
 
         return result;

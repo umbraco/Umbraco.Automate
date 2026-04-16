@@ -169,6 +169,7 @@ public class AutomationExecutorTests
             .AddStep(stepC)  // Deliberately reversed
             .AddStep(stepB)
             .AddStep(stepA)
+            .WithTriggerConnection(stepA.Id)
             .WithConnection(stepA.Id, stepB.Id)
             .WithConnection(stepB.Id, stepC.Id)
             .Build();
@@ -264,6 +265,7 @@ public class AutomationExecutorTests
             .AddStep(ifStep)
             .AddStep(trueStep)
             .AddStep(falseStep)
+            .WithTriggerConnection(ifStep.Id)
             .WithConnection(ifStep.Id, trueStep.Id, "true")
             .WithConnection(ifStep.Id, falseStep.Id, "false")
             .Build();
@@ -301,6 +303,7 @@ public class AutomationExecutorTests
             .AddStep(stepA)
             .AddStep(ifStep)
             .AddStep(trueStep)
+            .WithTriggerConnection(stepA.Id)
             .WithConnection(stepA.Id, ifStep.Id)         // Sequential (no outcome)
             .WithConnection(ifStep.Id, trueStep.Id, "true")  // Branching
             .Build();
@@ -334,6 +337,7 @@ public class AutomationExecutorTests
             .AddStep(trueStep)
             .AddStep(falseStep)
             .AddStep(sharedEnd)
+            .WithTriggerConnection(ifStep.Id)
             .WithConnection(ifStep.Id, trueStep.Id, "true")
             .WithConnection(ifStep.Id, falseStep.Id, "false")
             .WithConnection(trueStep.Id, sharedEnd.Id)
@@ -381,6 +385,7 @@ public class AutomationExecutorTests
             .AddStep(falseStep)
             .AddStep(ifStep)
             .AddStep(trueStep)
+            .WithTriggerConnection(ifStep.Id)
             .WithConnection(ifStep.Id, trueStep.Id, "true")
             .WithConnection(ifStep.Id, falseStep.Id, "false")
             .WithConnection(trueStep.Id, sharedEnd.Id)
@@ -409,6 +414,7 @@ public class AutomationExecutorTests
             .AddStep(falseStep)
             .AddStep(sharedMerge)
             .AddStep(finalStep)
+            .WithTriggerConnection(ifStep.Id)
             .WithConnection(ifStep.Id, trueStep.Id, "true")
             .WithConnection(ifStep.Id, falseStep.Id, "false")
             .WithConnection(trueStep.Id, sharedMerge.Id)

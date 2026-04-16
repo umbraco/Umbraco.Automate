@@ -93,6 +93,7 @@ public class WorkflowCompilerTests
             .AddStep(actionA)
             .AddStep(actionB)
             .AddStep(merge)
+            .WithTriggerConnection(forEach.Id)
             .WithConnection(forEach.Id, actionA.Id, "branch1")
             .WithConnection(forEach.Id, actionB.Id, "branch2")
             .WithConnection(actionA.Id, merge.Id)
@@ -126,6 +127,7 @@ public class WorkflowCompilerTests
         var automation = new AutomationBuilder()
             .AddStep(forEach)
             .AddStep(action)
+            .WithTriggerConnection(forEach.Id)
             .WithConnection(forEach.Id, action.Id)
             .Build();
 
@@ -149,6 +151,7 @@ public class WorkflowCompilerTests
         var automation = new AutomationBuilder()
             .AddStep(stepA)
             .AddStep(stepB)
+            .WithTriggerConnection(stepA.Id)
             .WithConnection(stepA.Id, stepB.Id)
             .Build();
 
@@ -158,5 +161,25 @@ public class WorkflowCompilerTests
         // Action steps should NOT have children.
         definition.Steps.FindById(0).Children.ShouldBeEmpty();
         definition.Steps.FindById(1).Children.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Compile_DisconnectedSteps_AreExcludedFromWorkflow()
+    {
+        StepConfiguration connected = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Connected");
+        StepConfiguration disconnected = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Disconnected");
+
+        var automation = new AutomationBuilder()
+            .AddStep(connected)
+            .AddStep(disconnected)
+            .WithTriggerConnection(connected.Id)
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+
+        definition.Steps.Count.ShouldBe(1);
+        definition.Steps.FindById(0).Name.ShouldBe("Connected");
     }
 }

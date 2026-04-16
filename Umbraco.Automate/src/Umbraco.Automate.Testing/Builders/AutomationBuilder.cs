@@ -109,6 +109,12 @@ public class AutomationBuilder
     }
 
     /// <summary>
+    /// Adds a connection from the trigger (<see cref="Guid.Empty"/>) to the specified step.
+    /// </summary>
+    public AutomationBuilder WithTriggerConnection(Guid targetStepId)
+        => WithConnection(Guid.Empty, targetStepId);
+
+    /// <summary>
     /// Configures the automation as a draft (unpublished).
     /// </summary>
     public AutomationBuilder AsDraft()
