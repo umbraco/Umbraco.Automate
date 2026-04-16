@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
@@ -22,6 +23,7 @@ namespace Umbraco.Automate.Web.Api.Webhook.Controllers;
 [Route("automate/webhook")]
 [MapToApi(Constants.WebhookApi.ApiName)]
 [ApiExplorerSettings(GroupName = "Webhooks")]
+[EnableRateLimiting(Constants.WebhookApi.RateLimitPolicy)]
 public sealed class WebhookEndpointController : ControllerBase
 {
     private readonly IAutomationService _automationService;
@@ -61,6 +63,7 @@ public sealed class WebhookEndpointController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status405MethodNotAllowed)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status413PayloadTooLarge)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> ReceiveWebhook(
