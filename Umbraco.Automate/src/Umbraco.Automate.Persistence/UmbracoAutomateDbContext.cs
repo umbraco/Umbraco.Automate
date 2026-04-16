@@ -66,6 +66,7 @@ public class UmbracoAutomateDbContext : DbContext
                 {
                     x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer");
                     x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                    x.EnableRetryOnFailure();
                 });
                 break;
 

@@ -34,6 +34,7 @@ public class OpenIddictDbContext : DbContext
                 {
                     x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.SqlServer");
                     x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                    x.EnableRetryOnFailure();
                 });
                 break;
 
