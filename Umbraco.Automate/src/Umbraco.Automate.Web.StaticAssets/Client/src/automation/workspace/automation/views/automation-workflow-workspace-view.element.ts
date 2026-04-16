@@ -5,7 +5,7 @@ import { UMB_MODAL_MANAGER_CONTEXT, UMB_CONFIRM_MODAL } from "@umbraco-cms/backo
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
-import { modelToNodes, modelToEdges } from "../canvas/utils/model-to-flow.js";
+import { modelToNodes, modelToEdges, TRIGGER_NODE_ID } from "../canvas/utils/model-to-flow.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
 import type { CanvasState, CanvasChangeDetail, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
@@ -14,6 +14,7 @@ import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trig
 import { UA_EDGE_FILTER_MODAL } from "../../../modals/edge-filter/edge-filter-modal.token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import type { EditableModelSchemaModel } from "../../../../api/types.gen.js";
+import { UA_EMPTY_GUID } from "../../../../core/index.js";
 import "../canvas/ua-automation-canvas.element.js";
 
 @customElement("ua-automation-workflow-workspace-view")
@@ -275,6 +276,21 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
             const updatedSteps = [...this._model.steps, newStep];
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
+
+            // Auto-connect when the node was created by dragging from a handle.
+            if (event.detail.connectFrom) {
+                const { sourceStepId, sourceHandle } = event.detail.connectFrom;
+                const newConnection = {
+                    sourceStepId: sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId,
+                    sourceHandle: sourceHandle ?? null,
+                    targetStepId: newStepId,
+                    targetHandle: null,
+                    outcome: sourceHandle ?? null,
+                    filter: null,
+                };
+                const updatedConnections = [...this._model.connections, newConnection];
+                this.#workspaceContext?.updateProperty("connections", updatedConnections);
+            }
 
             await this.#openNodeSettingsModal(newStepId);
         } catch {

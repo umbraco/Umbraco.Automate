@@ -32,6 +32,11 @@ export interface NodeSettingsOpenDetail {
 
 export interface AddNodeRequestDetail {
     position: { x: number; y: number };
+    /** When set, auto-connect the new node to this source. */
+    connectFrom?: {
+        sourceStepId: string;
+        sourceHandle?: string | null;
+    };
 }
 
 export interface NodeDeleteRequestDetail {

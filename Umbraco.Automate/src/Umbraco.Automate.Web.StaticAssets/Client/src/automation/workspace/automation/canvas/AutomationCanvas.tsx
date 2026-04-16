@@ -174,6 +174,36 @@ export default function AutomationCanvas({
         [setEdges, setNodes, emitChange],
     );
 
+    // Track the source of a connection drag for drop-to-add.
+    const connectStartRef = useRef<{ nodeId: string; handleId: string | null } | null>(null);
+
+    const onConnectStart = useCallback((_event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null }) => {
+        connectStartRef.current = { nodeId: params.nodeId ?? "", handleId: params.handleId };
+    }, []);
+
+    const onConnectEnd = useCallback(
+        (event: MouseEvent | TouchEvent) => {
+            if (!onAddNodeRequest || !rfInstance.current || !connectStartRef.current) return;
+
+            // If the drop landed on a handle, onConnect already handled it.
+            const target = (event as MouseEvent).target as HTMLElement | null;
+            if (target?.closest(".react-flow__handle")) return;
+
+            const clientX = "changedTouches" in event ? event.changedTouches[0].clientX : (event as MouseEvent).clientX;
+            const clientY = "changedTouches" in event ? event.changedTouches[0].clientY : (event as MouseEvent).clientY;
+
+            const position = rfInstance.current.screenToFlowPosition({ x: clientX, y: clientY });
+            const { nodeId, handleId } = connectStartRef.current;
+            connectStartRef.current = null;
+
+            onAddNodeRequest({
+                position,
+                connectFrom: { sourceStepId: nodeId, sourceHandle: handleId },
+            });
+        },
+        [onAddNodeRequest],
+    );
+
     const onInit = useCallback((instance: ReactFlowInstance) => {
         rfInstance.current = instance;
     }, []);
@@ -208,6 +238,8 @@ export default function AutomationCanvas({
             onNodesChange={readOnly ? undefined : handleNodesChange}
             onEdgesChange={readOnly ? undefined : handleEdgesChange}
             onConnect={readOnly ? undefined : onConnect}
+            onConnectStart={readOnly ? undefined : onConnectStart}
+            onConnectEnd={readOnly ? undefined : onConnectEnd}
             isValidConnection={readOnly ? undefined : isValidConnection}
             onBeforeDelete={readOnly ? undefined : handleBeforeDelete}
             onInit={onInit}
