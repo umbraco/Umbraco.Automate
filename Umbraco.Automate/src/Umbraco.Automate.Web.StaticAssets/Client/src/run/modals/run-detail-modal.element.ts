@@ -23,6 +23,9 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
     private _replaying = false;
 
     @state()
+    private _lifecycleBusy = false;
+
+    @state()
     private _expandedStep?: string;
 
     @state()
@@ -69,6 +72,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             case "Running":
             case "Pending":
             case "WaitingForInput":
+            case "Suspended":
                 return "warning";
             case "Failed":
                 return "danger";
@@ -100,6 +104,23 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             // Replay failed — stay on modal
         } finally {
             this._replaying = false;
+        }
+    }
+
+    async #callLifecycle(action: "suspend" | "resume" | "terminate") {
+        if (!this._run) return;
+        this._lifecycleBusy = true;
+        try {
+            await client.post({
+                url: `/umbraco/automate/management/api/v1/runs/${this._run.unique}/${action}`,
+                security: [{ scheme: "bearer", type: "http" }],
+            });
+            // Reload the run so the user sees the updated status without closing the modal.
+            await this.#loadRun(this._run.unique);
+        } catch {
+            // Lifecycle call failed — stay on modal with current state.
+        } finally {
+            this._lifecycleBusy = false;
         }
     }
 
@@ -166,6 +187,50 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                       : html`<p class="center">${this.localize.term("uaRun_noRuns")}</p>`}
 
                 <div slot="actions">
+                    ${when(
+                        this._run?.status === "Running",
+                        () => html`
+                            <uui-button
+                                label=${this.localize.term("uaRun_suspend")}
+                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                ?disabled=${this._lifecycleBusy}
+                                @click=${() => this.#callLifecycle("suspend")}
+                            >
+                                <uui-icon name="icon-pause"></uui-icon>
+                                ${this.localize.term("uaRun_suspend")}
+                            </uui-button>
+                        `,
+                    )}
+                    ${when(
+                        this._run?.status === "Suspended",
+                        () => html`
+                            <uui-button
+                                look="primary"
+                                label=${this.localize.term("uaRun_resume")}
+                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                ?disabled=${this._lifecycleBusy}
+                                @click=${() => this.#callLifecycle("resume")}
+                            >
+                                <uui-icon name="icon-play"></uui-icon>
+                                ${this.localize.term("uaRun_resume")}
+                            </uui-button>
+                        `,
+                    )}
+                    ${when(
+                        this._run?.status === "Running" || this._run?.status === "Suspended",
+                        () => html`
+                            <uui-button
+                                color="danger"
+                                label=${this.localize.term("uaRun_terminate")}
+                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                ?disabled=${this._lifecycleBusy}
+                                @click=${() => this.#callLifecycle("terminate")}
+                            >
+                                <uui-icon name="icon-stop-alt"></uui-icon>
+                                ${this.localize.term("uaRun_terminate")}
+                            </uui-button>
+                        `,
+                    )}
                     ${when(
                         this._run && (this._run.status === "Failed" || this._run.status === "Completed"),
                         () => html`

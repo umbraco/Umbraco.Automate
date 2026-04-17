@@ -94,6 +94,9 @@ export default {
     uaRun: {
         dashboardTitle: "Runs",
         replay: "Replay",
+        suspend: "Suspend",
+        resume: "Resume",
+        terminate: "Terminate",
         noRuns: "No runs found.",
         noStepRuns: "No step runs recorded for this execution.",
         noRecentActivity: "No recent activity.",
