@@ -1,5 +1,5 @@
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -16,26 +16,11 @@ public sealed class WebhookTriggerSettings
     public List<string> AllowedMethods { get; set; } = ["POST"];
 
     /// <summary>
-    /// Gets or sets the secret used to authenticate incoming webhook requests.
-    /// The selected <see cref="AuthenticatorAlias"/> determines how the secret is validated
-    /// (plain token, HMAC key, provider-specific, etc.). The UI pre-fills a fresh secret when
-    /// empty; the server also auto-generates on save as a safety net for API-direct writes.
+    /// Gets or sets the authentication strategy and its strategy-specific settings.
     /// </summary>
     [Field(
-        Label = "Webhook Secret",
-        Description = "Secret used to authenticate incoming requests.",
-        IsSensitive = true,
-        EditorUiAlias = "Umb.Automate.WebhookSecretField")]
-    public string? Secret { get; set; }
-
-    /// <summary>
-    /// Gets or sets the alias of the <see cref="Webhooks.IWebhookAuthenticator"/> that validates
-    /// incoming requests. Defaults to the built-in plain-secret header/query authenticator.
-    /// Unknown or missing aliases fall back to <c>plain-secret</c> defensively.
-    /// </summary>
-    [Field(
-        Label = "Authentication Strategy",
+        Label = "Authentication",
         Description = "How incoming webhook requests are authenticated.",
         EditorUiAlias = "Umb.Automate.WebhookAuthenticatorPicker")]
-    public string AuthenticatorAlias { get; set; } = PlainSecretWebhookAuthenticator.WellKnownAlias;
+    public WebhookAuthenticatorConfig Authenticator { get; set; } = new();
 }

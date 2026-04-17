@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 
@@ -17,4 +18,9 @@ public sealed class WebhookAuthenticatorItemResponseModel
 
     /// <summary>Optional short description of how callers must authenticate.</summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    /// The strategy-specific settings schema, or null if the authenticator has no settings.
+    /// </summary>
+    public EditableModelSchema? SettingsSchema { get; set; }
 }

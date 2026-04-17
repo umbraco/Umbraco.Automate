@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Triggers.Webhooks;
@@ -29,6 +30,7 @@ public sealed class WebhookEndpointController : ControllerBase
     private readonly ITriggerDispatcher _dispatcher;
     private readonly TriggerCollection _triggers;
     private readonly WebhookAuthenticatorCollection _authenticators;
+    private readonly IEditableModelResolver _modelResolver;
     private readonly IOptions<WebhookOptions> _webhookOptions;
     private readonly ILogger<WebhookEndpointController> _logger;
 
@@ -38,6 +40,7 @@ public sealed class WebhookEndpointController : ControllerBase
         ITriggerDispatcher dispatcher,
         TriggerCollection triggers,
         WebhookAuthenticatorCollection authenticators,
+        IEditableModelResolver modelResolver,
         IOptions<WebhookOptions> webhookOptions,
         ILogger<WebhookEndpointController> logger)
     {
@@ -45,13 +48,14 @@ public sealed class WebhookEndpointController : ControllerBase
         _dispatcher = dispatcher;
         _triggers = triggers;
         _authenticators = authenticators;
+        _modelResolver = modelResolver;
         _webhookOptions = webhookOptions;
         _logger = logger;
     }
 
     /// <summary>
     /// Receives an incoming webhook request and triggers the matching automation.
-    /// Requires a valid secret via <c>X-Webhook-Secret</c> header or <c>secret</c> query parameter.
+    /// Authentication is performed by the strategy configured on the trigger.
     /// </summary>
     [HttpPost("{automationId:guid}")]
     [HttpPut("{automationId:guid}")]
@@ -113,20 +117,21 @@ public sealed class WebhookEndpointController : ControllerBase
             });
         }
 
+        var authenticator = ResolveAuthenticator(triggerSettings);
+        var authenticatorSettings = authenticator is not null
+            ? ResolveAuthenticatorSettings(authenticator, triggerSettings?.Authenticator)
+            : null;
+
         // Run pre-body authentication for authenticators that don't need the body.
         // Lets large-payload spam fail fast with 401 before we read into memory.
-        var authenticator = ResolveAuthenticator(triggerSettings);
-        if (authenticator is not null
-            && !string.IsNullOrEmpty(triggerSettings?.Secret)
-            && !authenticator.RequiresBody)
+        if (authenticator is not null && !authenticator.RequiresBody)
         {
             var preBodyContext = new WebhookAuthenticationContext
             {
                 Request = Request,
                 Body = null,
-                Secret = triggerSettings.Secret,
             };
-            if (!authenticator.Validate(preBodyContext))
+            if (!authenticator.Validate(preBodyContext, authenticatorSettings))
             {
                 return Unauthorized();
             }
@@ -190,16 +195,15 @@ public sealed class WebhookEndpointController : ControllerBase
             }
         }
 
-        // Post-body authentication (HMAC-SHA256 or custom authenticators that need the body).
-        if (authenticator is not null && !string.IsNullOrEmpty(triggerSettings?.Secret))
+        // Post-body authentication for strategies that need the body (e.g. HMAC).
+        if (authenticator is not null)
         {
             var postBodyContext = new WebhookAuthenticationContext
             {
                 Request = Request,
                 Body = body,
-                Secret = triggerSettings.Secret,
             };
-            if (!authenticator.Validate(postBodyContext))
+            if (!authenticator.Validate(postBodyContext, authenticatorSettings))
             {
                 return Unauthorized();
             }
@@ -235,16 +239,11 @@ public sealed class WebhookEndpointController : ControllerBase
     /// <summary>
     /// Resolves the authenticator for the trigger. Unknown or missing aliases fall back
     /// to the built-in plain-secret authenticator so stale config never leaves the endpoint
-    /// unauthenticated or errored.
+    /// errored; whether the request passes authentication is still up to the strategy.
     /// </summary>
     private IWebhookAuthenticator? ResolveAuthenticator(WebhookTriggerSettings? settings)
     {
-        if (string.IsNullOrEmpty(settings?.Secret))
-        {
-            return null;
-        }
-
-        var alias = settings.AuthenticatorAlias;
+        var alias = settings?.Authenticator?.Alias;
         if (!string.IsNullOrEmpty(alias))
         {
             var match = _authenticators.GetByAlias(alias);
@@ -259,5 +258,16 @@ public sealed class WebhookEndpointController : ControllerBase
         }
 
         return _authenticators.GetByAlias(PlainSecretWebhookAuthenticator.WellKnownAlias);
+    }
+
+    private object? ResolveAuthenticatorSettings(IWebhookAuthenticator authenticator, WebhookAuthenticatorConfig? config)
+    {
+        if (authenticator.SettingsType is null)
+        {
+            return null;
+        }
+
+        var raw = config?.Settings ?? [];
+        return _modelResolver.ResolveModel(authenticator.Alias, authenticator.SettingsType, raw, authenticator.GetSettingsSchema());
     }
 }

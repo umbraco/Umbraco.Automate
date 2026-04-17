@@ -8,7 +8,7 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 /// <c>X-Webhook-Signature</c> header (format: <c>sha256=&lt;hex&gt;</c>).
 /// Compatible with GitHub's <c>X-Hub-Signature-256</c> scheme.
 /// </summary>
-public sealed class HmacSha256WebhookAuthenticator : IWebhookAuthenticator
+public sealed class HmacSha256WebhookAuthenticator : WebhookAuthenticatorBase<HmacSha256WebhookAuthenticatorSettings>
 {
     /// <summary>
     /// Well-known alias for this authenticator.
@@ -18,17 +18,22 @@ public sealed class HmacSha256WebhookAuthenticator : IWebhookAuthenticator
     internal const string SignatureHeaderName = "X-Webhook-Signature";
 
     /// <inheritdoc />
-    public string Alias => WellKnownAlias;
+    public override string Alias => WellKnownAlias;
 
     /// <inheritdoc />
-    public string Name => "HMAC-SHA256 Signature";
+    public override string Name => "HMAC-SHA256 Signature";
 
     /// <inheritdoc />
-    public string? Description => "Caller computes HMAC-SHA256(secret, body) and sends it in the X-Webhook-Signature header as 'sha256=<hex>'.";
+    public override string? Description => "Caller computes HMAC-SHA256(signingKey, body) and sends it in the X-Webhook-Signature header as 'sha256=<hex>'.";
 
     /// <inheritdoc />
-    public bool Validate(WebhookAuthenticationContext context)
+    protected override bool Validate(WebhookAuthenticationContext context, HmacSha256WebhookAuthenticatorSettings settings)
     {
+        if (string.IsNullOrEmpty(settings.SigningKey))
+        {
+            return false;
+        }
+
         var header = context.Request.Headers[SignatureHeaderName].FirstOrDefault();
         if (string.IsNullOrEmpty(header) || !header.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
         {
@@ -53,7 +58,7 @@ public sealed class HmacSha256WebhookAuthenticator : IWebhookAuthenticator
             return false;
         }
 
-        var keyBytes = Encoding.UTF8.GetBytes(context.Secret);
+        var keyBytes = Encoding.UTF8.GetBytes(settings.SigningKey);
         var payloadBytes = Encoding.UTF8.GetBytes(context.Body ?? string.Empty);
         var expectedBytes = HMACSHA256.HashData(keyBytes, payloadBytes);
 

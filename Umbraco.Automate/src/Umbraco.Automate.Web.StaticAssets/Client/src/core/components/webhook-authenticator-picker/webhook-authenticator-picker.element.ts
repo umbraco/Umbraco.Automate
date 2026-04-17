@@ -5,11 +5,20 @@ import { UmbFormControlMixin } from "@umbraco-cms/backoffice/validation";
 import type { UmbPropertyEditorUiElement } from "@umbraco-cms/backoffice/property-editor";
 import type { UUISelectElement, UUISelectEvent } from "@umbraco-cms/backoffice/external/uui";
 import { client } from "../../../api/client.gen.js";
+import type { EditableModelFieldDescriptorModel, EditableModelSchemaModel } from "../../../api/types.gen.js";
+import type { SettingsChangeDetail } from "../settings-form/settings-form.element.js";
+import "../settings-form/settings-form.element.js";
 
 interface WebhookAuthenticatorItem {
     alias: string;
     name: string;
     description?: string;
+    settingsSchema?: EditableModelSchemaModel | null;
+}
+
+interface WebhookAuthenticatorValue {
+    alias: string;
+    settings: Record<string, unknown>;
 }
 
 const ENDPOINT = "/umbraco/automate/management/api/v1/catalogue/webhook-authenticators";
@@ -17,7 +26,10 @@ const PLAIN_SECRET_ALIAS = "plain-secret";
 
 @customElement("ua-webhook-authenticator-picker")
 export class UaWebhookAuthenticatorPickerElement
-    extends UmbFormControlMixin<string, typeof UmbLitElement, undefined>(UmbLitElement, undefined)
+    extends UmbFormControlMixin<WebhookAuthenticatorValue | undefined, typeof UmbLitElement, undefined>(
+        UmbLitElement,
+        undefined,
+    )
     implements UmbPropertyEditorUiElement
 {
     @property({ type: Boolean, reflect: true })
@@ -54,12 +66,10 @@ export class UaWebhookAuthenticatorPickerElement
 
             this._options = data;
 
-            // Seed the default when no value is set yet so the form persists something sensible.
-            if (!this.value) {
+            if (!this.value?.alias) {
                 const fallback = data.find((d) => d.alias === PLAIN_SECRET_ALIAS) ?? data[0];
                 if (fallback) {
-                    this.value = fallback.alias;
-                    this.dispatchEvent(new UmbChangeEvent());
+                    this.#setValue({ alias: fallback.alias, settings: {} });
                 }
             }
         } catch {
@@ -69,15 +79,27 @@ export class UaWebhookAuthenticatorPickerElement
         }
     }
 
-    #onChange(event: UUISelectEvent) {
-        const next = (event.target as UUISelectElement).value as string;
-        if (next === this.value) return;
+    #setValue(next: WebhookAuthenticatorValue) {
         this.value = next;
         this.dispatchEvent(new UmbChangeEvent());
     }
 
+    #onStrategyChange(event: UUISelectEvent) {
+        const alias = (event.target as UUISelectElement).value as string;
+        if (alias === this.value?.alias) return;
+        // Switching strategy drops the previous strategy's settings — different strategies
+        // use different fields, so carrying them across would be noise. If the user picks
+        // the same strategy again later, they refill.
+        this.#setValue({ alias, settings: {} });
+    }
+
+    #onSettingsChange(event: CustomEvent<SettingsChangeDetail>) {
+        if (!this.value) return;
+        this.#setValue({ alias: this.value.alias, settings: event.detail.settings });
+    }
+
     get #selected(): WebhookAuthenticatorItem | undefined {
-        return this._options.find((o) => o.alias === this.value);
+        return this._options.find((o) => o.alias === this.value?.alias);
     }
 
     override render() {
@@ -92,25 +114,46 @@ export class UaWebhookAuthenticatorPickerElement
         const items = this._options.map((opt) => ({
             name: opt.name,
             value: opt.alias,
-            selected: opt.alias === this.value,
+            selected: opt.alias === this.value?.alias,
         }));
 
-        const hint = this.#selected?.description;
+        const selected = this.#selected;
+        const fields = (selected?.settingsSchema?.fields ?? []) as EditableModelFieldDescriptorModel[];
 
         return html`
-            <uui-select
-                label="Authentication Strategy"
-                .options=${items}
-                ?disabled=${this.readonly}
-                @change=${this.#onChange}
-            ></uui-select>
-            ${hint ? html`<small class="hint">${hint}</small>` : nothing}
+            <div class="picker">
+                <uui-select
+                    label="Authentication Strategy"
+                    .options=${items}
+                    ?disabled=${this.readonly}
+                    @change=${this.#onStrategyChange}
+                ></uui-select>
+                ${selected?.description ? html`<small class="hint">${selected.description}</small>` : nothing}
+            </div>
+            ${fields.length > 0
+                ? html`
+                      <div class="strategy-settings">
+                          <ua-settings-form
+                              no-box
+                              .fields=${fields}
+                              .values=${(this.value?.settings ?? {}) as Record<string, unknown>}
+                              @ua:settings-change=${this.#onSettingsChange}
+                          ></ua-settings-form>
+                      </div>
+                  `
+                : nothing}
         `;
     }
 
     static override styles = [
         css`
             :host {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-layout-1);
+            }
+
+            .picker {
                 display: flex;
                 flex-direction: column;
                 gap: var(--uui-size-space-2);
@@ -127,6 +170,11 @@ export class UaWebhookAuthenticatorPickerElement
 
             .error {
                 color: var(--uui-color-danger);
+            }
+
+            .strategy-settings {
+                padding-top: var(--uui-size-space-3);
+                border-top: 1px solid var(--uui-color-divider);
             }
         `,
     ];

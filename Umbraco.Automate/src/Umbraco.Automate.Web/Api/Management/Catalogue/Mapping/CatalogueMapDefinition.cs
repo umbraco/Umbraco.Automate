@@ -100,5 +100,6 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
+        target.SettingsSchema = source.GetSettingsSchema();
     }
 }

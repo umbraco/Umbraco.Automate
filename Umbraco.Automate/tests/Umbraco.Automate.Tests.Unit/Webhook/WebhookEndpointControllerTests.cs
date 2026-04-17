@@ -46,6 +46,7 @@ public class WebhookEndpointControllerTests
             _dispatcher.Object,
             triggers,
             authenticators,
+            modelResolver,
             Options.Create(new WebhookOptions()),
             Mock.Of<ILogger<WebhookEndpointController>>());
 
@@ -118,26 +119,25 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_NoSecret_DispatchesAndReturns202()
+    public async Task ReceiveWebhook_EmptySecretSettings_Returns401()
     {
+        // Default strategy with no configured secret fails authentication rather than letting
+        // unauthenticated requests through silently.
         var automation = CreateAutomation();
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
         var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
-        result.ShouldBeOfType<AcceptedResult>();
-        _dispatcher.Verify(d => d.DispatchAsync(
-            It.Is<TriggerEvent<WebhookTriggerOutput>>(e =>
-                e.TriggerAlias == "umbracoAutomate.webhook" &&
-                e.InitiatorType == "webhook"),
-            It.IsAny<CancellationToken>()), Times.Once);
+        result.ShouldBeOfType<UnauthorizedResult>();
     }
 
     [Fact]
     public async Task ReceiveWebhook_ValidSecretInHeader_Returns202()
     {
-        var automation = CreateAutomation(secret: "my-secret-token");
+        var automation = CreateAutomation(
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "my-secret-token" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -151,7 +151,9 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_ValidSecretInQuery_Returns202()
     {
-        var automation = CreateAutomation(secret: "my-secret-token");
+        var automation = CreateAutomation(
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "my-secret-token" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -165,7 +167,9 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_InvalidSecret_Returns401()
     {
-        var automation = CreateAutomation(secret: "correct-secret");
+        var automation = CreateAutomation(
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "correct-secret" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -178,13 +182,15 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_MissingSecretWhenRequired_Returns401()
+    public async Task ReceiveWebhook_MissingSecretHeader_Returns401()
     {
-        var automation = CreateAutomation(secret: "required-secret");
+        var automation = CreateAutomation(
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "required-secret" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
-        // No header, no query param — secret is missing.
+        // No header, no query param — secret is missing from the request.
         var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
         result.ShouldBeOfType<UnauthorizedResult>();
@@ -193,10 +199,13 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_CapturesQueryParameters()
     {
-        var automation = CreateAutomation();
+        var automation = CreateAutomation(
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "tok" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
         _controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?foo=bar&baz=123");
 
         TriggerEvent<WebhookTriggerOutput>? captured = null;
@@ -215,13 +224,15 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_ValidHmacSignature_Returns202()
     {
-        var secret = "hmac-secret-key";
-        var automation = CreateAutomation(secret: secret, authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias);
+        var key = "hmac-secret-key";
+        var automation = CreateAutomation(
+            authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new HmacSha256WebhookAuthenticatorSettings { SigningKey = key });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
         var body = """{"event":"test"}""";
-        var signature = ComputeHmacSha256(body, secret);
+        var signature = ComputeHmacSha256(body, key);
 
         SetRequestBody(body);
         _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Signature"] = $"sha256={signature}";
@@ -234,7 +245,9 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_InvalidHmacSignature_Returns401()
     {
-        var automation = CreateAutomation(secret: "hmac-secret-key", authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias);
+        var automation = CreateAutomation(
+            authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new HmacSha256WebhookAuthenticatorSettings { SigningKey = "hmac-secret-key" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -251,7 +264,9 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_MissingSignatureHeaderWhenRequired_Returns401()
     {
-        var automation = CreateAutomation(secret: "hmac-secret-key", authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias);
+        var automation = CreateAutomation(
+            authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new HmacSha256WebhookAuthenticatorSettings { SigningKey = "hmac-secret-key" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -267,13 +282,15 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_TamperedBody_Returns401()
     {
-        var secret = "hmac-secret-key";
-        var automation = CreateAutomation(secret: secret, authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias);
+        var key = "hmac-secret-key";
+        var automation = CreateAutomation(
+            authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new HmacSha256WebhookAuthenticatorSettings { SigningKey = key });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
         // Sign the original body but send a different one.
-        var signature = ComputeHmacSha256("""{"event":"original"}""", secret);
+        var signature = ComputeHmacSha256("""{"event":"original"}""", key);
         SetRequestBody("""{"event":"tampered"}""");
         _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Signature"] = $"sha256={signature}";
 
@@ -285,14 +302,16 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_SignatureMode_IgnoresPlainSecretHeader()
     {
-        var secret = "hmac-secret-key";
-        var automation = CreateAutomation(secret: secret, authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias);
+        var key = "hmac-secret-key";
+        var automation = CreateAutomation(
+            authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new HmacSha256WebhookAuthenticatorSettings { SigningKey = key });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
         // Provide the plain secret header but not the HMAC signature — should still fail.
         SetRequestBody("""{"event":"test"}""");
-        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = secret;
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = key;
 
         var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
@@ -303,7 +322,9 @@ public class WebhookEndpointControllerTests
     public async Task ReceiveWebhook_UnknownAuthenticatorAlias_FallsBackToPlainSecret()
     {
         // Unknown/stale alias shouldn't error — it should behave like plain-secret (the default).
-        var automation = CreateAutomation(secret: "my-secret-token", authenticatorAlias: "not-registered-provider");
+        var automation = CreateAutomation(
+            authenticatorAlias: "not-registered-provider",
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "my-secret-token" });
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -334,8 +355,8 @@ public class WebhookEndpointControllerTests
         AutomationStatus status = AutomationStatus.Published,
         bool isEnabled = true,
         string triggerAlias = "umbracoAutomate.webhook",
-        string? secret = null,
-        string? authenticatorAlias = null)
+        string? authenticatorAlias = null,
+        object? authenticatorSettings = null)
     {
         var builder = new AutomationBuilder()
             .WithStatus(status)
@@ -343,7 +364,7 @@ public class WebhookEndpointControllerTests
 
         if (triggerAlias == "umbracoAutomate.webhook")
         {
-            builder.WithWebhookTrigger(secret, authenticatorAlias);
+            builder.WithWebhookTrigger(authenticatorAlias, authenticatorSettings);
         }
         else
         {

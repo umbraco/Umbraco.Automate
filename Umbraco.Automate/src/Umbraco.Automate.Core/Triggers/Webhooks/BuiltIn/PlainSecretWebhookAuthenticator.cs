@@ -7,7 +7,7 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 /// Authenticates webhooks by comparing a plain secret token sent in the
 /// <c>X-Webhook-Secret</c> header or <c>secret</c> query parameter.
 /// </summary>
-public sealed class PlainSecretWebhookAuthenticator : IWebhookAuthenticator
+public sealed class PlainSecretWebhookAuthenticator : WebhookAuthenticatorBase<PlainSecretWebhookAuthenticatorSettings>
 {
     /// <summary>
     /// Well-known alias for this authenticator, also used as the default for webhook triggers.
@@ -18,20 +18,25 @@ public sealed class PlainSecretWebhookAuthenticator : IWebhookAuthenticator
     internal const string SecretQueryParam = "secret";
 
     /// <inheritdoc />
-    public string Alias => WellKnownAlias;
+    public override string Alias => WellKnownAlias;
 
     /// <inheritdoc />
-    public string Name => "Plain Secret";
+    public override string Name => "Plain Secret";
 
     /// <inheritdoc />
-    public string? Description => "Caller sends the secret as a token in the X-Webhook-Secret header or ?secret= query parameter.";
+    public override string? Description => "Caller sends the secret as a token in the X-Webhook-Secret header or ?secret= query parameter.";
 
     /// <inheritdoc />
-    public bool RequiresBody => false;
+    public override bool RequiresBody => false;
 
     /// <inheritdoc />
-    public bool Validate(WebhookAuthenticationContext context)
+    protected override bool Validate(WebhookAuthenticationContext context, PlainSecretWebhookAuthenticatorSettings settings)
     {
+        if (string.IsNullOrEmpty(settings.Secret))
+        {
+            return false;
+        }
+
         var providedSecret = context.Request.Headers[SecretHeaderName].FirstOrDefault()
                              ?? context.Request.Query[SecretQueryParam].FirstOrDefault();
 
@@ -41,7 +46,7 @@ public sealed class PlainSecretWebhookAuthenticator : IWebhookAuthenticator
         }
 
         return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(context.Secret),
+            Encoding.UTF8.GetBytes(settings.Secret),
             Encoding.UTF8.GetBytes(providedSecret));
     }
 }
