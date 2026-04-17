@@ -15,13 +15,11 @@ public interface IAutomationExecutor
     /// <param name="initiatorId">An optional identifier for the initiator.</param>
     /// <param name="triggerOutputData">The trigger output data, if any.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <param name="isDryRun">When true, actions describe their effect without executing.</param>
     /// <returns>The ID of the created run.</returns>
     Task<Guid> ExecuteAsync(
         Automation automation,
         string initiatorType,
         string? initiatorId,
         Dictionary<string, object?>? triggerOutputData,
-        CancellationToken cancellationToken,
-        bool isDryRun = false);
+        CancellationToken cancellationToken);
 }

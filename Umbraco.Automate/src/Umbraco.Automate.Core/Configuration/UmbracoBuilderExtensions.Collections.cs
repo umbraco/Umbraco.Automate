@@ -96,15 +96,13 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
 
         // Action middleware — ordered pipeline:
-        //   1. DryRun — prevents side effects, short-circuits before any real work
-        //   2. ErrorHandling — catches exceptions from everything inside
-        //   3. BackOfficeIdentity — resolves the workspace service principal so all
+        //   1. ErrorHandling — catches exceptions from everything inside
+        //   2. BackOfficeIdentity — resolves the workspace service principal so all
         //      subsequent middleware and the action itself execute as that identity
-        //   4. StepRunLogging — logs execution timing (excludes identity resolution overhead)
-        //   5. SettingsValidation — validates before audit so invalid configs aren't trailed
-        //   6. AuditTrail — writes CMS audit entry on success
+        //   3. StepRunLogging — logs execution timing (excludes identity resolution overhead)
+        //   4. SettingsValidation — validates before audit so invalid configs aren't trailed
+        //   5. AuditTrail — writes CMS audit entry on success
         builder.AutomateActionMiddleware()
-            .Append<DryRunMiddleware>()
             .Append<ErrorHandlingMiddleware>()
             .Append<BackOfficeIdentityMiddleware>()
             .Append<StepRunLoggingMiddleware>()
