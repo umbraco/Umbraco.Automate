@@ -319,6 +319,31 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
+    public async Task ReceiveWebhook_GetMethodWithQuerySecret_Returns202()
+    {
+        // GET must be routable so that webhooks configured with GET in AllowedMethods
+        // don't 404 at the routing layer before the allow-list check runs.
+        var automation = new AutomationBuilder()
+            .WithStatus(AutomationStatus.Published)
+            .WithIsEnabled(true)
+            .WithWebhookTrigger(
+                PlainSecretWebhookAuthenticator.WellKnownAlias,
+                new PlainSecretWebhookAuthenticatorSettings { Secret = "ping" })
+            .Build();
+        automation.Trigger!.Settings["allowedMethod"] = "GET";
+
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Method = "GET";
+        _controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?secret=ping");
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<AcceptedResult>();
+    }
+
+    [Fact]
     public async Task ReceiveWebhook_UnknownAuthenticatorAlias_FallsBackToPlainSecret()
     {
         // Unknown/stale alias shouldn't error — it should behave like plain-secret (the default).

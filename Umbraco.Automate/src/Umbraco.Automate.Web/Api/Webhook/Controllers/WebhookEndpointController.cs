@@ -57,10 +57,12 @@ public sealed class WebhookEndpointController : ControllerBase
     /// Receives an incoming webhook request and triggers the matching automation.
     /// Authentication is performed by the strategy configured on the trigger.
     /// </summary>
+    [HttpGet("{automationId:guid}")]
     [HttpPost("{automationId:guid}")]
     [HttpPut("{automationId:guid}")]
     [HttpPatch("{automationId:guid}")]
     [HttpDelete("{automationId:guid}")]
+    [HttpHead("{automationId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -106,13 +108,13 @@ public sealed class WebhookEndpointController : ControllerBase
             ? trigger.ResolveSettings(automation.Trigger.Settings)
             : null;
 
-        var allowedMethods = triggerSettings?.AllowedMethods ?? ["POST"];
-        if (!allowedMethods.Contains(Request.Method, StringComparer.OrdinalIgnoreCase))
+        var allowedMethod = string.IsNullOrEmpty(triggerSettings?.AllowedMethod) ? "POST" : triggerSettings.AllowedMethod;
+        if (!string.Equals(allowedMethod, Request.Method, StringComparison.OrdinalIgnoreCase))
         {
             return StatusCode(StatusCodes.Status405MethodNotAllowed, new ProblemDetails
             {
                 Title = "Method not allowed",
-                Detail = $"This webhook accepts: {string.Join(", ", allowedMethods)}",
+                Detail = $"This webhook accepts: {allowedMethod}",
                 Status = StatusCodes.Status405MethodNotAllowed,
             });
         }

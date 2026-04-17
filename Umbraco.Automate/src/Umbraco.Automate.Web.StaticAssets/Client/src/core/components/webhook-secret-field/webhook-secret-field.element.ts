@@ -23,6 +23,10 @@ export class UaWebhookSecretFieldElement
     readonly = false;
 
     #notificationContext?: UmbNotificationContext;
+    // Flag set when *we* updated the value (seed / regenerate / user typing) so the
+    // next updated() call skips the auto-seed check. External resets (e.g. the picker
+    // wiping settings when the strategy changes) leave this false and get re-seeded.
+    #selfUpdated = false;
 
     constructor() {
         super();
@@ -31,16 +35,18 @@ export class UaWebhookSecretFieldElement
         });
     }
 
-    override connectedCallback(): void {
-        super.connectedCallback();
-        // Seed a secret immediately when empty so users can copy it without saving first.
-        // The server-side safety net still generates one for API-direct saves.
+    protected override updated() {
+        if (this.#selfUpdated) {
+            this.#selfUpdated = false;
+            return;
+        }
         if (!this.value && !this.readonly) {
             this.#assignNewSecret();
         }
     }
 
     #assignNewSecret() {
+        this.#selfUpdated = true;
         this.value = generateSecret();
         this.dispatchEvent(new UmbChangeEvent());
     }
@@ -63,6 +69,7 @@ export class UaWebhookSecretFieldElement
     #onInput(e: InputEvent) {
         const next = (e.target as HTMLInputElement).value;
         if (next === this.value) return;
+        this.#selfUpdated = true;
         this.value = next;
         this.dispatchEvent(new UmbChangeEvent());
     }

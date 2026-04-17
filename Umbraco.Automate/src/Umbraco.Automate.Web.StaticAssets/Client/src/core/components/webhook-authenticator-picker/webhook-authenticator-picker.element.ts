@@ -94,8 +94,18 @@ export class UaWebhookAuthenticatorPickerElement
     }
 
     #onSettingsChange(event: CustomEvent<SettingsChangeDetail>) {
+        // The inner ua-settings-form manages the strategy's fields. Stop its change event
+        // from bubbling past the picker so the outer trigger-settings form doesn't mistake
+        // inner strategy fields for its own authenticator property value.
+        event.stopPropagation();
         if (!this.value) return;
         this.#setValue({ alias: this.value.alias, settings: event.detail.settings });
+    }
+
+    #onInnerNativeChange(event: Event) {
+        // Same reason — the nested <umb-property-dataset> emits native change events when
+        // its children update. Those must not reach the outer dataset.
+        event.stopPropagation();
     }
 
     get #selected(): WebhookAuthenticatorItem | undefined {
@@ -138,6 +148,7 @@ export class UaWebhookAuthenticatorPickerElement
                               .fields=${fields}
                               .values=${(this.value?.settings ?? {}) as Record<string, unknown>}
                               @ua:settings-change=${this.#onSettingsChange}
+                              @change=${this.#onInnerNativeChange}
                           ></ua-settings-form>
                       </div>
                   `
