@@ -72,7 +72,6 @@ Automations are built in a full-screen visual node graph editor within the Umbra
 - **Pencil icon** on each node opens a settings modal with auto-generated forms
 - **No sidebars** — maximum canvas space for complex automations
 - **Minimap, keyboard shortcuts, copy/paste, undo/redo**
-- **Dry run mode** — test an automation visually with green/red status per node
 
 ---
 
@@ -98,7 +97,7 @@ Automations follow a **draft → publish** lifecycle, consistent with Umbraco's 
 
 | Status | Triggers fire? | Description |
 |--------|---------------|-------------|
-| **Draft** | No | Being edited. Can be tested via dry run. |
+| **Draft** | No | Being edited. Does not respond to triggers. |
 | **Published** | Yes (if enabled) | Live version responds to triggers. |
 | **Inactive** | No | Explicitly deactivated. Published version retained for rollback. |
 
@@ -133,7 +132,6 @@ A dedicated backoffice view for investigating runs:
 
 | Feature | Description |
 |---------|-------------|
-| **Dry run mode** | Execute without side effects — steps return what they *would* do |
 | **Rate limiting** | Configurable max runs per automation per time window |
 | **Kill switch** | Global and per-automation emergency disable |
 | **Version rollback** | Restore any previous version instantly |
@@ -287,7 +285,7 @@ A new backoffice section with:
 Core engine, basic triggers/actions (Manual, Scheduled, Webhook, Content Published), canvas editor, run logging, security hardening, draft/publish lifecycle.
 
 ### Phase 2: HITL, Branching & Hardening
-Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, dry run mode, import/export, automation templates.
+Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, import/export, automation templates.
 
 ### Phase 3: AI Integration
 AI agents as actions, AI events as triggers, automations as AI tools, HITL gates for AI-initiated runs.

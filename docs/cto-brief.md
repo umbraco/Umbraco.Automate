@@ -117,7 +117,7 @@ Only scheduled (CRON) triggers are restricted to the SchedulingPublisher node. E
 Core engine, basic triggers/actions (Manual, Scheduled, Webhook, Content Published), canvas editor, run logging, draft/publish lifecycle, security hardening, developer tooling (test harness, project template).
 
 ### Phase 2: HITL, Branching & Hardening
-Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, dry run mode, automation templates.
+Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, automation templates.
 
 ### Phase 3: AI Integration
 `Umbraco.AI.Automate` — agents as actions, AI events as triggers, automations as agent tools, HITL gates for AI-initiated runs.

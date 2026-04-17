@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.Automations;
 public enum AutomationStatus
 {
     /// <summary>
-    /// Newly created or never published. Editable, testable via dry-run.
+    /// Newly created or never published. Editable but does not trigger.
     /// </summary>
     Draft = 0,
 
