@@ -28,4 +28,6 @@ internal sealed class AutomationRunEntity
     public string? CorrelationId { get; set; }
 
     public string? Error { get; set; }
+
+    public string? WorkflowInstanceId { get; set; }
 }

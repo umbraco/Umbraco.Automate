@@ -66,6 +66,14 @@ public sealed class AutomationRun : IAutomateEntity
     public string? Error { get; set; }
 
     /// <summary>
+    /// Gets or sets the WorkflowCore instance ID that backs this run. Populated after
+    /// <c>StartWorkflow</c> returns; used for lifecycle operations (suspend, resume,
+    /// terminate) via <c>IWorkflowHost</c>. Null for runs created before this field
+    /// was introduced.
+    /// </summary>
+    public string? WorkflowInstanceId { get; set; }
+
+    /// <summary>
     /// Gets or sets the step runs within this automation run.
     /// </summary>
     public IList<StepRun> StepRuns { get; set; } = [];

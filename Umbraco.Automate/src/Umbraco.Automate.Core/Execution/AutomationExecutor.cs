@@ -121,6 +121,11 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 
         var instanceId = await _workflowHost.StartWorkflow(workflowId, workflowData);
 
+        // Persist the WorkflowCore instance ID so lifecycle operations (suspend / resume /
+        // terminate) can map the run back to the correct workflow.
+        run.WorkflowInstanceId = instanceId;
+        await _runRepository.SaveAsync(run, cancellationToken);
+
         _logger.LogInformation(
             "Started workflow {WorkflowId} (instance {InstanceId}) for run {RunId} as service account {ServiceAccountKey}",
             workflowId, instanceId, run.Id, workspace.ServiceAccountKey);

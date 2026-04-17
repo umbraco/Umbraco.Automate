@@ -74,7 +74,22 @@ public class AutomationExecutorTests
             .Returns((WorkflowDefinition?)null);
         _workflowRegistry.Setup(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()))
             .Callback<WorkflowDefinition>(d => _registeredDefinitions.Add(d));
-        _workflowHost.Setup(h => h.StartWorkflow(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<string>()))
+        // AutomationExecutor calls the generic StartWorkflow<AutomationWorkflowData>(id, data).
+        // Cover both the 2-arg and 3-arg forms in case overload resolution or default
+        // parameters route through either.
+        _workflowHost.Setup(h => h.StartWorkflow<AutomationWorkflowData>(
+                It.IsAny<string>(),
+                It.IsAny<AutomationWorkflowData>()))
+            .ReturnsAsync("instance-1");
+        _workflowHost.Setup(h => h.StartWorkflow<AutomationWorkflowData>(
+                It.IsAny<string>(),
+                It.IsAny<AutomationWorkflowData>(),
+                It.IsAny<string?>()))
+            .ReturnsAsync("instance-1");
+        _workflowHost.Setup(h => h.StartWorkflow(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<string>()))
             .ReturnsAsync("instance-1");
         _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
@@ -97,13 +112,31 @@ public class AutomationExecutorTests
 
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
+        // The run is saved twice: once before StartWorkflow, once after to persist the
+        // workflow instance ID. Match either save; both represent this run.
         _runRepo.Verify(r => r.SaveAsync(
             It.Is<AutomationRun>(run =>
                 run.AutomationId == automation.Id &&
                 run.Status == AutomationRunStatus.Running &&
                 run.WorkspaceId == _defaultWorkspace.Id &&
                 run.ServiceAccountKey == _defaultWorkspace.ServiceAccountKey),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PersistsWorkflowInstanceId()
+    {
+        var automation = CreateAutomation("testAction");
+        AutomationRun? savedRun = null;
+        _runRepo
+            .Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRun, CancellationToken>((r, _) => savedRun = r)
+            .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        savedRun.ShouldNotBeNull();
+        savedRun.WorkflowInstanceId.ShouldBe("instance-1");
     }
 
     [Fact]

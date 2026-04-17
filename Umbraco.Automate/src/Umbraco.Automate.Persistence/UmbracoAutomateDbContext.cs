@@ -125,6 +125,7 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.InitiatedBy).HasMaxLength(100).IsRequired();
             entity.Property(e => e.CorrelationId).HasMaxLength(255);
             entity.Property(e => e.Error);
+            entity.Property(e => e.WorkflowInstanceId).HasMaxLength(200);
 
             entity.HasIndex(e => e.AutomationId);
             entity.HasIndex(e => e.Status);
