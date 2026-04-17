@@ -675,10 +675,10 @@ The endpoint:
 public class WebhookReceivedTriggerSettings
 {
     [Field(IsSensitive = true)]
-    public string? Secret { get; set; }  // Optional shared secret for validation
+    public string? Secret { get; set; }  // Shared secret used by the selected strategy
 
-    [Field]
-    public bool ValidateSignature { get; set; }  // HMAC-SHA256 signature validation
+    [Field(EditorUiAlias = "Umb.Automate.WebhookAuthenticatorPicker")]
+    public string AuthenticatorAlias { get; set; } = "plain-secret";  // Authentication strategy
 
     [Field]
     public string? AllowedMethods { get; set; } = "POST";  // Comma-separated HTTP methods

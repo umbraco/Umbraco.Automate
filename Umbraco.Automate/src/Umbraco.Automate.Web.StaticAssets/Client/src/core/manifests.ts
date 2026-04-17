@@ -4,6 +4,9 @@ import { switchCaseBuilderManifests } from "./components/switch-case-builder/man
 import { bindingPickerManifests } from "./components/binding-picker/manifests.js";
 import { bindingTextBoxManifests } from "./components/binding-text-box/manifests.js";
 import { bindingTextAreaManifests } from "./components/binding-text-area/manifests.js";
+import { webhookAuthenticatorPickerManifests } from "./components/webhook-authenticator-picker/manifests.js";
+import { webhookMethodPickerManifests } from "./components/webhook-method-picker/manifests.js";
+import { webhookSecretFieldManifests } from "./components/webhook-secret-field/manifests.js";
 
 export const manifests: UmbExtensionManifest[] = [
     ...versionHistoryManifests,
@@ -12,4 +15,7 @@ export const manifests: UmbExtensionManifest[] = [
     ...bindingPickerManifests,
     ...bindingTextBoxManifests,
     ...bindingTextAreaManifests,
+    ...webhookAuthenticatorPickerManifests,
+    ...webhookMethodPickerManifests,
+    ...webhookSecretFieldManifests,
 ];

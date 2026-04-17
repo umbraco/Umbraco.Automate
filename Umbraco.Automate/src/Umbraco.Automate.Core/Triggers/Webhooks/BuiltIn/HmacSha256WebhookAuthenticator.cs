@@ -8,19 +8,24 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 /// <c>X-Webhook-Signature</c> header (format: <c>sha256=&lt;hex&gt;</c>).
 /// Compatible with GitHub's <c>X-Hub-Signature-256</c> scheme.
 /// </summary>
-public sealed class HmacSha256WebhookAuthenticator : IWebhookAuthenticator
+[WebhookAuthenticator(WellKnownAlias, "HMAC-SHA256 Signature")]
+public sealed class HmacSha256WebhookAuthenticator : WebhookAuthenticatorBase<HmacSha256WebhookAuthenticatorSettings>
 {
+    /// <summary>
+    /// Well-known alias for this authenticator.
+    /// </summary>
+    public const string WellKnownAlias = "hmac-sha256";
+
     internal const string SignatureHeaderName = "X-Webhook-Signature";
 
     /// <inheritdoc />
-    public string Alias => "hmac-sha256";
-
-    /// <inheritdoc />
-    public string Name => "HMAC-SHA256 Signature";
-
-    /// <inheritdoc />
-    public bool Validate(WebhookAuthenticationContext context)
+    protected override bool Validate(WebhookAuthenticationContext context, HmacSha256WebhookAuthenticatorSettings settings)
     {
+        if (string.IsNullOrEmpty(settings.SigningKey))
+        {
+            return false;
+        }
+
         var header = context.Request.Headers[SignatureHeaderName].FirstOrDefault();
         if (string.IsNullOrEmpty(header) || !header.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
         {
@@ -45,7 +50,7 @@ public sealed class HmacSha256WebhookAuthenticator : IWebhookAuthenticator
             return false;
         }
 
-        var keyBytes = Encoding.UTF8.GetBytes(context.Secret);
+        var keyBytes = Encoding.UTF8.GetBytes(settings.SigningKey);
         var payloadBytes = Encoding.UTF8.GetBytes(context.Body ?? string.Empty);
         var expectedBytes = HMACSHA256.HashData(keyBytes, payloadBytes);
 

@@ -4,6 +4,8 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
+using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Testing.Builders;
 
@@ -26,7 +28,8 @@ public class AutomationFactoryTests
         _factory = new AutomationFactory(
             serializerMock.Object,
             new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>));
+            new TriggerCollection(Array.Empty<ITrigger>),
+            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
     }
 
     private static AutomationFactory CreatePassthroughFactory()
@@ -39,7 +42,8 @@ public class AutomationFactoryTests
         return new AutomationFactory(
             serializer,
             new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>));
+            new TriggerCollection(Array.Empty<ITrigger>),
+            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
     }
 
     [Fact]
@@ -128,6 +132,61 @@ public class AutomationFactoryTests
         automation.Trigger.ShouldBeNull();
         automation.Steps.ShouldBeEmpty();
         automation.Connections.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void BuildEntity_EncryptsNestedWebhookAuthenticatorSecret()
+    {
+        // Top-level Secret field used to be on WebhookTriggerSettings, but sensitive fields
+        // now live on per-strategy settings (e.g. PlainSecretWebhookAuthenticatorSettings.Secret).
+        // The factory must encrypt those nested fields using the selected authenticator's schema.
+        var protector = new Mock<ISensitiveFieldProtector>();
+        protector.Setup(p => p.Protect(It.IsAny<string>())).Returns((string v) => $"ENC:{v}");
+        protector.Setup(p => p.IsProtected(It.IsAny<string>()))
+            .Returns((string v) => v?.StartsWith("ENC:", StringComparison.Ordinal) == true);
+        protector.Setup(p => p.Unprotect(It.IsAny<string>()))
+            .Returns((string v) => v[4..]);
+
+        var serializer = new EditableModelSerializer(protector.Object);
+        var modelResolver = new EditableModelResolver(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        var triggers = new TriggerCollection(() =>
+        {
+            var deps = new TriggerInfrastructure(modelResolver);
+            return new ITrigger[] { new Core.Triggers.BuiltIn.WebhookTrigger(deps) };
+        });
+        var authenticators = new WebhookAuthenticatorCollection(() =>
+            new IWebhookAuthenticator[]
+            {
+                new PlainSecretWebhookAuthenticator(),
+                new HmacSha256WebhookAuthenticator(),
+            });
+
+        var factory = new AutomationFactory(
+            serializer,
+            new ActionCollection(Array.Empty<IAction>),
+            triggers,
+            authenticators);
+
+        var automation = new AutomationBuilder()
+            .WithAlias("webhookTest")
+            .WithName("Webhook Test")
+            .WithWebhookTrigger(
+                PlainSecretWebhookAuthenticator.WellKnownAlias,
+                new PlainSecretWebhookAuthenticatorSettings { Secret = "raw-plaintext-secret" })
+            .Build();
+
+        var entity = factory.BuildEntity(automation);
+
+        entity.Definition.ShouldNotBeNull();
+        entity.Definition.ShouldContain("ENC:raw-plaintext-secret");
+        entity.Definition.ShouldNotContain("\"raw-plaintext-secret\"");
+
+        // Round-trip restores plaintext via the serializer's recursive decrypt.
+        var roundTripped = factory.BuildDomain(entity);
+        roundTripped.Trigger.ShouldNotBeNull();
+        var authElement = (System.Text.Json.JsonElement)roundTripped.Trigger.Settings["authenticator"]!;
+        authElement.GetProperty("settings").GetProperty("secret").GetString()
+            .ShouldBe("raw-plaintext-secret");
     }
 
     [Fact]

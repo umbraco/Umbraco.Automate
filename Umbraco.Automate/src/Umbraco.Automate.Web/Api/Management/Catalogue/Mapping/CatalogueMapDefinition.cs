@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
 
@@ -23,6 +24,8 @@ public class CatalogueMapDefinition : IMapDefinition
             (_, _) => new NotificationChannelItemResponseModel(), MapToNotificationChannelItem);
         mapper.Define<IConnectionType, ConnectionTypeItemResponseModel>(
             (_, _) => new ConnectionTypeItemResponseModel(), MapToConnectionTypeItem);
+        mapper.Define<IWebhookAuthenticator, WebhookAuthenticatorItemResponseModel>(
+            (_, _) => new WebhookAuthenticatorItemResponseModel(), MapToWebhookAuthenticatorItem);
     }
 
     // Umbraco.Code.MapAll
@@ -88,6 +91,15 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Description = source.Description;
         target.Group = source.Group;
         target.Icon = source.Icon;
+        target.SettingsSchema = source.GetSettingsSchema();
+    }
+
+    // Umbraco.Code.MapAll
+    private static void MapToWebhookAuthenticatorItem(IWebhookAuthenticator source, WebhookAuthenticatorItemResponseModel target, MapperContext context)
+    {
+        target.Alias = source.Alias;
+        target.Name = source.Name;
+        target.Description = source.Description;
         target.SettingsSchema = source.GetSettingsSchema();
     }
 }
