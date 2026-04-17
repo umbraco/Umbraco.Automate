@@ -263,7 +263,7 @@ A single notification can produce both a direct dispatch (for PerItem automation
 
 ### Phase 3: ForEach integration
 
-With ForEach control flow implemented:
+With ForEach control flow implemented (`workflowcore-feature-gaps.md` #2):
 
 1. Automation uses `Batched` trigger mode
 2. `TriggerOutput["items"]` contains the batch array
@@ -281,6 +281,16 @@ This depends on:
 - ForEach control flow implementation
 - Iteration context in binding resolution (`{{item.X}}` syntax)
 - Per-iteration step run tracking
+
+**Note on iteration parallelism:** WorkflowCore's `ForEach` is **parallel by default** — all iterations execute concurrently unless explicitly serialized. For batch processing this can be desirable (100 items processed in parallel rather than sequentially) but also risky (100 simultaneous HTTP requests may overwhelm a downstream service). The ForEach implementation should surface this as a user-configurable option ("parallel" vs "sequential"), and batch-mode automations should default to sequential processing to avoid surprising users with concurrent execution semantics.
+
+### Relationship to Parallel execution (`workflowcore-feature-gaps.md` #1)
+
+Batch + ForEach (parallel) overlaps with explicit Parallel execution. The difference:
+- **Parallel** = fan out to N *different* branches, join at the end. Used when the branches do different things concurrently.
+- **ForEach (parallel mode)** = fan out to N *identical* iterations of the same branch over different data. Used when the same logic runs per item.
+
+Batch processing is the ForEach case, not the Parallel case. No direct dependency on Parallel, but users familiar with Zapier's "Paths" may expect a Parallel-style UI for batch processing — we should surface them as distinct features.
 
 ### Phase 4: Smart batching (future)
 

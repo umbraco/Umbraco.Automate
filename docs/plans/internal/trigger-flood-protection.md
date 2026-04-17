@@ -198,12 +198,20 @@ Resolution order: automation trigger settings → per-trigger appsettings overri
 
 ### Phase 3: Batching support (future)
 
-A more advanced strategy where multiple trigger events are grouped into a single run with a collection input, rather than spawning one run per event. This requires:
-- A `BatchWindow` option (e.g., "collect events for 5 seconds, then dispatch as one batch")
-- A batch-aware trigger output model (list of entities rather than single entity)
-- ForEach support in the workflow engine to iterate over batch items
+A more advanced strategy where multiple trigger events are grouped into a single run with a collection input, rather than spawning one run per event. See the separate `trigger-event-batching.md` spec for the full design — it depends on ForEach (`workflowcore-feature-gaps.md` #2) and is out of scope for the initial flood protection feature.
 
-This depends on ForEach implementation (see `workflowcore-feature-gaps.md`) and is out of scope for the initial flood protection feature.
+### Interaction with circuit breaker (`circuit-breaker-auto-disable.md`)
+
+When the circuit breaker disables an automation, any events still pending in the throttle (queued by rate limit, waiting in a debounce window, or collecting in a batch) should be discarded — no point dispatching them, the automation won't run. Two options:
+
+1. **Polling check** — before dispatching a queued/debounced event, the throttle checks `IAutomationService.GetAutomationAsync()` and drops the event if `IsEnabled == false`.
+2. **Event-driven invalidation** — the circuit breaker publishes an "automation disabled" event that the throttle subscribes to, clearing any pending state for that automation's trigger.
+
+Recommend Option 1 for Phase 1 (simpler, eventually consistent) with Option 2 as an optimization if the lookup overhead becomes measurable.
+
+### Interaction with CancelCondition (`workflowcore-feature-gaps.md` #8)
+
+`CancelCondition` operates inside a running workflow, not on queued trigger events, so it doesn't directly apply to the throttle. However, once CancelCondition lands, it can complement the circuit breaker: a long-running automation can have a cancel condition that checks `IsEnabled` and aborts mid-run if the automation gets disabled. The throttle handles pre-dispatch cleanup; CancelCondition handles mid-flight cleanup.
 
 ---
 

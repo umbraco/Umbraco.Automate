@@ -35,6 +35,36 @@ Add a new `StepErrorBehavior.ErrorPath` that tells the compiler to attach a sequ
 
 This builds on WorkflowCore's existing `CompensateWith` infrastructure but repurposes it for user-defined error handling rather than saga rollback.
 
+### Relationship to WorkflowCore features
+
+**ErrorPath vs Saga/Compensation (`workflowcore-feature-gaps.md` #6):**
+
+Both use WorkflowCore's `CompensateWith<T>()` under the hood, but they serve different purposes and should be surfaced as distinct features in the UI:
+
+| Feature | Purpose | When to use |
+|---------|---------|-------------|
+| **ErrorPath** (this spec) | Forward-looking fallback: "if step X fails, do Y instead" | Notify a human, log to external system, graceful degradation |
+| **Saga/Compensation** (#6) | Backward-looking rollback: "undo the work that prior successful steps did" | Multi-system transactions where partial failure must be reverted |
+
+Implementation implication: if Saga lands, we need to ensure a step can't have both an ErrorPath and a Compensation — or define clear semantics for which runs first. Recommend: **ErrorPath takes precedence**. If defined, Saga compensation doesn't run for that step (the error path is the explicit handler).
+
+**ErrorPath + Suspend error mode (`workflowcore-feature-gaps.md` #7):**
+
+The WorkflowCore gaps doc flags "Suspend error mode" as a Phase 1 low-effort feature. Once implemented, we can offer Suspend as an outcome after error path completion alongside Terminate and Continue:
+
+```csharp
+public enum ErrorPathOutcome
+{
+    Terminate = 0,   // Default — stop the run after error path completes
+    Continue = 1,    // Continue to the next step after the failed step
+    Suspend = 2,     // Pause the run for manual intervention
+}
+
+public ErrorPathOutcome Outcome { get; set; } = ErrorPathOutcome.Terminate;
+```
+
+This replaces the `ContinueAfterErrorPath` boolean (see §1.7) with a more expressive enum. Suspend is particularly valuable for Lars's use case: run the error path (notify a human, log context), then suspend so the human can inspect the run state and decide whether to resume or terminate.
+
 ### Phase 1: Backend — error path execution
 
 #### 1.1 New `StepErrorBehavior` value
@@ -175,17 +205,17 @@ Error path step executions should be tracked as `StepRun` records on the parent 
 
 #### 1.7 What happens after the error path completes
 
-After all error path steps execute, the automation should **continue to the next step** (not terminate). This matches Zapier's behavior and Lars's use case — the error path handles the failure, and the automation moves on. If the user wants to terminate after the error path, they can add a Terminate step as the last error step, or we can add a `ContinueAfterErrorPath` boolean to `StepConfiguration`:
+The user chooses the outcome after error path completion via `ErrorPathOutcome`:
 
 ```csharp
-/// <summary>
-/// Whether the automation continues to the next step after error path completes.
-/// Default: false (terminate after error path).
-/// </summary>
-public bool ContinueAfterErrorPath { get; set; } = false;
+public ErrorPathOutcome Outcome { get; set; } = ErrorPathOutcome.Terminate;
 ```
 
-Default to `false` (terminate) since Lars's use case is "notify and stop." Users who want to continue can opt in.
+- **Terminate** (default) — stop the run. Matches Lars's primary use case: "notify a human, then stop."
+- **Continue** — proceed to the next step. Matches Zapier's default behavior.
+- **Suspend** — pause the run for manual intervention (depends on WorkflowCore Suspend error mode landing first).
+
+Default to `Terminate` since it's the safer choice — a step that failed badly enough to hit the error path usually shouldn't continue on the happy path. Users who want to continue opt in explicitly.
 
 ### Phase 2: Management API
 

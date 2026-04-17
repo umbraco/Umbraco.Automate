@@ -143,9 +143,43 @@ Warning = 32,
 
 Default `GovernanceOptions.DefaultNotifyOn` should include `Disabled` (always want to know when an automation is auto-disabled).
 
-#### 1.5 Integration point: `RunCompletedNotificationDispatcher`
+#### 1.5 Integration point: `IWorkflowMiddleware` (WorkflowCore)
 
-After the existing notification dispatch, call `ICircuitBreakerService.EvaluateAsync()`. This keeps the circuit breaker logic decoupled — the dispatcher is already the hook point for "something happened after a run completed."
+Implement the circuit breaker as a WorkflowCore post-execution middleware. `IWorkflowMiddleware` runs pre/post the entire workflow and is explicitly designed for cross-cutting governance concerns like this.
+
+```csharp
+internal sealed class CircuitBreakerMiddleware : IWorkflowMiddleware
+{
+    public WorkflowMiddlewarePhase Phase => WorkflowMiddlewarePhase.PostWorkflow;
+
+    public async Task HandleAsync(
+        WorkflowInstance workflow,
+        WorkflowDelegate next,
+        CancellationToken cancellationToken)
+    {
+        await next();
+
+        // After the workflow completes (success, failure, or terminate),
+        // evaluate the circuit breaker for the automation.
+        if (workflow.Data is AutomationWorkflowData data)
+        {
+            var runStatus = MapWorkflowStatus(workflow.Status);
+            await _circuitBreakerService.EvaluateAsync(
+                data.AutomationId, runStatus, cancellationToken);
+        }
+    }
+}
+```
+
+**Why middleware over the notification dispatcher:**
+- Runs inside the engine's execution context — cleaner separation of concerns
+- Fires for all workflow terminations, not just those that reach the notification path
+- Aligned with the planned workflow-level middleware feature (see `workflowcore-feature-gaps.md` #11)
+- Lets the `RunCompletedNotificationDispatcher` stay focused on user-facing notifications
+
+**Dependency:** requires workflow-level middleware infrastructure (`workflowcore-feature-gaps.md` #11, flagged as Phase 1 low-effort). If not yet implemented, the circuit breaker is a good forcing function to land it.
+
+**Ordering:** the circuit breaker middleware should run **after** notification dispatch so notifications reflect the pre-disable state. Configure via registration order.
 
 #### 1.6 Integration point: `IAutomationService.PublishAutomationAsync`
 
