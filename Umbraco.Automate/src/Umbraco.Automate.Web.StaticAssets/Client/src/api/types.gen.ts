@@ -765,39 +765,6 @@ export type GetAutomationsByIdAncestorsResponses = {
 
 export type GetAutomationsByIdAncestorsResponse = GetAutomationsByIdAncestorsResponses[keyof GetAutomationsByIdAncestorsResponses];
 
-export type PostAutomationsByIdDryRunData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/umbraco/automate/management/api/v1/automations/{id}/dry-run';
-};
-
-export type PostAutomationsByIdDryRunErrors = {
-    /**
-     * The resource is protected and requires an authentication token
-     */
-    401: unknown;
-    /**
-     * Not Found
-     */
-    404: ProblemDetails;
-    /**
-     * Conflict
-     */
-    409: ProblemDetails;
-};
-
-export type PostAutomationsByIdDryRunError = PostAutomationsByIdDryRunErrors[keyof PostAutomationsByIdDryRunErrors];
-
-export type PostAutomationsByIdDryRunResponses = {
-    /**
-     * Accepted
-     */
-    202: unknown;
-};
-
 export type GetAutomationsByIdExportData = {
     body?: never;
     path: {
