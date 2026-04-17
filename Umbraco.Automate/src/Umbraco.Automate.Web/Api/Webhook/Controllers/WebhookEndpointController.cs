@@ -9,6 +9,7 @@ using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Triggers.Webhooks;
+using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Cms.Api.Common.Attributes;
 
@@ -16,7 +17,7 @@ namespace Umbraco.Automate.Web.Api.Webhook.Controllers;
 
 /// <summary>
 /// Public endpoint for receiving incoming webhooks that trigger automations.
-/// Authenticated via a per-trigger secret (<c>X-Webhook-Secret</c> header or <c>secret</c> query param).
+/// Each trigger selects an authentication strategy (e.g. plain-secret header, HMAC-SHA256, provider-specific).
 /// </summary>
 [ApiController]
 [Route("automate/webhook")]
@@ -112,12 +113,12 @@ public sealed class WebhookEndpointController : ControllerBase
             });
         }
 
-        // Pre-body authentication for authenticators that don't need the body (e.g. plain-secret).
-        // Custom authenticator takes precedence over the built-in ValidateSignature toggle.
+        // Run pre-body authentication for authenticators that don't need the body.
+        // Lets large-payload spam fail fast with 401 before we read into memory.
         var authenticator = ResolveAuthenticator(triggerSettings);
         if (authenticator is not null
             && !string.IsNullOrEmpty(triggerSettings?.Secret)
-            && authenticator.Alias == "plain-secret")
+            && !authenticator.RequiresBody)
         {
             var preBodyContext = new WebhookAuthenticationContext
             {
@@ -232,9 +233,9 @@ public sealed class WebhookEndpointController : ControllerBase
     }
 
     /// <summary>
-    /// Resolves the appropriate authenticator based on trigger settings.
-    /// Custom authenticator alias takes precedence, then falls back to built-in
-    /// plain-secret or hmac-sha256 based on the ValidateSignature flag.
+    /// Resolves the authenticator for the trigger. Unknown or missing aliases fall back
+    /// to the built-in plain-secret authenticator so stale config never leaves the endpoint
+    /// unauthenticated or errored.
     /// </summary>
     private IWebhookAuthenticator? ResolveAuthenticator(WebhookTriggerSettings? settings)
     {
@@ -243,25 +244,20 @@ public sealed class WebhookEndpointController : ControllerBase
             return null;
         }
 
-        // Custom authenticator alias takes precedence.
-        if (!string.IsNullOrEmpty(settings.AuthenticatorAlias))
+        var alias = settings.AuthenticatorAlias;
+        if (!string.IsNullOrEmpty(alias))
         {
-            var custom = _authenticators.GetByAlias(settings.AuthenticatorAlias);
-            if (custom is null)
+            var match = _authenticators.GetByAlias(alias);
+            if (match is not null)
             {
-                _logger.LogWarning(
-                    "Webhook authenticator '{Alias}' not found, falling back to built-in",
-                    settings.AuthenticatorAlias);
+                return match;
             }
-            else
-            {
-                return custom;
-            }
+
+            _logger.LogWarning(
+                "Webhook authenticator '{Alias}' not registered, falling back to '{Fallback}'",
+                alias, PlainSecretWebhookAuthenticator.WellKnownAlias);
         }
 
-        // Fall back to built-in based on ValidateSignature toggle.
-        return settings.ValidateSignature
-            ? _authenticators.GetByAlias("hmac-sha256")
-            : _authenticators.GetByAlias("plain-secret");
+        return _authenticators.GetByAlias(PlainSecretWebhookAuthenticator.WellKnownAlias);
     }
 }

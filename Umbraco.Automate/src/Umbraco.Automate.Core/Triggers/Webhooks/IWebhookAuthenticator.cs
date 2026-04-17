@@ -19,7 +19,20 @@ public interface IWebhookAuthenticator
     string Name { get; }
 
     /// <summary>
-    /// Validates the webhook request. Called after the body has been read.
+    /// Gets an optional short description shown in the authentication strategy picker
+    /// (e.g. the header/query parameter the caller must send).
+    /// </summary>
+    string? Description => null;
+
+    /// <summary>
+    /// Gets a value indicating whether this authenticator needs the request body during validation
+    /// (e.g. HMAC body-signing). When <c>false</c>, validation runs before the body is read which
+    /// lets callers fail fast with 401 for unauthorized requests on large payloads.
+    /// </summary>
+    bool RequiresBody => true;
+
+    /// <summary>
+    /// Validates the webhook request.
     /// </summary>
     /// <param name="context">The webhook authentication context containing the request, body, and configured secret.</param>
     /// <returns><c>true</c> if the request is authentic; otherwise <c>false</c>.</returns>

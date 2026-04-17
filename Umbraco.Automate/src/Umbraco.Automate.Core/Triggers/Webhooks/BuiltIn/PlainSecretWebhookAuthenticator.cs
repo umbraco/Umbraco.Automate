@@ -9,14 +9,25 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 /// </summary>
 public sealed class PlainSecretWebhookAuthenticator : IWebhookAuthenticator
 {
+    /// <summary>
+    /// Well-known alias for this authenticator, also used as the default for webhook triggers.
+    /// </summary>
+    public const string WellKnownAlias = "plain-secret";
+
     internal const string SecretHeaderName = "X-Webhook-Secret";
     internal const string SecretQueryParam = "secret";
 
     /// <inheritdoc />
-    public string Alias => "plain-secret";
+    public string Alias => WellKnownAlias;
 
     /// <inheritdoc />
     public string Name => "Plain Secret";
+
+    /// <inheritdoc />
+    public string? Description => "Caller sends the secret as a token in the X-Webhook-Secret header or ?secret= query parameter.";
+
+    /// <inheritdoc />
+    public bool RequiresBody => false;
 
     /// <inheritdoc />
     public bool Validate(WebhookAuthenticationContext context)

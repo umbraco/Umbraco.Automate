@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -16,28 +17,25 @@ public sealed class WebhookTriggerSettings
 
     /// <summary>
     /// Gets or sets the secret used to authenticate incoming webhook requests.
-    /// When <see cref="ValidateSignature"/> is false (default), validated via the
-    /// <c>X-Webhook-Secret</c> header or <c>secret</c> query parameter as a plain token.
-    /// When true, the secret is used as an HMAC-SHA256 key and the caller must send
-    /// the body signature in the <c>X-Webhook-Signature</c> header as <c>sha256=&lt;hex&gt;</c>.
-    /// Auto-generated on first save if empty.
+    /// The selected <see cref="AuthenticatorAlias"/> determines how the secret is validated
+    /// (plain token, HMAC key, provider-specific, etc.). The UI pre-fills a fresh secret when
+    /// empty; the server also auto-generates on save as a safety net for API-direct writes.
     /// </summary>
-    [Field(Label = "Webhook Secret", Description = "Secret token for authenticating incoming requests. Auto-generated if left empty.", IsSensitive = true)]
+    [Field(
+        Label = "Webhook Secret",
+        Description = "Secret used to authenticate incoming requests.",
+        IsSensitive = true,
+        EditorUiAlias = "Umb.Automate.WebhookSecretField")]
     public string? Secret { get; set; }
 
     /// <summary>
-    /// Gets or sets whether to use HMAC-SHA256 signature validation instead of plain secret comparison.
-    /// When enabled, the caller must compute <c>HMAC-SHA256(secret, body)</c> and send it in the
-    /// <c>X-Webhook-Signature</c> header as <c>sha256=&lt;hex&gt;</c>.
+    /// Gets or sets the alias of the <see cref="Webhooks.IWebhookAuthenticator"/> that validates
+    /// incoming requests. Defaults to the built-in plain-secret header/query authenticator.
+    /// Unknown or missing aliases fall back to <c>plain-secret</c> defensively.
     /// </summary>
-    [Field(Label = "Validate Signature", Description = "Use HMAC-SHA256 body signing instead of a plain secret header.")]
-    public bool ValidateSignature { get; set; }
-
-    /// <summary>
-    /// Gets or sets the alias of a custom <see cref="Webhooks.IWebhookAuthenticator"/> to use
-    /// instead of the built-in plain-secret / HMAC-SHA256 authentication.
-    /// When set, <see cref="ValidateSignature"/> is ignored and the named authenticator handles all validation.
-    /// </summary>
-    [Field(Label = "Authentication Strategy", Description = "Optional custom authenticator alias (e.g. 'github', 'stripe'). Leave empty to use the built-in secret/signature validation.")]
-    public string? AuthenticatorAlias { get; set; }
+    [Field(
+        Label = "Authentication Strategy",
+        Description = "How incoming webhook requests are authenticated.",
+        EditorUiAlias = "Umb.Automate.WebhookAuthenticatorPicker")]
+    public string AuthenticatorAlias { get; set; } = PlainSecretWebhookAuthenticator.WellKnownAlias;
 }

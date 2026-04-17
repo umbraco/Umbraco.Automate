@@ -10,13 +10,21 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 /// </summary>
 public sealed class HmacSha256WebhookAuthenticator : IWebhookAuthenticator
 {
+    /// <summary>
+    /// Well-known alias for this authenticator.
+    /// </summary>
+    public const string WellKnownAlias = "hmac-sha256";
+
     internal const string SignatureHeaderName = "X-Webhook-Signature";
 
     /// <inheritdoc />
-    public string Alias => "hmac-sha256";
+    public string Alias => WellKnownAlias;
 
     /// <inheritdoc />
     public string Name => "HMAC-SHA256 Signature";
+
+    /// <inheritdoc />
+    public string? Description => "Caller computes HMAC-SHA256(secret, body) and sends it in the X-Webhook-Signature header as 'sha256=<hex>'.";
 
     /// <inheritdoc />
     public bool Validate(WebhookAuthenticationContext context)
