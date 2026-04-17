@@ -56,4 +56,19 @@ public interface IAutomationRunService
         DateTime? to = null,
         int take = 10,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Suspends a running workflow, pausing it until <see cref="ResumeRunAsync"/> is called.
+    /// </summary>
+    Task<RunLifecycleResult> SuspendRunAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resumes a suspended workflow, returning it to the running state.
+    /// </summary>
+    Task<RunLifecycleResult> ResumeRunAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Terminates a running or suspended workflow. The run is recorded as Cancelled.
+    /// </summary>
+    Task<RunLifecycleResult> TerminateRunAsync(Guid runId, CancellationToken cancellationToken = default);
 }
