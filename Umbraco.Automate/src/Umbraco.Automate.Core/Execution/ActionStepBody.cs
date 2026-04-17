@@ -256,10 +256,11 @@ internal sealed class ActionStepBody : StepBodyAsync
     /// <summary>
     /// Decides how to surface a step failure to WorkflowCore. The step's
     /// <see cref="StepErrorBehavior"/> is wired onto the <c>WorkflowStep</c> at compile
-    /// time, so WorkflowCore handles retry/suspend/terminate/compensate when we throw.
-    /// We only need to decide whether to throw (let WorkflowCore apply the behavior) or
-    /// short-circuit with <see cref="ExecutionResult.Next"/> — the latter when retrying
-    /// makes no sense (terminal category) or would exceed the configured budget.
+    /// time, so WorkflowCore honors retry/suspend/terminate/compensate when we throw.
+    /// Terminate and Suspend always throw — the whole point of those modes is to halt
+    /// the run regardless of retry budget or error category. Only the Retry path applies
+    /// the terminal-category and retry-budget guards, short-circuiting with
+    /// <see cref="ExecutionResult.Next"/> when retrying cannot help.
     /// </summary>
     private ExecutionResult DecideFailureOutcome(
         Exception exception,
@@ -274,7 +275,20 @@ internal sealed class ActionStepBody : StepBodyAsync
             throw exception;
         }
 
-        // Terminal category + non-Terminate behavior: retrying cannot change the outcome
+        // Suspend pauses the workflow for manual intervention — throw unconditionally so
+        // WorkflowCore applies the Suspend handler. The retry-budget and terminal-category
+        // guards below intentionally do not apply: the whole point of Suspend is that a
+        // human fixes the underlying issue (e.g. bad config, missing credentials) before
+        // resuming, which is exactly the case where retry cannot help.
+        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Suspend)
+        {
+            _logger.LogError(
+                "Step {StepId} failed with Suspend behavior ({Category}) — suspending workflow",
+                _stepConfig.Id, category);
+            throw exception;
+        }
+
+        // Terminal category + Retry behavior: retrying cannot change the outcome
         // (bad settings, missing auth, etc.). Skip past the failed step without retry.
         if (_errorClassifier.IsTerminal(category))
         {
@@ -295,8 +309,8 @@ internal sealed class ActionStepBody : StepBodyAsync
             return ExecutionResult.Next();
         }
 
-        // Throw so WorkflowCore applies the configured ErrorBehavior (Retry with interval,
-        // Suspend, or Compensate) via the step-level settings set at compile time.
+        // Throw so WorkflowCore applies the configured Retry behavior (with interval) via
+        // the step-level settings set at compile time.
         throw exception;
     }
 
@@ -373,6 +387,14 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             _logger.LogWarning("No WaitingForInput step run found for step {StepId} in run {RunId}", _stepConfig.Id, data.RunId);
             return ExecutionResult.Next();
+        }
+
+        // The run was marked Suspended when WorkflowCore suspended on WaitForEvent;
+        // bring it back to Running now that the event has fired.
+        if (run is not null && run.Status == AutomationRunStatus.Suspended)
+        {
+            run.Status = AutomationRunStatus.Running;
+            await _runRepository.SaveAsync(run, cancellationToken);
         }
 
         stepRun.CompletedUtc = DateTime.UtcNow;
