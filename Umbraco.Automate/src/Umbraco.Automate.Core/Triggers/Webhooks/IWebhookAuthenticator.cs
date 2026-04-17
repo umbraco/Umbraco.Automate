@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Umbraco.Automate.Core.Dispatch;
@@ -8,8 +9,8 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks;
 /// <summary>
 /// Validates the authenticity of an incoming webhook request.
 /// Provider packages can register custom authenticators for services like GitHub, Stripe, etc.
-/// Use <see cref="WebhookAuthenticatorBase{TSettings}"/> to implement — it provides typed settings
-/// resolution and schema generation.
+/// Derive from <see cref="WebhookAuthenticatorBase{TSettings}"/> and decorate with
+/// <see cref="WebhookAuthenticatorAttribute"/> to register one.
 /// </summary>
 public interface IWebhookAuthenticator
 {
@@ -26,14 +27,14 @@ public interface IWebhookAuthenticator
     /// <summary>
     /// Gets an optional short description shown in the authentication strategy picker.
     /// </summary>
-    string? Description => null;
+    string? Description { get; }
 
     /// <summary>
     /// Gets a value indicating whether this authenticator needs the request body during validation
     /// (e.g. HMAC body-signing). When <c>false</c>, validation runs before the body is read which
     /// lets callers fail fast with 401 for unauthorized requests on large payloads.
     /// </summary>
-    bool RequiresBody => true;
+    bool RequiresBody { get; }
 
     /// <summary>
     /// Gets the CLR type of the authenticator's settings model (e.g.
@@ -58,21 +59,34 @@ public interface IWebhookAuthenticator
 }
 
 /// <summary>
-/// Convenience base class for implementing <see cref="IWebhookAuthenticator"/> with strongly-typed
-/// settings. Handles schema generation and settings resolution from the raw dictionary.
+/// Base class for webhook authenticators that reads discovery metadata from the
+/// <see cref="WebhookAuthenticatorAttribute"/> and auto-derives the settings schema from
+/// <typeparamref name="TSettings"/>.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO for this authenticator.</typeparam>
 public abstract class WebhookAuthenticatorBase<TSettings> : IWebhookAuthenticator
     where TSettings : class, new()
 {
-    /// <inheritdoc />
-    public abstract string Alias { get; }
+    private readonly WebhookAuthenticatorAttribute _attribute;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WebhookAuthenticatorBase{TSettings}"/> class.
+    /// </summary>
+    protected WebhookAuthenticatorBase()
+    {
+        _attribute = GetType().GetCustomAttribute<WebhookAuthenticatorAttribute>(inherit: false)
+            ?? throw new InvalidOperationException(
+                $"Webhook authenticator '{GetType().FullName}' is missing a required [WebhookAuthenticator] attribute.");
+    }
 
     /// <inheritdoc />
-    public abstract string Name { get; }
+    public string Alias => _attribute.Alias;
 
     /// <inheritdoc />
-    public virtual string? Description => null;
+    public string Name => _attribute.Name;
+
+    /// <inheritdoc />
+    public virtual string? Description => _attribute.Description;
 
     /// <inheritdoc />
     public virtual bool RequiresBody => true;

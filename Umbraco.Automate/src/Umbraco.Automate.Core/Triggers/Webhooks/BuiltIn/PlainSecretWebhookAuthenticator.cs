@@ -7,6 +7,10 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 /// Authenticates webhooks by comparing a plain secret token sent in the
 /// <c>X-Webhook-Secret</c> header or <c>secret</c> query parameter.
 /// </summary>
+[WebhookAuthenticator(
+    WellKnownAlias,
+    "Plain Secret",
+    Description = "Caller sends the secret as a token in the X-Webhook-Secret header or ?secret= query parameter.")]
 public sealed class PlainSecretWebhookAuthenticator : WebhookAuthenticatorBase<PlainSecretWebhookAuthenticatorSettings>
 {
     /// <summary>
@@ -16,15 +20,6 @@ public sealed class PlainSecretWebhookAuthenticator : WebhookAuthenticatorBase<P
 
     internal const string SecretHeaderName = "X-Webhook-Secret";
     internal const string SecretQueryParam = "secret";
-
-    /// <inheritdoc />
-    public override string Alias => WellKnownAlias;
-
-    /// <inheritdoc />
-    public override string Name => "Plain Secret";
-
-    /// <inheritdoc />
-    public override string? Description => "Caller sends the secret as a token in the X-Webhook-Secret header or ?secret= query parameter.";
 
     /// <inheritdoc />
     public override bool RequiresBody => false;

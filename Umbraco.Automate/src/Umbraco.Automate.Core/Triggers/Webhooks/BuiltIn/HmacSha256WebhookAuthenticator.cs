@@ -8,6 +8,10 @@ namespace Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 /// <c>X-Webhook-Signature</c> header (format: <c>sha256=&lt;hex&gt;</c>).
 /// Compatible with GitHub's <c>X-Hub-Signature-256</c> scheme.
 /// </summary>
+[WebhookAuthenticator(
+    WellKnownAlias,
+    "HMAC-SHA256 Signature",
+    Description = "Caller computes HMAC-SHA256(signingKey, body) and sends it in the X-Webhook-Signature header as 'sha256=<hex>'.")]
 public sealed class HmacSha256WebhookAuthenticator : WebhookAuthenticatorBase<HmacSha256WebhookAuthenticatorSettings>
 {
     /// <summary>
@@ -16,15 +20,6 @@ public sealed class HmacSha256WebhookAuthenticator : WebhookAuthenticatorBase<Hm
     public const string WellKnownAlias = "hmac-sha256";
 
     internal const string SignatureHeaderName = "X-Webhook-Signature";
-
-    /// <inheritdoc />
-    public override string Alias => WellKnownAlias;
-
-    /// <inheritdoc />
-    public override string Name => "HMAC-SHA256 Signature";
-
-    /// <inheritdoc />
-    public override string? Description => "Caller computes HMAC-SHA256(signingKey, body) and sends it in the X-Webhook-Signature header as 'sha256=<hex>'.";
 
     /// <inheritdoc />
     protected override bool Validate(WebhookAuthenticationContext context, HmacSha256WebhookAuthenticatorSettings settings)
