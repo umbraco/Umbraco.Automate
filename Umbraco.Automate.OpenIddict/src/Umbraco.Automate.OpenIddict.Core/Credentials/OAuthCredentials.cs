@@ -27,6 +27,13 @@ public sealed class OAuthCredentials
     public string? RefreshToken { get; set; }
 
     /// <summary>
+    /// Gets or sets an encrypted secondary access token, if available.
+    /// Used by providers that issue two tokens in a single flow (e.g. Slack V2 returns
+    /// a bot token as <see cref="AccessToken"/> and a user token here).
+    /// </summary>
+    public string? UserAccessToken { get; set; }
+
+    /// <summary>
     /// Gets or sets the access token expiry time.
     /// </summary>
     public DateTime? ExpiresUtc { get; set; }

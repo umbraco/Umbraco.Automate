@@ -66,6 +66,7 @@ public class OpenIddictDbContext : DbContext
             entity.Property(e => e.Provider).HasMaxLength(100).IsRequired();
             entity.Property(e => e.AccessToken).IsRequired();
             entity.Property(e => e.RefreshToken);
+            entity.Property(e => e.UserAccessToken);
             entity.Property(e => e.ExpiresUtc);
             entity.Property(e => e.Scopes).HasMaxLength(2000);
             entity.Property(e => e.AccountLabel).HasMaxLength(500);

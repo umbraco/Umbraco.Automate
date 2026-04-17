@@ -1,11 +1,17 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
@@ -21,6 +27,7 @@ using Umbraco.Cms.Api.Common.DependencyInjection;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Web.Common.ApplicationBuilder;
 
 namespace Umbraco.Automate.Extensions;
 
@@ -125,6 +132,51 @@ public static partial class UmbracoBuilderExtensions
                     Version = "Latest",
                     Description = "Public webhook endpoints for triggering automations from external systems. No authentication required.",
                 });
+        });
+
+        builder.AddUmbracoAutomateWebhookRateLimiting();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateWebhookRateLimiting(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.AddPolicy(Constants.WebhookApi.RateLimitPolicy, context =>
+            {
+                var webhookOptions = context.RequestServices
+                    .GetRequiredService<IOptions<WebhookOptions>>().Value;
+
+                var partitionKey = context.Request.RouteValues["automationId"]?.ToString() ?? "global";
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: partitionKey,
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = webhookOptions.RateLimitPerMinute,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                    });
+            });
+
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                context.HttpContext.Response.Headers.RetryAfter = "60";
+            };
+        });
+
+        // Register an Umbraco pipeline filter to add UseRateLimiter() middleware
+        // after routing (so route values are available for partitioning).
+        builder.Services.Configure<UmbracoPipelineOptions>(options =>
+        {
+            options.AddFilter(new UmbracoPipelineFilter(
+                "UmbracoAutomateWebhookRateLimiting")
+            {
+                PostRouting = app => app.UseRateLimiter(),
+            });
         });
 
         return builder;

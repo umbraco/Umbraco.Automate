@@ -40,6 +40,10 @@ artifacts/
 # ASP.NET
 ScaffoldingReadMe.txt
 
+# Environment-specific settings (may contain secrets — use user-secrets instead)
+**/appsettings.Development.json
+**/appsettings.Local.json
+
 # Node
 node_modules/
 npm-debug.log

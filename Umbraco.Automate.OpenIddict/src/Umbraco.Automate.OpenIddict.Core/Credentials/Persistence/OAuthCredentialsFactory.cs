@@ -22,6 +22,7 @@ internal sealed class OAuthCredentialsFactory
         Provider = entity.Provider,
         AccessToken = _protector.Unprotect(entity.AccessToken)!,
         RefreshToken = _protector.Unprotect(entity.RefreshToken),
+        UserAccessToken = _protector.Unprotect(entity.UserAccessToken),
         ExpiresUtc = entity.ExpiresUtc,
         Scopes = entity.Scopes,
         AccountLabel = entity.AccountLabel,
@@ -35,6 +36,7 @@ internal sealed class OAuthCredentialsFactory
         Provider = credentials.Provider,
         AccessToken = _protector.Protect(credentials.AccessToken)!,
         RefreshToken = _protector.Protect(credentials.RefreshToken),
+        UserAccessToken = _protector.Protect(credentials.UserAccessToken),
         ExpiresUtc = credentials.ExpiresUtc,
         Scopes = credentials.Scopes,
         AccountLabel = credentials.AccountLabel,
@@ -47,6 +49,7 @@ internal sealed class OAuthCredentialsFactory
         entity.Provider = credentials.Provider;
         entity.AccessToken = _protector.Protect(credentials.AccessToken)!;
         entity.RefreshToken = _protector.Protect(credentials.RefreshToken);
+        entity.UserAccessToken = _protector.Protect(credentials.UserAccessToken);
         entity.ExpiresUtc = credentials.ExpiresUtc;
         entity.Scopes = credentials.Scopes;
         entity.AccountLabel = credentials.AccountLabel;

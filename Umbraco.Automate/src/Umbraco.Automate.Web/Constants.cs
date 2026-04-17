@@ -179,5 +179,10 @@ public class Constants
         /// The API title.
         /// </summary>
         public const string ApiTitle = "Umbraco Automate Webhook API";
+
+        /// <summary>
+        /// The rate limiter policy name applied to webhook endpoints.
+        /// </summary>
+        public const string RateLimitPolicy = "automate-webhook-rate-limit";
     }
 }
