@@ -12,8 +12,10 @@ using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
+using Umbraco.Automate.Web.Realtime;
 using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 using Umbraco.Automate.Web.Api.Management.Common.Configuration;
@@ -45,6 +47,34 @@ public static partial class UmbracoBuilderExtensions
         builder.AddUmbracoAutomateManagementApi();
         builder.AddUmbracoAutomateWebhookApi();
         builder.AddUmbracoAutomateMapDefinitions();
+        builder.AddUmbracoAutomateRealtime();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateRealtime(this IUmbracoBuilder builder)
+    {
+        // JsonStringEnumConverter is required because the default SignalR JSON protocol
+        // serialises enums as their numeric value — the backoffice listener matches on
+        // the string name.
+        builder.Services.AddSignalR().AddJsonProtocol(options =>
+        {
+            options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        });
+        builder.Services.AddSingleton<IEditorNotifier, EditorNotifier>();
+
+        // Map the hub endpoint. The Endpoints callback runs before Umbraco's own UseEndpoints,
+        // so calling UseEndpoints here adds our hub middleware ahead of the main endpoint mapping.
+        builder.Services.Configure<UmbracoPipelineOptions>(options =>
+        {
+            options.AddFilter(new UmbracoPipelineFilter("UmbracoAutomateEditorNotificationHub")
+            {
+                Endpoints = app => app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapHub<EditorNotificationHub>(EditorNotificationHub.Route);
+                }),
+            });
+        });
 
         return builder;
     }
