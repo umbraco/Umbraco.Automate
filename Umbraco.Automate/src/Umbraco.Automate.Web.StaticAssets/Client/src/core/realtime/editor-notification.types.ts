@@ -11,7 +11,7 @@ export type EditorNotificationSeverity = "Default" | "Positive" | "Warning" | "D
  */
 export interface EditorNotificationMessage {
     contentKey: string;
-    contentName: string;
+    title?: string | null;
     message: string;
     severity: EditorNotificationSeverity;
 }

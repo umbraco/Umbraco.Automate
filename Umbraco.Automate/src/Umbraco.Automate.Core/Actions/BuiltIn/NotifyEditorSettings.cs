@@ -15,10 +15,16 @@ public sealed class NotifyEditorSettings
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the message to show in the toast.
+    /// Gets or sets the toast headline. When empty, the triggering automation's name is used.
     /// </summary>
-    [Field(Label = "Message", Description = "The message to show the editor.", SortOrder = 1, SupportsBindings = true, EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
-    public string Message { get; set; } = string.Empty;
+    [Field(Label = "Title", Description = "Headline shown on the toast. Defaults to the automation name when left blank.", SortOrder = 1, SupportsBindings = true)]
+    public string? Title { get; set; }
+
+    /// <summary>
+    /// Gets or sets the toast body. Optional — the toast shows the title alone when empty.
+    /// </summary>
+    [Field(Label = "Message", Description = "Body shown on the toast. Optional — when empty only the title is shown.", SortOrder = 2, SupportsBindings = true, EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
+    public string? Message { get; set; }
 
     /// <summary>
     /// Gets or sets the notification severity. Stored as a string so the dropdown picker
@@ -27,7 +33,7 @@ public sealed class NotifyEditorSettings
     [Field(
         Label = "Severity",
         Description = "Severity of the notification — controls the toast colour.",
-        SortOrder = 2,
+        SortOrder = 3,
         EditorUiAlias = "Umb.Automate.EditorNotificationSeverityPicker")]
     public string Severity { get; set; } = nameof(EditorNotificationSeverity.Default);
 }

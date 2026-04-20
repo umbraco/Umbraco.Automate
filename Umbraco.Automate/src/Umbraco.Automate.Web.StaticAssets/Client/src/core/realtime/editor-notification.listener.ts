@@ -93,7 +93,7 @@ export class UaEditorNotificationListener extends UmbControllerBase {
         const color = severityToColor(message.severity);
         this.#notificationContext.peek(color, {
             data: {
-                headline: message.contentName,
+                headline: message.title ?? undefined,
                 message: message.message,
             },
         });

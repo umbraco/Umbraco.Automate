@@ -11,12 +11,13 @@ public sealed class EditorNotificationMessage
     public required Guid ContentKey { get; init; }
 
     /// <summary>
-    /// Gets the name of the content item at the time the notification was dispatched.
+    /// Gets the optional toast headline.
     /// </summary>
-    public required string ContentName { get; init; }
+    public string? Title { get; init; }
 
     /// <summary>
-    /// Gets the message body to show to the editor.
+    /// Gets the toast body. Always populated — when the user leaves the action setting blank,
+    /// the server substitutes a description that names the triggering automation.
     /// </summary>
     public required string Message { get; init; }
 
