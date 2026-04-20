@@ -130,6 +130,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEntityVersionService, EntityVersionService>();
         builder.Services.AddHostedService<VersionCleanupBackgroundJob>();
         builder.Services.AddHostedService<RunCleanupBackgroundJob>();
+        builder.Services.AddHostedService<OutboxCleanupBackgroundJob>();
         builder.Services.AddHostedService<ScheduledTriggerBackgroundJob>();
 
         // Readiness signal — set by migration handler, awaited by background services
