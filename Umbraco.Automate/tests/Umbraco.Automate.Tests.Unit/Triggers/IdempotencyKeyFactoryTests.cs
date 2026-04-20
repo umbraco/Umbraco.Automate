@@ -129,4 +129,81 @@ public class IdempotencyKeyFactoryTests
         hashPart.ShouldNotContain('+');
         hashPart.ShouldNotContain('/');
     }
+
+    [Fact]
+    public void ForContentSaveEvent_SameVersionAndUpdateDate_ProducesSameKey()
+    {
+        // A duplicate save notification carries the same VersionId and UpdateDate,
+        // so the keys match and the outbox collapses the duplicate.
+        var contentKey = Guid.NewGuid();
+        var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var a = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, versionId: 5, updateDate);
+        var b = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, versionId: 5, updateDate);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForContentSaveEvent_SameVersionDifferentUpdateDate_ProducesDifferentKeys()
+    {
+        // Sequential draft saves share the VersionId but bump UpdateDate — each must
+        // produce a distinct key so the second save isn't dedup'd against the first.
+        var contentKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, 5, new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc));
+        var b = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, 5, new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc));
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void ForContentSaveEvent_KeyFormat_IsStable()
+    {
+        var contentKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var key = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, 42, updateDate);
+        key.ShouldBe($"test.trigger:11111111-1111-1111-1111-111111111111:v42:u{updateDate.Ticks}");
+    }
+
+    [Fact]
+    public void ForContentSaveBatch_EmptyBatch_ReturnsNull()
+        => IdempotencyKeyFactory.ForContentSaveBatch("test.batch", []).ShouldBeNull();
+
+    [Fact]
+    public void ForContentSaveBatch_SameItems_ProducesSameKey()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var t1 = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var t2 = new DateTime(2026, 4, 20, 10, 0, 5, DateTimeKind.Utc);
+
+        var key1 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
+        var key2 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
+
+        key1.ShouldBe(key2);
+    }
+
+    [Fact]
+    public void ForContentSaveBatch_SameVersionsDifferentUpdateDates_ProduceDifferentKeys()
+    {
+        var a = Guid.NewGuid();
+        var t1 = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var t2 = new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc);
+
+        var key1 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1)]);
+        var key2 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t2)]);
+
+        key1.ShouldNotBe(key2);
+    }
+
+    [Fact]
+    public void ForContentSaveBatch_OrderInsensitive()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var t1 = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var t2 = new DateTime(2026, 4, 20, 10, 0, 5, DateTimeKind.Utc);
+
+        var key1 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
+        var key2 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(b, 2, t2), (a, 1, t1)]);
+
+        key1.ShouldBe(key2);
+    }
 }

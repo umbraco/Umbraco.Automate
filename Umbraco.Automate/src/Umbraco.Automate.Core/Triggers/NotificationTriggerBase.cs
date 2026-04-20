@@ -27,12 +27,25 @@ public abstract class NotificationTriggerBase<TSettings, TOutput, TNotification>
     public abstract IEnumerable<TriggerEvent> MapEvent(TNotification notification);
 
     /// <summary>
-    /// Generates a deterministic idempotency key for a content-based trigger event.
-    /// A duplicate notification for the same (content, version) collapses to the same
-    /// key and is deduped by the outbox; genuinely separate events produce distinct keys.
+    /// Generates a deterministic idempotency key for a publish/unpublish trigger event
+    /// where <paramref name="versionId"/> uniquely identifies the event. A duplicate
+    /// notification for the same (content, version) collapses to the same key and is
+    /// deduped by the outbox; genuinely separate events produce distinct keys.
     /// </summary>
     /// <param name="contentKey">The content item's unique key.</param>
-    /// <param name="versionId">The CMS version id that represents the event (publish/save/unpublish).</param>
+    /// <param name="versionId">The CMS version id — typically <c>IContent.PublishedVersionId</c>.</param>
     protected string GenerateIdempotencyKey(Guid contentKey, int versionId)
         => IdempotencyKeyFactory.ForContentEvent(Alias, contentKey, versionId);
+
+    /// <summary>
+    /// Generates a deterministic idempotency key for a save trigger event. Umbraco reuses
+    /// the draft version id across successive saves, so <paramref name="updateDate"/>
+    /// is included to distinguish legitimate sequential saves while still collapsing a
+    /// duplicate notification for the same save.
+    /// </summary>
+    /// <param name="contentKey">The content item's unique key.</param>
+    /// <param name="versionId">The current CMS version id.</param>
+    /// <param name="updateDate">The <c>IContent.UpdateDate</c> captured at save time.</param>
+    protected string GenerateIdempotencyKey(Guid contentKey, int versionId, DateTime updateDate)
+        => IdempotencyKeyFactory.ForContentSaveEvent(Alias, contentKey, versionId, updateDate);
 }
