@@ -21,8 +21,13 @@ public sealed class NotifyEditorSettings
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the notification severity.
+    /// Gets or sets the notification severity. Stored as a string so the dropdown picker
+    /// round-trips cleanly — parsed into <see cref="EditorNotificationSeverity"/> at execute time.
     /// </summary>
-    [Field(Label = "Severity", Description = "Severity of the notification — controls the toast colour.", SortOrder = 2)]
-    public EditorNotificationSeverity Severity { get; set; } = EditorNotificationSeverity.Default;
+    [Field(
+        Label = "Severity",
+        Description = "Severity of the notification — controls the toast colour.",
+        SortOrder = 2,
+        EditorUiAlias = "Umb.Automate.EditorNotificationSeverityPicker")]
+    public string Severity { get; set; } = nameof(EditorNotificationSeverity.Default);
 }

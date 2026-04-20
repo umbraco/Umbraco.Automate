@@ -68,12 +68,16 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
             return SuccessWithOutcome(OutcomeNotFound, new NotifyEditorOutput { ContentKey = contentKey });
         }
 
+        var severity = Enum.TryParse<EditorNotificationSeverity>(settings.Severity, ignoreCase: true, out var parsed)
+            ? parsed
+            : EditorNotificationSeverity.Default;
+
         var message = new EditorNotificationMessage
         {
             ContentKey = contentKey,
             ContentName = content.Name ?? string.Empty,
             Message = settings.Message,
-            Severity = settings.Severity,
+            Severity = severity,
         };
 
         await _editorNotifier.NotifyAsync(message, cancellationToken);
