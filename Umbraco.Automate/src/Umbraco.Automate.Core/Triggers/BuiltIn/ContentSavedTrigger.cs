@@ -29,7 +29,9 @@ public sealed class ContentSavedTrigger
             {
                 TriggerAlias = Alias,
                 InitiatorType = "system",
-                IdempotencyKey = GenerateIdempotencyKey(content.Key, content.VersionId),
+                // Draft saves reuse the same VersionId; UpdateDate is what advances per save,
+                // so include it to avoid deduping legitimate sequential saves.
+                IdempotencyKey = GenerateIdempotencyKey(content.Key, content.VersionId, content.UpdateDate),
                 Output = new ContentSavedTriggerOutput
                 {
                     ContentKey = content.Key,

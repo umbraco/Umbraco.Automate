@@ -37,15 +37,17 @@ public sealed class ContentBatchSavedTrigger
             ContentTypeAlias = content.ContentType?.Alias,
         }).ToList();
 
+        // Draft saves reuse the same VersionId per item; UpdateDate is what advances per save,
+        // so include it in the batch hash to avoid deduping legitimate sequential saves.
         var batchIdentity = entities
-            .Select(c => (c.Key, c.VersionId))
+            .Select(c => (c.Key, c.VersionId, c.UpdateDate))
             .ToList();
 
         yield return new TriggerEvent<BatchTriggerOutput<ContentSavedTriggerOutput>>
         {
             TriggerAlias = Alias,
             InitiatorType = "system",
-            IdempotencyKey = IdempotencyKeyFactory.ForContentBatch(Alias, batchIdentity),
+            IdempotencyKey = IdempotencyKeyFactory.ForContentSaveBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentSavedTriggerOutput>
             {
                 Items = items,
