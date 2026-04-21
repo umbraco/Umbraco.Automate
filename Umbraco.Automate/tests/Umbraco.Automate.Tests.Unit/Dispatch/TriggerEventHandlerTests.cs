@@ -164,10 +164,9 @@ public class TriggerEventHandlerTests
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
                 It.IsAny<Dictionary<string, object?>?>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<bool>()))
-            .Callback<Automation, string, string?, Dictionary<string, object?>?, CancellationToken, bool>(
-                (_, _, _, data, _, _) => capturedData = data)
+                It.IsAny<CancellationToken>()))
+            .Callback<Automation, string, string?, Dictionary<string, object?>?, CancellationToken>(
+                (_, _, _, data, _) => capturedData = data)
             .ReturnsAsync(Guid.NewGuid());
 
         var body = SerializeMessage(new TriggerEventMessage
