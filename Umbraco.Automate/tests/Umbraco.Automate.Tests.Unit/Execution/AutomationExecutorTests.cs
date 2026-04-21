@@ -74,7 +74,22 @@ public class AutomationExecutorTests
             .Returns((WorkflowDefinition?)null);
         _workflowRegistry.Setup(r => r.RegisterWorkflow(It.IsAny<WorkflowDefinition>()))
             .Callback<WorkflowDefinition>(d => _registeredDefinitions.Add(d));
-        _workflowHost.Setup(h => h.StartWorkflow(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<string>()))
+        // AutomationExecutor calls the generic StartWorkflow<AutomationWorkflowData>(id, data).
+        // Cover both the 2-arg and 3-arg forms in case overload resolution or default
+        // parameters route through either.
+        _workflowHost.Setup(h => h.StartWorkflow<AutomationWorkflowData>(
+                It.IsAny<string>(),
+                It.IsAny<AutomationWorkflowData>()))
+            .ReturnsAsync("instance-1");
+        _workflowHost.Setup(h => h.StartWorkflow<AutomationWorkflowData>(
+                It.IsAny<string>(),
+                It.IsAny<AutomationWorkflowData>(),
+                It.IsAny<string?>()))
+            .ReturnsAsync("instance-1");
+        _workflowHost.Setup(h => h.StartWorkflow(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<string>()))
             .ReturnsAsync("instance-1");
         _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
@@ -104,6 +119,23 @@ public class AutomationExecutorTests
                 run.WorkspaceId == _defaultWorkspace.Id &&
                 run.ServiceAccountKey == _defaultWorkspace.ServiceAccountKey),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PersistsWorkflowInstanceIdViaScopedUpdate()
+    {
+        var automation = CreateAutomation("testAction");
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        // Scoped update so a concurrent RunFinalizer write (e.g. first-step WaitForEvent)
+        // cannot be clobbered by re-saving the whole run with stale Status = Running.
+        _runRepo.Verify(
+            r => r.SetWorkflowInstanceIdAsync(It.IsAny<Guid>(), "instance-1", It.IsAny<CancellationToken>()),
+            Times.Once);
+        _runRepo.Verify(
+            r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

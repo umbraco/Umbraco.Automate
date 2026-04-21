@@ -238,6 +238,10 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.Property<string>("TriggerData")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("WorkflowInstanceId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uniqueidentifier");
 
@@ -570,6 +574,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(1);

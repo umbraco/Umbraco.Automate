@@ -119,6 +119,14 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 
         var instanceId = await _workflowHost.StartWorkflow(workflowId, workflowData);
 
+        // Scoped update so lifecycle operations (suspend / resume / terminate) can
+        // map the run back to its workflow. A full SaveAsync here would overwrite
+        // Status / CompletedUtc / Error with the stale local run (still Running)
+        // and race with RunFinalizer when the first step is WaitForEvent or
+        // fast-completing.
+        run.WorkflowInstanceId = instanceId;
+        await _runRepository.SetWorkflowInstanceIdAsync(run.Id, instanceId, cancellationToken);
+
         _logger.LogInformation(
             "Started workflow {WorkflowId} (instance {InstanceId}) for run {RunId} as service account {ServiceAccountKey}",
             workflowId, instanceId, run.Id, workspace.ServiceAccountKey);

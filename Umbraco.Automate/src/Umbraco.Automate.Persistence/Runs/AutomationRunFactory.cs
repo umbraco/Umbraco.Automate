@@ -23,6 +23,7 @@ internal static class AutomationRunFactory
             InitiatedBy = entity.InitiatedBy,
             CorrelationId = entity.CorrelationId,
             Error = entity.Error,
+            WorkflowInstanceId = entity.WorkflowInstanceId,
             StepRuns = stepRuns ?? [],
         };
     }
@@ -43,6 +44,7 @@ internal static class AutomationRunFactory
             InitiatedBy = run.InitiatedBy,
             CorrelationId = run.CorrelationId,
             Error = run.Error,
+            WorkflowInstanceId = run.WorkflowInstanceId,
         };
     }
 
@@ -52,5 +54,6 @@ internal static class AutomationRunFactory
         entity.StartedUtc = run.StartedUtc;
         entity.CompletedUtc = run.CompletedUtc;
         entity.Error = run.Error;
+        entity.WorkflowInstanceId = run.WorkflowInstanceId;
     }
 }

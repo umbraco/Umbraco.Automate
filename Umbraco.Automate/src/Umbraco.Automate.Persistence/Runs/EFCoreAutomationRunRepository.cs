@@ -79,6 +79,20 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         return run;
     }
 
+    public async Task SetWorkflowInstanceIdAsync(
+        Guid runId,
+        string workflowInstanceId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        await db.AutomationRuns
+            .Where(r => r.Id == runId)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(r => r.WorkflowInstanceId, workflowInstanceId),
+                cancellationToken);
+    }
+
     public async Task<StepRun> SaveStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
