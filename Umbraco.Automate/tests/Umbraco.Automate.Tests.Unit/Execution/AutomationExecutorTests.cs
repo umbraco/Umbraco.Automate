@@ -112,31 +112,30 @@ public class AutomationExecutorTests
 
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
-        // The run is saved twice: once before StartWorkflow, once after to persist the
-        // workflow instance ID. Match either save; both represent this run.
         _runRepo.Verify(r => r.SaveAsync(
             It.Is<AutomationRun>(run =>
                 run.AutomationId == automation.Id &&
                 run.Status == AutomationRunStatus.Running &&
                 run.WorkspaceId == _defaultWorkspace.Id &&
                 run.ServiceAccountKey == _defaultWorkspace.ServiceAccountKey),
-            It.IsAny<CancellationToken>()), Times.Exactly(2));
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ExecuteAsync_PersistsWorkflowInstanceId()
+    public async Task ExecuteAsync_PersistsWorkflowInstanceIdViaScopedUpdate()
     {
         var automation = CreateAutomation("testAction");
-        AutomationRun? savedRun = null;
-        _runRepo
-            .Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
-            .Callback<AutomationRun, CancellationToken>((r, _) => savedRun = r)
-            .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
 
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
-        savedRun.ShouldNotBeNull();
-        savedRun.WorkflowInstanceId.ShouldBe("instance-1");
+        // Scoped update so a concurrent RunFinalizer write (e.g. first-step WaitForEvent)
+        // cannot be clobbered by re-saving the whole run with stale Status = Running.
+        _runRepo.Verify(
+            r => r.SetWorkflowInstanceIdAsync(It.IsAny<Guid>(), "instance-1", It.IsAny<CancellationToken>()),
+            Times.Once);
+        _runRepo.Verify(
+            r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

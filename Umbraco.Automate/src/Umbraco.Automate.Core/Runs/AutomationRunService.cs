@@ -153,12 +153,17 @@ internal sealed class AutomationRunService : IAutomationRunService
             return RunLifecycleResult.NoWorkflowInstance;
         }
 
-        await _workflowHost.TerminateWorkflow(run.WorkflowInstanceId);
-
+        // Write the terminal Cancelled state first so RunFinalizer's early-return
+        // guard (Status is Completed or Failed or Cancelled) kicks in when
+        // WorkflowCore persists Terminated — otherwise the finalizer observes a
+        // still-Running row and dispatches AutomationRunCompletedNotification
+        // with Status = Failed before we overwrite with Cancelled.
         run.Status = AutomationRunStatus.Cancelled;
         run.CompletedUtc = DateTime.UtcNow;
         run.Error ??= "Workflow terminated by user";
         await _runRepository.SaveAsync(run, cancellationToken);
+
+        await _workflowHost.TerminateWorkflow(run.WorkflowInstanceId);
 
         _logger.LogInformation("Run {RunId} terminated via lifecycle API", runId);
         return RunLifecycleResult.Success;

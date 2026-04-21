@@ -149,4 +149,29 @@ public class AutomationRunServiceTests
         _workflowHost.Verify(h => h.TerminateWorkflow("instance-1"), Times.Once);
         run.Status.ShouldBe(AutomationRunStatus.Cancelled);
     }
+
+    [Fact]
+    public async Task TerminateRun_WritesCancelledBeforeCallingWorkflowHost()
+    {
+        // If we called TerminateWorkflow first, RunFinalizer would observe the run as
+        // still Running and dispatch AutomationRunCompletedNotification with Failed
+        // before the service overwrites with Cancelled. Writing Cancelled first lets
+        // the finalizer's early-return guard short-circuit.
+        var run = BuildRun(AutomationRunStatus.Running);
+        _runRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(run);
+
+        var callOrder = new List<string>();
+        _runRepo
+            .Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRun, CancellationToken>((r, _) => callOrder.Add($"save:{r.Status}"))
+            .ReturnsAsync(run);
+        _workflowHost
+            .Setup(h => h.TerminateWorkflow(It.IsAny<string>()))
+            .Callback<string>(_ => callOrder.Add("terminate"))
+            .ReturnsAsync(true);
+
+        await _service.TerminateRunAsync(Guid.NewGuid());
+
+        callOrder.ShouldBe(["save:Cancelled", "terminate"]);
+    }
 }

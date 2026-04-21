@@ -25,6 +25,16 @@ internal interface IAutomationRunRepository
     Task<AutomationRun> SaveAsync(AutomationRun run, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sets the WorkflowCore instance ID for a run. Scoped update — writes only that
+    /// column so it cannot clobber a concurrent <see cref="RunFinalizer"/> write that
+    /// may have happened between <c>StartWorkflow</c> returning and this call.
+    /// </summary>
+    Task SetWorkflowInstanceIdAsync(
+        Guid runId,
+        string workflowInstanceId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Saves a step run (insert or update).
     /// </summary>
     Task<StepRun> SaveStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
