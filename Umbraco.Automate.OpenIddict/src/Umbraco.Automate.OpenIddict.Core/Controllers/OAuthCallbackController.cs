@@ -51,15 +51,25 @@ public sealed class OAuthCallbackController : ControllerBase
             return Content(BuildPopupHtml(success: false, error: "No access token received."), "text/html");
         }
 
+        // Extract optional well-known properties that providers may set via event handlers.
+        string? userAccessToken = null, accountLabel = null, scopes = null;
+        var items = result.Properties?.Items;
+        items?.TryGetValue(Constants.OAuthProperties.UserAccessToken, out userAccessToken);
+        items?.TryGetValue(Constants.OAuthProperties.AccountLabel, out accountLabel);
+        items?.TryGetValue(Constants.OAuthProperties.Scopes, out scopes);
+
         var credential = new OAuthCredentials
         {
             Provider = provider,
             AccessToken = accessToken,
             RefreshToken = refreshToken,
+            UserAccessToken = !string.IsNullOrEmpty(userAccessToken) ? userAccessToken : null,
             // Only store expiry when a refresh token is available — providers like Slack
             // issue long-lived tokens with no refresh mechanism, so the expiry from
             // OpenIddict's response is misleading and would cause premature rejection.
             ExpiresUtc = !string.IsNullOrEmpty(refreshToken) ? expiresAt?.UtcDateTime : null,
+            Scopes = scopes,
+            AccountLabel = accountLabel,
         };
 
         var saved = await _credentialsService.CreateCredentialsAsync(credential);

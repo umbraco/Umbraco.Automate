@@ -55,20 +55,39 @@ public class AutomationBuilder
     public AutomationBuilder WithManualTrigger()
         => WithTrigger("umbracoAutomate.manual");
 
-    public AutomationBuilder WithWebhookTrigger(string? secret = null, bool validateSignature = false)
+    public AutomationBuilder WithWebhookTrigger(string? authenticatorAlias = null, object? authenticatorSettings = null)
     {
         var settings = new Dictionary<string, object?>();
-        if (secret is not null)
-        {
-            settings["secret"] = secret;
-        }
 
-        if (validateSignature)
+        if (authenticatorAlias is not null || authenticatorSettings is not null)
         {
-            settings["validateSignature"] = true;
+            settings["authenticator"] = new Dictionary<string, object?>
+            {
+                ["alias"] = authenticatorAlias ?? "plain-secret",
+                ["settings"] = ToDictionary(authenticatorSettings),
+            };
         }
 
         return WithTrigger("umbracoAutomate.webhook", settings);
+    }
+
+    private static Dictionary<string, object?> ToDictionary(object? value)
+    {
+        if (value is null)
+        {
+            return [];
+        }
+
+        if (value is Dictionary<string, object?> dict)
+        {
+            return dict;
+        }
+
+        var json = System.Text.Json.JsonSerializer.Serialize(value, new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        });
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? [];
     }
 
     public AutomationBuilder AddStep(StepConfiguration step)

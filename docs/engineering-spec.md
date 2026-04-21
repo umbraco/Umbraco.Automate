@@ -675,10 +675,10 @@ The endpoint:
 public class WebhookReceivedTriggerSettings
 {
     [Field(IsSensitive = true)]
-    public string? Secret { get; set; }  // Optional shared secret for validation
+    public string? Secret { get; set; }  // Shared secret used by the selected strategy
 
-    [Field]
-    public bool ValidateSignature { get; set; }  // HMAC-SHA256 signature validation
+    [Field(EditorUiAlias = "Umb.Automate.WebhookAuthenticatorPicker")]
+    public string AuthenticatorAlias { get; set; } = "plain-secret";  // Authentication strategy
 
     [Field]
     public string? AllowedMethods { get; set; } = "POST";  // Comma-separated HTTP methods
@@ -1341,7 +1341,7 @@ Automations follow a **draft → publish** lifecycle, similar to most automation
 
 | Status | Triggers fire? | Description |
 |--------|---------------|-------------|
-| **Draft** | No | Newly created or never published. Can be edited and tested via dry run. |
+| **Draft** | No | Newly created or never published. Editable but does not trigger. |
 | **Published** | Yes (if enabled) | Has a published version. Triggers evaluate against the published definition. |
 | **Inactive** | No | Previously published, explicitly deactivated. Published version is retained for reference/rollback. |
 
@@ -1556,7 +1556,6 @@ Leverage Umbraco's existing user group / permission model:
 
 | Feature | Description |
 |---------|-------------|
-| **Dry run mode** | Execute an automation without side effects; steps return what they *would* do |
 | **Rate limiting** | Configurable max runs per automation per time window |
 | **Kill switch** | Global and per-automation emergency disable |
 | **Automation versioning** | Each save creates an immutable version snapshot. Draft/publish lifecycle ensures edits don't affect live triggers. Running instances complete on their original version. Rollback restores any previous version. |
@@ -1813,12 +1812,11 @@ Opened by clicking an automation in the tree. Uses workspace apps (tabs) followi
 **Workspace App: Workflow** (primary tab, `icon-nodes`)
 The canvas editor for building the automation.
 
-- **Top bar**: Automation name, alias, save, **publish** (with split button for "save draft"), enable/disable toggle, test/dry-run button. Shows "unpublished changes" badge when draft is ahead of published version.
+- **Top bar**: Automation name, alias, save, **publish** (with split button for "save draft"), enable/disable toggle. Shows "unpublished changes" badge when draft is ahead of published version.
 - **Full-width canvas**: React Flow node graph — no sidebars, maximum canvas space
   - Trigger node (single, at the top)
   - Action nodes with typed input/output handles
   - Connection lines between nodes (with optional filter badges)
-  - Visual status during dry-run (green check / red X per node)
   - Each node shows a **pencil icon** — clicking opens the settings modal
   - **Add button** (on canvas or toolbar) opens a picker modal to insert a new trigger/action
 
@@ -2184,7 +2182,6 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 - If/Switch step types in the canvas
 - Email notification action
 - Failure notification channels (email, webhook)
-- Dry run mode
 - **Named Connections** entity (alias → environment-specific credentials, encrypted via `[Field(IsSensitive = true)]`)
 - OAuth2 support in connections (authorization code flow + automatic refresh)
 - Connection management UI in settings panel

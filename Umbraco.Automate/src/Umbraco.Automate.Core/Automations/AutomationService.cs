@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations.Transfer;
@@ -98,7 +97,6 @@ internal sealed class AutomationService : IAutomationService
             automation.Id = Guid.NewGuid();
         }
 
-        EnsureWebhookSecret(automation);
         EnsureStepAliases(automation);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
@@ -123,7 +121,6 @@ internal sealed class AutomationService : IAutomationService
 
     public async Task<Automation> UpdateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
-        EnsureWebhookSecret(automation);
         EnsureStepAliases(automation);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
@@ -165,8 +162,15 @@ internal sealed class AutomationService : IAutomationService
         }
 
         automation.PublishedVersion = automation.Version;
+
+        // Only enable on first publish (Draft → Published). Re-publishing an already-published
+        // automation preserves the user's enabled/disabled choice.
+        if (automation.Status != AutomationStatus.Published)
+        {
+            automation.IsEnabled = true;
+        }
+
         automation.Status = AutomationStatus.Published;
-        automation.IsEnabled = true;
 
         var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
 
@@ -174,27 +178,6 @@ internal sealed class AutomationService : IAutomationService
         scope.Complete();
 
         return saved;
-    }
-
-    /// <summary>
-    /// If the automation uses a webhook trigger and the secret is empty, auto-generate one.
-    /// </summary>
-    private void EnsureWebhookSecret(Automation automation)
-    {
-        if (automation.Trigger is null) return;
-
-        var trigger = _triggers.GetByAlias(automation.Trigger.TriggerAlias);
-        if (trigger is not IWebhookTrigger) return;
-
-        var settings = automation.Trigger.Settings;
-        var hasSecret = settings.TryGetValue("secret", out var existing)
-                        && existing is string s
-                        && !string.IsNullOrWhiteSpace(s);
-
-        if (!hasSecret)
-        {
-            settings["secret"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        }
     }
 
     private async Task ValidateForPublishAsync(Automation automation, CancellationToken cancellationToken)

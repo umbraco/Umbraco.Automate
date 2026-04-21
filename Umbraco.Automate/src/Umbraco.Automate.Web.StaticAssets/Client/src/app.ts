@@ -1,6 +1,7 @@
 import type { UmbEntryPointOnInit, UmbEntryPointOnUnload } from "@umbraco-cms/backoffice/extension-api";
 import { client } from "./api/client.gen.js";
 import { UMB_AUTH_CONTEXT } from "@umbraco-cms/backoffice/auth";
+import { UaEditorNotificationListener } from "./core/realtime/editor-notification.listener.js";
 
 // Re-export everything from the main index
 export * from "./index.js";
@@ -10,6 +11,8 @@ let coreClientReadyResolve: (() => void) | undefined;
 export const coreClientReady = new Promise<void>((resolve) => {
     coreClientReadyResolve = resolve;
 });
+
+let editorNotificationListener: UaEditorNotificationListener | undefined;
 
 export const onInit: UmbEntryPointOnInit = (_host, _extensionRegistry) => {
     _host.consumeContext(UMB_AUTH_CONTEXT, async (authContext) => {
@@ -25,8 +28,11 @@ export const onInit: UmbEntryPointOnInit = (_host, _extensionRegistry) => {
             coreClientReadyResolve = undefined;
         }
     });
+
+    editorNotificationListener = new UaEditorNotificationListener(_host);
 };
 
 export const onUnload: UmbEntryPointOnUnload = (_host, _extensionRegistry) => {
-    // Clean up if needed
+    editorNotificationListener?.destroy();
+    editorNotificationListener = undefined;
 };

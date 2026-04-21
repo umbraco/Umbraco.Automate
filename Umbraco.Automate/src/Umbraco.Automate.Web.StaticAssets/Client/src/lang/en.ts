@@ -17,7 +17,6 @@ export default {
         unpublish: "Unpublish",
         export: "Export",
         import: "Import",
-        dryRun: "Dry Run",
     },
     uaLabels: {
         name: "Name",

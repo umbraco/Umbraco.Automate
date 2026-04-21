@@ -26,6 +26,13 @@ public sealed class WebhookOptions
     /// Default: 1 MB.
     /// </summary>
     public long MaxPayloadBytes { get; set; } = 1_048_576;
+
+    /// <summary>
+    /// Gets or sets the maximum number of webhook requests per automation per minute.
+    /// Requests exceeding this limit are rejected with <c>429 Too Many Requests</c>.
+    /// Default: 100.
+    /// </summary>
+    public int RateLimitPerMinute { get; set; } = 100;
 }
 
 /// <summary>

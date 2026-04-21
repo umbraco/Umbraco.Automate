@@ -3,6 +3,8 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.BuiltIn;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 
 namespace Umbraco.Automate.Persistence.Automations;
 
@@ -21,15 +23,18 @@ internal sealed class AutomationFactory
     private readonly IEditableModelSerializer _serializer;
     private readonly ActionCollection _actions;
     private readonly TriggerCollection _triggers;
+    private readonly WebhookAuthenticatorCollection _webhookAuthenticators;
 
     public AutomationFactory(
         IEditableModelSerializer serializer,
         ActionCollection actions,
-        TriggerCollection triggers)
+        TriggerCollection triggers,
+        WebhookAuthenticatorCollection webhookAuthenticators)
     {
         _serializer = serializer;
         _actions = actions;
         _triggers = triggers;
+        _webhookAuthenticators = webhookAuthenticators;
     }
 
     public Automation BuildDomain(AutomationEntity entity)
@@ -147,7 +152,15 @@ internal sealed class AutomationFactory
         var schema = GetTriggerSchema(trigger.TriggerAlias);
         var encryptedSettings = EncryptSettings(trigger.Settings, schema);
 
-        if (encryptedSettings == trigger.Settings)
+        // Webhook triggers carry a dynamic per-strategy sub-schema under Authenticator.Settings.
+        // The top-level schema doesn't know which authenticator's fields are sensitive,
+        // so we look up the selected strategy and encrypt its settings inline.
+        if (trigger.TriggerAlias == WebhookTrigger.WellKnownAlias)
+        {
+            encryptedSettings = EncryptWebhookAuthenticatorSettings(encryptedSettings);
+        }
+
+        if (ReferenceEquals(encryptedSettings, trigger.Settings))
         {
             return trigger;
         }
@@ -156,6 +169,73 @@ internal sealed class AutomationFactory
         {
             TriggerAlias = trigger.TriggerAlias,
             Settings = encryptedSettings,
+        };
+    }
+
+    private Dictionary<string, object?> EncryptWebhookAuthenticatorSettings(Dictionary<string, object?> triggerSettings)
+    {
+        if (!triggerSettings.TryGetValue("authenticator", out var authValue) || authValue is null)
+        {
+            return triggerSettings;
+        }
+
+        // Normalize to Dictionary regardless of whether it came in as a dict, JsonElement, or POCO.
+        var authDict = CoerceToDictionary(authValue);
+        if (authDict is null)
+        {
+            return triggerSettings;
+        }
+
+        var alias = authDict.TryGetValue("alias", out var aliasValue) ? aliasValue as string : null;
+        if (string.IsNullOrEmpty(alias))
+        {
+            return triggerSettings;
+        }
+
+        var authenticator = _webhookAuthenticators.FirstOrDefault(a =>
+            string.Equals(a.Alias, alias, StringComparison.OrdinalIgnoreCase));
+        var authSchema = authenticator?.GetSettingsSchema();
+        if (authSchema is null || !authSchema.Fields.Any(f => f.IsSensitive))
+        {
+            return triggerSettings;
+        }
+
+        if (!authDict.TryGetValue("settings", out var settingsValue) || settingsValue is null)
+        {
+            return triggerSettings;
+        }
+
+        var settingsDict = CoerceToDictionary(settingsValue);
+        if (settingsDict is null)
+        {
+            return triggerSettings;
+        }
+
+        var encryptedStrategySettings = EncryptSettings(settingsDict, authSchema);
+        if (ReferenceEquals(encryptedStrategySettings, settingsDict))
+        {
+            return triggerSettings;
+        }
+
+        var newAuth = new Dictionary<string, object?>(authDict, StringComparer.OrdinalIgnoreCase)
+        {
+            ["settings"] = encryptedStrategySettings,
+        };
+        return new Dictionary<string, object?>(triggerSettings, StringComparer.OrdinalIgnoreCase)
+        {
+            ["authenticator"] = newAuth,
+        };
+    }
+
+    private static Dictionary<string, object?>? CoerceToDictionary(object value)
+    {
+        return value switch
+        {
+            Dictionary<string, object?> dict => new Dictionary<string, object?>(dict, StringComparer.OrdinalIgnoreCase),
+            JsonElement { ValueKind: JsonValueKind.Object } element
+                => JsonSerializer.Deserialize<Dictionary<string, object?>>(element.GetRawText(), JsonOptions),
+            _ => JsonSerializer.Deserialize<Dictionary<string, object?>>(
+                    JsonSerializer.Serialize(value, JsonOptions), JsonOptions),
         };
     }
 
