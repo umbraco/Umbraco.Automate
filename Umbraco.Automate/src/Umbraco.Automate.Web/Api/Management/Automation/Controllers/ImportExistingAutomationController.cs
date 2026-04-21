@@ -4,23 +4,24 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
-using Umbraco.Automate.Web.Api.Management.Automation.Models;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
 /// <summary>
-/// Imports an automation from a portable JSON definition.
+/// Overwrites an existing automation from a portable JSON definition. The export's ID must match
+/// the target automation ID; use <see cref="ImportNewAutomationController"/> to create a new
+/// automation.
 /// </summary>
 [ApiVersion("1.0")]
-public sealed class ImportAutomationController : AutomationControllerBase
+public sealed class ImportExistingAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ImportAutomationController"/> class.
+    /// Initializes a new instance of the <see cref="ImportExistingAutomationController"/> class.
     /// </summary>
-    public ImportAutomationController(
+    public ImportExistingAutomationController(
         IAutomationService automationService,
         IAuthorizationService authorizationService)
     {
@@ -29,26 +30,36 @@ public sealed class ImportAutomationController : AutomationControllerBase
     }
 
     /// <summary>
-    /// Imports an automation from a portable JSON definition into a target workspace.
-    /// The automation is created as Draft and disabled.
+    /// Overwrites the automation with the given ID using the supplied export. The workspace and
+    /// lifecycle state (published/draft, enabled/disabled) are preserved; only the automation's
+    /// content is replaced.
     /// </summary>
-    [HttpPost("import")]
+    [HttpPut("{id:guid}/import")]
     [MapToApiVersion("1.0")]
-    [ProducesResponseType(typeof(AutomationImportResult), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(AutomationImportResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ImportAutomation(
-        ImportAutomationRequestModel requestModel,
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ImportExistingAutomation(
+        Guid id,
+        AutomationExportModel exportModel,
         CancellationToken cancellationToken = default)
     {
-        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, requestModel.WorkspaceId);
+        var existing = await _automationService.GetAutomationAsync(id, cancellationToken);
+        if (existing is null)
+        {
+            return AutomationNotFound();
+        }
+
+        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, existing.WorkspaceId);
         if (forbidden is not null)
         {
             return forbidden;
         }
 
         var result = await _automationService.ImportAutomationAsync(
-            requestModel.ExportModel,
-            requestModel.WorkspaceId,
+            exportModel,
+            existing.WorkspaceId,
+            existingAutomationId: id,
             cancellationToken: cancellationToken);
 
         if (!result.Success)
@@ -61,10 +72,6 @@ public sealed class ImportAutomationController : AutomationControllerBase
             });
         }
 
-        return CreatedAtAction(
-            nameof(ByIdAutomationController.GetAutomationById),
-            nameof(ByIdAutomationController).Replace("Controller", string.Empty),
-            new { id = result.AutomationId },
-            result);
+        return Ok(result);
     }
 }

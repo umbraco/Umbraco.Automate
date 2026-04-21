@@ -69,6 +69,10 @@ export default {
             `Are you sure you want to delete ${count} automation(s)?`,
         moveHeadline: "Move Automation",
         backToList: "Back to automations",
+        importSuccess: "Imported automation",
+        importFailed: "Import failed",
+        importInvalidFile: "Selected file is not valid JSON",
+        importWarnings: "Imported with warnings",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>

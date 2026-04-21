@@ -290,6 +290,7 @@ export type ExportStepModel = {
     id: string;
     actionAlias: string;
     name: string;
+    alias?: string | null;
     connectionAlias?: string | null;
     settings: {
         [key: string]: unknown;
@@ -764,6 +765,39 @@ export type GetAutomationsByIdAncestorsResponses = {
 };
 
 export type GetAutomationsByIdAncestorsResponse = GetAutomationsByIdAncestorsResponses[keyof GetAutomationsByIdAncestorsResponses];
+
+export type PostAutomationsByIdDryRunData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/dry-run';
+};
+
+export type PostAutomationsByIdDryRunErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PostAutomationsByIdDryRunError = PostAutomationsByIdDryRunErrors[keyof PostAutomationsByIdDryRunErrors];
+
+export type PostAutomationsByIdDryRunResponses = {
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
 
 export type GetAutomationsByIdExportData = {
     body?: never;
@@ -1449,6 +1483,105 @@ export type PostRunsByIdReplayErrors = {
 export type PostRunsByIdReplayError = PostRunsByIdReplayErrors[keyof PostRunsByIdReplayErrors];
 
 export type PostRunsByIdReplayResponses = {
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
+
+export type PostRunsByIdResumeData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/resume';
+};
+
+export type PostRunsByIdResumeErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PostRunsByIdResumeError = PostRunsByIdResumeErrors[keyof PostRunsByIdResumeErrors];
+
+export type PostRunsByIdResumeResponses = {
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
+
+export type PostRunsByIdSuspendData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/suspend';
+};
+
+export type PostRunsByIdSuspendErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PostRunsByIdSuspendError = PostRunsByIdSuspendErrors[keyof PostRunsByIdSuspendErrors];
+
+export type PostRunsByIdSuspendResponses = {
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
+
+export type PostRunsByIdTerminateData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/terminate';
+};
+
+export type PostRunsByIdTerminateErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type PostRunsByIdTerminateError = PostRunsByIdTerminateErrors[keyof PostRunsByIdTerminateErrors];
+
+export type PostRunsByIdTerminateResponses = {
     /**
      * Accepted
      */

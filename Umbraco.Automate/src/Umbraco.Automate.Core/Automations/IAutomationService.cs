@@ -139,23 +139,32 @@ public interface IAutomationService
     /// </summary>
     /// <param name="exportModel">The export model to validate.</param>
     /// <param name="workspaceId">The target workspace to import into.</param>
+    /// <param name="existingAutomationId">
+    /// When <c>null</c>, validates for a new import (file ID and alias must not exist).
+    /// When set, validates for overwriting an existing automation (file ID must match).
+    /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<AutomationImportResult> ValidateImportAsync(
         AutomationExportModel exportModel,
         Guid workspaceId,
+        Guid? existingAutomationId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Imports an automation from an export model into a target workspace.
-    /// The automation is created as Draft and disabled.
+    /// Imports an automation from an export model.
     /// </summary>
     /// <param name="exportModel">The export model to import.</param>
     /// <param name="workspaceId">The target workspace to import into.</param>
+    /// <param name="existingAutomationId">
+    /// When <c>null</c>, a new automation is created as Draft and disabled, preserving the export's ID.
+    /// When set, the existing automation with that ID is overwritten in place (status and workspace preserved).
+    /// </param>
     /// <param name="userId">The user performing the import.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task<AutomationImportResult> ImportAutomationAsync(
         AutomationExportModel exportModel,
         Guid workspaceId,
+        Guid? existingAutomationId = null,
         Guid? userId = null,
         CancellationToken cancellationToken = default);
 }

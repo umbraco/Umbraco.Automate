@@ -137,25 +137,6 @@ export const manifests: Array<UmbExtensionManifest> = [
     {
         type: "workspaceActionMenuItem",
         kind: "default",
-        alias: "UmbracoAutomate.WorkspaceActionMenuItem.Automation.Import",
-        name: "Import Automation Workspace Action Menu Item",
-        weight: 5,
-        forWorkspaceActions: "UmbracoAutomate.WorkspaceAction.Automation.SaveAndPublish",
-        api: () => import("./actions/automation-import.action.js"),
-        meta: {
-            label: "#uaGeneral_import",
-            icon: "icon-download-alt",
-        },
-        conditions: [
-            {
-                alias: UMB_WORKSPACE_CONDITION_ALIAS,
-                match: UA_AUTOMATION_WORKSPACE_ALIAS,
-            },
-        ],
-    },
-    {
-        type: "workspaceActionMenuItem",
-        kind: "default",
         alias: "UmbracoAutomate.WorkspaceActionMenuItem.Automation.Unpublish",
         name: "Unpublish Automation Workspace Action Menu Item",
         weight: 10,

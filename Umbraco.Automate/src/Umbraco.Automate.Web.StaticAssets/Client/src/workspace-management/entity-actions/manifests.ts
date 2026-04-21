@@ -1,4 +1,8 @@
-import { UA_WORKSPACE_MGMT_ENTITY_TYPE, UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE } from "../constants.js";
+import {
+    UA_WORKSPACE_ENTITY_TYPE,
+    UA_WORKSPACE_MGMT_ENTITY_TYPE,
+    UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE,
+} from "../constants.js";
 
 export const workspaceManagementEntityActionManifests: Array<UmbExtensionManifest> = [
     // Create workspace (available on mgmt tree root in Settings)
@@ -27,6 +31,20 @@ export const workspaceManagementEntityActionManifests: Array<UmbExtensionManifes
         meta: {
             icon: "icon-trash",
             label: "#actions_delete",
+        },
+    },
+    // Import automation into a workspace (available on user-facing workspace entity)
+    {
+        type: "entityAction",
+        kind: "default",
+        alias: "UmbracoAutomate.EntityAction.Workspace.ImportAutomation",
+        name: "Import Automation Entity Action",
+        weight: 500,
+        api: () => import("./workspace-import-automation.action.js"),
+        forEntityTypes: [UA_WORKSPACE_ENTITY_TYPE],
+        meta: {
+            icon: "icon-download-alt",
+            label: "#uaGeneral_import",
         },
     },
 ];

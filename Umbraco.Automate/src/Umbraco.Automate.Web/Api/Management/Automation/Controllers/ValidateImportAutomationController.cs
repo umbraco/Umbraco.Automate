@@ -49,7 +49,7 @@ public sealed class ValidateImportAutomationController : AutomationControllerBas
         var result = await _automationService.ValidateImportAsync(
             requestModel.ExportModel,
             requestModel.WorkspaceId,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         return Ok(result);
     }

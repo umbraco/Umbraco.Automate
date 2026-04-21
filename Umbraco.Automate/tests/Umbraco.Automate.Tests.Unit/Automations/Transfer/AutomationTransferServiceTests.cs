@@ -142,6 +142,20 @@ public class AutomationTransferTests
     }
 
     [Fact]
+    public async Task ExportAutomationAsync_IncludesAutomationId()
+    {
+        var automation = new AutomationBuilder().WithManualTrigger().Build();
+
+        _repo.Setup(r => r.GetAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var result = await _service.ExportAutomationAsync(automation.Id);
+
+        result.ShouldNotBeNull();
+        result.Automation.Id.ShouldBe(automation.Id);
+    }
+
+    [Fact]
     public async Task ExportAutomationAsync_ResolvesConnectionAlias_FromConnectionId()
     {
         var connectionId = Guid.NewGuid();
@@ -295,6 +309,65 @@ public class AutomationTransferTests
     }
 
     [Fact]
+    public async Task ValidateImportAsync_FailsWhenIdMissing()
+    {
+        var exportModel = BuildValidExportModel(id: Guid.Empty);
+        var workspaceId = SetupValidWorkspace();
+
+        var result = await _service.ValidateImportAsync(exportModel, workspaceId);
+
+        result.Success.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.Contains("missing an automation ID"));
+    }
+
+    [Fact]
+    public async Task ValidateImportAsync_FailsWhenIdAlreadyExists_OnCreate()
+    {
+        var fileId = Guid.NewGuid();
+        var exportModel = BuildValidExportModel(id: fileId);
+        var workspaceId = SetupValidWorkspace();
+
+        _repo.Setup(r => r.GetAsync(fileId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AutomationBuilder().WithId(fileId).Build());
+
+        var result = await _service.ValidateImportAsync(exportModel, workspaceId);
+
+        result.Success.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.Contains(fileId.ToString()) && e.Contains("already exists"));
+    }
+
+    [Fact]
+    public async Task ValidateImportAsync_FailsWhenFileIdDoesNotMatchTarget_OnOverwrite()
+    {
+        var fileId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var exportModel = BuildValidExportModel(id: fileId);
+        var workspaceId = SetupValidWorkspace();
+
+        var result = await _service.ValidateImportAsync(exportModel, workspaceId, existingAutomationId: targetId);
+
+        result.Success.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.Contains("does not match") && e.Contains(targetId.ToString()));
+    }
+
+    [Fact]
+    public async Task ValidateImportAsync_AllowsOverwrite_WhenAliasMatchesSameAutomation()
+    {
+        var existingId = Guid.NewGuid();
+        var exportModel = BuildValidExportModel(alias: "auto-one", id: existingId);
+        var workspaceId = SetupValidWorkspace();
+
+        _repo.Setup(r => r.GetAsync(existingId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AutomationBuilder().WithId(existingId).WithAlias("auto-one").Build());
+        _repo.Setup(r => r.GetByAliasAsync("auto-one", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AutomationBuilder().WithId(existingId).WithAlias("auto-one").Build());
+
+        var result = await _service.ValidateImportAsync(exportModel, workspaceId, existingAutomationId: existingId);
+
+        result.Success.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task ValidateImportAsync_Succeeds_WithNoConnectionsAndNoTrigger()
     {
         var exportModel = BuildValidExportModel(triggerAlias: null);
@@ -336,6 +409,67 @@ public class AutomationTransferTests
     }
 
     [Fact]
+    public async Task ImportAutomationAsync_PreservesIdFromExport()
+    {
+        var fileId = Guid.NewGuid();
+        var exportModel = BuildValidExportModel(alias: "with-id", triggerAlias: null, id: fileId);
+        var workspaceId = SetupValidWorkspace();
+
+        Automation? captured = null;
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback<Automation, Guid?, CancellationToken>((a, _, _) => captured = a)
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var result = await _service.ImportAutomationAsync(exportModel, workspaceId);
+
+        result.Success.ShouldBeTrue();
+        result.AutomationId.ShouldBe(fileId);
+        captured.ShouldNotBeNull();
+        captured!.Id.ShouldBe(fileId);
+    }
+
+    [Fact]
+    public async Task ImportAutomationAsync_OverwritesExisting_PreservingWorkspaceAndLifecycle()
+    {
+        var existingId = Guid.NewGuid();
+        var workspaceId = SetupValidWorkspace();
+        var existing = new AutomationBuilder()
+            .WithId(existingId)
+            .WithAlias("live-auto")
+            .WithName("Old Name")
+            .WithWorkspaceId(workspaceId)
+            .WithStatus(AutomationStatus.Published)
+            .WithIsEnabled(true)
+            .WithPublishedVersion(3)
+            .Build();
+
+        var exportModel = BuildValidExportModel(
+            alias: "live-auto",
+            triggerAlias: null,
+            id: existingId,
+            description: "Updated from import");
+
+        _repo.Setup(r => r.GetAsync(existingId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        Automation? captured = null;
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback<Automation, Guid?, CancellationToken>((a, _, _) => captured = a)
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var result = await _service.ImportAutomationAsync(exportModel, workspaceId, existingAutomationId: existingId);
+
+        result.Success.ShouldBeTrue();
+        result.AutomationId.ShouldBe(existingId);
+        captured.ShouldNotBeNull();
+        captured!.Id.ShouldBe(existingId);
+        captured.WorkspaceId.ShouldBe(workspaceId);
+        captured.Status.ShouldBe(AutomationStatus.Published);
+        captured.IsEnabled.ShouldBeTrue();
+        captured.Description.ShouldBe("Updated from import");
+    }
+
+    [Fact]
     public async Task ImportAutomationAsync_FailsValidation_ReturnsErrors()
     {
         var exportModel = BuildValidExportModel(formatVersion: "99.0");
@@ -354,7 +488,9 @@ public class AutomationTransferTests
     private static AutomationExportModel BuildValidExportModel(
         string formatVersion = "1.0",
         string alias = "test-export",
-        string? triggerAlias = null)
+        string? triggerAlias = null,
+        Guid? id = null,
+        string? description = null)
     {
         return new AutomationExportModel
         {
@@ -363,8 +499,10 @@ public class AutomationTransferTests
             ExportedFrom = new ExportSourceModel { Product = "Umbraco.Automate", Version = "1.0.0" },
             Automation = new AutomationExportDefinition
             {
+                Id = id ?? Guid.NewGuid(),
                 Alias = alias,
                 Name = "Test Export",
+                Description = description,
                 Trigger = triggerAlias is not null
                     ? new TriggerConfiguration { TriggerAlias = triggerAlias }
                     : null,

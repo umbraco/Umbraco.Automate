@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteAutomationsByIdData, DeleteAutomationsByIdErrors, DeleteAutomationsByIdResponses, DeleteConnectionsByIdData, DeleteConnectionsByIdErrors, DeleteConnectionsByIdResponses, DeleteWorkspacesByIdData, DeleteWorkspacesByIdErrors, DeleteWorkspacesByIdGroupsByGroupIdData, DeleteWorkspacesByIdGroupsByGroupIdErrors, DeleteWorkspacesByIdGroupsByGroupIdResponses, DeleteWorkspacesByIdResponses, GetApprovalsPendingData, GetApprovalsPendingErrors, GetApprovalsPendingResponses, GetAutomationsByIdAncestorsData, GetAutomationsByIdAncestorsErrors, GetAutomationsByIdAncestorsResponses, GetAutomationsByIdData, GetAutomationsByIdErrors, GetAutomationsByIdExportData, GetAutomationsByIdExportErrors, GetAutomationsByIdExportResponses, GetAutomationsByIdResponses, GetAutomationsByIdRunsData, GetAutomationsByIdRunsErrors, GetAutomationsByIdRunsResponses, GetAutomationsData, GetAutomationsErrors, GetAutomationsGroupsByGroupIdData, GetAutomationsGroupsByGroupIdErrors, GetAutomationsGroupsByGroupIdResponses, GetAutomationsResponses, GetCatalogueActionsData, GetCatalogueActionsErrors, GetCatalogueActionsResponses, GetCatalogueConnectionTypesData, GetCatalogueConnectionTypesErrors, GetCatalogueConnectionTypesResponses, GetCatalogueControlFlowsData, GetCatalogueControlFlowsErrors, GetCatalogueControlFlowsResponses, GetCatalogueNotificationChannelsData, GetCatalogueNotificationChannelsErrors, GetCatalogueNotificationChannelsResponses, GetCatalogueStepTypesData, GetCatalogueStepTypesErrors, GetCatalogueStepTypesResponses, GetCatalogueTriggersData, GetCatalogueTriggersErrors, GetCatalogueTriggersResponses, GetConnectionsByIdData, GetConnectionsByIdErrors, GetConnectionsByIdResponses, GetConnectionsData, GetConnectionsErrors, GetConnectionsResponses, GetMetricsByAutomationData, GetMetricsByAutomationErrors, GetMetricsByAutomationResponses, GetMetricsData, GetMetricsErrors, GetMetricsResponses, GetRunsByIdData, GetRunsByIdErrors, GetRunsByIdResponses, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdData, GetVersionHistoryByEntityTypeByEntityIdErrors, GetVersionHistoryByEntityTypeByEntityIdResponses, GetVersionHistorySupportedTypesData, GetVersionHistorySupportedTypesErrors, GetVersionHistorySupportedTypesResponses, GetWorkspacesByIdData, GetWorkspacesByIdErrors, GetWorkspacesByIdGroupsByGroupIdData, GetWorkspacesByIdGroupsByGroupIdErrors, GetWorkspacesByIdGroupsByGroupIdResponses, GetWorkspacesByIdGroupsData, GetWorkspacesByIdGroupsErrors, GetWorkspacesByIdGroupsResponses, GetWorkspacesByIdResponses, GetWorkspacesData, GetWorkspacesErrors, GetWorkspacesResponses, PostApprovalsByRunIdStepsByStepIdDecisionData, PostApprovalsByRunIdStepsByStepIdDecisionErrors, PostApprovalsByRunIdStepsByStepIdDecisionResponses, PostAutomationsByIdPublishData, PostAutomationsByIdPublishErrors, PostAutomationsByIdPublishResponses, PostAutomationsByIdTriggerData, PostAutomationsByIdTriggerErrors, PostAutomationsByIdTriggerResponses, PostAutomationsByIdUnpublishData, PostAutomationsByIdUnpublishErrors, PostAutomationsByIdUnpublishResponses, PostAutomationsData, PostAutomationsErrors, PostAutomationsImportData, PostAutomationsImportErrors, PostAutomationsImportResponses, PostAutomationsImportValidateData, PostAutomationsImportValidateErrors, PostAutomationsImportValidateResponses, PostAutomationsResponses, PostCatalogueStepTypesByAliasOutputSchemaData, PostCatalogueStepTypesByAliasOutputSchemaErrors, PostCatalogueStepTypesByAliasOutputSchemaResponses, PostConnectionsData, PostConnectionsErrors, PostConnectionsResponses, PostRunsByIdReplayData, PostRunsByIdReplayErrors, PostRunsByIdReplayResponses, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackData, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses, PostWorkspacesByIdGroupsData, PostWorkspacesByIdGroupsErrors, PostWorkspacesByIdGroupsResponses, PostWorkspacesData, PostWorkspacesErrors, PostWorkspacesResponses, PutAutomationsByIdData, PutAutomationsByIdErrors, PutAutomationsByIdResponses, PutConnectionsByIdData, PutConnectionsByIdErrors, PutConnectionsByIdResponses, PutWorkspacesByIdData, PutWorkspacesByIdErrors, PutWorkspacesByIdGroupsByGroupIdData, PutWorkspacesByIdGroupsByGroupIdErrors, PutWorkspacesByIdGroupsByGroupIdResponses, PutWorkspacesByIdResponses } from './types.gen';
+import type { DeleteAutomationsByIdData, DeleteAutomationsByIdErrors, DeleteAutomationsByIdResponses, DeleteConnectionsByIdData, DeleteConnectionsByIdErrors, DeleteConnectionsByIdResponses, DeleteWorkspacesByIdData, DeleteWorkspacesByIdErrors, DeleteWorkspacesByIdGroupsByGroupIdData, DeleteWorkspacesByIdGroupsByGroupIdErrors, DeleteWorkspacesByIdGroupsByGroupIdResponses, DeleteWorkspacesByIdResponses, GetApprovalsPendingData, GetApprovalsPendingErrors, GetApprovalsPendingResponses, GetAutomationsByIdAncestorsData, GetAutomationsByIdAncestorsErrors, GetAutomationsByIdAncestorsResponses, GetAutomationsByIdData, GetAutomationsByIdErrors, GetAutomationsByIdExportData, GetAutomationsByIdExportErrors, GetAutomationsByIdExportResponses, GetAutomationsByIdResponses, GetAutomationsByIdRunsData, GetAutomationsByIdRunsErrors, GetAutomationsByIdRunsResponses, GetAutomationsData, GetAutomationsErrors, GetAutomationsGroupsByGroupIdData, GetAutomationsGroupsByGroupIdErrors, GetAutomationsGroupsByGroupIdResponses, GetAutomationsResponses, GetCatalogueActionsData, GetCatalogueActionsErrors, GetCatalogueActionsResponses, GetCatalogueConnectionTypesData, GetCatalogueConnectionTypesErrors, GetCatalogueConnectionTypesResponses, GetCatalogueControlFlowsData, GetCatalogueControlFlowsErrors, GetCatalogueControlFlowsResponses, GetCatalogueNotificationChannelsData, GetCatalogueNotificationChannelsErrors, GetCatalogueNotificationChannelsResponses, GetCatalogueStepTypesData, GetCatalogueStepTypesErrors, GetCatalogueStepTypesResponses, GetCatalogueTriggersData, GetCatalogueTriggersErrors, GetCatalogueTriggersResponses, GetConnectionsByIdData, GetConnectionsByIdErrors, GetConnectionsByIdResponses, GetConnectionsData, GetConnectionsErrors, GetConnectionsResponses, GetMetricsByAutomationData, GetMetricsByAutomationErrors, GetMetricsByAutomationResponses, GetMetricsData, GetMetricsErrors, GetMetricsResponses, GetRunsByIdData, GetRunsByIdErrors, GetRunsByIdResponses, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdData, GetVersionHistoryByEntityTypeByEntityIdErrors, GetVersionHistoryByEntityTypeByEntityIdResponses, GetVersionHistorySupportedTypesData, GetVersionHistorySupportedTypesErrors, GetVersionHistorySupportedTypesResponses, GetWorkspacesByIdData, GetWorkspacesByIdErrors, GetWorkspacesByIdGroupsByGroupIdData, GetWorkspacesByIdGroupsByGroupIdErrors, GetWorkspacesByIdGroupsByGroupIdResponses, GetWorkspacesByIdGroupsData, GetWorkspacesByIdGroupsErrors, GetWorkspacesByIdGroupsResponses, GetWorkspacesByIdResponses, GetWorkspacesData, GetWorkspacesErrors, GetWorkspacesResponses, PostApprovalsByRunIdStepsByStepIdDecisionData, PostApprovalsByRunIdStepsByStepIdDecisionErrors, PostApprovalsByRunIdStepsByStepIdDecisionResponses, PostAutomationsByIdDryRunData, PostAutomationsByIdDryRunErrors, PostAutomationsByIdDryRunResponses, PostAutomationsByIdPublishData, PostAutomationsByIdPublishErrors, PostAutomationsByIdPublishResponses, PostAutomationsByIdTriggerData, PostAutomationsByIdTriggerErrors, PostAutomationsByIdTriggerResponses, PostAutomationsByIdUnpublishData, PostAutomationsByIdUnpublishErrors, PostAutomationsByIdUnpublishResponses, PostAutomationsData, PostAutomationsErrors, PostAutomationsImportData, PostAutomationsImportErrors, PostAutomationsImportResponses, PostAutomationsImportValidateData, PostAutomationsImportValidateErrors, PostAutomationsImportValidateResponses, PostAutomationsResponses, PostCatalogueStepTypesByAliasOutputSchemaData, PostCatalogueStepTypesByAliasOutputSchemaErrors, PostCatalogueStepTypesByAliasOutputSchemaResponses, PostConnectionsData, PostConnectionsErrors, PostConnectionsResponses, PostRunsByIdReplayData, PostRunsByIdReplayErrors, PostRunsByIdReplayResponses, PostRunsByIdResumeData, PostRunsByIdResumeErrors, PostRunsByIdResumeResponses, PostRunsByIdSuspendData, PostRunsByIdSuspendErrors, PostRunsByIdSuspendResponses, PostRunsByIdTerminateData, PostRunsByIdTerminateErrors, PostRunsByIdTerminateResponses, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackData, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses, PostWorkspacesByIdGroupsData, PostWorkspacesByIdGroupsErrors, PostWorkspacesByIdGroupsResponses, PostWorkspacesData, PostWorkspacesErrors, PostWorkspacesResponses, PutAutomationsByIdData, PutAutomationsByIdErrors, PutAutomationsByIdResponses, PutConnectionsByIdData, PutConnectionsByIdErrors, PutConnectionsByIdResponses, PutWorkspacesByIdData, PutWorkspacesByIdErrors, PutWorkspacesByIdGroupsByGroupIdData, PutWorkspacesByIdGroupsByGroupIdErrors, PutWorkspacesByIdGroupsByGroupIdResponses, PutWorkspacesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -133,6 +133,19 @@ export class AutomationsService {
                 }
             ],
             url: '/umbraco/automate/management/api/v1/automations/{id}/ancestors',
+            ...options
+        });
+    }
+    
+    public static postAutomationsByIdDryRun<ThrowOnError extends boolean = false>(options: Options<PostAutomationsByIdDryRunData, ThrowOnError>) {
+        return (options.client ?? client).post<PostAutomationsByIdDryRunResponses, PostAutomationsByIdDryRunErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/automations/{id}/dry-run',
             ...options
         });
     }
@@ -473,6 +486,45 @@ export class RunsService {
                 }
             ],
             url: '/umbraco/automate/management/api/v1/runs/{id}/replay',
+            ...options
+        });
+    }
+    
+    public static postRunsByIdResume<ThrowOnError extends boolean = false>(options: Options<PostRunsByIdResumeData, ThrowOnError>) {
+        return (options.client ?? client).post<PostRunsByIdResumeResponses, PostRunsByIdResumeErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/runs/{id}/resume',
+            ...options
+        });
+    }
+    
+    public static postRunsByIdSuspend<ThrowOnError extends boolean = false>(options: Options<PostRunsByIdSuspendData, ThrowOnError>) {
+        return (options.client ?? client).post<PostRunsByIdSuspendResponses, PostRunsByIdSuspendErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/runs/{id}/suspend',
+            ...options
+        });
+    }
+    
+    public static postRunsByIdTerminate<ThrowOnError extends boolean = false>(options: Options<PostRunsByIdTerminateData, ThrowOnError>) {
+        return (options.client ?? client).post<PostRunsByIdTerminateResponses, PostRunsByIdTerminateErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/automate/management/api/v1/runs/{id}/terminate',
             ...options
         });
     }

@@ -368,6 +368,7 @@ internal sealed class AutomationService : IAutomationService
             },
             Automation = new AutomationExportDefinition
             {
+                Id = automation.Id,
                 Alias = automation.Alias,
                 Name = automation.Name,
                 Description = automation.Description,
@@ -384,12 +385,14 @@ internal sealed class AutomationService : IAutomationService
     public async Task<AutomationImportResult> ValidateImportAsync(
         AutomationExportModel exportModel,
         Guid workspaceId,
+        Guid? existingAutomationId = null,
         CancellationToken cancellationToken = default)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
 
         ValidateFormatVersion(exportModel, errors);
+        ValidateExportHasId(exportModel, errors);
 
         if (errors.Count > 0)
         {
@@ -400,7 +403,7 @@ internal sealed class AutomationService : IAutomationService
         ValidateProviders(exportModel, errors);
         var resolvedConnections = await ResolveImportConnectionsAsync(exportModel, errors, cancellationToken);
         await ValidateWorkspaceAllowsConnectionsAsync(workspaceId, resolvedConnections, errors, cancellationToken);
-        await CheckImportAliasConflictAsync(exportModel.Automation.Alias, errors, cancellationToken);
+        await CheckImportIdentityAsync(exportModel, existingAutomationId, errors, cancellationToken);
         CollectSensitiveFieldWarnings(exportModel, warnings);
 
         return new AutomationImportResult
@@ -415,10 +418,11 @@ internal sealed class AutomationService : IAutomationService
     public async Task<AutomationImportResult> ImportAutomationAsync(
         AutomationExportModel exportModel,
         Guid workspaceId,
+        Guid? existingAutomationId = null,
         Guid? userId = null,
         CancellationToken cancellationToken = default)
     {
-        var validationResult = await ValidateImportAsync(exportModel, workspaceId, cancellationToken);
+        var validationResult = await ValidateImportAsync(exportModel, workspaceId, existingAutomationId, cancellationToken);
         if (!validationResult.Success)
         {
             return validationResult;
@@ -444,6 +448,35 @@ internal sealed class AutomationService : IAutomationService
             MaxRetries = s.MaxRetries,
         }).ToList();
 
+        if (existingAutomationId is null)
+        {
+            var created = await CreateImportedAutomationAsync(def, steps, workspaceId, userId, cancellationToken);
+            return new AutomationImportResult
+            {
+                Success = true,
+                AutomationId = created.Id,
+                AutomationAlias = created.Alias,
+                Warnings = validationResult.Warnings,
+            };
+        }
+
+        var updated = await OverwriteImportedAutomationAsync(existingAutomationId.Value, def, steps, userId, cancellationToken);
+        return new AutomationImportResult
+        {
+            Success = true,
+            AutomationId = updated.Id,
+            AutomationAlias = updated.Alias,
+            Warnings = validationResult.Warnings,
+        };
+    }
+
+    private async Task<Automation> CreateImportedAutomationAsync(
+        AutomationExportDefinition def,
+        List<StepConfiguration> steps,
+        Guid workspaceId,
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
         var automation = new Automation
         {
             Alias = def.Alias,
@@ -458,16 +491,31 @@ internal sealed class AutomationService : IAutomationService
             CanvasState = def.CanvasState,
             NotificationSettings = def.NotificationSettings,
         };
+        automation.Id = def.Id;
 
-        var created = await CreateAutomationAsync(automation, userId, cancellationToken);
+        return await CreateAutomationAsync(automation, userId, cancellationToken);
+    }
 
-        return new AutomationImportResult
-        {
-            Success = true,
-            AutomationId = created.Id,
-            AutomationAlias = created.Alias,
-            Warnings = validationResult.Warnings,
-        };
+    private async Task<Automation> OverwriteImportedAutomationAsync(
+        Guid existingAutomationId,
+        AutomationExportDefinition def,
+        List<StepConfiguration> steps,
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _automationRepository.GetAsync(existingAutomationId, cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{existingAutomationId}' not found.");
+
+        existing.Alias = def.Alias;
+        existing.Name = def.Name;
+        existing.Description = def.Description;
+        existing.Trigger = def.Trigger;
+        existing.Steps = steps;
+        existing.Connections = def.Connections.ToList();
+        existing.CanvasState = def.CanvasState;
+        existing.NotificationSettings = def.NotificationSettings;
+
+        return await UpdateAutomationAsync(existing, userId, cancellationToken);
     }
 
     private async Task<ExportStepModel> BuildExportStepAsync(
@@ -661,12 +709,60 @@ internal sealed class AutomationService : IAutomationService
         }
     }
 
-    private async Task CheckImportAliasConflictAsync(string alias, List<string> errors, CancellationToken cancellationToken)
+    private static void ValidateExportHasId(AutomationExportModel exportModel, List<string> errors)
     {
-        var existing = await _automationRepository.GetByAliasAsync(alias, cancellationToken);
-        if (existing is not null)
+        if (exportModel.Automation.Id == Guid.Empty)
         {
-            errors.Add($"An automation with alias '{alias}' already exists (ID: {existing.Id}).");
+            errors.Add("The export file is missing an automation ID. Re-export from a newer version of Umbraco.Automate.");
+        }
+    }
+
+    private async Task CheckImportIdentityAsync(
+        AutomationExportModel exportModel,
+        Guid? existingAutomationId,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        var fileId = exportModel.Automation.Id;
+        var alias = exportModel.Automation.Alias;
+
+        if (existingAutomationId is null)
+        {
+            // Create path: both id and alias must not already exist.
+            var byId = await _automationRepository.GetAsync(fileId, cancellationToken);
+            if (byId is not null)
+            {
+                errors.Add($"An automation with ID '{fileId}' already exists. Use the overwrite endpoint to update it.");
+            }
+
+            var byAlias = await _automationRepository.GetByAliasAsync(alias, cancellationToken);
+            if (byAlias is not null && byAlias.Id != fileId)
+            {
+                errors.Add($"An automation with alias '{alias}' already exists (ID: {byAlias.Id}).");
+            }
+
+            return;
+        }
+
+        // Overwrite path: the file's id must match the target id.
+        if (fileId != existingAutomationId.Value)
+        {
+            errors.Add($"The export file's automation ID '{fileId}' does not match the target automation ID '{existingAutomationId.Value}'.");
+            return;
+        }
+
+        var target = await _automationRepository.GetAsync(existingAutomationId.Value, cancellationToken);
+        if (target is null)
+        {
+            errors.Add($"Target automation '{existingAutomationId.Value}' was not found.");
+            return;
+        }
+
+        // Alias uniqueness still applies — but not against the automation being overwritten.
+        var byAliasForUpdate = await _automationRepository.GetByAliasAsync(alias, cancellationToken);
+        if (byAliasForUpdate is not null && byAliasForUpdate.Id != existingAutomationId.Value)
+        {
+            errors.Add($"An automation with alias '{alias}' already exists (ID: {byAliasForUpdate.Id}).");
         }
     }
 

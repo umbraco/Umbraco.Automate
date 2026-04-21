@@ -49,10 +49,18 @@ public sealed class ExportSourceModel
 }
 
 /// <summary>
-/// The portable automation definition, free of environment-specific identifiers.
+/// The portable automation definition. The <see cref="Id"/> is the stable identity that travels
+/// with the export across environments; step and connection references use aliases so they can be
+/// resolved against the target environment at import time.
 /// </summary>
 public sealed class AutomationExportDefinition
 {
+    /// <summary>
+    /// Gets or sets the automation id. This is preserved across export/import so references
+    /// (webhook URLs, run history, cross-environment deployments) remain stable.
+    /// </summary>
+    public required Guid Id { get; init; }
+
     /// <summary>
     /// Gets or sets the unique alias.
     /// </summary>
