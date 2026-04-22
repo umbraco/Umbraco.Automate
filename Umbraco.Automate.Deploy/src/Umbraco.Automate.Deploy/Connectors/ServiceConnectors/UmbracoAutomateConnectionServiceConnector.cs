@@ -22,7 +22,12 @@ public class UmbracoAutomateConnectionServiceConnector(
     protected override int[] ProcessPasses => [2];
 
     /// <inheritdoc />
-    protected override string[] ValidOpenSelectors => ["this", "this-and-descendants", "descendants"];
+    protected override string[] ValidOpenSelectors =>
+    [
+        Constants.DeploySelector.This,
+        Constants.DeploySelector.ThisAndDescendants,
+        Constants.DeploySelector.DescendantsOfThis,
+    ];
 
     /// <inheritdoc />
     protected override string OpenUdiName => "All Umbraco Automate Connections";

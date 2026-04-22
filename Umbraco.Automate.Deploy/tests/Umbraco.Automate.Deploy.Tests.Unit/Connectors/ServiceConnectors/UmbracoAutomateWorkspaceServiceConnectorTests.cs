@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Deploy.Configuration;
@@ -9,6 +10,8 @@ namespace Umbraco.Automate.Deploy.Tests.Unit.Connectors.ServiceConnectors;
 public class UmbracoAutomateWorkspaceServiceConnectorTests
 {
     private readonly Mock<IWorkspaceService> _workspaceServiceMock = new();
+    private readonly Mock<IWorkspaceGroupService> _groupServiceMock = new();
+    private readonly Mock<IAutomationService> _automationServiceMock = new();
     private readonly Mock<IConnectionService> _connectionServiceMock = new();
     private readonly Mock<UmbracoAutomateDeploySettingsAccessor> _settingsAccessorMock;
     private readonly UmbracoAutomateWorkspaceServiceConnector _connector;
@@ -20,6 +23,8 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
 
         _connector = new UmbracoAutomateWorkspaceServiceConnector(
             _workspaceServiceMock.Object,
+            _groupServiceMock.Object,
+            _automationServiceMock.Object,
             _connectionServiceMock.Object,
             _settingsAccessorMock.Object);
     }

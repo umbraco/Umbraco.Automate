@@ -127,6 +127,22 @@ public abstract class UmbracoAutomateEntityServiceConnectorBase<TArtifact, TEnti
     private NamedUdiRange GetRange(TEntity e, string selector)
         => new(e.GetUdi(UdiEntityType), GetEntityName(e), selector);
 
+    /// <summary>
+    /// Returns the UDIs of this entity's direct children. Override to support
+    /// "this-and-children" / "children-of-this" selectors when a workspace or
+    /// group contains other Automate entities.
+    /// </summary>
+    protected virtual IAsyncEnumerable<GuidUdi> GetChildUdisAsync(TEntity entity, CancellationToken cancellationToken)
+        => AsyncEnumerable.Empty<GuidUdi>();
+
+    /// <summary>
+    /// Returns the UDIs of this entity's descendants (children, grandchildren, …).
+    /// Defaults to <see cref="GetChildUdisAsync"/> — override when the hierarchy
+    /// is deeper than one level.
+    /// </summary>
+    protected virtual IAsyncEnumerable<GuidUdi> GetDescendantUdisAsync(TEntity entity, CancellationToken cancellationToken)
+        => GetChildUdisAsync(entity, cancellationToken);
+
     /// <inheritdoc />
     public override async IAsyncEnumerable<GuidUdi> ExpandRangeAsync(
         UdiRange range,
@@ -152,12 +168,47 @@ public abstract class UmbracoAutomateEntityServiceConnectorBase<TArtifact, TEnti
                 yield break;
             }
 
-            if (range.Selector != "this")
-            {
-                throw new NotSupportedException("Unexpected selector \"" + range.Selector + "\".");
-            }
+            GuidUdi udi = entity.GetUdi(UdiEntityType);
 
-            yield return entity.GetUdi(UdiEntityType);
+            switch (range.Selector)
+            {
+                case Constants.DeploySelector.This:
+                    yield return udi;
+                    break;
+
+                case Constants.DeploySelector.ThisAndChildren:
+                    yield return udi;
+                    await foreach (GuidUdi childUdi in GetChildUdisAsync(entity, cancellationToken).ConfigureAwait(false))
+                    {
+                        yield return childUdi;
+                    }
+                    break;
+
+                case Constants.DeploySelector.ThisAndDescendants:
+                    yield return udi;
+                    await foreach (GuidUdi descendantUdi in GetDescendantUdisAsync(entity, cancellationToken).ConfigureAwait(false))
+                    {
+                        yield return descendantUdi;
+                    }
+                    break;
+
+                case Constants.DeploySelector.ChildrenOfThis:
+                    await foreach (GuidUdi childUdi in GetChildUdisAsync(entity, cancellationToken).ConfigureAwait(false))
+                    {
+                        yield return childUdi;
+                    }
+                    break;
+
+                case Constants.DeploySelector.DescendantsOfThis:
+                    await foreach (GuidUdi descendantUdi in GetDescendantUdisAsync(entity, cancellationToken).ConfigureAwait(false))
+                    {
+                        yield return descendantUdi;
+                    }
+                    break;
+
+                default:
+                    throw new NotSupportedException("Unexpected selector \"" + range.Selector + "\".");
+            }
         }
     }
 

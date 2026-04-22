@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Deploy.Artifacts;
@@ -15,6 +16,8 @@ namespace Umbraco.Automate.Deploy.Connectors.ServiceConnectors;
 [UdiDefinition(UmbracoAutomateDeployConstants.UdiEntityType.Workspace, UdiType.GuidUdi)]
 public class UmbracoAutomateWorkspaceServiceConnector(
     IWorkspaceService workspaceService,
+    IWorkspaceGroupService groupService,
+    IAutomationService automationService,
     IConnectionService connectionService,
     UmbracoAutomateDeploySettingsAccessor settingsAccessor)
     : UmbracoAutomateEntityServiceConnectorBase<AutomateWorkspaceArtifact, Workspace>(settingsAccessor)
@@ -23,7 +26,12 @@ public class UmbracoAutomateWorkspaceServiceConnector(
     protected override int[] ProcessPasses => [3];
 
     /// <inheritdoc />
-    protected override string[] ValidOpenSelectors => ["this", "this-and-descendants", "descendants"];
+    protected override string[] ValidOpenSelectors =>
+    [
+        Constants.DeploySelector.This,
+        Constants.DeploySelector.ThisAndDescendants,
+        Constants.DeploySelector.DescendantsOfThis,
+    ];
 
     /// <inheritdoc />
     protected override string OpenUdiName => "All Umbraco Automate Workspaces";
@@ -158,6 +166,61 @@ public class UmbracoAutomateWorkspaceServiceConnector(
             };
 
             state.Entity = await workspaceService.CreateWorkspaceAsync(workspace, cancellationToken: cancellationToken);
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Direct children of a workspace are its root-level groups and root-level automations
+    /// (those with no parent group).
+    /// </remarks>
+    protected override async IAsyncEnumerable<GuidUdi> GetChildUdisAsync(
+        Workspace entity,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var rootGroups = await groupService.GetGroupsByWorkspaceAsync(entity.Id, parentId: null, cancellationToken);
+        foreach (var group in rootGroups)
+        {
+            yield return new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup, group.Id);
+        }
+
+        var (rootAutomations, _) = await automationService.GetAutomationsPagedAsync(
+            workspaceIds: new HashSet<Guid> { entity.Id },
+            groupId: Guid.Empty,
+            skip: 0,
+            take: int.MaxValue,
+            cancellationToken: cancellationToken);
+
+        foreach (var automation in rootAutomations)
+        {
+            yield return new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Automation, automation.Id);
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Descendants of a workspace are every group and automation it contains, at any depth.
+    /// </remarks>
+    protected override async IAsyncEnumerable<GuidUdi> GetDescendantUdisAsync(
+        Workspace entity,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var allGroups = await groupService.GetAllGroupsAsync(cancellationToken);
+        foreach (var group in allGroups.Where(g => g.WorkspaceId == entity.Id))
+        {
+            yield return new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup, group.Id);
+        }
+
+        var (allAutomations, _) = await automationService.GetAutomationsPagedAsync(
+            workspaceIds: new HashSet<Guid> { entity.Id },
+            groupId: null,
+            skip: 0,
+            take: int.MaxValue,
+            cancellationToken: cancellationToken);
+
+        foreach (var automation in allAutomations)
+        {
+            yield return new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Automation, automation.Id);
         }
     }
 }
