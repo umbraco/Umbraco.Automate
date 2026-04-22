@@ -62,13 +62,25 @@ public class UmbracoAutomateWorkspaceServiceConnector(
 
         var dependencies = new ArtifactDependencyCollection();
 
-        // Add Connection dependencies
+        // Connection dependencies — the workspace's allowed-connections list.
         var connectionUdis = new List<GuidUdi>();
         foreach (var connectionId in entity.AllowedConnections)
         {
             var connectionUdi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Connection, connectionId);
             dependencies.Add(new UmbracoAutomateArtifactDependency(connectionUdi, ArtifactDependencyMode.Match));
             connectionUdis.Add(connectionUdi);
+        }
+
+        // Service account user — the backoffice user automations run as. Without this dependency
+        // a workspace could land in the target env referencing a user that doesn't exist there.
+        var serviceAccountUdi = new GuidUdi(Umbraco.Cms.Core.Constants.UdiEntityType.User, entity.ServiceAccountKey);
+        dependencies.Add(new UmbracoAutomateArtifactDependency(serviceAccountUdi, ArtifactDependencyMode.Match));
+
+        // User group dependencies — the workspace's access-control list.
+        foreach (var userGroupKey in entity.UserGroups)
+        {
+            var userGroupUdi = new GuidUdi(Umbraco.Cms.Core.Constants.UdiEntityType.UserGroup, userGroupKey);
+            dependencies.Add(new UmbracoAutomateArtifactDependency(userGroupUdi, ArtifactDependencyMode.Match));
         }
 
         var artifact = new AutomateWorkspaceArtifact(udi, dependencies)
@@ -133,9 +145,11 @@ public class UmbracoAutomateWorkspaceServiceConnector(
         }
         else
         {
-            // Create new workspace
+            // Create new workspace, preserving the artifact's UDI so cross-environment
+            // references resolve and redeployment stays idempotent.
             var workspace = new Workspace
             {
+                Id = artifact.Udi.Guid,
                 Alias = artifact.Alias!,
                 Name = artifact.Name,
                 ServiceAccountKey = artifact.ServiceAccountKey,

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Deploy.Artifacts;
 using Umbraco.Automate.Deploy.Configuration;
@@ -11,12 +12,14 @@ namespace Umbraco.Automate.Deploy.Connectors.ServiceConnectors;
 
 /// <summary>
 /// Service connector for Automations, responsible for synchronizing
-/// automation entities during deploy operations. Resolves Workspace dependencies.
+/// automation entities during deploy operations. Resolves Workspace and
+/// Connection dependencies.
 /// </summary>
 [UdiDefinition(UmbracoAutomateDeployConstants.UdiEntityType.Automation, UdiType.GuidUdi)]
 public class UmbracoAutomateAutomationServiceConnector(
     IAutomationService automationService,
     IWorkspaceService workspaceService,
+    ISensitiveSettingsStripper sensitiveStripper,
     UmbracoAutomateDeploySettingsAccessor settingsAccessor)
     : UmbracoAutomateEntityServiceConnectorBase<AutomateAutomationArtifact, Automation>(settingsAccessor)
 {
@@ -63,9 +66,35 @@ public class UmbracoAutomateAutomationServiceConnector(
 
         var dependencies = new ArtifactDependencyCollection();
 
-        // Add Workspace dependency
+        // Workspace dependency — the automation cannot deploy without its workspace.
         var workspaceUdi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Workspace, entity.WorkspaceId);
         dependencies.Add(new UmbracoAutomateArtifactDependency(workspaceUdi, ArtifactDependencyMode.Match));
+
+        // Group dependency — when the automation lives in a folder, that folder must exist
+        // in the target environment before the automation can land in it.
+        if (entity.GroupId.HasValue)
+        {
+            var groupUdi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup, entity.GroupId.Value);
+            dependencies.Add(new UmbracoAutomateArtifactDependency(groupUdi, ArtifactDependencyMode.Match));
+        }
+
+        // Connection dependencies — each step that references a connection needs that
+        // connection to exist in the target environment, otherwise the step would land
+        // with a dangling ConnectionId.
+        foreach (var connectionId in entity.Steps
+            .Select(s => s.ConnectionId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct())
+        {
+            var connectionUdi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Connection, connectionId);
+            dependencies.Add(new UmbracoAutomateArtifactDependency(connectionUdi, ArtifactDependencyMode.Match));
+        }
+
+        // Strip sensitive trigger/step settings before serializing — the artifact will
+        // be written to disk and committed to source control by Deploy consumers.
+        var strippedTrigger = sensitiveStripper.StripTrigger(entity.Trigger);
+        var strippedSteps = sensitiveStripper.StripSteps(entity.Steps);
 
         var artifact = new AutomateAutomationArtifact(udi, dependencies)
         {
@@ -77,8 +106,8 @@ public class UmbracoAutomateAutomationServiceConnector(
             PublishedVersion = entity.PublishedVersion,
             WorkspaceUdi = workspaceUdi,
             GroupId = entity.GroupId,
-            Trigger = entity.Trigger != null ? JsonSerializer.SerializeToElement(entity.Trigger) : null,
-            Steps = entity.Steps.Count > 0 ? JsonSerializer.SerializeToElement(entity.Steps) : null,
+            Trigger = strippedTrigger != null ? JsonSerializer.SerializeToElement(strippedTrigger) : null,
+            Steps = strippedSteps.Count > 0 ? JsonSerializer.SerializeToElement(strippedSteps) : null,
             Connections = entity.Connections.Count > 0 ? JsonSerializer.SerializeToElement(entity.Connections) : null,
             NotificationSettings = entity.NotificationSettings != null ? JsonSerializer.SerializeToElement(entity.NotificationSettings) : null,
             CanvasState = entity.CanvasState,
@@ -147,7 +176,9 @@ public class UmbracoAutomateAutomationServiceConnector(
 
         if (state.Entity != null)
         {
-            // Update existing automation
+            // Update existing automation — preserve the target environment's lifecycle state
+            // (published/draft, enabled/disabled) so redeploys don't knock a live automation
+            // back to draft. Only the content (alias, steps, trigger, etc.) is replaced.
             var automation = state.Entity;
             automation.Alias = artifact.Alias!;
             automation.Name = artifact.Name;
@@ -160,22 +191,22 @@ public class UmbracoAutomateAutomationServiceConnector(
             automation.NotificationSettings = notificationSettings;
             automation.CanvasState = artifact.CanvasState;
 
-            // Safety: import as disabled draft to prevent accidental trigger execution
-            automation.IsEnabled = false;
-            automation.Status = AutomationStatus.Draft;
-
             state.Entity = await automationService.UpdateAutomationAsync(automation, cancellationToken: cancellationToken);
         }
         else
         {
-            // Create new automation as disabled draft
+            // Create new automation as disabled draft for safety — an operator must explicitly
+            // enable/publish after the first deploy. Preserve the artifact UDI as the entity ID
+            // so redeployment of the same artifact stays idempotent.
             var automation = new Automation
             {
+                Id = state.Artifact.Udi.Guid,
                 Alias = artifact.Alias!,
                 Name = artifact.Name,
                 Description = artifact.Description,
                 IsEnabled = false,
                 Status = AutomationStatus.Draft,
+                PublishedVersion = artifact.PublishedVersion,
                 WorkspaceId = workspace.Id,
                 GroupId = artifact.GroupId,
                 Trigger = trigger,

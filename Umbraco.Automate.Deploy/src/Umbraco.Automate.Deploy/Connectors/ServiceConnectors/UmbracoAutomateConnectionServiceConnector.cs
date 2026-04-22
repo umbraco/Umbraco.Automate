@@ -124,9 +124,11 @@ public class UmbracoAutomateConnectionServiceConnector(
         }
         else
         {
-            // Create new connection
+            // Create new connection, preserving the artifact's UDI so cross-environment
+            // references resolve and redeployment stays idempotent.
             var connection = new Connection
             {
+                Id = artifact.Udi.Guid,
                 Alias = artifact.Alias!,
                 Name = artifact.Name,
                 Type = artifact.Type,
