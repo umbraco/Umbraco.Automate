@@ -30,6 +30,23 @@
     <PackageReference Include="Umbraco.Deploy.Infrastructure" />
   </ItemGroup>
 
+  <!-- Add JSON schema file to package output -->
+  <PropertyGroup>
+    <_UmbracoAutomateDeployJsonSchemaReference>appsettings-schema.Umbraco.Automate.Deploy.json</_UmbracoAutomateDeployJsonSchemaReference>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="$(_UmbracoAutomateDeployJsonSchemaReference)" PackagePath="" Visible="false" />
+  </ItemGroup>
+
+  <!-- Generate JSON schema on build (and before copying to project) -->
+  <Target Name="GenerateAppsettingsSchema" BeforeTargets="Build;CopyUmbracoJsonSchemaFiles" Inputs="$(TargetPath)" Outputs="$(_UmbracoAutomateDeployJsonSchemaReference)">
+    <Message Text="Generating $(_UmbracoAutomateDeployJsonSchemaReference)" Importance="high" />
+    <JsonSchemaGenerate AssemblyPath="$(TargetPath)" TypeName="UmbracoAutomateDeploySchema" OutputPath="$(_UmbracoAutomateDeployJsonSchemaReference)" IncludeObsoleteProperties="false" />
+    <ItemGroup>
+      <FileWrites Include="$(_UmbracoAutomateDeployJsonSchemaReference)" />
+    </ItemGroup>
+  </Target>
+
   <!-- Copy client assets to intermediate output path (mirrors Umbraco.Forms.Deploy) -->
   <ItemGroup>
     <ClientAssetsInputs Include="wwwroot\**" Exclude="$(DefaultItemExcludes)" />
