@@ -138,6 +138,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             versionService.Object,
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
+            triggers,
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }
 

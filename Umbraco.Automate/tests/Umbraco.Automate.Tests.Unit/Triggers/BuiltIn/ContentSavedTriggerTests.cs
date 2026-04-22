@@ -104,6 +104,39 @@ public class ContentSavedTriggerTests
         events[0].IdempotencyKey.ShouldStartWith($"umbracoAutomate.contentSaved:{contentKey}:");
     }
 
+    [Fact]
+    public void CanHandle_NoSettings_ReturnsTrue()
+    {
+        var output = new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() };
+        ((ITrigger)_trigger).CanHandle(output, null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CanHandle_MatchingContentType_ReturnsTrue()
+    {
+        var typeKey = Guid.NewGuid();
+        var output = new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = typeKey };
+        var settings = new ContentSavedTriggerSettings { ContentTypes = typeKey.ToString() };
+
+        ((ITrigger)_trigger).CanHandle(output, settings).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CanHandle_NonMatchingContentType_ReturnsFalse()
+    {
+        var output = new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() };
+        var settings = new ContentSavedTriggerSettings { ContentTypes = Guid.NewGuid().ToString() };
+
+        ((ITrigger)_trigger).CanHandle(output, settings).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void CanHandle_MismatchedOutputType_ReturnsTrue()
+    {
+        // Defensive: a wrong output type shouldn't suppress automations.
+        ((ITrigger)_trigger).CanHandle(new { }, new ContentSavedTriggerSettings()).ShouldBeTrue();
+    }
+
     private static IContent CreateContent(Guid key, string name, string contentTypeAlias)
     {
         var contentType = new Mock<ISimpleContentType>();

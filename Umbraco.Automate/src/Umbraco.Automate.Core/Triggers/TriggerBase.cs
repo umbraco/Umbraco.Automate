@@ -16,4 +16,22 @@ public abstract class TriggerBase<TSettings, TOutput> : StepTypeBase<TSettings, 
     /// Initializes a new instance of the <see cref="TriggerBase{TSettings, TOutput}"/> class.
     /// </summary>
     protected TriggerBase(TriggerInfrastructure infrastructure) : base(infrastructure) { }
+
+    /// <summary>
+    /// Override to filter events based on the automation's trigger settings. The default
+    /// implementation returns <c>true</c>, meaning every event fires for every subscribing
+    /// automation. Triggers with filterable settings (e.g. <c>ContentTypes</c>) should
+    /// override to compare <paramref name="output"/> against <paramref name="settings"/>.
+    /// </summary>
+    /// <param name="output">The trigger event output.</param>
+    /// <param name="settings">The automation's resolved trigger settings, or <c>null</c> if unconfigured.</param>
+    /// <returns><c>true</c> if the event should fire for this automation.</returns>
+    protected virtual bool CanHandle(TOutput output, TSettings? settings) => true;
+
+    /// <inheritdoc />
+    // Defensive: if the dispatcher ever hands us the wrong output type, don't filter
+    // rather than dropping events — mis-typed deserialization should not silently
+    // suppress automations.
+    bool ITrigger.CanHandle(object output, object? settings)
+        => output is not TOutput typed || CanHandle(typed, settings as TSettings);
 }

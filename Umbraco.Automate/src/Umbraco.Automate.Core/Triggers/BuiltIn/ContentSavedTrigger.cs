@@ -42,4 +42,8 @@ public sealed class ContentSavedTrigger
             };
         }
     }
+
+    /// <inheritdoc />
+    protected override bool CanHandle(ContentSavedTriggerOutput output, ContentSavedTriggerSettings? settings)
+        => ContentTypesFilter.Matches(output.ContentTypeKey, settings?.ContentTypes);
 }

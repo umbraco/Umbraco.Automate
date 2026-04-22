@@ -73,6 +73,53 @@ public class ContentBatchSavedTriggerTests
         events.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void CanHandle_NoSettings_ReturnsTrue()
+    {
+        var batch = new BatchTriggerOutput<ContentSavedTriggerOutput>
+        {
+            Items = [new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() }],
+            Count = 1,
+        };
+
+        ((ITrigger)_trigger).CanHandle(batch, null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CanHandle_AnyItemMatchingContentType_ReturnsTrue()
+    {
+        var allowed = Guid.NewGuid();
+        var batch = new BatchTriggerOutput<ContentSavedTriggerOutput>
+        {
+            Items =
+            [
+                new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() },
+                new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = allowed },
+            ],
+            Count = 2,
+        };
+        var settings = new ContentSavedTriggerSettings { ContentTypes = allowed.ToString() };
+
+        ((ITrigger)_trigger).CanHandle(batch, settings).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CanHandle_NoItemsMatchingContentType_ReturnsFalse()
+    {
+        var batch = new BatchTriggerOutput<ContentSavedTriggerOutput>
+        {
+            Items =
+            [
+                new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() },
+                new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() },
+            ],
+            Count = 2,
+        };
+        var settings = new ContentSavedTriggerSettings { ContentTypes = Guid.NewGuid().ToString() };
+
+        ((ITrigger)_trigger).CanHandle(batch, settings).ShouldBeFalse();
+    }
+
     private static IContent CreateContent(Guid key, string name, string contentTypeAlias)
     {
         var contentType = new Mock<ISimpleContentType>();
