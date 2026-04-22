@@ -42,8 +42,12 @@ steps:
               New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
               $outputFile = Join-Path $outputDir "${{ parameters.product }}-bom.json"
 
-              # Generate SBOM and upload to Dependency-Track
+              # Generate SBOM and upload to Dependency-Track.
+              # Pin spec-version to 1.6 — cdxgen 12.x defaults to 1.7, which
+              # Dependency-Track only supports from 4.13+. Drop the override
+              # once the D-Track server is upgraded.
               cdxgen --recurse `
+                --spec-version 1.6 `
                 --output $outputFile `
                 --json-pretty `
                 --project-group "Umbraco" `
