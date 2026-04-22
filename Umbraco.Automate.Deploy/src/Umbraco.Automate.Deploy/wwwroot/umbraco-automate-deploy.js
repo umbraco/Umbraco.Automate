@@ -45,6 +45,30 @@ export const onInit = async (host, extensionRegistry) => {
     },
     {
       type: "deployEntityActionRegistrar",
+      actionAlias: "Deploy.EntityAction.EnvironmentRestore",
+      alias: "Automate.Deploy.EnvironmentRestore.Registrar",
+      name: "Automate Deploy Environment Restore Entity Action Registrar",
+      forEntityTypes: [
+        {
+          entityTypes: [UA_WORKSPACE_ROOT_ENTITY_TYPE],
+          conditions: ["default"],
+        },
+      ],
+    },
+    {
+      type: "deployEntityActionRegistrar",
+      actionAlias: "Deploy.EntityAction.EnvironmentExport",
+      alias: "Automate.Deploy.EnvironmentExport.Registrar",
+      name: "Automate Deploy Environment Export Entity Action Registrar",
+      forEntityTypes: [
+        {
+          entityTypes: [UA_WORKSPACE_ROOT_ENTITY_TYPE],
+          conditions: ["default"],
+        },
+      ],
+    },
+    {
+      type: "deployEntityActionRegistrar",
       actionAlias: "Deploy.EntityAction.Queue",
       alias: "Automate.Deploy.Queue.Registrar",
       name: "Automate Deploy Queue Entity Action Registrar",
