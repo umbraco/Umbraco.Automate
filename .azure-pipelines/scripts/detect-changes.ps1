@@ -438,6 +438,20 @@ function Get-ChangedProducts {
         $remoteBranch = "origin/$branchName"
         $remoteExists = git rev-parse --verify "$remoteBranch" 2>&1
         if ($LASTEXITCODE -eq 0) {
+            # Azure DevOps' checkout task fetches origin/$branchName before CI runs, so
+            # origin/$branchName ends up at HEAD (the new tip). When that happens the
+            # diff is empty and we lose the range of the push. Detect this case and build
+            # every product — safer than silently falling back to HEAD~1, which only sees
+            # the top commit of a multi-commit push.
+            $remoteCommit = (git rev-parse $remoteBranch 2>$null | Out-String).Trim()
+            $headCommit = (git rev-parse HEAD 2>$null | Out-String).Trim()
+
+            if ($remoteCommit -eq $headCommit) {
+                Write-Host "  origin/$branchName already points at HEAD - push range unknowable, building all products" -ForegroundColor Yellow
+                $Products.Keys | ForEach-Object { $changed[$_] = $true }
+                return $changed
+            }
+
             $comparisonBase = $remoteBranch
             $changedFiles = git diff --name-only $remoteBranch HEAD 2>&1
             Write-Host "  Comparing against remote: $remoteBranch" -ForegroundColor Cyan
