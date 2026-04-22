@@ -295,6 +295,60 @@ function Get-BuildLevels {
 # CHANGE DETECTION
 # ============================================================================
 
+function Get-LastSuccessfulBuildCommit {
+    <#
+    .SYNOPSIS
+    Returns the source commit SHA of the most recent successful build of this
+    pipeline on the same branch, via the Azure DevOps REST API.
+
+    .DESCRIPTION
+    Requires SYSTEM_ACCESSTOKEN to be exposed to the script (done by setting
+    env: SYSTEM_ACCESSTOKEN: $(System.AccessToken) on the task). Returns $null
+    if the API call fails, no previous build exists, or we're not running in
+    Azure Pipelines.
+    #>
+    param([string]$SourceBranch)
+
+    $collectionUri = $env:SYSTEM_COLLECTIONURI
+    $project = $env:SYSTEM_TEAMPROJECT
+    $definitionId = $env:SYSTEM_DEFINITIONID
+    $accessToken = $env:SYSTEM_ACCESSTOKEN
+    $currentBuildId = $env:BUILD_BUILDID
+
+    if (-not $collectionUri -or -not $project -or -not $definitionId) {
+        Write-Host "    Azure DevOps env vars not set - skipping API lookup" -ForegroundColor Gray
+        return $null
+    }
+
+    if (-not $accessToken) {
+        Write-Host "    SYSTEM_ACCESSTOKEN not available - add 'env: SYSTEM_ACCESSTOKEN: \$(System.AccessToken)' to the task" -ForegroundColor Yellow
+        return $null
+    }
+
+    $encodedBranch = [System.Uri]::EscapeDataString($SourceBranch)
+    $uri = "${collectionUri}${project}/_apis/build/builds?definitions=${definitionId}&branchName=${encodedBranch}&statusFilter=completed&resultFilter=succeeded&`$top=5&api-version=7.1-preview.7"
+    $headers = @{ "Authorization" = "Bearer $accessToken" }
+
+    try {
+        $response = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -ErrorAction Stop
+
+        # Pick the most recent build that isn't the current one
+        foreach ($build in $response.value) {
+            if ($build.id -ne $currentBuildId -and $build.sourceVersion) {
+                Write-Host "    Last successful build: #$($build.id) @ $($build.sourceVersion)" -ForegroundColor Gray
+                return $build.sourceVersion
+            }
+        }
+
+        Write-Host "    No prior successful build found for branch" -ForegroundColor Gray
+        return $null
+    }
+    catch {
+        Write-Host "    Azure DevOps API call failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        return $null
+    }
+}
+
 function Test-SubstantiveChange {
     <#
     .SYNOPSIS
@@ -430,37 +484,35 @@ function Get-ChangedProducts {
         }
     }
     elseif ($SourceBranch -match '^refs/heads/(main|dev)$') {
-        # For main/dev pushes: compare with remote tracking branch to capture all commits in push
+        # For main/dev pushes: origin/$branchName always points at HEAD after CI's fetch,
+        # so a direct git diff would be empty. Ask Azure DevOps for the previous successful
+        # build's source version on this branch and diff against that — captures the whole
+        # push range (even multi-commit pushes) accurately.
         $branchName = if ($SourceBranch -match '/main$') { 'main' } else { 'dev' }
-        Write-Host "  Main/dev branch detected, comparing with origin/$branchName" -ForegroundColor Cyan
+        Write-Host "  Main/dev branch detected" -ForegroundColor Cyan
 
-        # Try to use origin branch (captures all commits in multi-commit push)
-        $remoteBranch = "origin/$branchName"
-        $remoteExists = git rev-parse --verify "$remoteBranch" 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            # Azure DevOps' checkout task fetches origin/$branchName before CI runs, so
-            # origin/$branchName ends up at HEAD (the new tip). When that happens the
-            # diff is empty and we lose the range of the push. Detect this case and build
-            # every product — safer than silently falling back to HEAD~1, which only sees
-            # the top commit of a multi-commit push.
-            $remoteCommit = (git rev-parse $remoteBranch 2>$null | Out-String).Trim()
-            $headCommit = (git rev-parse HEAD 2>$null | Out-String).Trim()
-
-            if ($remoteCommit -eq $headCommit) {
-                Write-Host "  origin/$branchName already points at HEAD - push range unknowable, building all products" -ForegroundColor Yellow
+        $previousSha = Get-LastSuccessfulBuildCommit -SourceBranch $SourceBranch
+        if ($previousSha) {
+            # Verify the SHA is reachable — it might not be if history was rewritten
+            # or the fetch depth is too shallow.
+            $null = git cat-file -e "$previousSha^{commit}" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                $comparisonBase = $previousSha
+                $changedFiles = git diff --name-only $previousSha HEAD 2>&1
+                Write-Host "  Comparing against last successful build: $previousSha" -ForegroundColor Cyan
+            }
+            else {
+                Write-Host "  Previous build SHA $previousSha not reachable - building all products" -ForegroundColor Yellow
                 $Products.Keys | ForEach-Object { $changed[$_] = $true }
                 return $changed
             }
-
-            $comparisonBase = $remoteBranch
-            $changedFiles = git diff --name-only $remoteBranch HEAD 2>&1
-            Write-Host "  Comparing against remote: $remoteBranch" -ForegroundColor Cyan
         }
         else {
-            # Fallback to HEAD~1 if remote branch doesn't exist (e.g., first push)
-            Write-Host "  Remote branch not found, falling back to HEAD~1" -ForegroundColor Yellow
-            $comparisonBase = "HEAD~1"
-            $changedFiles = git diff --name-only HEAD~1 HEAD 2>&1
+            # No previous successful build (first build on branch, API unreachable, etc.)
+            # Safer to build everything than miss something.
+            Write-Host "  No previous successful build found - building all products" -ForegroundColor Yellow
+            $Products.Keys | ForEach-Object { $changed[$_] = $true }
+            return $changed
         }
     }
     elseif ($SourceBranch -match '^refs/heads/(release|hotfix)/') {

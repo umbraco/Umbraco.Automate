@@ -331,6 +331,10 @@ stages:
                   inputs:
                       filePath: .azure-pipelines/scripts/detect-changes.ps1
                       pwsh: true
+                  env:
+                      # Required by Get-LastSuccessfulBuildCommit to query the Azure DevOps REST API
+                      # for the previous successful build's source version on this branch.
+                      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
                 - task: Bash@3
                   displayName: Summarize packed products + tag build
