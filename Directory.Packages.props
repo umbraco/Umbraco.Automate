@@ -9,7 +9,7 @@
     <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118" />
     <GlobalPackageReference Include="Umbraco.Code" Version="2.4.0" />
     <GlobalPackageReference Include="Umbraco.GitVersioning.Extensions" Version="0.2.0" />
-    <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.3.0" PrivateAssets="all" />
+    <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.4.0" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Umbraco CMS -->

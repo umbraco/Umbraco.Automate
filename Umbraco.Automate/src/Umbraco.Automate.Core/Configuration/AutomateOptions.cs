@@ -6,7 +6,11 @@ namespace Umbraco.Automate.Core.Configuration;
 /// Top-level configuration options for Umbraco.Automate.
 /// Bound to <c>Umbraco:Automate</c> in appsettings.json.
 /// </summary>
-public sealed class AutomateOptions
+/// <remarks>
+/// Not <c>sealed</c> so the JSON schema definition can inherit from it and expose both
+/// these root-level properties and the sub-section options under a single type.
+/// </remarks>
+public class AutomateOptions
 {
     /// <summary>
     /// Gets or sets whether the automation engine is enabled.
