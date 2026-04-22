@@ -30,7 +30,11 @@
   <Folder Name="/Umbraco.Automate.Slack/">
     <Project Path="Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj" />
   </Folder>
-  <Folder Name="/Umbraco.Automate.Deploy/">
+  <Folder Name="/Umbraco.Automate.Deploy/" />
+  <Folder Name="/Umbraco.Automate.Deploy/src/">
     <Project Path="Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj" />
+  </Folder>
+  <Folder Name="/Umbraco.Automate.Deploy/tests/">
+    <Project Path="Umbraco.Automate.Deploy/tests/Umbraco.Automate.Deploy.Tests.Unit/Umbraco.Automate.Deploy.Tests.Unit.csproj" />
   </Folder>
 </Solution>

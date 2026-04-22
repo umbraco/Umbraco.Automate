@@ -107,22 +107,24 @@ cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "demo/Umbraco.Automate.D
 echo "Creating unified solution..."
 dotnet new sln -n "Umbraco.Automate.local" --force
 
-# Helper function to add all projects from a product's src folder
+# Helper function to add all projects from a product's src and tests folders
 add_product_projects() {
     local product_folder="$1"
     local solution_folder="$2"
-    local src_path="$product_folder/src"
 
-    if [ -d "$src_path" ]; then
-        local count=0
-        while IFS= read -r -d '' proj; do
-            local proj_name=$(basename "$proj")
-            echo "  Adding $proj_name"
-            dotnet sln "Umbraco.Automate.local.slnx" add "$proj" --solution-folder "$solution_folder" 2>/dev/null || true
-            ((count++))
-        done < <(find "$src_path" -name "*.csproj" -print0)
-        echo "  Added $count projects"
-    fi
+    local count=0
+    for sub in src tests; do
+        local sub_path="$product_folder/$sub"
+        if [ -d "$sub_path" ]; then
+            while IFS= read -r -d '' proj; do
+                local proj_name=$(basename "$proj")
+                echo "  Adding $proj_name"
+                dotnet sln "Umbraco.Automate.local.slnx" add "$proj" --solution-folder "$solution_folder" 2>/dev/null || true
+                ((count++))
+            done < <(find "$sub_path" -name "*.csproj" -print0)
+        fi
+    done
+    echo "  Added $count projects"
 }
 
 # Step 5: Add Core projects
@@ -136,6 +138,10 @@ add_product_projects "Umbraco.Automate.OpenIddict" "OpenIddict"
 # Step 7: Add Slack projects
 echo "Adding Umbraco.Automate.Slack projects..."
 add_product_projects "Umbraco.Automate.Slack" "Slack"
+
+# Step 7b: Add Deploy projects
+echo "Adding Umbraco.Automate.Deploy projects..."
+add_product_projects "Umbraco.Automate.Deploy" "Deploy"
 
 # Step 8: Add demo site to solution
 echo "Adding demo site to solution..."
@@ -157,6 +163,11 @@ fi
 # Slack add-on
 if [ -f "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj" ]; then
     dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj"
+fi
+
+# Deploy add-on
+if [ -f "Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj" ]; then
+    dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj"
 fi
 
 echo ""
