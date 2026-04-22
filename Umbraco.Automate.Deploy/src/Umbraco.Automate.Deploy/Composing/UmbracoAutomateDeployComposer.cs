@@ -31,6 +31,8 @@ public class UmbracoAutomateDeployComposer : IComposer
             ConnectionSavedDeployRefresherNotificationAsyncHandler>();
         builder.AddNotificationAsyncHandler<WorkspaceSavedNotification,
             WorkspaceSavedDeployRefresherNotificationAsyncHandler>();
+        builder.AddNotificationAsyncHandler<WorkspaceGroupSavedNotification,
+            WorkspaceGroupSavedDeployRefresherNotificationAsyncHandler>();
         builder.AddNotificationAsyncHandler<AutomationSavedNotification,
             AutomationSavedDeployRefresherNotificationAsyncHandler>();
 
@@ -39,6 +41,8 @@ public class UmbracoAutomateDeployComposer : IComposer
             ConnectionDeletedDeployRefresherNotificationAsyncHandler>();
         builder.AddNotificationAsyncHandler<WorkspaceDeletedNotification,
             WorkspaceDeletedDeployRefresherNotificationAsyncHandler>();
+        builder.AddNotificationAsyncHandler<WorkspaceGroupDeletedNotification,
+            WorkspaceGroupDeletedDeployRefresherNotificationAsyncHandler>();
         builder.AddNotificationAsyncHandler<AutomationDeletedNotification,
             AutomationDeletedDeployRefresherNotificationAsyncHandler>();
     }

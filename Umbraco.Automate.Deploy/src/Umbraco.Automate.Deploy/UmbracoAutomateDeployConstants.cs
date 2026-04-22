@@ -24,5 +24,10 @@ public static class UmbracoAutomateDeployConstants
         /// UDI entity type for connections.
         /// </summary>
         public const string Connection = "umbraco-automate-connection";
+
+        /// <summary>
+        /// UDI entity type for workspace groups (folders that organize automations within a workspace).
+        /// </summary>
+        public const string WorkspaceGroup = "umbraco-automate-workspace-group";
     }
 }

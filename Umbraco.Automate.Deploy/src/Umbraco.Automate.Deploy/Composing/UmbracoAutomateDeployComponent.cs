@@ -26,6 +26,7 @@ public class UmbracoAutomateDeployComponent(IDiskEntityService diskEntityService
     {
         UdiParser.RegisterUdiType(UmbracoAutomateDeployConstants.UdiEntityType.Connection, UdiType.GuidUdi);
         UdiParser.RegisterUdiType(UmbracoAutomateDeployConstants.UdiEntityType.Workspace, UdiType.GuidUdi);
+        UdiParser.RegisterUdiType(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup, UdiType.GuidUdi);
         UdiParser.RegisterUdiType(UmbracoAutomateDeployConstants.UdiEntityType.Automation, UdiType.GuidUdi);
     }
 
@@ -33,6 +34,7 @@ public class UmbracoAutomateDeployComponent(IDiskEntityService diskEntityService
     {
         diskEntityService.RegisterDiskEntityType(UmbracoAutomateDeployConstants.UdiEntityType.Connection);
         diskEntityService.RegisterDiskEntityType(UmbracoAutomateDeployConstants.UdiEntityType.Workspace);
+        diskEntityService.RegisterDiskEntityType(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup);
         diskEntityService.RegisterDiskEntityType(UmbracoAutomateDeployConstants.UdiEntityType.Automation);
     }
 }
