@@ -41,6 +41,18 @@ internal sealed class EFCoreWorkspaceGroupRepository : IWorkspaceGroupRepository
         return entities.Select(_factory.BuildDomain);
     }
 
+    public async Task<IEnumerable<WorkspaceGroup>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var entities = await db.WorkspaceGroups
+            .OrderBy(g => g.WorkspaceId)
+            .ThenBy(g => g.Name)
+            .ToListAsync(cancellationToken);
+
+        return entities.Select(_factory.BuildDomain);
+    }
+
     public async Task<WorkspaceGroup> SaveAsync(WorkspaceGroup group, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);

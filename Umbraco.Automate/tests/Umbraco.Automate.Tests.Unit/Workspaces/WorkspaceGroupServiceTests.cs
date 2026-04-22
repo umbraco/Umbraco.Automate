@@ -1,6 +1,9 @@
+using System.Data;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Scoping;
 
 namespace Umbraco.Automate.Tests.Unit.Workspaces;
 
@@ -10,10 +13,24 @@ public class WorkspaceGroupServiceTests
     private readonly Mock<IAutomationService> _automationService = new();
     private readonly Mock<IAutomationRepository> _automationRepo = new();
     private readonly Mock<IWorkspaceService> _workspaceService = new();
+    private readonly Mock<ICoreScopeProvider> _scopeProvider = new();
+    private readonly Mock<ICoreScope> _scope = new();
+    private readonly Mock<IScopedNotificationPublisher> _notifications = new();
     private readonly WorkspaceGroupService _service;
 
     public WorkspaceGroupServiceTests()
     {
+        _scope.Setup(s => s.Notifications).Returns(_notifications.Object);
+        _scopeProvider.Setup(p => p.CreateCoreScope(
+                It.IsAny<IsolationLevel>(),
+                It.IsAny<RepositoryCacheMode>(),
+                It.IsAny<IEventDispatcher?>(),
+                It.IsAny<IScopedNotificationPublisher?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>()))
+            .Returns(_scope.Object);
+
         // Default workspace mock — returns a valid workspace for any ID.
         _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceBuilder().Build());
@@ -22,7 +39,9 @@ public class WorkspaceGroupServiceTests
             _groupRepo.Object,
             _automationService.Object,
             _automationRepo.Object,
-            _workspaceService.Object);
+            _workspaceService.Object,
+            _scopeProvider.Object,
+            Mock.Of<IEventMessagesFactory>());
     }
 
     [Fact]
@@ -183,10 +202,14 @@ public class WorkspaceGroupServiceTests
     {
         var parentId = Guid.NewGuid();
         var childId = Guid.NewGuid();
-        var parent = new WorkspaceGroup { Id = parentId, Name = "Parent", WorkspaceId = Guid.NewGuid() };
+        var workspaceId = Guid.NewGuid();
+        var parent = new WorkspaceGroup { Id = parentId, Name = "Parent", WorkspaceId = workspaceId };
+        var child = new WorkspaceGroup { Id = childId, Name = "Child", WorkspaceId = workspaceId, ParentId = parentId };
 
         _groupRepo.Setup(r => r.GetAsync(parentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(parent);
+        _groupRepo.Setup(r => r.GetAsync(childId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(child);
         _groupRepo.Setup(r => r.GetChildIdsAsync(parentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { childId });
         _groupRepo.Setup(r => r.GetChildIdsAsync(childId, It.IsAny<CancellationToken>()))

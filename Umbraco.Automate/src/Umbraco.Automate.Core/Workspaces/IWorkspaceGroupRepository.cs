@@ -19,6 +19,11 @@ internal interface IWorkspaceGroupRepository
     Task<IEnumerable<WorkspaceGroup>> GetByWorkspaceAsync(Guid workspaceId, Guid? parentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets all workspace groups across every workspace.
+    /// </summary>
+    Task<IEnumerable<WorkspaceGroup>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Saves a group (insert or update).
     /// </summary>
     Task<WorkspaceGroup> SaveAsync(WorkspaceGroup group, CancellationToken cancellationToken = default);

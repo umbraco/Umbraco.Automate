@@ -19,6 +19,11 @@ public interface IWorkspaceGroupService
     Task<IEnumerable<WorkspaceGroup>> GetGroupsByWorkspaceAsync(Guid workspaceId, Guid? parentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets all workspace groups across every workspace.
+    /// </summary>
+    Task<IEnumerable<WorkspaceGroup>> GetAllGroupsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a new group.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when the workspace or parent group is not found, or a duplicate name exists.</exception>
