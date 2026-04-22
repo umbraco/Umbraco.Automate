@@ -7,6 +7,14 @@ const UA_AUTOMATION_ENTITY_TYPE = "ua:automation";
 const UA_AUTOMATION_ROOT_ENTITY_TYPE = "ua:automation-root";
 const UA_AUTOMATION_GROUP_ENTITY_TYPE = "ua:automation-group";
 
+// Automate's tree uses client entity types prefixed with "ua:", but Deploy registers
+// transfer options server-side against UDI entity types. This mapping lets Deploy's
+// lookup (`DeployContext.getRegisteredEntity`) resolve a tree entity type to the
+// matching server registration.
+const UA_SERVER_WORKSPACE_ENTITY_TYPE = "umbraco-automate-workspace";
+const UA_SERVER_WORKSPACE_GROUP_ENTITY_TYPE = "umbraco-automate-workspace-group";
+const UA_SERVER_AUTOMATION_ENTITY_TYPE = "umbraco-automate-automation";
+
 export const onInit = async (host, extensionRegistry) => {
   extensionRegistry.registerMany([
     {
@@ -23,6 +31,16 @@ export const onInit = async (host, extensionRegistry) => {
             [UA_AUTOMATION_GROUP_ENTITY_TYPE]: "Automation folder",
           },
         },
+      },
+    },
+    {
+      type: "deployEntityTypeMapping",
+      alias: "Automate.Deploy.EntityTypeMapping",
+      name: "Automate Deploy Entity Type Mapping",
+      entityTypes: {
+        [UA_WORKSPACE_ENTITY_TYPE]: UA_SERVER_WORKSPACE_ENTITY_TYPE,
+        [UA_AUTOMATION_ENTITY_TYPE]: UA_SERVER_AUTOMATION_ENTITY_TYPE,
+        [UA_AUTOMATION_GROUP_ENTITY_TYPE]: UA_SERVER_WORKSPACE_GROUP_ENTITY_TYPE,
       },
     },
     {
