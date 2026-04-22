@@ -5,6 +5,9 @@
         <Description>Slack connection and actions for Umbraco Automate</Description>
         <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
         <StaticWebAssetBasePath>App_Plugins/UmbracoAutomateSlack</StaticWebAssetBasePath>
+        <!-- Razor SDK auto-includes root-level JSON as Content, which collides with the
+             explicit include of the generated appsettings-schema JSON below. -->
+        <EnableDefaultContentItems>false</EnableDefaultContentItems>
     </PropertyGroup>
 
     <PropertyGroup>
