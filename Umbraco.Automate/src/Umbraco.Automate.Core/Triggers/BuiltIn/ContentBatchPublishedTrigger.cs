@@ -55,4 +55,26 @@ public sealed class ContentBatchPublishedTrigger
             },
         };
     }
+
+    /// <inheritdoc />
+    // Match-if-any semantics: the batch fires whole when at least one item matches the
+    // configured filter. Automations needing strict per-item filtering should use a
+    // filter step inside the workflow.
+    protected override bool CanHandle(BatchTriggerOutput<ContentPublishedTriggerOutput> output, ContentPublishedTriggerSettings? settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings?.ContentTypes))
+        {
+            return true;
+        }
+
+        foreach (var item in output.Items)
+        {
+            if (ContentTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

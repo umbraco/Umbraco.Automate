@@ -43,4 +43,8 @@ public sealed class ContentPublishedTrigger
             };
         }
     }
+
+    /// <inheritdoc />
+    protected override bool CanHandle(ContentPublishedTriggerOutput output, ContentPublishedTriggerSettings? settings)
+        => ContentTypesFilter.Matches(output.ContentTypeKey, settings?.ContentTypes);
 }

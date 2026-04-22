@@ -1,9 +1,13 @@
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Testing.Builders;
 
@@ -14,17 +18,30 @@ public class TriggerEventHandlerTests
     private readonly Mock<IAutomationService> _automationService = new();
     private readonly Mock<IAutomationExecutor> _executor = new();
     private readonly Mock<IExecutionNodeEligibility> _nodeEligibility = new();
+    private readonly TriggerCollection _triggers;
     private readonly TriggerEventHandler _handler;
 
     public TriggerEventHandlerTests()
     {
         _nodeEligibility.Setup(e => e.CanExecuteWorkflows()).Returns(true);
 
+        var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
+        _triggers = new TriggerCollection(() =>
+        {
+            var infra = new TriggerInfrastructure(modelResolver);
+            return new ITrigger[]
+            {
+                new ContentSavedTrigger(infra),
+                new ContentPublishedTrigger(infra),
+            };
+        });
+
         _handler = new TriggerEventHandler(
             _automationService.Object,
             Mock.Of<IEntityVersionService>(),
             _executor.Object,
             _nodeEligibility.Object,
+            _triggers,
             Mock.Of<ILogger<TriggerEventHandler>>());
     }
 
@@ -216,6 +233,96 @@ public class TriggerEventHandlerTests
 
         _nodeEligibility.Setup(e => e.CanExecuteWorkflows()).Returns(true);
         _handler.CanProcessNow().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task HandleAsync_TriggerSettingsFilter_SkipsNonMatchingAutomation()
+    {
+        var allowedTypeKey = Guid.NewGuid();
+        var blockedTypeKey = Guid.NewGuid();
+
+        var matching = new AutomationBuilder()
+            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
+            {
+                ["contentTypes"] = allowedTypeKey.ToString(),
+            })
+            .Build();
+
+        var nonMatching = new AutomationBuilder()
+            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
+            {
+                ["contentTypes"] = blockedTypeKey.ToString(),
+            })
+            .Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { matching, nonMatching });
+
+        var output = new ContentSavedTriggerOutput
+        {
+            ContentKey = Guid.NewGuid(),
+            ContentName = "Page",
+            ContentTypeKey = allowedTypeKey,
+            ContentTypeAlias = "blogPost",
+        };
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(output, JsonOptions.Default),
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            matching,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            nonMatching,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TriggerSettingsFilter_EmptyFilterMatchesAll()
+    {
+        var automation = new AutomationBuilder()
+            .WithTrigger("umbracoAutomate.contentSaved")
+            .Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automation });
+
+        var output = new ContentSavedTriggerOutput
+        {
+            ContentKey = Guid.NewGuid(),
+            ContentName = "Page",
+            ContentTypeKey = Guid.NewGuid(),
+            ContentTypeAlias = "blogPost",
+        };
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(output, JsonOptions.Default),
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            automation,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static string SerializeMessage(TriggerEventMessage message)

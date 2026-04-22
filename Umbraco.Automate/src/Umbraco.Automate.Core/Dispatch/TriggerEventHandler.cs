@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
 
 namespace Umbraco.Automate.Core.Dispatch;
@@ -16,6 +17,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly IEntityVersionService _versionService;
     private readonly IAutomationExecutor _executor;
     private readonly IExecutionNodeEligibility _nodeEligibility;
+    private readonly TriggerCollection _triggers;
     private readonly ILogger<TriggerEventHandler> _logger;
 
     public TriggerEventHandler(
@@ -23,12 +25,14 @@ internal sealed class TriggerEventHandler : IMessageHandler
         IEntityVersionService versionService,
         IAutomationExecutor executor,
         IExecutionNodeEligibility nodeEligibility,
+        TriggerCollection triggers,
         ILogger<TriggerEventHandler> logger)
     {
         _automationService = automationService;
         _versionService = versionService;
         _executor = executor;
         _nodeEligibility = nodeEligibility;
+        _triggers = triggers;
         _logger = logger;
     }
 
@@ -75,6 +79,16 @@ internal sealed class TriggerEventHandler : IMessageHandler
             triggerOutputData = JsonOptions.DeserializeToUnwrappedDictionary(message.OutputData);
         }
 
+        // Look up the trigger so we can consult its per-automation settings filter
+        // (ITrigger.CanHandle). Not finding the trigger is unusual but shouldn't drop
+        // events — fall through and dispatch unconditionally.
+        var trigger = _triggers.GetByAlias(message.TriggerAlias);
+
+        // Typed output is only needed when at least one automation has configured
+        // trigger settings. Deserialize lazily to avoid the cost on the common no-filter path.
+        object? typedOutput = null;
+        var typedOutputAttempted = false;
+
         foreach (var automation in matching)
         {
             // Resolve the published version snapshot for execution.
@@ -97,6 +111,33 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 }
             }
 
+            // Filter: apply the trigger's per-automation settings predicate against the
+            // published snapshot's settings. Skip when there are no configured settings,
+            // no trigger, or the trigger declares no settings type — nothing to match on.
+            var triggerSettings = executionAutomation.Trigger?.Settings;
+            if (trigger is not null
+                && trigger.SettingsType is not null
+                && triggerSettings is { Count: > 0 })
+            {
+                if (!typedOutputAttempted)
+                {
+                    typedOutput = DeserializeTypedOutput(message.OutputData, trigger.OutputType);
+                    typedOutputAttempted = true;
+                }
+
+                if (typedOutput is not null)
+                {
+                    var resolvedSettings = trigger.ResolveSettings(triggerSettings);
+                    if (!trigger.CanHandle(typedOutput, resolvedSettings))
+                    {
+                        _logger.LogDebug(
+                            "Automation {AutomationId} skipped by trigger {TriggerAlias} settings filter",
+                            executionAutomation.Id, message.TriggerAlias);
+                        continue;
+                    }
+                }
+            }
+
             _logger.LogInformation(
                 "Starting run for automation {AutomationAlias} ({AutomationId}) version {Version} from trigger {TriggerAlias}",
                 executionAutomation.Alias, executionAutomation.Id, executionAutomation.Version, message.TriggerAlias);
@@ -107,6 +148,29 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 message.InitiatorId,
                 triggerOutputData,
                 cancellationToken);
+        }
+    }
+
+    private object? DeserializeTypedOutput(string? outputData, Type? outputType)
+    {
+        if (string.IsNullOrEmpty(outputData) || outputType is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize(outputData, outputType, JsonOptions.Default);
+        }
+        catch (JsonException ex)
+        {
+            // A deserialization failure shouldn't silently suppress automations. Log and
+            // fall through — automations with settings filters will behave as if no filter
+            // was configured rather than being dropped.
+            _logger.LogWarning(ex,
+                "Failed to deserialize trigger output as {OutputType} for filtering — automations with configured settings will fire unfiltered",
+                outputType.FullName);
+            return null;
         }
     }
 }
