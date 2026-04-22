@@ -175,6 +175,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 actionName: catalogueItem.name,
                 settings: step.settings,
                 schema: catalogueItem.schema,
+                connectionId: step.connectionId ?? null,
+                workspaceId: this._model.workspaceId,
                 automationContext: {
                     trigger: this._model.trigger ?? null,
                     steps: this._model.steps,
@@ -184,9 +186,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         });
 
         try {
-            const { settings } = await modal.onSubmit();
+            const { settings, connectionId } = await modal.onSubmit();
             const updatedSteps = this._model.steps.map((s) =>
-                s.id === stepId ? { ...s, settings } : s,
+                s.id === stepId ? { ...s, settings, connectionId } : s,
             );
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
         } catch {

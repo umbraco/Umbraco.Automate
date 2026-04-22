@@ -48,6 +48,8 @@ export default {
         history: "History",
         membership: "Membership",
         connectionType: "Connection Type",
+        connection: "Connection",
+        settings: "Settings",
         webhookUrl: "Webhook URL",
         steps: "Steps",
         runInfo: "Run Info",
@@ -73,6 +75,9 @@ export default {
         importFailed: "Import failed",
         importInvalidFile: "Selected file is not valid JSON",
         importWarnings: "Imported with warnings",
+        stepConnectionDescription:
+            "Choose which of the workspace's connections this step should use. Leave as auto-resolve to pick one that matches the action automatically.",
+        stepConnectionAutoResolve: "Auto-resolve",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
