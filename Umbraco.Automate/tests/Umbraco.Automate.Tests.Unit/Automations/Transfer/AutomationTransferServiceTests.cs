@@ -58,7 +58,8 @@ public class AutomationTransferTests
             Mock.Of<IEventMessagesFactory>(),
             _actions,
             _triggers,
-            _controlFlows);
+            _controlFlows,
+            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows));
     }
 
     #region Export Tests

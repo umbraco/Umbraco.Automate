@@ -2,6 +2,7 @@ using System.Data;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
@@ -42,6 +43,10 @@ public class AutomationServiceTests
         _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceBuilder().Build());
 
+        var actions = new ActionCollection(() => []);
+        var triggers = new TriggerCollection(() => []);
+        var controlFlows = new ControlFlowCollection(() => []);
+
         _service = new AutomationService(
             _repo.Object,
             _runRepo.Object,
@@ -50,9 +55,10 @@ public class AutomationServiceTests
             Mock.Of<IConnectionService>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
-            new ActionCollection(() => []),
-            new TriggerCollection(() => []),
-            new ControlFlowCollection(() => []));
+            actions,
+            triggers,
+            controlFlows,
+            new SensitiveSettingsStripper(actions, triggers, controlFlows));
     }
 
     [Fact]

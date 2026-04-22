@@ -44,6 +44,7 @@ internal sealed class AutomationService : IAutomationService
     private readonly ActionCollection _actions;
     private readonly TriggerCollection _triggers;
     private readonly ControlFlowCollection _controlFlows;
+    private readonly ISensitiveSettingsStripper _sensitiveStripper;
 
     public AutomationService(
         IAutomationRepository automationRepository,
@@ -55,7 +56,8 @@ internal sealed class AutomationService : IAutomationService
         IEventMessagesFactory eventMessagesFactory,
         ActionCollection actions,
         TriggerCollection triggers,
-        ControlFlowCollection controlFlows)
+        ControlFlowCollection controlFlows,
+        ISensitiveSettingsStripper sensitiveStripper)
     {
         _automationRepository = automationRepository;
         _runRepository = runRepository;
@@ -67,6 +69,7 @@ internal sealed class AutomationService : IAutomationService
         _actions = actions;
         _triggers = triggers;
         _controlFlows = controlFlows;
+        _sensitiveStripper = sensitiveStripper;
     }
 
     public Task<Automation?> GetAutomationAsync(Guid id, CancellationToken cancellationToken = default)
@@ -355,7 +358,7 @@ internal sealed class AutomationService : IAutomationService
             exportSteps.Add(exportStep);
         }
 
-        var exportTrigger = StripTriggerSensitiveFields(automation.Trigger);
+        var exportTrigger = _sensitiveStripper.StripTrigger(automation.Trigger);
 
         return new AutomationExportModel
         {
@@ -544,7 +547,7 @@ internal sealed class AutomationService : IAutomationService
             }
         }
 
-        var strippedSettings = StripSensitiveSettings(step.Settings, GetStepTypeSchema(step.ActionAlias));
+        var strippedSettings = _sensitiveStripper.StripStepSettings(step.ActionAlias, step.Settings);
 
         return new ExportStepModel
         {
@@ -560,52 +563,6 @@ internal sealed class AutomationService : IAutomationService
             RetryInterval = step.RetryInterval,
             MaxRetries = step.MaxRetries,
         };
-    }
-
-    private TriggerConfiguration? StripTriggerSensitiveFields(TriggerConfiguration? trigger)
-    {
-        if (trigger is null || trigger.Settings.Count == 0)
-        {
-            return trigger;
-        }
-
-        var schema = _triggers.GetByAlias(trigger.TriggerAlias)?.GetSettingsSchema();
-        var strippedSettings = StripSensitiveSettings(trigger.Settings, schema);
-
-        if (strippedSettings == trigger.Settings)
-        {
-            return trigger;
-        }
-
-        return new TriggerConfiguration
-        {
-            TriggerAlias = trigger.TriggerAlias,
-            Settings = strippedSettings,
-        };
-    }
-
-    private static Dictionary<string, object?> StripSensitiveSettings(
-        Dictionary<string, object?> settings,
-        EditableModelSchema? schema)
-    {
-        if (schema is null)
-        {
-            return settings;
-        }
-
-        var sensitiveFields = schema.Fields
-            .Where(f => f.IsSensitive)
-            .Select(f => f.PropertyName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        if (sensitiveFields.Count == 0)
-        {
-            return settings;
-        }
-
-        return settings
-            .Where(kvp => !sensitiveFields.Contains(kvp.Key))
-            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     }
 
     private EditableModelSchema? GetStepTypeSchema(string actionAlias)

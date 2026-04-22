@@ -2,6 +2,7 @@ using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.ControlFlow;
@@ -143,6 +144,7 @@ public static partial class UmbracoBuilderExtensions
         // Core services
         builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
         builder.Services.AddSingleton<IConnectionService, ConnectionService>();
+        builder.Services.AddSingleton<ISensitiveSettingsStripper, SensitiveSettingsStripper>();
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();

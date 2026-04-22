@@ -1,6 +1,7 @@
 using System.Data;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Runs;
@@ -45,6 +46,10 @@ public class PublishValidationTests
         _repo.Setup(r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
 
+        var actions = new ActionCollection(() => []);
+        var triggers = new TriggerCollection(() => []);
+        var controlFlows = new ControlFlowCollection(() => []);
+
         _service = new AutomationService(
             _repo.Object,
             Mock.Of<IAutomationRunRepository>(),
@@ -53,9 +58,10 @@ public class PublishValidationTests
             Mock.Of<IConnectionService>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
-            new ActionCollection(() => []),
-            new TriggerCollection(() => []),
-            new ControlFlowCollection(() => []));
+            actions,
+            triggers,
+            controlFlows,
+            new SensitiveSettingsStripper(actions, triggers, controlFlows));
     }
 
     [Fact]
