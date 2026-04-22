@@ -51,6 +51,10 @@ yarn-error.log
 
 # Build output
 wwwroot/
+# … but the Deploy add-on's wwwroot is hand-written source (no npm build toolchain),
+# same pattern as Umbraco.Forms.Deploy.
+!Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/wwwroot/
+!Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/wwwroot/**
 
 # Test results
 [Tt]est[Rr]esult*/

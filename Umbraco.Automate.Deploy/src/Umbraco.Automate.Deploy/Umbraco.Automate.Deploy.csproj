@@ -1,8 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
     <Title>Umbraco Automate Deploy</Title>
     <Description>Umbraco Deploy support for Umbraco Automate</Description>
+    <StaticWebAssetBasePath>App_Plugins/Umbraco.Automate.Deploy</StaticWebAssetBasePath>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <!-- Disable compression for static files, because MapStaticAssets() is not used anyway (yet) -->
+    <CompressionEnabled>false</CompressionEnabled>
   </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
 
   <!-- Use project references for local dev, NuGet packages for CI -->
   <PropertyGroup>
@@ -20,4 +29,51 @@
   <ItemGroup>
     <PackageReference Include="Umbraco.Deploy.Infrastructure" />
   </ItemGroup>
+
+  <!-- Copy client assets to intermediate output path (mirrors Umbraco.Forms.Deploy) -->
+  <ItemGroup>
+    <ClientAssetsInputs Include="wwwroot\**" Exclude="$(DefaultItemExcludes)" />
+  </ItemGroup>
+
+  <Target Name="ClientAssetsBuild" BeforeTargets="DispatchToInnerBuilds;AssignTargetPaths" Inputs="@(ClientAssetsInputs)" Outputs="$(IntermediateOutputPath)clientassetsbuild.complete.txt">
+    <PropertyGroup>
+      <_ClientAssetsOutputFullPath>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)clientassets'))</_ClientAssetsOutputFullPath>
+    </PropertyGroup>
+
+    <Message Text="Copying client assets" Importance="High" />
+
+    <MakeDir Directories="$(_ClientAssetsOutputFullPath)" />
+    <Copy SourceFiles="%(ClientAssetsInputs.FullPath)" DestinationFolder="$(_ClientAssetsOutputFullPath)" />
+
+    <ItemGroup>
+      <_ClientAssetsBuildOutput Include="$(IntermediateOutputPath)clientassets\**"></_ClientAssetsBuildOutput>
+    </ItemGroup>
+
+    <WriteLinesToFile File="$(IntermediateOutputPath)clientassetsbuild.complete.txt" Lines="@(_ClientAssetsBuildOutput)" />
+  </Target>
+
+  <Target Name="DefineClientAssets" AfterTargets="ClientAssetsBuild" DependsOnTargets="ResolveStaticWebAssetsConfiguration">
+    <ItemGroup>
+      <FileWrites Include="@(_ClientAssetsBuildOutput)" />
+      <FileWrites Include="$(IntermediateOutputPath)clientassetsbuild.complete.txt" />
+    </ItemGroup>
+
+    <DefineStaticWebAssets CandidateAssets="@(_ClientAssetsBuildOutput)" SourceId="$(PackageId)" SourceType="Computed" ContentRoot="$(_ClientAssetsOutputFullPath)" BasePath="$(StaticWebAssetBasePath)">
+      <Output TaskParameter="Assets" ItemName="StaticWebAsset" />
+    </DefineStaticWebAssets>
+    <DefineStaticWebAssetEndpoints CandidateAssets="@(StaticWebAsset)" ExistingEndpoints="@(StaticWebAssetEndpoint)" ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_ClientStaticWebAssetEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+    <ItemGroup>
+      <StaticWebAssetEndpoint Include="@(_ClientStaticWebAssetEndpoint)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Update umbraco-package.json files with current build version after client assets build -->
+  <Target Name="UpdatePackageManifestVersion" DependsOnTargets="ClientAssetsBuild" AfterTargets="GetUmbracoBuildVersion">
+    <ItemGroup>
+      <_PackageManifestFiles Include="$(IntermediateOutputPath)clientassets\**\umbraco-package.json" />
+    </ItemGroup>
+    <JsonPathUpdateValue JsonFile="%(_PackageManifestFiles.FullPath)" Path="$.version" Value="&quot;$(PackageVersion)&quot;" />
+  </Target>
 </Project>
