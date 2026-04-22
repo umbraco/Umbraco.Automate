@@ -25,4 +25,21 @@
         <PackageReference Include="Umbraco.Automate.OpenIddict" />
     </ItemGroup>
 
+    <!-- Add JSON schema file to package output -->
+    <PropertyGroup>
+        <_UmbracoAutomateSlackJsonSchemaReference>appsettings-schema.Umbraco.Automate.Slack.json</_UmbracoAutomateSlackJsonSchemaReference>
+    </PropertyGroup>
+    <ItemGroup>
+        <Content Include="$(_UmbracoAutomateSlackJsonSchemaReference)" PackagePath="" Visible="false" />
+    </ItemGroup>
+
+    <!-- Generate JSON schema on build (and before copying to project) -->
+    <Target Name="GenerateAppsettingsSchema" BeforeTargets="Build;CopyUmbracoJsonSchemaFiles" Inputs="$(TargetPath)" Outputs="$(_UmbracoAutomateSlackJsonSchemaReference)">
+        <Message Text="Generating $(_UmbracoAutomateSlackJsonSchemaReference)" Importance="high" />
+        <JsonSchemaGenerate AssemblyPath="$(TargetPath)" TypeName="UmbracoAutomateSlackSchema" OutputPath="$(_UmbracoAutomateSlackJsonSchemaReference)" IncludeObsoleteProperties="false" />
+        <ItemGroup>
+            <FileWrites Include="$(_UmbracoAutomateSlackJsonSchemaReference)" />
+        </ItemGroup>
+    </Target>
+
 </Project>

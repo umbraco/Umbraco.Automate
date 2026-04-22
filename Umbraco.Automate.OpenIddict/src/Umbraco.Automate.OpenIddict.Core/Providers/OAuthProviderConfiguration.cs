@@ -5,7 +5,12 @@ namespace Umbraco.Automate.OpenIddict.Providers;
 /// These are the client ID/secret registered with the external provider (e.g. a Slack OAuth App),
 /// not the user's access tokens.
 /// </summary>
-public sealed class OAuthProviderConfiguration
+/// <remarks>
+/// Not <c>sealed</c> so provider packages (Slack, etc.) can inherit from it when
+/// shaping their appsettings JSON schema — letting them expose provider-specific
+/// fields (e.g. Slack's UserScopes) alongside the shared OAuth fields.
+/// </remarks>
+public class OAuthProviderConfiguration
 {
     /// <summary>
     /// Gets or sets the OAuth client ID.
