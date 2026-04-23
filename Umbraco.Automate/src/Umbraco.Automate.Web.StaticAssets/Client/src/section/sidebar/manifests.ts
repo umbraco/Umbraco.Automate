@@ -1,16 +1,18 @@
 import { UA_MENU_ALIAS, UA_SECTION_ALIAS, UA_SETTINGS_MENU_ALIAS } from "../constants.js";
 import { UA_WORKSPACES_EXIST_CONDITION_ALIAS } from "../conditions/workspaces-exist.condition.js";
+import { UA_WORKSPACE_ROOT_ENTITY_TYPE } from "../../workspace-management/entity.js";
 
 export const sectionSidebarManifests: Array<UmbExtensionManifest> = [
     {
         type: "sectionSidebarApp",
-        kind: "menu",
+        kind: "menuWithEntityActions",
         alias: "UmbracoAutomate.SectionSidebarApp.Menu",
         name: "Automate Section Sidebar",
         weight: 1000,
         meta: {
             label: "#uaMenu_automations",
             menu: UA_MENU_ALIAS,
+            entityType: UA_WORKSPACE_ROOT_ENTITY_TYPE,
         },
         conditions: [
             {
