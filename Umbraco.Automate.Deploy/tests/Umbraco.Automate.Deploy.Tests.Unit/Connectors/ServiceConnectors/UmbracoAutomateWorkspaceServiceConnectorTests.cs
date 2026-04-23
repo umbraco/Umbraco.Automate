@@ -57,8 +57,10 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
     }
 
     [Fact]
-    public async Task GetArtifactAsync_AddsServiceAccountUserDependency()
+    public async Task GetArtifactAsync_DoesNotAddUserDependencyForServiceAccount()
     {
+        // Users are not a deployable entity type in Umbraco Deploy — declaring a
+        // user dependency throws "No connector registered for entity type 'user'".
         var serviceAccountKey = Guid.NewGuid();
         var workspace = BuildWorkspace(serviceAccountKey: serviceAccountKey);
         var udi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Workspace, workspace.Id);
@@ -66,9 +68,8 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
         var artifact = await _connector.GetArtifactAsync(udi, workspace);
 
         artifact.ShouldNotBeNull();
-        artifact.Dependencies.ShouldContain(d =>
-            d.Udi.EntityType == Umbraco.Cms.Core.Constants.UdiEntityType.User &&
-            ((GuidUdi)d.Udi).Guid == serviceAccountKey);
+        artifact.Dependencies.ShouldNotContain(d =>
+            d.Udi.EntityType == Umbraco.Cms.Core.Constants.UdiEntityType.User);
     }
 
     [Fact]
@@ -112,7 +113,7 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
     }
 
     [Fact]
-    public async Task GetArtifactAsync_WithNoConnectionsOrGroups_StillAddsServiceAccountDependency()
+    public async Task GetArtifactAsync_WithNoConnectionsOrGroups_HasNoDependencies()
     {
         var workspace = BuildWorkspace();
         var udi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Workspace, workspace.Id);
@@ -120,8 +121,7 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
         var artifact = await _connector.GetArtifactAsync(udi, workspace);
 
         artifact.ShouldNotBeNull();
-        artifact.Dependencies.Count().ShouldBe(1);
-        artifact.Dependencies.Single().Udi.EntityType.ShouldBe(Umbraco.Cms.Core.Constants.UdiEntityType.User);
+        artifact.Dependencies.ShouldBeEmpty();
     }
 
     [Fact]

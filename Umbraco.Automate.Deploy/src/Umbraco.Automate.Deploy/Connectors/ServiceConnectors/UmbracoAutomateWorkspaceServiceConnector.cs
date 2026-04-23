@@ -79,11 +79,6 @@ public class UmbracoAutomateWorkspaceServiceConnector(
             connectionUdis.Add(connectionUdi);
         }
 
-        // Service account user — the backoffice user automations run as. Without this dependency
-        // a workspace could land in the target env referencing a user that doesn't exist there.
-        var serviceAccountUdi = new GuidUdi(Umbraco.Cms.Core.Constants.UdiEntityType.User, entity.ServiceAccountKey);
-        dependencies.Add(new UmbracoAutomateArtifactDependency(serviceAccountUdi, ArtifactDependencyMode.Match));
-
         // User group dependencies — the workspace's access-control list.
         foreach (var userGroupKey in entity.UserGroups)
         {
