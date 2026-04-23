@@ -9,6 +9,12 @@
         "semVer": 2
     },
     "publicReleaseRefSpec": ["^refs/heads/main$", "^refs/heads/hotfix/", "^refs/heads/release/"],
+    "pathFilters": [
+        "./",
+        "../Directory.Build.targets",
+        "../Directory.Packages.props",
+        "../global.json"
+    ],
     "cloudBuild": {
         "buildNumber": {
             "enabled": false
