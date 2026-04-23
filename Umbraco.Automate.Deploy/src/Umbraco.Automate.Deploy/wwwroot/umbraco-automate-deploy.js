@@ -25,10 +25,13 @@ export const onInit = async (host, extensionRegistry) => {
       meta: {
         culture: "en",
         localizations: {
+          // Keys are Deploy's server-side UDI entity types — that's what
+          // Deploy passes to `deploy_entityTypes_<entityType>` when resolving
+          // labels in dialogs (e.g. "This will put all <name> items in the queue").
           deploy_entityTypes: {
-            [UA_WORKSPACE_ENTITY_TYPE]: "Automate workspace",
-            [UA_AUTOMATION_ENTITY_TYPE]: "Automation",
-            [UA_AUTOMATION_GROUP_ENTITY_TYPE]: "Automation folder",
+            [UA_SERVER_WORKSPACE_ENTITY_TYPE]: "Automation",
+            [UA_SERVER_WORKSPACE_GROUP_ENTITY_TYPE]: "Automation folder",
+            [UA_SERVER_AUTOMATION_ENTITY_TYPE]: "Automation",
           },
         },
       },
