@@ -43,6 +43,7 @@ ScaffoldingReadMe.txt
 # Environment-specific settings (may contain secrets — use user-secrets instead)
 **/appsettings.Development.json
 **/appsettings.Local.json
+**/umbraco-cloud.json
 
 # Node
 node_modules/
