@@ -144,7 +144,7 @@ export const manifests: Array<UmbExtensionManifest> = [
         api: () => import("./actions/automation-unpublish.action.js"),
         meta: {
             label: "#uaGeneral_unpublish",
-            icon: "icon-undo",
+            icon: "icon-globe",
         },
         conditions: [
             {
