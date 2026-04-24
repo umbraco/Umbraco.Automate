@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Umbraco.Automate.Core.Bindings;
 
@@ -121,7 +122,9 @@ public sealed class BindingEvaluator
             }
         }
 
-        return current;
+        // Final unwrap in case the last resolved value is a JToken (e.g. JValue wrapping
+        // a GUID string) — ensures downstream Stringify sees a plain CLR value.
+        return EnsureUnwrapped(current);
     }
 
     /// <summary>
@@ -237,12 +240,25 @@ public sealed class BindingEvaluator
     }
 
     /// <summary>
-    /// If the value is a JSON string (e.g. from the Newtonsoft.Json round-trip in
-    /// WorkflowCore persistence), re-parse it into a structured form so path
-    /// traversal can continue into nested properties.
+    /// Normalises a value to plain .NET types before traversal. Handles two round-trip
+    /// artefacts from the WorkflowCore persistence layer:
+    /// <list type="bullet">
+    /// <item>JSON-string values (when nested data was flattened to text).</item>
+    /// <item><see cref="JToken"/> instances (when Newtonsoft deserialises
+    /// <c>Dictionary&lt;string, object?&gt;</c> values without <see cref="Newtonsoft.Json.TypeNameHandling"/>
+    /// metadata — nested objects become <see cref="JObject"/> and arrays become <see cref="JArray"/>,
+    /// neither of which satisfies the strict <c>IDictionary&lt;string,object?&gt;</c>/<c>IList&lt;object?&gt;</c>
+    /// checks <see cref="ResolveKey"/> and <see cref="ResolveIndex"/> rely on).</item>
+    /// </list>
     /// </summary>
     private static object? EnsureUnwrapped(object? value)
     {
+        // JToken → plain types first so downstream traversal sees Dictionary/List.
+        if (value is JToken jtoken)
+        {
+            return UnwrapJToken(jtoken);
+        }
+
         if (value is not string jsonString || string.IsNullOrWhiteSpace(jsonString))
         {
             return value;
@@ -262,6 +278,36 @@ public sealed class BindingEvaluator
         catch (JsonException)
         {
             return value;
+        }
+    }
+
+    private static object? UnwrapJToken(JToken token)
+    {
+        switch (token.Type)
+        {
+            case JTokenType.Object:
+                var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var prop in ((JObject)token).Properties())
+                {
+                    dict[prop.Name] = UnwrapJToken(prop.Value);
+                }
+                return dict;
+
+            case JTokenType.Array:
+                var list = new List<object?>();
+                foreach (var item in (JArray)token)
+                {
+                    list.Add(UnwrapJToken(item));
+                }
+                return list;
+
+            case JTokenType.Null:
+            case JTokenType.Undefined:
+                return null;
+
+            default:
+                // JValue (string/int/bool/float/date/etc) — extract the underlying CLR value.
+                return ((JValue)token).Value;
         }
     }
 

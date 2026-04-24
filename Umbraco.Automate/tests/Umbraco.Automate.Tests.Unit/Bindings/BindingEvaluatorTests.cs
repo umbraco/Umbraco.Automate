@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Shouldly;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Bindings.Filters;
 using Umbraco.Automate.Core.Dispatch;
@@ -62,6 +61,182 @@ public class BindingEvaluatorTests
         var result = _evaluator.Evaluate("Name: ${ trigger.contentName }", _data);
 
         result.ShouldBe("Name: Hello World");
+    }
+
+    // Regression: when a workflow data round-trip goes through Newtonsoft without
+    // TypeNameHandling, nested values come back as JObject/JArray. BindingEvaluator
+    // must unwrap these to plain Dictionary/List so path traversal still works.
+    [Fact]
+    public void Evaluate_AfterNewtonsoftRoundTripWithoutTypeNames_ResolvesNestedPath()
+    {
+        var output = new Umbraco.Automate.Core.Actions.BuiltIn.FindContentOutput
+        {
+            Matches = [new Umbraco.Automate.Core.Actions.BuiltIn.FindContentMatch
+            {
+                ContentKey = Guid.Parse("776a648d-3a0d-4745-8853-2de74cd486d8"),
+                Name = "Novicell UK",
+                ContentTypeAlias = "partnerPage",
+            }],
+        };
+        var stjJson = JsonSerializer.Serialize(output, JsonOptions.Default);
+        var unwrapped = JsonOptions.DeserializeToUnwrappedDictionary(stjJson);
+
+        // No TypeNameHandling — Newtonsoft produces JObject/JArray on deserialization.
+        var persisted = Newtonsoft.Json.JsonConvert.SerializeObject(unwrapped);
+        var rehydrated = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object?>>(persisted)!;
+
+        var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["steps"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["findContent"] = rehydrated },
+        };
+
+        // Without the defensive fix, these evaluate to empty strings — which is what
+        // triggers "Invalid or missing content key: ''" in the user's automation.
+        var matches = _evaluator.Evaluate("${ steps.findContent.matches }", bindingData);
+        var contentKey = _evaluator.Evaluate("${ steps.findContent.first.contentKey }", bindingData);
+
+        matches.ShouldNotBeNullOrEmpty();
+        contentKey.ShouldBe("776a648d-3a0d-4745-8853-2de74cd486d8");
+    }
+
+    // Simulates the exact WorkflowCore persistence round-trip on AutomationWorkflowData
+    // as used inside a ForEach branch — this is where the user bug manifests.
+    [Fact]
+    public void Evaluate_AfterAutomationWorkflowDataRoundTrip_ResolvesNestedPath()
+    {
+        var findContentId = Guid.Parse("814d234d-16fc-4916-9cf8-ead07d3b0e72");
+        var output = new Umbraco.Automate.Core.Actions.BuiltIn.FindContentOutput
+        {
+            Matches = [new Umbraco.Automate.Core.Actions.BuiltIn.FindContentMatch
+            {
+                ContentKey = Guid.Parse("776a648d-3a0d-4745-8853-2de74cd486d8"),
+                Name = "Novicell UK",
+                ContentTypeAlias = "partnerPage",
+            }],
+        };
+        var stjJson = JsonSerializer.Serialize(output, JsonOptions.Default);
+        var unwrapped = JsonOptions.DeserializeToUnwrappedDictionary(stjJson);
+
+        var data = new Umbraco.Automate.Core.Execution.AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            AutomationAlias = "test",
+            StepOutputs = new Dictionary<Guid, Dictionary<string, object?>> { [findContentId] = unwrapped },
+            StepAliases = new Dictionary<Guid, string> { [findContentId] = "findContent" },
+        };
+
+        var settings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
+            ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore,
+        };
+        var persisted = Newtonsoft.Json.JsonConvert.SerializeObject(data, settings);
+        var rehydrated = Newtonsoft.Json.JsonConvert.DeserializeObject<Umbraco.Automate.Core.Execution.AutomationWorkflowData>(persisted, settings)!;
+
+        var bindingData = Umbraco.Automate.Core.Execution.BindingDataBuilder.Build(rehydrated);
+
+        _evaluator.Evaluate("${ steps.findContent.first.contentKey }", bindingData)
+            .ShouldBe("776a648d-3a0d-4745-8853-2de74cd486d8");
+
+        var matches = _evaluator.Evaluate("${ steps.findContent.matches }", bindingData);
+        matches.Length.ShouldBeGreaterThan(2); // not "[]" or ""
+    }
+
+    // Repro for user-reported bug: step output with a nested object under "first"
+    // doesn't resolve AFTER the workflow suspends and resumes, because WorkflowCore
+    // persists the data dictionary through Newtonsoft.Json — which returns JObject/
+    // JArray rather than Dictionary<string, object?> / List<object?>.
+    [Fact]
+    public void Evaluate_AfterNewtonsoftPersistenceRoundTrip_StillResolvesNestedPath()
+    {
+        var output = new Umbraco.Automate.Core.Actions.BuiltIn.FindContentOutput
+        {
+            Matches = [new Umbraco.Automate.Core.Actions.BuiltIn.FindContentMatch
+            {
+                ContentKey = Guid.Parse("776a648d-3a0d-4745-8853-2de74cd486d8"),
+                Name = "Novicell UK",
+                ContentTypeAlias = "partnerPage",
+            }],
+        };
+        var stjJson = JsonSerializer.Serialize(output, JsonOptions.Default);
+        var unwrapped = JsonOptions.DeserializeToUnwrappedDictionary(stjJson);
+
+        // Simulate WorkflowCore persisting and rehydrating the data through
+        // Newtonsoft with TypeNameHandling.All (see EFCoreWorkflowPersistenceProvider).
+        var settings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
+        };
+        var persisted = Newtonsoft.Json.JsonConvert.SerializeObject(unwrapped, settings);
+        var rehydrated = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object?>>(persisted, settings)!;
+
+        var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["steps"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["findContent"] = rehydrated,
+            },
+        };
+
+        _evaluator.Evaluate("${ steps.findContent.first.contentKey }", bindingData)
+            .ShouldBe("776a648d-3a0d-4745-8853-2de74cd486d8");
+    }
+
+    // Repro for user-reported bug: step output with a nested object under "first"
+    // doesn't resolve through the binding path steps.<alias>.first.contentKey.
+    [Fact]
+    public void Evaluate_StepOutputDeserializedFromJson_ResolvesNestedFirstContentKey()
+    {
+        var output = new Umbraco.Automate.Core.Actions.BuiltIn.FindContentOutput
+        {
+            Matches = [new Umbraco.Automate.Core.Actions.BuiltIn.FindContentMatch
+            {
+                ContentKey = Guid.Parse("776a648d-3a0d-4745-8853-2de74cd486d8"),
+                Name = "Novicell UK",
+                ContentTypeAlias = "partnerPage",
+            }],
+        };
+        var json = JsonSerializer.Serialize(output, JsonOptions.Default);
+        var unwrapped = JsonOptions.DeserializeToUnwrappedDictionary(json);
+
+        var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["steps"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["findContent"] = unwrapped,
+            },
+        };
+
+        _evaluator.Evaluate("${ steps.findContent.first.contentKey }", bindingData)
+            .ShouldBe("776a648d-3a0d-4745-8853-2de74cd486d8");
+    }
+
+    // Repro for user-reported bug: IsNotEmpty on a list-typed binding stringifies
+    // to something non-empty so the condition evaluates true.
+    [Fact]
+    public void Evaluate_StepOutputDeserializedFromJson_MatchesStringifiesNonEmpty()
+    {
+        var output = new Umbraco.Automate.Core.Actions.BuiltIn.FindContentOutput
+        {
+            Matches = [new Umbraco.Automate.Core.Actions.BuiltIn.FindContentMatch
+            {
+                ContentKey = Guid.NewGuid(),
+                Name = "x",
+                ContentTypeAlias = "t",
+            }],
+        };
+        var json = JsonSerializer.Serialize(output, JsonOptions.Default);
+        var unwrapped = JsonOptions.DeserializeToUnwrappedDictionary(json);
+
+        var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["steps"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["findContent"] = unwrapped },
+        };
+
+        var matches = _evaluator.Evaluate("${ steps.findContent.matches }", bindingData);
+        matches.ShouldNotBeNullOrEmpty();
+        matches.Length.ShouldBeGreaterThan(2); // "[]" would be 2
     }
 
     [Fact]
