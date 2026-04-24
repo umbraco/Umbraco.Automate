@@ -78,6 +78,9 @@ export default {
         stepConnectionDescription:
             "Choose which of the workspace's connections this step should use. Leave as auto-resolve to pick one that matches the action automatically.",
         stepConnectionAutoResolve: "Auto-resolve",
+        runNow: "Run now",
+        runNowStarted: "Automation triggered",
+        runNowFailed: "Could not run this automation",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
