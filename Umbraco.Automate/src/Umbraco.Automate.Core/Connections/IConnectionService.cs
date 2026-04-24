@@ -55,4 +55,12 @@ public interface IConnectionService
     /// Connections whose type is not found are excluded from the result.
     /// </summary>
     Task<IReadOnlyList<ConfiguredConnection>> GetConfiguredConnectionsByIdsAsync(IReadOnlyCollection<Guid> connectionIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs the connection type's connectivity check against the stored settings.
+    /// Returns <c>null</c> if the connection does not exist; returns a
+    /// <see cref="ConnectionValidationStatus.Failure"/> result if the connection exists but
+    /// its type is no longer registered (e.g. provider package uninstalled).
+    /// </summary>
+    Task<ConnectionValidationResult?> TestConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default);
 }

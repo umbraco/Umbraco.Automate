@@ -118,4 +118,125 @@ public class ConnectionServiceTests
         result.Alias.ShouldBe("test");
         _repo.Verify(r => r.SaveAsync(connection, null, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task TestConnectionAsync_ReturnsNull_WhenConnectionNotFound()
+    {
+        _repo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Connection?)null);
+
+        var result = await _service.TestConnectionAsync(Guid.NewGuid());
+
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_ReturnsFailure_WhenTypeNotRegistered()
+    {
+        // Provider package uninstalled / stale connection row scenario.
+        var id = Guid.NewGuid();
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Connection { Id = id, Alias = "a", Name = "N", Type = "unknown" });
+
+        var result = await _service.TestConnectionAsync(id);
+
+        result.ShouldNotBeNull();
+        result.Status.ShouldBe(ConnectionValidationStatus.Failure);
+        result.Message.ShouldNotBeNull().ShouldContain("unknown");
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_ReturnsFailure_WhenValidateThrows()
+    {
+        // Any unhandled exception from the type's ValidateAsync gets wrapped so the UI
+        // always sees a structured failure rather than a 500.
+        var type = new ThrowingConnectionType();
+        var service = new ConnectionService(
+            _repo.Object,
+            new ConnectionTypeCollection(() => [type]),
+            _scopeProvider.Object,
+            Mock.Of<IEventMessagesFactory>());
+
+        var id = Guid.NewGuid();
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Connection { Id = id, Alias = "a", Name = "N", Type = "throwing" });
+
+        var result = await service.TestConnectionAsync(id);
+
+        result.ShouldNotBeNull();
+        result.Status.ShouldBe(ConnectionValidationStatus.Failure);
+        result.Details.ShouldContain("boom");
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_ReturnsResult_FromConnectionType()
+    {
+        var expected = ConnectionValidationResult.Success("ok");
+        var type = new StubConnectionType(expected);
+        var service = new ConnectionService(
+            _repo.Object,
+            new ConnectionTypeCollection(() => [type]),
+            _scopeProvider.Object,
+            Mock.Of<IEventMessagesFactory>());
+
+        var id = Guid.NewGuid();
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Connection { Id = id, Alias = "a", Name = "N", Type = "stub" });
+
+        var result = await service.TestConnectionAsync(id);
+
+        result.ShouldBe(expected);
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_RethrowsCancellation()
+    {
+        // Cancellation must propagate — wrapping it as a "Failure" would hide genuine
+        // client-disconnect behaviour and break cooperative cancellation for callers.
+        var type = new StubConnectionType(validateImpl: (_, ct) => throw new OperationCanceledException(ct));
+        var service = new ConnectionService(
+            _repo.Object,
+            new ConnectionTypeCollection(() => [type]),
+            _scopeProvider.Object,
+            Mock.Of<IEventMessagesFactory>());
+
+        var id = Guid.NewGuid();
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Connection { Id = id, Alias = "a", Name = "N", Type = "stub" });
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => service.TestConnectionAsync(id, new CancellationToken(canceled: true)));
+    }
+
+    [ConnectionType("throwing", "Throwing")]
+    private sealed class ThrowingConnectionType : ConnectionTypeBase<object>
+    {
+        public ThrowingConnectionType()
+            : base(new ConnectionTypeInfrastructure(Mock.Of<Umbraco.Automate.Core.Settings.IEditableModelResolver>()))
+        {
+        }
+
+        public override Task<ConnectionValidationResult> ValidateAsync(object? settings, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("boom");
+    }
+
+    [ConnectionType("stub", "Stub")]
+    private sealed class StubConnectionType : ConnectionTypeBase<object>
+    {
+        private readonly Func<object?, CancellationToken, Task<ConnectionValidationResult>> _validate;
+
+        public StubConnectionType(ConnectionValidationResult result)
+            : this((_, _) => Task.FromResult(result))
+        {
+        }
+
+        public StubConnectionType(Func<object?, CancellationToken, Task<ConnectionValidationResult>> validateImpl)
+            : base(new ConnectionTypeInfrastructure(Mock.Of<Umbraco.Automate.Core.Settings.IEditableModelResolver>()))
+        {
+            _validate = validateImpl;
+        }
+
+        public override Task<ConnectionValidationResult> ValidateAsync(object? settings, CancellationToken cancellationToken)
+            => _validate(settings, cancellationToken);
+    }
 }

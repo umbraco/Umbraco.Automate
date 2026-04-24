@@ -56,9 +56,10 @@ public interface IConnectionType : IDiscoverable
     /// <summary>
     /// Validates that the connection settings are correct and the external system is reachable.
     /// Override to implement connectivity checks (e.g. test API token, verify SMTP host).
+    /// The default implementation returns <see cref="ConnectionValidationStatus.Warning"/> to
+    /// signal that no concrete check was run — the UI surfaces this as "not verified".
     /// </summary>
     /// <param name="settings">The resolved settings object.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>True if the connection is valid, false otherwise.</returns>
-    Task<bool> ValidateAsync(object? settings, CancellationToken cancellationToken);
+    Task<ConnectionValidationResult> ValidateAsync(object? settings, CancellationToken cancellationToken);
 }

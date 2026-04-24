@@ -135,6 +135,49 @@ internal sealed class ConnectionService : IConnectionService
         return new ConfiguredConnection(connection, connectionType, resolvedSettings);
     }
 
+    public async Task<ConnectionValidationResult?> TestConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default)
+    {
+        var connection = await _connectionRepository.GetAsync(connectionId, cancellationToken);
+        if (connection is null)
+        {
+            return null;
+        }
+
+        var connectionType = _connectionTypeCollection.GetByAlias(connection.Type);
+        if (connectionType is null)
+        {
+            return ConnectionValidationResult.Failure(
+                $"Connection type '{connection.Type}' is not registered. The provider package may be missing.");
+        }
+
+        object? resolvedSettings;
+        try
+        {
+            resolvedSettings = connectionType.ResolveSettings(connection.Settings);
+        }
+        catch (Exception ex)
+        {
+            return ConnectionValidationResult.Failure(
+                "Connection settings could not be resolved.",
+                [ex.Message]);
+        }
+
+        try
+        {
+            return await connectionType.ValidateAsync(resolvedSettings, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return ConnectionValidationResult.Failure(
+                "The connectivity check threw an unexpected error.",
+                [ex.Message]);
+        }
+    }
+
     public async Task<IReadOnlyList<ConfiguredConnection>> GetConfiguredConnectionsByIdsAsync(IReadOnlyCollection<Guid> connectionIds, CancellationToken cancellationToken = default)
     {
         var connections = await _connectionRepository.GetByIdsAsync(connectionIds, cancellationToken);

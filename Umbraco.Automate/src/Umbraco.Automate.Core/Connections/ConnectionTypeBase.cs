@@ -69,8 +69,10 @@ public abstract class ConnectionTypeBase<TSettings> : IConnectionType
 
     /// <summary>
     /// Validates that the connection settings are correct and the external system is reachable.
-    /// Default implementation always returns true. Override to implement connectivity checks.
+    /// Default returns <see cref="ConnectionValidationStatus.Warning"/> so the UI can say
+    /// "no check available" rather than a misleading green tick — override to implement one.
     /// </summary>
-    public virtual Task<bool> ValidateAsync(object? settings, CancellationToken cancellationToken)
-        => Task.FromResult(true);
+    public virtual Task<ConnectionValidationResult> ValidateAsync(object? settings, CancellationToken cancellationToken)
+        => Task.FromResult(ConnectionValidationResult.Warning(
+            $"The '{Name}' connection type does not implement a connectivity check."));
 }
