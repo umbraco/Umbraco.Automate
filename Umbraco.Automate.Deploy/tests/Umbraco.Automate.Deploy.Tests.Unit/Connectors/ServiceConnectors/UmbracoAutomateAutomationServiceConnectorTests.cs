@@ -1,10 +1,14 @@
 using System.Text.Json;
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Automate.Deploy.Artifacts;
 using Umbraco.Automate.Deploy.Configuration;
 using Umbraco.Automate.Deploy.Connectors.ServiceConnectors;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Deploy;
 
 namespace Umbraco.Automate.Deploy.Tests.Unit.Connectors.ServiceConnectors;
 
@@ -14,6 +18,8 @@ public class UmbracoAutomateAutomationServiceConnectorTests
     private readonly Mock<IWorkspaceService> _workspaceServiceMock = new();
     private readonly Mock<ISensitiveSettingsStripper> _stripperMock = new();
     private readonly Mock<UmbracoAutomateDeploySettingsAccessor> _settingsAccessorMock;
+    private readonly List<IAction> _registeredActions = [];
+    private readonly List<ITrigger> _registeredTriggers = [];
     private readonly UmbracoAutomateAutomationServiceConnector _connector;
 
     public UmbracoAutomateAutomationServiceConnectorTests()
@@ -27,11 +33,36 @@ public class UmbracoAutomateAutomationServiceConnectorTests
         _stripperMock.Setup(x => x.StripSteps(It.IsAny<IEnumerable<StepConfiguration>>()))
             .Returns<IEnumerable<StepConfiguration>>(s => s.ToList());
 
+        // Default registry: the aliases used by test fixtures are registered on the target.
+        // Individual tests can clear or extend these to simulate missing provider packages.
+        _registeredActions.Add(BuildActionMock("http"));
+        _registeredActions.Add(BuildActionMock("delay"));
+        _registeredTriggers.Add(BuildTriggerMock("webhook"));
+
+        var actionCollection = new ActionCollection(() => _registeredActions);
+        var triggerCollection = new TriggerCollection(() => _registeredTriggers);
+
         _connector = new UmbracoAutomateAutomationServiceConnector(
             _automationServiceMock.Object,
             _workspaceServiceMock.Object,
+            actionCollection,
+            triggerCollection,
             _stripperMock.Object,
             _settingsAccessorMock.Object);
+    }
+
+    private static IAction BuildActionMock(string alias)
+    {
+        var mock = new Mock<IAction>();
+        mock.SetupGet(x => x.Alias).Returns(alias);
+        return mock.Object;
+    }
+
+    private static ITrigger BuildTriggerMock(string alias)
+    {
+        var mock = new Mock<ITrigger>();
+        mock.SetupGet(x => x.Alias).Returns(alias);
+        return mock.Object;
     }
 
     private static Automation BuildAutomation(
@@ -174,9 +205,6 @@ public class UmbracoAutomateAutomationServiceConnectorTests
     {
         var automation = BuildAutomation();
         automation.Description = "Nightly digest email";
-        automation.IsEnabled = true;
-        automation.Status = AutomationStatus.Published;
-        automation.PublishedVersion = 7;
         automation.CanvasState = "{\"viewport\":1}";
         var udi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Automation, automation.Id);
 
@@ -186,9 +214,6 @@ public class UmbracoAutomateAutomationServiceConnectorTests
         artifact.Alias.ShouldBe("sendDailyDigest");
         artifact.Name.ShouldBe("Send daily digest");
         artifact.Description.ShouldBe("Nightly digest email");
-        artifact.IsEnabled.ShouldBeTrue();
-        artifact.Status.ShouldBe((int)AutomationStatus.Published);
-        artifact.PublishedVersion.ShouldBe(7);
         artifact.CanvasState.ShouldBe("{\"viewport\":1}");
     }
 
@@ -228,5 +253,100 @@ public class UmbracoAutomateAutomationServiceConnectorTests
     public void UdiEntityType_ReturnsAutomationUdiType()
     {
         _connector.UdiEntityType.ShouldBe(UmbracoAutomateDeployConstants.UdiEntityType.Automation);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithUnknownTriggerAlias_ThrowsWithActionableMessage()
+    {
+        _registeredTriggers.Clear();
+        var workspaceId = Guid.NewGuid();
+        _workspaceServiceMock
+            .Setup(x => x.GetWorkspaceAsync(workspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Workspace { Alias = "default", Name = "Default" });
+
+        var artifact = BuildArtifact(
+            workspaceId: workspaceId,
+            trigger: new TriggerConfiguration { TriggerAlias = "slackMessageReceived" });
+        var state = ArtifactDeployState.Create<AutomateAutomationArtifact, Automation>(artifact, null, _connector, 6);
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(
+            () => _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 6));
+
+        ex.Message.ShouldContain("'slackMessageReceived'");
+        ex.Message.ShouldContain(artifact.Name);
+        _automationServiceMock.Verify(
+            x => x.CreateAutomationAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithUnknownStepActionAlias_ThrowsWithActionableMessage()
+    {
+        var workspaceId = Guid.NewGuid();
+        _workspaceServiceMock
+            .Setup(x => x.GetWorkspaceAsync(workspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Workspace { Alias = "default", Name = "Default" });
+
+        var artifact = BuildArtifact(
+            workspaceId: workspaceId,
+            trigger: new TriggerConfiguration { TriggerAlias = "webhook" },
+            steps:
+            [
+                new StepConfiguration { ActionAlias = "slack.sendMessage", Name = "Notify team" },
+            ]);
+        var state = ArtifactDeployState.Create<AutomateAutomationArtifact, Automation>(artifact, null, _connector, 6);
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(
+            () => _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 6));
+
+        ex.Message.ShouldContain("'slack.sendMessage'");
+        ex.Message.ShouldContain("Notify team");
+        _automationServiceMock.Verify(
+            x => x.CreateAutomationAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithRegisteredTriggerAndActions_CreatesAutomation()
+    {
+        var workspaceId = Guid.NewGuid();
+        _workspaceServiceMock
+            .Setup(x => x.GetWorkspaceAsync(workspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Workspace { Alias = "default", Name = "Default" });
+        _automationServiceMock
+            .Setup(x => x.CreateAutomationAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var artifact = BuildArtifact(
+            workspaceId: workspaceId,
+            trigger: new TriggerConfiguration { TriggerAlias = "webhook" },
+            steps:
+            [
+                new StepConfiguration { ActionAlias = "http", Name = "Call API" },
+                new StepConfiguration { ActionAlias = "delay", Name = "Wait" },
+            ]);
+        var state = ArtifactDeployState.Create<AutomateAutomationArtifact, Automation>(artifact, null, _connector, 6);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 6);
+
+        _automationServiceMock.Verify(
+            x => x.CreateAutomationAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    private static AutomateAutomationArtifact BuildArtifact(
+        Guid workspaceId,
+        TriggerConfiguration? trigger = null,
+        IList<StepConfiguration>? steps = null)
+    {
+        var udi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Automation, Guid.NewGuid());
+        return new AutomateAutomationArtifact(udi)
+        {
+            Alias = "sendDailyDigest",
+            Name = "Send daily digest",
+            WorkspaceUdi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Workspace, workspaceId),
+            Trigger = trigger is null ? null : JsonSerializer.SerializeToElement(trigger),
+            Steps = steps is null || steps.Count == 0 ? null : JsonSerializer.SerializeToElement(steps),
+        };
     }
 }

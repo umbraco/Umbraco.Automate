@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Deploy.Artifacts;
 using Umbraco.Automate.Deploy.Configuration;
@@ -19,12 +21,14 @@ namespace Umbraco.Automate.Deploy.Connectors.ServiceConnectors;
 public class UmbracoAutomateAutomationServiceConnector(
     IAutomationService automationService,
     IWorkspaceService workspaceService,
+    ActionCollection actionCollection,
+    TriggerCollection triggerCollection,
     ISensitiveSettingsStripper sensitiveStripper,
     UmbracoAutomateDeploySettingsAccessor settingsAccessor)
     : UmbracoAutomateEntityServiceConnectorBase<AutomateAutomationArtifact, Automation>(settingsAccessor)
 {
     /// <inheritdoc />
-    protected override int[] ProcessPasses => [4];
+    protected override int[] ProcessPasses => [6];
 
     /// <inheritdoc />
     protected override string[] ValidOpenSelectors =>
@@ -106,9 +110,6 @@ public class UmbracoAutomateAutomationServiceConnector(
             Alias = entity.Alias,
             Name = entity.Name,
             Description = entity.Description,
-            IsEnabled = entity.IsEnabled,
-            Status = (int)entity.Status,
-            PublishedVersion = entity.PublishedVersion,
             WorkspaceUdi = workspaceUdi,
             GroupId = entity.GroupId,
             Trigger = strippedTrigger != null ? JsonSerializer.SerializeToElement(strippedTrigger) : null,
@@ -132,13 +133,13 @@ public class UmbracoAutomateAutomationServiceConnector(
 
         switch (pass)
         {
-            case 4:
-                await Pass4Async(state, cancellationToken);
+            case 6:
+                await Pass6Async(state, cancellationToken);
                 break;
         }
     }
 
-    private async Task Pass4Async(
+    private async Task Pass6Async(
         ArtifactDeployState<AutomateAutomationArtifact, Automation> state,
         CancellationToken cancellationToken)
     {
@@ -179,6 +180,27 @@ public class UmbracoAutomateAutomationServiceConnector(
             notificationSettings = artifact.NotificationSettings.Value.Deserialize<AutomationNotificationSettings>();
         }
 
+        // Trigger and step actions are contributed via DI (ITrigger/IAction). If the package
+        // that contributes one isn't installed on the target, the automation would land with
+        // references to unknown aliases and fail silently at runtime. Fail the deploy now
+        // with a message pointing at the missing package.
+        if (trigger is not null && triggerCollection.GetByAlias(trigger.TriggerAlias) is null)
+        {
+            throw new InvalidOperationException(
+                $"Target site does not contain a trigger with alias '{trigger.TriggerAlias}' (automation '{artifact.Name}'). " +
+                "Ensure the package providing this trigger is installed on the target.");
+        }
+
+        foreach (var step in steps)
+        {
+            if (actionCollection.GetByAlias(step.ActionAlias) is null)
+            {
+                throw new InvalidOperationException(
+                    $"Target site does not contain an action with alias '{step.ActionAlias}' (automation '{artifact.Name}', step '{step.Name}'). " +
+                    "Ensure the package providing this action is installed on the target.");
+            }
+        }
+
         if (state.Entity != null)
         {
             // Update existing automation — preserve the target environment's lifecycle state
@@ -211,7 +233,6 @@ public class UmbracoAutomateAutomationServiceConnector(
                 Description = artifact.Description,
                 IsEnabled = false,
                 Status = AutomationStatus.Draft,
-                PublishedVersion = artifact.PublishedVersion,
                 WorkspaceId = workspace.Id,
                 GroupId = artifact.GroupId,
                 Trigger = trigger,

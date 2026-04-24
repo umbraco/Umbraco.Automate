@@ -15,6 +15,7 @@ namespace Umbraco.Automate.Deploy.Connectors.ServiceConnectors;
 [UdiDefinition(UmbracoAutomateDeployConstants.UdiEntityType.Connection, UdiType.GuidUdi)]
 public class UmbracoAutomateConnectionServiceConnector(
     IConnectionService connectionService,
+    ConnectionTypeCollection connectionTypeCollection,
     UmbracoAutomateDeploySettingsAccessor settingsAccessor)
     : UmbracoAutomateEntityServiceConnectorBase<AutomateConnectionArtifact, Connection>(settingsAccessor)
 {
@@ -104,6 +105,18 @@ public class UmbracoAutomateConnectionServiceConnector(
         CancellationToken cancellationToken)
     {
         var artifact = state.Artifact;
+
+        // The connection's Type alias maps to an IConnectionType registered via DI. If the
+        // package that contributes that type isn't installed on the target (e.g. deploying
+        // a Slack connection to a Cloud site without the Slack package), the resulting row
+        // would be orphaned — unresolvable at runtime and unrenderable in the UI. Fail the
+        // deploy with a message pointing at the missing package instead.
+        if (connectionTypeCollection.GetByAlias(artifact.Type) is null)
+        {
+            throw new InvalidOperationException(
+                $"Target site does not contain a connection type with alias '{artifact.Type}' (connection '{artifact.Name}'). " +
+                "Ensure the package providing this connection type is installed on the target.");
+        }
 
         Dictionary<string, object?> settings = [];
         if (artifact.Settings.HasValue)

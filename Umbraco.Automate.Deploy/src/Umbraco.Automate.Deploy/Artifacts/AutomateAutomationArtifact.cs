@@ -17,21 +17,6 @@ public class AutomateAutomationArtifact(GuidUdi udi, IEnumerable<ArtifactDepende
     public string? Description { get; set; }
 
     /// <summary>
-    /// Whether triggers are active for this automation.
-    /// </summary>
-    public bool IsEnabled { get; set; }
-
-    /// <summary>
-    /// The lifecycle status (stored as int for serialization stability).
-    /// </summary>
-    public int Status { get; set; }
-
-    /// <summary>
-    /// The currently published version number, or null if never published.
-    /// </summary>
-    public int? PublishedVersion { get; set; }
-
-    /// <summary>
     /// UDI of the workspace this automation belongs to.
     /// </summary>
     public required GuidUdi WorkspaceUdi { get; set; }
