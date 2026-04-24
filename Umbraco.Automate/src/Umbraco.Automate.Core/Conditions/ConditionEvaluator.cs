@@ -54,6 +54,21 @@ public sealed class ConditionEvaluator
         // AND within group: all conditions must pass.
         foreach (var condition in group.Conditions)
         {
+            // IsEmpty / IsNotEmpty need to see the raw value — stringifying a list
+            // gives "[]" which is a non-empty string and makes empty collections
+            // falsely test as "not empty".
+            if (condition.Operator is ConditionOperator.IsEmpty or ConditionOperator.IsNotEmpty)
+            {
+                var raw = _bindingEvaluator.EvaluateRaw(condition.LeftOperand, bindingData);
+                var empty = IsEmptyValue(raw);
+                var pass = condition.Operator == ConditionOperator.IsEmpty ? empty : !empty;
+                if (!pass)
+                {
+                    return false;
+                }
+                continue;
+            }
+
             var left = _bindingEvaluator.Evaluate(condition.LeftOperand, bindingData);
             var right = _bindingEvaluator.Evaluate(condition.RightOperand, bindingData);
 
@@ -65,6 +80,15 @@ public sealed class ConditionEvaluator
 
         return true;
     }
+
+    private static bool IsEmptyValue(object? value) => value switch
+    {
+        null => true,
+        string s => string.IsNullOrEmpty(s),
+        System.Collections.ICollection col => col.Count == 0,
+        System.Collections.IEnumerable e => !e.GetEnumerator().MoveNext(),
+        _ => false,
+    };
 
     private static bool EvaluateCondition(string left, ConditionOperator op, string right)
     {
@@ -80,8 +104,7 @@ public sealed class ConditionEvaluator
             ConditionOperator.LessThan => CompareNumeric(left, right) < 0,
             ConditionOperator.GreaterThanOrEquals => CompareNumeric(left, right) >= 0,
             ConditionOperator.LessThanOrEquals => CompareNumeric(left, right) <= 0,
-            ConditionOperator.IsEmpty => string.IsNullOrEmpty(left),
-            ConditionOperator.IsNotEmpty => !string.IsNullOrEmpty(left),
+            // IsEmpty / IsNotEmpty are handled in EvaluateGroup against the raw value.
             _ => false,
         };
     }

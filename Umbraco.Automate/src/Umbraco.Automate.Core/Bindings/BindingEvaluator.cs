@@ -62,6 +62,37 @@ public sealed class BindingEvaluator
     }
 
     /// <summary>
+    /// Evaluates a template that is expected to be a single unfiltered binding
+    /// (e.g. <c>${ steps.x.matches }</c>) and returns the raw resolved value —
+    /// useful for callers that need to inspect collection emptiness or types
+    /// rather than a stringified form. Templates with surrounding text or filters
+    /// fall back to the string-producing <see cref="Evaluate"/>.
+    /// </summary>
+    public object? EvaluateRaw(string template, IReadOnlyDictionary<string, object?> data)
+    {
+        if (string.IsNullOrEmpty(template))
+        {
+            return template;
+        }
+
+        var bindings = BindingTokenizer.FindBindings(template).ToList();
+        if (bindings.Count == 1)
+        {
+            var (start, length, content) = bindings[0];
+            if (start == 0 && length == template.Length)
+            {
+                var token = BindingTokenizer.Tokenize(content);
+                if (token.Filters.Count == 0)
+                {
+                    return ResolvePath(token.Path, data);
+                }
+            }
+        }
+
+        return Evaluate(template, data);
+    }
+
+    /// <summary>
     /// Resolves a dot-separated path against the run data dictionary.
     /// Supports nested dictionaries, array index access (<c>items[0]</c>),
     /// dictionary key access (<c>headers["Content-Type"]</c>),

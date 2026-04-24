@@ -146,6 +146,72 @@ public class ConditionEvaluatorTests
         _evaluator.Evaluate(set, EmptyData).ShouldBeFalse();
     }
 
+    // Regression: a binding that resolves to an empty collection used to stringify
+    // to "[]" and pass IsNotEmpty because the JSON string is 2 chars long.
+    [Fact]
+    public void IsNotEmpty_EmptyCollectionBinding_ReturnsFalse()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?>
+            {
+                ["findContent"] = new Dictionary<string, object?> { ["matches"] = new List<object?>() },
+            },
+        };
+
+        var set = BuildSingleCondition("${ steps.findContent.matches }", ConditionOperator.IsNotEmpty, "");
+
+        _evaluator.Evaluate(set, data).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsNotEmpty_NonEmptyCollectionBinding_ReturnsTrue()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?>
+            {
+                ["findContent"] = new Dictionary<string, object?>
+                {
+                    ["matches"] = new List<object?> { new Dictionary<string, object?> { ["contentKey"] = "x" } },
+                },
+            },
+        };
+
+        var set = BuildSingleCondition("${ steps.findContent.matches }", ConditionOperator.IsNotEmpty, "");
+
+        _evaluator.Evaluate(set, data).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsEmpty_EmptyCollectionBinding_ReturnsTrue()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?>
+            {
+                ["findContent"] = new Dictionary<string, object?> { ["matches"] = new List<object?>() },
+            },
+        };
+
+        var set = BuildSingleCondition("${ steps.findContent.matches }", ConditionOperator.IsEmpty, "");
+
+        _evaluator.Evaluate(set, data).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsEmpty_NullBinding_ReturnsTrue()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?> { ["findContent"] = null },
+        };
+
+        var set = BuildSingleCondition("${ steps.findContent.missing }", ConditionOperator.IsEmpty, "");
+
+        _evaluator.Evaluate(set, data).ShouldBeTrue();
+    }
+
     #endregion
 
     #region AND Logic
