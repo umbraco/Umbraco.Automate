@@ -54,13 +54,11 @@ public static partial class UmbracoBuilderExtensions
 
     private static IUmbracoBuilder AddUmbracoAutomateRealtime(this IUmbracoBuilder builder)
     {
-        // JsonStringEnumConverter is required because the default SignalR JSON protocol
-        // serialises enums as their numeric value — the backoffice listener matches on
-        // the string name.
-        builder.Services.AddSignalR().AddJsonProtocol(options =>
-        {
-            options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        });
+        // Do NOT configure JsonHubProtocolOptions here — that options object is app-wide,
+        // and mutating it would change the wire format for every other SignalR hub in the
+        // process (notably Umbraco Deploy's hubs, whose frontend expects numeric enum
+        // values). Our own backoffice listener reads numeric enum values instead.
+        builder.Services.AddSignalR();
         builder.Services.AddSingleton<IEditorNotifier, EditorNotifier>();
 
         // Map the hub endpoint. The Endpoints callback runs before Umbraco's own UseEndpoints,

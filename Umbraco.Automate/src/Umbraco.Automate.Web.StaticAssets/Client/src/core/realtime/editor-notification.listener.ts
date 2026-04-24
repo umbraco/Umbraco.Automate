@@ -4,7 +4,7 @@ import { UMB_AUTH_CONTEXT } from "@umbraco-cms/backoffice/auth";
 import { UMB_SERVER_CONTEXT } from "@umbraco-cms/backoffice/server";
 import { UMB_NOTIFICATION_CONTEXT, type UmbNotificationContext, type UmbNotificationColor } from "@umbraco-cms/backoffice/notification";
 import { HubConnectionBuilder, type HubConnection } from "@umbraco-cms/backoffice/external/signalr";
-import type { EditorNotificationMessage, EditorNotificationSeverity } from "./editor-notification.types.js";
+import { EditorNotificationSeverity, type EditorNotificationMessage } from "./editor-notification.types.js";
 
 const HUB_PATH = "/umbraco/automate/hubs/editor-notification";
 
@@ -116,9 +116,9 @@ export class UaEditorNotificationListener extends UmbControllerBase {
 
 function severityToColor(severity: EditorNotificationSeverity): UmbNotificationColor {
     switch (severity) {
-        case "Positive": return "positive";
-        case "Warning": return "warning";
-        case "Danger": return "danger";
+        case EditorNotificationSeverity.Positive: return "positive";
+        case EditorNotificationSeverity.Warning: return "warning";
+        case EditorNotificationSeverity.Danger: return "danger";
         default: return "default";
     }
 }
