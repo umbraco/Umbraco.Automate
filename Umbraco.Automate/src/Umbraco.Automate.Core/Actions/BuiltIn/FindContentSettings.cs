@@ -85,6 +85,7 @@ public sealed class FindContentSettings
     [Field(
         Label = "Limit",
         Description = "Maximum number of matches to return (1–500).",
-        SortOrder = 5)]
+        SortOrder = 5,
+        EditorUiAlias = "Umb.PropertyEditorUi.Integer")]
     public int Limit { get; set; } = 50;
 }
