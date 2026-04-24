@@ -146,11 +146,11 @@ export const manifests: Array<UmbExtensionManifest> = [
         kind: "default",
         alias: "UmbracoAutomate.WorkspaceAction.Automation.RunNow",
         name: "Run Now Automation Workspace Action",
-        weight: 60,
+        weight: 90,
         api: () => import("./actions/automation-run-now.action.js"),
         meta: {
             label: "#uaAutomation_runNow",
-            look: "secondary",
+            look: "primary",
             color: "default",
         },
         // Only surface for automations using the Manual Trigger, once saved. The endpoint
