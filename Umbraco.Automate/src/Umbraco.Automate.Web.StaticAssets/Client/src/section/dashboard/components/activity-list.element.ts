@@ -47,10 +47,10 @@ export class UaActivityListElement extends UmbLitElement {
                 ${this.items.map(
                     (item) => html`
                         <div class="activity-item" @click=${() => this.#openRunModal(item.runId)}>
+                            <span class="activity-name">${item.automationName}</span>
                             <uui-tag color=${this.#statusColor(item.status)} look="secondary">
                                 ${item.status}
                             </uui-tag>
-                            <span class="activity-name">${item.automationName}</span>
                             <span class="activity-time">
                                 ${item.startedUtc ? formatDateTime(item.startedUtc) : "-"}
                             </span>
@@ -72,7 +72,7 @@ export class UaActivityListElement extends UmbLitElement {
             .activity-item {
                 display: flex;
                 align-items: center;
-                gap: var(--uui-size-space-3);
+                gap: var(--uui-size-space-5);
                 padding: var(--uui-size-space-3) var(--uui-size-space-4);
                 border-bottom: 1px solid var(--uui-color-border);
                 cursor: pointer;
