@@ -4,7 +4,11 @@ import { UmbRequestReloadChildrenOfEntityEvent } from "@umbraco-cms/backoffice/e
 import { UaWorkspaceDetailServerDataSource } from "./workspace-detail.server.data-source.js";
 import { UA_WORKSPACE_DETAIL_STORE_CONTEXT } from "./workspace-detail.store.js";
 import type { UaWorkspaceDetailModel } from "../../types.js";
-import { UA_WORKSPACE_ENTITY_TYPE, UA_WORKSPACE_ROOT_ENTITY_TYPE } from "../../constants.js";
+import {
+    UA_WORKSPACE_ENTITY_TYPE,
+    UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE,
+    UA_WORKSPACE_ROOT_ENTITY_TYPE,
+} from "../../constants.js";
 import { UaEntityActionEvent, dispatchActionEvent } from "../../../core/index.js";
 
 export class UaWorkspaceDetailRepository extends UmbDetailRepositoryBase<UaWorkspaceDetailModel> {
@@ -16,10 +20,19 @@ export class UaWorkspaceDetailRepository extends UmbDetailRepositoryBase<UaWorks
         const result = await super.create(model, null);
         if (!result.error && result.data) {
             dispatchActionEvent(this, UaEntityActionEvent.created(result.data.unique, UA_WORKSPACE_ENTITY_TYPE));
+            // Workspaces appear in two trees: the user-facing workspace picker and the
+            // management tree in Settings. Reload both so a create is reflected everywhere.
             dispatchActionEvent(
                 this,
                 new UmbRequestReloadChildrenOfEntityEvent({
                     entityType: UA_WORKSPACE_ROOT_ENTITY_TYPE,
+                    unique: null,
+                }),
+            );
+            dispatchActionEvent(
+                this,
+                new UmbRequestReloadChildrenOfEntityEvent({
+                    entityType: UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE,
                     unique: null,
                 }),
             );
@@ -39,10 +52,19 @@ export class UaWorkspaceDetailRepository extends UmbDetailRepositoryBase<UaWorks
         const result = await super.delete(unique);
         if (!result.error) {
             dispatchActionEvent(this, UaEntityActionEvent.deleted(unique, UA_WORKSPACE_ENTITY_TYPE));
+            // Workspaces appear in two trees: the user-facing workspace picker and the
+            // management tree in Settings. Reload both so a delete is reflected everywhere.
             dispatchActionEvent(
                 this,
                 new UmbRequestReloadChildrenOfEntityEvent({
                     entityType: UA_WORKSPACE_ROOT_ENTITY_TYPE,
+                    unique: null,
+                }),
+            );
+            dispatchActionEvent(
+                this,
+                new UmbRequestReloadChildrenOfEntityEvent({
+                    entityType: UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE,
                     unique: null,
                 }),
             );
