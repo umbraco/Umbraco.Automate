@@ -138,6 +138,11 @@ export default {
         key: "Key",
         value: "Value",
         backToList: "Back to connections",
+        test: "Test connection",
+        testSuccess: "Connection test succeeded",
+        testWarning: "Connection test inconclusive",
+        testFailure: "Connection test failed",
+        testError: "Could not reach the server to test this connection.",
     },
     uaApproval: {
         dashboardTitle: "Approvals",
