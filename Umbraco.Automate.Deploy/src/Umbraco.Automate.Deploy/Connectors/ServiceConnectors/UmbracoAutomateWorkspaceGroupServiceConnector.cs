@@ -20,7 +20,13 @@ public class UmbracoAutomateWorkspaceGroupServiceConnector(
     : UmbracoAutomateEntityServiceConnectorBase<AutomateWorkspaceGroupArtifact, WorkspaceGroup>(settingsAccessor)
 {
     /// <inheritdoc />
-    protected override int[] ProcessPasses => [3];
+    /// <remarks>
+    /// Two passes to handle nested folders: Deploy processes artifacts within a pass in
+    /// package order, not dependency order, so a child group can appear before its parent.
+    /// Pass 4 creates/updates every group at the root; pass 5 re-parents once every group
+    /// in the package exists.
+    /// </remarks>
+    protected override int[] ProcessPasses => [4, 5];
 
     /// <inheritdoc />
     protected override string[] ValidOpenSelectors =>
@@ -100,13 +106,16 @@ public class UmbracoAutomateWorkspaceGroupServiceConnector(
 
         switch (pass)
         {
-            case 3:
-                await Pass3Async(state, cancellationToken);
+            case 4:
+                await Pass4Async(state, cancellationToken);
+                break;
+            case 5:
+                await Pass5Async(state, cancellationToken);
                 break;
         }
     }
 
-    private async Task Pass3Async(
+    private async Task Pass4Async(
         ArtifactDeployState<AutomateWorkspaceGroupArtifact, WorkspaceGroup> state,
         CancellationToken cancellationToken)
     {
@@ -114,29 +123,37 @@ public class UmbracoAutomateWorkspaceGroupServiceConnector(
 
         artifact.WorkspaceUdi.EnsureType(UmbracoAutomateDeployConstants.UdiEntityType.Workspace);
 
-        if (state.Entity != null)
+        // Save every group at the root first. The final parent is applied in pass 5
+        // once every group in the package exists, so intra-pass ordering doesn't matter.
+        var group = state.Entity ?? new WorkspaceGroup
         {
-            // Update existing group — only Name and ParentId are mutable.
-            var group = state.Entity;
-            group.Name = artifact.Name;
-            group.ParentId = artifact.ParentUdi?.Guid;
+            Id = artifact.Udi.Guid,
+            Name = artifact.Name,
+        };
+        group.Name = artifact.Name;
+        group.WorkspaceId = artifact.WorkspaceUdi.Guid;
+        group.ParentId = null;
 
-            state.Entity = await groupService.UpdateGroupAsync(group, cancellationToken);
-        }
-        else
+        state.Entity = await groupService.SaveGroupForDeployAsync(group, cancellationToken);
+    }
+
+    private async Task Pass5Async(
+        ArtifactDeployState<AutomateWorkspaceGroupArtifact, WorkspaceGroup> state,
+        CancellationToken cancellationToken)
+    {
+        var artifact = state.Artifact;
+
+        if (artifact.ParentUdi is null)
         {
-            // Create new group with the artifact's UDI as the entity Id to keep
-            // redeployment idempotent across environments.
-            var group = new WorkspaceGroup
-            {
-                Id = state.Artifact.Udi.Guid,
-                Name = artifact.Name,
-                WorkspaceId = artifact.WorkspaceUdi.Guid,
-                ParentId = artifact.ParentUdi?.Guid,
-            };
-
-            state.Entity = await groupService.CreateGroupAsync(group, cancellationToken);
+            return;
         }
+
+        artifact.ParentUdi.EnsureType(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup);
+
+        var group = state.Entity!;
+        group.ParentId = artifact.ParentUdi.Guid;
+
+        state.Entity = await groupService.SaveGroupForDeployAsync(group, cancellationToken);
     }
 
     /// <inheritdoc />

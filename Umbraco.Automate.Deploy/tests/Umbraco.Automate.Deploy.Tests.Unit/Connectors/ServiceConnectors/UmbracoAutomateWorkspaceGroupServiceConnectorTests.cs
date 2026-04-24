@@ -1,8 +1,10 @@
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Automate.Deploy.Artifacts;
 using Umbraco.Automate.Deploy.Configuration;
 using Umbraco.Automate.Deploy.Connectors.ServiceConnectors;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Deploy;
 
 namespace Umbraco.Automate.Deploy.Tests.Unit.Connectors.ServiceConnectors;
 
@@ -132,4 +134,153 @@ public class UmbracoAutomateWorkspaceGroupServiceConnectorTests
     {
         _connector.UdiEntityType.ShouldBe(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup);
     }
+
+    [Fact]
+    public async Task ProcessAsync_Pass4_WhenNewGroupWithParent_CreatesAtRootDeferringReparent()
+    {
+        // Pass 4 must land the group at the root regardless of the artifact's ParentUdi,
+        // because Deploy processes artifacts within a pass in package order and the parent
+        // may not exist yet. Reparenting happens in pass 5.
+        var workspaceId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var parentId = Guid.NewGuid();
+
+        var artifact = BuildArtifact(groupId, workspaceId, parentId);
+        var state = BuildState(artifact, entity: null, pass: 4);
+
+        var saved = new WorkspaceGroup { Id = groupId, Name = "Campaigns", WorkspaceId = workspaceId };
+        _groupServiceMock
+            .Setup(x => x.SaveGroupForDeployAsync(It.IsAny<WorkspaceGroup>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(saved);
+
+        await _connector.ProcessAsync(state, context: null!, pass: 4);
+
+        _groupServiceMock.Verify(x => x.SaveGroupForDeployAsync(
+            It.Is<WorkspaceGroup>(g =>
+                g.Id == groupId &&
+                g.WorkspaceId == workspaceId &&
+                g.ParentId == null),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+        state.Entity.ShouldBe(saved);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_Pass4_WhenExistingGroupWithParent_ResetsToRoot()
+    {
+        // Updating an existing nested group must also drop it to root in pass 4 so
+        // pass 5's reparent has a consistent starting point.
+        var workspaceId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var parentId = Guid.NewGuid();
+
+        var existing = new WorkspaceGroup
+        {
+            Id = groupId,
+            Name = "Old Name",
+            WorkspaceId = workspaceId,
+            ParentId = Guid.NewGuid(),
+        };
+        var artifact = BuildArtifact(groupId, workspaceId, parentId, name: "Campaigns");
+        var state = BuildState(artifact, entity: existing, pass: 4);
+
+        _groupServiceMock
+            .Setup(x => x.SaveGroupForDeployAsync(It.IsAny<WorkspaceGroup>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((WorkspaceGroup g, CancellationToken _) => g);
+
+        await _connector.ProcessAsync(state, context: null!, pass: 4);
+
+        _groupServiceMock.Verify(x => x.SaveGroupForDeployAsync(
+            It.Is<WorkspaceGroup>(g =>
+                g.Id == groupId &&
+                g.Name == "Campaigns" &&
+                g.WorkspaceId == workspaceId &&
+                g.ParentId == null),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_Pass5_WithParentUdi_Reparents()
+    {
+        var workspaceId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var parentId = Guid.NewGuid();
+
+        // Pass 5 runs on the entity produced by pass 4 — start from a root-landed group.
+        var rootLanded = new WorkspaceGroup
+        {
+            Id = groupId,
+            Name = "Campaigns",
+            WorkspaceId = workspaceId,
+            ParentId = null,
+        };
+        var artifact = BuildArtifact(groupId, workspaceId, parentId);
+        var state = BuildState(artifact, entity: rootLanded, pass: 5);
+
+        _groupServiceMock
+            .Setup(x => x.SaveGroupForDeployAsync(It.IsAny<WorkspaceGroup>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((WorkspaceGroup g, CancellationToken _) => g);
+
+        await _connector.ProcessAsync(state, context: null!, pass: 5);
+
+        _groupServiceMock.Verify(x => x.SaveGroupForDeployAsync(
+            It.Is<WorkspaceGroup>(g =>
+                g.Id == groupId &&
+                g.ParentId == parentId),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_Pass5_WithoutParentUdi_IsNoOp()
+    {
+        // Root groups have no ParentUdi on the artifact — pass 5 must not touch them,
+        // otherwise we'd issue a second save per group for no reason.
+        var workspaceId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+
+        var rootLanded = new WorkspaceGroup
+        {
+            Id = groupId,
+            Name = "Campaigns",
+            WorkspaceId = workspaceId,
+            ParentId = null,
+        };
+        var artifact = BuildArtifact(groupId, workspaceId, parentId: null);
+        var state = BuildState(artifact, entity: rootLanded, pass: 5);
+
+        await _connector.ProcessAsync(state, context: null!, pass: 5);
+
+        _groupServiceMock.Verify(x => x.SaveGroupForDeployAsync(
+            It.IsAny<WorkspaceGroup>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    private static AutomateWorkspaceGroupArtifact BuildArtifact(
+        Guid groupId,
+        Guid workspaceId,
+        Guid? parentId,
+        string name = "Campaigns")
+    {
+        var udi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup, groupId);
+        var workspaceUdi = new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.Workspace, workspaceId);
+        var parentUdi = parentId.HasValue
+            ? new GuidUdi(UmbracoAutomateDeployConstants.UdiEntityType.WorkspaceGroup, parentId.Value)
+            : null;
+
+        return new AutomateWorkspaceGroupArtifact(udi)
+        {
+            Name = name,
+            WorkspaceUdi = workspaceUdi,
+            ParentUdi = parentUdi,
+        };
+    }
+
+    private static ArtifactDeployState<AutomateWorkspaceGroupArtifact, WorkspaceGroup> BuildState(
+        AutomateWorkspaceGroupArtifact artifact,
+        WorkspaceGroup? entity,
+        int pass)
+        => new(artifact, entity, connector: null!, pass);
 }
