@@ -298,8 +298,26 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
             : 0;
 
     private static DateTime TryParseDate(ISearchResult result, string field)
-        => TryGetString(result, field) is { } raw
-           && DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var value)
+    {
+        var raw = TryGetString(result, field);
+        if (raw is null)
+        {
+            return default;
+        }
+
+        // Umbraco's Examine indexer encodes dates via Lucene's DateTools, which writes
+        // them as yyyyMMddHHmmssfff (milliseconds resolution) — the default DateTime
+        // parsers don't recognise that shape, so try the exact format first.
+        if (DateTime.TryParseExact(raw, "yyyyMMddHHmmssfff", CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var exact))
+        {
+            return exact;
+        }
+
+        // Fallback for indexers or custom fields that emit ISO-8601.
+        return DateTime.TryParse(raw, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var value)
             ? value
             : default;
+    }
 }
