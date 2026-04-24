@@ -37,6 +37,7 @@ export type AutomationAncestorResponseModel = {
 };
 
 export type AutomationExportDefinitionModel = {
+    id: string;
     alias: string;
     name: string;
     description?: string | null;
@@ -188,6 +189,14 @@ export type ConnectionTypeItemResponseModel = {
     icon?: string | null;
     settingsSchema?: EditableModelSchemaModel | null;
 };
+
+export type ConnectionValidationResponseModel = {
+    status: ConnectionValidationStatusModel;
+    message?: string | null;
+    details: Array<string>;
+};
+
+export type ConnectionValidationStatusModel = 'Success' | 'Warning' | 'Failure';
 
 export type ControlFlowItemResponseModel = {
     alias: string;
@@ -505,6 +514,13 @@ export type ValueChangeModel = {
     newValue?: string | null;
 };
 
+export type WebhookAuthenticatorItemResponseModel = {
+    alias: string;
+    name: string;
+    description?: string | null;
+    settingsSchema?: EditableModelSchemaModel | null;
+};
+
 export type WorkspaceGroupResponseModel = {
     id: string;
     name: string;
@@ -766,39 +782,6 @@ export type GetAutomationsByIdAncestorsResponses = {
 
 export type GetAutomationsByIdAncestorsResponse = GetAutomationsByIdAncestorsResponses[keyof GetAutomationsByIdAncestorsResponses];
 
-export type PostAutomationsByIdDryRunData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/umbraco/automate/management/api/v1/automations/{id}/dry-run';
-};
-
-export type PostAutomationsByIdDryRunErrors = {
-    /**
-     * The resource is protected and requires an authentication token
-     */
-    401: unknown;
-    /**
-     * Not Found
-     */
-    404: ProblemDetails;
-    /**
-     * Conflict
-     */
-    409: ProblemDetails;
-};
-
-export type PostAutomationsByIdDryRunError = PostAutomationsByIdDryRunErrors[keyof PostAutomationsByIdDryRunErrors];
-
-export type PostAutomationsByIdDryRunResponses = {
-    /**
-     * Accepted
-     */
-    202: unknown;
-};
-
 export type GetAutomationsByIdExportData = {
     body?: never;
     path: {
@@ -831,6 +814,41 @@ export type GetAutomationsByIdExportResponses = {
 };
 
 export type GetAutomationsByIdExportResponse = GetAutomationsByIdExportResponses[keyof GetAutomationsByIdExportResponses];
+
+export type PutAutomationsByIdImportData = {
+    body?: AutomationExportModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/import';
+};
+
+export type PutAutomationsByIdImportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PutAutomationsByIdImportError = PutAutomationsByIdImportErrors[keyof PutAutomationsByIdImportErrors];
+
+export type PutAutomationsByIdImportResponses = {
+    /**
+     * OK
+     */
+    200: AutomationImportResultModel;
+};
+
+export type PutAutomationsByIdImportResponse = PutAutomationsByIdImportResponses[keyof PutAutomationsByIdImportResponses];
 
 export type PostAutomationsByIdPublishData = {
     body?: never;
@@ -1223,6 +1241,29 @@ export type GetCatalogueTriggersResponses = {
 
 export type GetCatalogueTriggersResponse = GetCatalogueTriggersResponses[keyof GetCatalogueTriggersResponses];
 
+export type GetCatalogueWebhookAuthenticatorsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/catalogue/webhook-authenticators';
+};
+
+export type GetCatalogueWebhookAuthenticatorsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetCatalogueWebhookAuthenticatorsResponses = {
+    /**
+     * OK
+     */
+    200: Array<WebhookAuthenticatorItemResponseModel>;
+};
+
+export type GetCatalogueWebhookAuthenticatorsResponse = GetCatalogueWebhookAuthenticatorsResponses[keyof GetCatalogueWebhookAuthenticatorsResponses];
+
 export type GetConnectionsData = {
     body?: never;
     path?: never;
@@ -1369,6 +1410,37 @@ export type PutConnectionsByIdResponses = {
      */
     200: unknown;
 };
+
+export type PostConnectionsByIdTestData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/connections/{id}/test';
+};
+
+export type PostConnectionsByIdTestErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostConnectionsByIdTestError = PostConnectionsByIdTestErrors[keyof PostConnectionsByIdTestErrors];
+
+export type PostConnectionsByIdTestResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionValidationResponseModel;
+};
+
+export type PostConnectionsByIdTestResponse = PostConnectionsByIdTestResponses[keyof PostConnectionsByIdTestResponses];
 
 export type GetMetricsData = {
     body?: never;
