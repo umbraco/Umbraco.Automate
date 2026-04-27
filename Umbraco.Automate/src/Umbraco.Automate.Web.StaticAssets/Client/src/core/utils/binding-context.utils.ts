@@ -10,6 +10,11 @@ export interface BindingSource {
     id: string;
     /** Display name (e.g. "Webhook" or user-given step name) */
     label: string;
+    /**
+     * Secondary description shown beneath the label, e.g. the action's catalogue
+     * name or the step's binding alias — disambiguates two steps that share a label.
+     */
+    subLabel?: string;
     /** Icon alias */
     icon: string;
     /** Binding prefix for expressions (e.g. "trigger" or "steps.abc-123") */
@@ -46,6 +51,7 @@ export async function buildBindingSources(
                 sources.push({
                     id: "trigger",
                     label: triggerItem.name,
+                    subLabel: trigger.triggerAlias,
                     icon: triggerItem.icon ?? "icon-flash",
                     bindingPrefix: "trigger",
                     leaves,
@@ -78,11 +84,15 @@ export async function buildBindingSources(
         const leaves = flattenJsonSchema(outputSchema);
         if (leaves.length === 0) continue;
 
+        const bindingAlias = step.alias || predId;
         sources.push({
             id: predId,
             label: step.name || catalogueItem.name,
+            // Surface the binding alias and action type so two steps that share a
+            // display name can still be told apart.
+            subLabel: `${catalogueItem.name} • ${bindingAlias}`,
             icon: catalogueItem.icon ?? "icon-settings",
-            bindingPrefix: `steps.${step.alias || predId}`,
+            bindingPrefix: `steps.${bindingAlias}`,
             leaves,
         });
     }

@@ -83,7 +83,13 @@ export class UaBindingPickerElement extends UmbLitElement {
 
     #renderSource(source: BindingSource) {
         return html`
-            <uui-box .headline=${source.label}>
+            <uui-box>
+                <div slot="headline" class="source-headline">
+                    <span>${source.label}</span>
+                    ${source.subLabel
+                        ? html`<small class="source-sub-label">${source.subLabel}</small>`
+                        : ""}
+                </div>
                 <uui-icon slot="header-actions" name=${source.icon}></uui-icon>
                 <uui-ref-list>
                     ${repeat(
@@ -124,6 +130,19 @@ export class UaBindingPickerElement extends UmbLitElement {
             .empty {
                 color: var(--uui-color-text-alt);
                 text-align: center;
+            }
+
+            .source-headline {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                line-height: 1.2;
+            }
+
+            .source-sub-label {
+                font-size: var(--uui-type-small-size, 13px);
+                color: var(--uui-color-text-alt);
+                font-weight: normal;
             }
         `,
     ];

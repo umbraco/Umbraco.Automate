@@ -144,6 +144,7 @@ export class UaWebhookAuthenticatorPickerElement
                 ? html`
                       <div class="strategy-settings">
                           <ua-settings-form
+                              label-on-top
                               no-box
                               .fields=${fields}
                               .values=${(this.value?.settings ?? {}) as Record<string, unknown>}

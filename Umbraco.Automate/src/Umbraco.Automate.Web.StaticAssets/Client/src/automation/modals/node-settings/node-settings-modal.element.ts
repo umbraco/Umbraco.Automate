@@ -138,6 +138,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     #renderSettingsForm(noBox: boolean) {
         return html`
             <ua-settings-form
+                label-on-top
                 ?no-box=${noBox}
                 .fields=${this.data!.schema.fields}
                 .values=${this._settings}

@@ -37,6 +37,7 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
             <umb-body-layout .headline=${this.data.triggerName}>
                 <div id="content">
                     <ua-settings-form
+                        label-on-top
                         .fields=${this.data.schema.fields}
                         .values=${this._settings}
                         @ua:settings-change=${this.#onSettingsChange}
