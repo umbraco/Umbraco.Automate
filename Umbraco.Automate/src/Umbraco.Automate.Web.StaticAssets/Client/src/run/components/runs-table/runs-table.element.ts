@@ -55,6 +55,7 @@ export class UaRunsTableElement extends UmbLitElement {
         const run: UmbTableColumn = { name: "Run", alias: "run" };
         const rest: UmbTableColumn[] = [
             { name: "Status", alias: "status" },
+            { name: "Message", alias: "message" },
             { name: "Started", alias: "startedUtc" },
             { name: "Duration", alias: "duration" },
             { name: "Initiated By", alias: "initiatedBy" },
@@ -95,27 +96,29 @@ export class UaRunsTableElement extends UmbLitElement {
             const leadingCell = this.showAutomationColumn
                 ? {
                       columnAlias: "automationName",
-                      value: html`<uui-button
-                          look="default"
-                          compact
-                          label=${item.automationName ?? item.automationId}
-                          @click=${() => this.#openRunModal(item.unique)}
+                      value: html`<a
+                          href="#"
+                          @click=${(e: Event) => {
+                              e.preventDefault();
+                              this.#openRunModal(item.unique);
+                          }}
                       >
                           ${item.automationName
                               ?? this.automationNames.get(item.automationId)
                               ?? item.automationId}
-                      </uui-button>`,
+                      </a>`,
                   }
                 : {
                       columnAlias: "run",
-                      value: html`<uui-button
-                          look="default"
-                          compact
-                          label=${item.unique.substring(0, 8)}
-                          @click=${() => this.#openRunModal(item.unique)}
+                      value: html`<a
+                          href="#"
+                          @click=${(e: Event) => {
+                              e.preventDefault();
+                              this.#openRunModal(item.unique);
+                          }}
                       >
-                          ${item.unique.substring(0, 8)}...
-                      </uui-button>`,
+                          ${item.unique.substring(0, 8)}
+                      </a>`,
                   };
 
             return {
@@ -124,14 +127,15 @@ export class UaRunsTableElement extends UmbLitElement {
                     leadingCell,
                     {
                         columnAlias: "status",
-                        value: html`<div class="status-cell">
-                            <uui-tag color=${this.#statusColor(item.status)} look="secondary">
-                                ${item.status}
-                            </uui-tag>
-                            ${item.error
-                                ? html`<span class="status-error">${item.error}</span>`
-                                : ""}
-                        </div>`,
+                        value: html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">
+                            ${item.status}
+                        </uui-tag>`,
+                    },
+                    {
+                        columnAlias: "message",
+                        value: item.error
+                            ? html`<span class="message-error" title=${item.error}>${item.error}</span>`
+                            : "-",
                     },
                     {
                         columnAlias: "startedUtc",
@@ -183,19 +187,23 @@ export class UaRunsTableElement extends UmbLitElement {
                 color: var(--uui-color-text-alt);
             }
 
-            .status-cell {
-                display: flex;
-                align-items: center;
-                gap: var(--uui-size-space-3);
-            }
-
-            .status-error {
+            .message-error {
+                display: inline-block;
                 color: var(--uui-color-danger-standalone);
-                font-size: var(--uui-size-4);
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-                max-width: 300px;
+                max-width: 400px;
+                vertical-align: middle;
+            }
+
+            a {
+                color: var(--uui-color-interactive);
+                text-decoration: none;
+            }
+
+            a:hover {
+                text-decoration: underline;
             }
         `,
     ];
