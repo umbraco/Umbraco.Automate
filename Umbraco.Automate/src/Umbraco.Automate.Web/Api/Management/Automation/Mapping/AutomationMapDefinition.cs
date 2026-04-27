@@ -96,7 +96,9 @@ public class AutomationMapDefinition : IMapDefinition
         target.WorkspaceId = source.WorkspaceId;
         target.GroupId = source.GroupId;
         target.Status = source.Status;
+        target.TriggerAlias = source.Trigger?.TriggerAlias;
         target.Version = source.Version;
+        target.PublishedVersion = source.PublishedVersion;
         target.DateCreated = source.DateCreated;
         target.DateModified = source.DateModified;
     }

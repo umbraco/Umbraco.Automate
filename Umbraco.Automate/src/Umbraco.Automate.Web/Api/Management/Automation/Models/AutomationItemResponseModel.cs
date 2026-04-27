@@ -37,8 +37,14 @@ public sealed class AutomationItemResponseModel
     [Required]
     public AutomationStatus Status { get; set; }
 
+    /// <summary>The alias of the configured trigger, or null if no trigger is configured.</summary>
+    public string? TriggerAlias { get; set; }
+
     /// <summary>The entity version.</summary>
     public int Version { get; set; }
+
+    /// <summary>The published version number, or null if never published. Compare against <see cref="Version"/> to detect unpublished changes.</summary>
+    public int? PublishedVersion { get; set; }
 
     /// <summary>When the automation was created.</summary>
     public DateTime DateCreated { get; set; }

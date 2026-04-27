@@ -18,7 +18,7 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
     #runCollectionRepo: UaRunCollectionRepository;
 
     @state()
-    private _tableConfig: UmbTableConfig = { allowSelection: false };
+    private _tableConfig: UmbTableConfig = { allowSelection: false, hideIcon: true };
 
     @state()
     private _items: UmbTableItem[] = [];
@@ -95,7 +95,6 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
     #createTableItems(items: UaRunItemModel[]) {
         this._items = items.map((item) => ({
             id: item.unique,
-            icon: "icon-nodes",
             data: [
                 {
                     columnAlias: "run",
