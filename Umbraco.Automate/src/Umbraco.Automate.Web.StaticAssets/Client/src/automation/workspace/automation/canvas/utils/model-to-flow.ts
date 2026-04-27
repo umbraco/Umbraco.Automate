@@ -62,7 +62,7 @@ export function modelToNodes(
 
         const data: ActionNodeData = {
             stepId: step.id,
-            stepAlias: step.alias,
+            stepAlias: step.alias ?? "",
             actionAlias: step.actionAlias,
             label,
             icon: entry?.icon,

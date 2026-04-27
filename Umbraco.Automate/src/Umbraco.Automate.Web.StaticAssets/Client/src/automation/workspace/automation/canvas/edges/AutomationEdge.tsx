@@ -20,7 +20,6 @@ function AutomationEdge({
     targetY,
     sourcePosition,
     targetPosition,
-    selected,
     label,
     data,
     markerEnd,
