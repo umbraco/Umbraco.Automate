@@ -11,6 +11,8 @@ export interface UaRollbackModalData {
     toVersion: number;
     /** The list of property changes between the versions. */
     changes: UaVersionValueChange[];
+    /** Whether to show the rollback action. When false the modal is view-only. */
+    allowRollback?: boolean;
 }
 
 /**

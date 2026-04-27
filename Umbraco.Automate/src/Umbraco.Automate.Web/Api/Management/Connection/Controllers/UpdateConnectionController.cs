@@ -66,7 +66,7 @@ public sealed class UpdateConnectionController : ConnectionControllerBase
 
         try
         {
-            await _connectionService.UpdateConnectionAsync(existing, cancellationToken: cancellationToken);
+            await _connectionService.UpdateConnectionAsync(existing, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
         }
         catch (ConcurrencyConflictException)
         {

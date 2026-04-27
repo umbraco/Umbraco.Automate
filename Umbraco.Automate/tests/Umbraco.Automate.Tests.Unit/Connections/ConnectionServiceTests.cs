@@ -1,6 +1,7 @@
 using System.Data;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Versioning;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
 
@@ -34,6 +35,7 @@ public class ConnectionServiceTests
         _service = new ConnectionService(
             _repo.Object,
             new ConnectionTypeCollection(() => []),
+            Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
     }
@@ -154,6 +156,7 @@ public class ConnectionServiceTests
         var service = new ConnectionService(
             _repo.Object,
             new ConnectionTypeCollection(() => [type]),
+            Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
 
@@ -176,6 +179,7 @@ public class ConnectionServiceTests
         var service = new ConnectionService(
             _repo.Object,
             new ConnectionTypeCollection(() => [type]),
+            Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
 
@@ -197,6 +201,7 @@ public class ConnectionServiceTests
         var service = new ConnectionService(
             _repo.Object,
             new ConnectionTypeCollection(() => [type]),
+            Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>());
 

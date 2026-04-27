@@ -282,6 +282,7 @@ public class EntityVersionHistoryController : VersioningControllerBase
     /// <summary>
     /// Resolves the workspace ID from the entity and authorizes workspace access.
     /// For automations, uses the WorkspaceId property. For workspaces, the entity ID is the workspace.
+    /// Connections are not workspace-scoped, so section-level access (enforced upstream) is sufficient.
     /// </summary>
     private async Task<IActionResult?> AuthorizeEntityAccessAsync(object entity)
     {
@@ -289,8 +290,14 @@ public class EntityVersionHistoryController : VersioningControllerBase
         {
             Core.Automations.Automation automation => automation.WorkspaceId,
             Core.Workspaces.Workspace workspace => workspace.Id,
+            Core.Connections.Connection => null,
             _ => null,
         };
+
+        if (entity is Core.Connections.Connection)
+        {
+            return null;
+        }
 
         if (!workspaceId.HasValue)
         {

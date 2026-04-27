@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Versioning;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
 
@@ -10,19 +11,24 @@ namespace Umbraco.Automate.Core.Connections;
 /// </summary>
 internal sealed class ConnectionService : IConnectionService
 {
+    private const string EntityTypeName = "Connection";
+
     private readonly IConnectionRepository _connectionRepository;
     private readonly ConnectionTypeCollection _connectionTypeCollection;
+    private readonly IEntityVersionService _versionService;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
 
     public ConnectionService(
         IConnectionRepository connectionRepository,
         ConnectionTypeCollection connectionTypeCollection,
+        IEntityVersionService versionService,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory)
     {
         _connectionRepository = connectionRepository;
         _connectionTypeCollection = connectionTypeCollection;
+        _versionService = versionService;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
     }
@@ -62,6 +68,8 @@ internal sealed class ConnectionService : IConnectionService
 
         var saved = await _connectionRepository.SaveAsync(connection, userId, cancellationToken);
 
+        await _versionService.SaveVersionAsync(saved, userId, "Created", cancellationToken);
+
         scope.Notifications.Publish(new ConnectionSavedNotification(saved, eventMessages));
         scope.Complete();
 
@@ -81,6 +89,8 @@ internal sealed class ConnectionService : IConnectionService
         }
 
         var saved = await _connectionRepository.SaveAsync(connection, userId, cancellationToken);
+
+        await _versionService.SaveVersionAsync(saved, userId, cancellationToken: cancellationToken);
 
         scope.Notifications.Publish(new ConnectionSavedNotification(saved, eventMessages));
         scope.Complete();
@@ -106,6 +116,8 @@ internal sealed class ConnectionService : IConnectionService
             throw new OperationCanceledException("Connection deletion was cancelled by a notification handler.");
         }
 
+        await _versionService.DeleteVersionsAsync(id, EntityTypeName, cancellationToken);
+
         var deleted = await _connectionRepository.DeleteAsync(id, cancellationToken);
 
         if (deleted)
@@ -115,6 +127,27 @@ internal sealed class ConnectionService : IConnectionService
 
         scope.Complete();
         return deleted;
+    }
+
+    public async Task<Connection> RollbackConnectionAsync(
+        Guid connectionId,
+        int targetVersion,
+        Guid? userId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _versionService.GetVersionSnapshotAsync<Connection>(
+            connectionId, targetVersion, cancellationToken)
+            ?? throw new InvalidOperationException($"Version {targetVersion} not found for connection '{connectionId}'.");
+
+        var current = await _connectionRepository.GetAsync(connectionId, cancellationToken)
+            ?? throw new InvalidOperationException($"Connection '{connectionId}' not found.");
+
+        current.Alias = snapshot.Alias;
+        current.Name = snapshot.Name;
+        current.Type = snapshot.Type;
+        current.Settings = snapshot.Settings;
+
+        return await UpdateConnectionAsync(current, userId, cancellationToken);
     }
 
     public async Task<ConfiguredConnection?> GetConfiguredConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default)

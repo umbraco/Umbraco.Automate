@@ -21,7 +21,7 @@ const PAGE_SIZE = 10;
  */
 @customElement("ua-version-history")
 export class UaVersionHistoryElement extends UmbLitElement {
-    #versionRepository = new UaVersionHistoryRepository(this);
+    #versionRepository?: UaVersionHistoryRepository;
     #userItemRepository = new UmbUserItemRepository(this);
 
     #modalManager?: typeof UMB_MODAL_MANAGER_CONTEXT.TYPE;
@@ -29,10 +29,17 @@ export class UaVersionHistoryElement extends UmbLitElement {
     #userMap = new Map<string, UmbUserItemModel>();
 
     /**
-     * The unique identifier of the automation.
+     * The unique identifier of the entity.
      */
     @property({ type: String, attribute: "entity-id" })
     entityId?: string;
+
+    /**
+     * The entity type used to route the version-history API call
+     * (e.g. "automation", "workspace"). Case-insensitive on the backend.
+     */
+    @property({ type: String, attribute: "entity-type" })
+    entityType: string = "automation";
 
     /**
      * The current version of the automation.
@@ -46,6 +53,13 @@ export class UaVersionHistoryElement extends UmbLitElement {
      */
     @property({ attribute: false })
     publishedVersion?: number | null;
+
+    /**
+     * Whether the user can roll back to a previous version. When false the
+     * comparison modal becomes a read-only diff view.
+     */
+    @property({ type: Boolean, attribute: "allow-rollback" })
+    allowRollback: boolean = true;
 
     @state()
     private _currentVersion?: number;
@@ -82,7 +96,10 @@ export class UaVersionHistoryElement extends UmbLitElement {
 
     override updated(changedProperties: Map<string, unknown>) {
         super.updated(changedProperties);
-        if (changedProperties.has("entityId")) {
+        if (changedProperties.has("entityType")) {
+            this.#versionRepository = undefined;
+        }
+        if (changedProperties.has("entityId") || changedProperties.has("entityType")) {
             if (this.entityId) {
                 this._currentPage = 1;
                 this.#loadVersionHistory();
@@ -92,6 +109,13 @@ export class UaVersionHistoryElement extends UmbLitElement {
         if (changedProperties.has("currentVersion") && changedProperties.get("currentVersion") !== undefined) {
             this.#loadVersionHistory();
         }
+    }
+
+    #getRepository(): UaVersionHistoryRepository {
+        if (!this.#versionRepository) {
+            this.#versionRepository = new UaVersionHistoryRepository(this, this.entityType);
+        }
+        return this.#versionRepository;
     }
 
     /**
@@ -108,7 +132,7 @@ export class UaVersionHistoryElement extends UmbLitElement {
         this._loading = true;
         try {
             const skip = (this._currentPage - 1) * PAGE_SIZE;
-            const { data: response } = await this.#versionRepository.getVersionHistory(this.entityId, skip, PAGE_SIZE);
+            const { data: response } = await this.#getRepository().getVersionHistory(this.entityId, skip, PAGE_SIZE);
             if (response) {
                 this._versions = response.versions;
                 this._totalVersions = response.totalVersions;
@@ -145,7 +169,7 @@ export class UaVersionHistoryElement extends UmbLitElement {
     async #onCompareClick(version: number) {
         if (!this.entityId || !this.#modalManager || this._currentVersion === undefined) return;
 
-        const { data: comparison } = await this.#versionRepository.compareVersions(
+        const { data: comparison } = await this.#getRepository().compareVersions(
             this.entityId,
             version,
             this._currentVersion,
@@ -157,12 +181,13 @@ export class UaVersionHistoryElement extends UmbLitElement {
                 fromVersion: version,
                 toVersion: this._currentVersion,
                 changes: comparison.changes,
+                allowRollback: this.allowRollback,
             },
         });
 
         const result = await modalContext.onSubmit().catch(() => undefined);
-        if (result?.rollback) {
-            const { error } = await this.#versionRepository.rollback(this.entityId, version);
+        if (result?.rollback && this.allowRollback) {
+            const { error } = await this.#getRepository().rollback(this.entityId, version);
             if (!error) {
                 this.dispatchEvent(new CustomEvent("rollback", { bubbles: true, composed: true }));
                 await this.#loadVersionHistory();

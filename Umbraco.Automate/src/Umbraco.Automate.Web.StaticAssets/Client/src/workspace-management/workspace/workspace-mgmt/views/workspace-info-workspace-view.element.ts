@@ -1,12 +1,20 @@
 import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
+import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice/entity-action";
 import type { UaWorkspaceDetailModel } from "../../../types.js";
 import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
+import { UA_WORKSPACE_MGMT_ENTITY_TYPE } from "../../../entity.js";
 import { UA_WORKSPACE_MGMT_WORKSPACE_CONTEXT } from "../workspace-mgmt-workspace.context-token.js";
+
+import "../../../../core/version-history/components/version-history/version-history.element.js";
 
 @customElement("ua-workspace-info-workspace-view")
 export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
+    #workspaceContext?: typeof UA_WORKSPACE_MGMT_WORKSPACE_CONTEXT.TYPE;
+    #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
+
     @state()
     private _model?: UaWorkspaceDetailModel;
 
@@ -14,10 +22,14 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
         super();
         this.consumeContext(UA_WORKSPACE_MGMT_WORKSPACE_CONTEXT, (context) => {
             if (context) {
+                this.#workspaceContext = context;
                 this.observe(context.data, (model) => {
                     this._model = model;
                 });
             }
+        });
+        this.consumeContext(UMB_ACTION_EVENT_CONTEXT, (context) => {
+            this.#eventContext = context;
         });
     }
 
@@ -26,26 +38,17 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
 
         return html`
             <div class="container">
-                <uui-box headline=${this.localize.term("uaLabels_history")}>
-                    ${this._model.dateCreated
-                        ? html`
-                              <umb-property-layout label=${this.localize.term("uaLabels_created")} orientation="vertical">
-                                  <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
-                              </umb-property-layout>
-                          `
-                        : ""}
-                    ${this._model.dateModified
-                        ? html`
-                              <umb-property-layout label=${this.localize.term("uaLabels_modified")} orientation="vertical">
-                                  <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
-                              </umb-property-layout>
-                          `
-                        : ""}
-                </uui-box>
+                <ua-version-history
+                    entity-id=${this._model.unique}
+                    entity-type="workspace"
+                    .currentVersion=${this._model.version}
+                    @rollback=${this.#onRollback}
+                >
+                </ua-version-history>
             </div>
 
             <div class="container">
-                <uui-box headline=${this.localize.term("general_general")}>
+                <uui-box headline=${this.localize.term("uaLabels_info")}>
                     <umb-property-layout label=${this.localize.term("uaLabels_id")} orientation="vertical">
                         <div slot="editor">
                             ${this._model.unique === UA_EMPTY_GUID
@@ -56,12 +59,36 @@ export class UaWorkspaceInfoWorkspaceViewElement extends UmbLitElement {
                     <umb-property-layout label=${this.localize.term("uaLabels_alias")} orientation="vertical">
                         <div slot="editor">${this._model.alias || "-"}</div>
                     </umb-property-layout>
-                    <umb-property-layout label=${this.localize.term("uaLabels_version")} orientation="vertical">
-                        <div slot="editor">${this._model.version}</div>
-                    </umb-property-layout>
+                    ${this._model.dateCreated
+                        ? html`
+                              <umb-property-layout label=${this.localize.term("uaLabels_dateCreated")} orientation="vertical">
+                                  <div slot="editor">${formatDateTime(this._model.dateCreated)}</div>
+                              </umb-property-layout>
+                          `
+                        : ""}
+                    ${this._model.dateModified
+                        ? html`
+                              <umb-property-layout label=${this.localize.term("uaLabels_dateModified")} orientation="vertical">
+                                  <div slot="editor">${formatDateTime(this._model.dateModified)}</div>
+                              </umb-property-layout>
+                          `
+                        : ""}
                 </uui-box>
             </div>
         `;
+    }
+
+    async #onRollback() {
+        const unique = this._model?.unique;
+        if (unique && unique !== UA_EMPTY_GUID) {
+            await this.#workspaceContext?.reload();
+            this.#eventContext?.dispatchEvent(
+                new UmbRequestReloadStructureForEntityEvent({
+                    entityType: UA_WORKSPACE_MGMT_ENTITY_TYPE,
+                    unique,
+                }),
+            );
+        }
     }
 
     static styles = [

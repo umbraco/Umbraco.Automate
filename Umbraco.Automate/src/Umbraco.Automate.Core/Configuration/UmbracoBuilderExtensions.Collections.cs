@@ -78,7 +78,8 @@ public static partial class UmbracoBuilderExtensions
         builder.AutomateBindingFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>()
-            .Add<WorkspaceVersionableEntityAdapter>();
+            .Add<WorkspaceVersionableEntityAdapter>()
+            .Add<ConnectionVersionableEntityAdapter>();
 
         // Wire notification triggers → TriggerNotificationHandler<T> for each notification type
         builder.RegisterTriggerNotificationHandlers();

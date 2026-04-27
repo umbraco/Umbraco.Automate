@@ -1,5 +1,5 @@
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
-import { customElement, html, css } from "@umbraco-cms/backoffice/external/lit";
+import { customElement, html, css, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UaRollbackModalData, UaRollbackModalValue } from "./rollback-modal.token.js";
 import "../../components/version-diff-view/version-diff-view.element.js";
@@ -42,16 +42,20 @@ export class UaRollbackModalElement extends UmbModalBaseElement<UaRollbackModalD
                 >
                     ${this.localize.term("general_close")}
                 </uui-button>
-                <uui-button
-                    slot="actions"
-                    id="rollback"
-                    color="positive"
-                    look="primary"
-                    label=${this.localize.term("uaVersionHistory_rollback", [this.data.fromVersion])}
-                    @click=${this.#onRollback}
-                >
-                    ${this.localize.term("uaVersionHistory_rollback", [this.data.fromVersion])}
-                </uui-button>
+                ${this.data.allowRollback === false
+                    ? nothing
+                    : html`
+                          <uui-button
+                              slot="actions"
+                              id="rollback"
+                              color="positive"
+                              look="primary"
+                              label=${this.localize.term("uaVersionHistory_rollback", [this.data.fromVersion])}
+                              @click=${this.#onRollback}
+                          >
+                              ${this.localize.term("uaVersionHistory_rollback", [this.data.fromVersion])}
+                          </uui-button>
+                      `}
             </umb-body-layout>
         `;
     }

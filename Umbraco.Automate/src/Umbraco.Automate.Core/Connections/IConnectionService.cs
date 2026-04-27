@@ -57,6 +57,15 @@ public interface IConnectionService
     Task<IReadOnlyList<ConfiguredConnection>> GetConfiguredConnectionsByIdsAsync(IReadOnlyCollection<Guid> connectionIds, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Rolls a connection back to a previously saved version.
+    /// </summary>
+    Task<Connection> RollbackConnectionAsync(
+        Guid connectionId,
+        int targetVersion,
+        Guid? userId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Runs the connection type's connectivity check against the stored settings.
     /// Returns <c>null</c> if the connection does not exist; returns a
     /// <see cref="ConnectionValidationStatus.Failure"/> result if the connection exists but
