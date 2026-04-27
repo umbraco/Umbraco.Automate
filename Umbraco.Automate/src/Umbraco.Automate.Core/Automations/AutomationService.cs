@@ -249,7 +249,6 @@ internal sealed class AutomationService : IAutomationService
         }
 
         automation.Status = AutomationStatus.Inactive;
-        automation.IsEnabled = false;
 
         var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
 

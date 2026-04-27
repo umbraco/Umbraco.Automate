@@ -110,7 +110,7 @@ export class UaAutomationWorkspaceContext
 
         if (error) throw error;
 
-        await this.load(unique);
+        await this.reload();
         this.#reloadStructure(unique);
     }
 
@@ -125,7 +125,7 @@ export class UaAutomationWorkspaceContext
 
         if (error) throw error;
 
-        await this.load(unique);
+        await this.reload();
         this.#reloadStructure(unique);
     }
 
