@@ -6,6 +6,7 @@ export interface UaAutomationTreeItemModel extends UmbTreeItemModel {
     entityType: UaAutomationEntityType | UaAutomationGroupEntityType;
     status?: AutomationStatusModel;
     isEnabled?: boolean;
+    triggerAlias?: string | null;
 }
 
 export interface UaAutomationTreeRootModel extends UmbTreeRootModel {

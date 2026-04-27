@@ -79,7 +79,9 @@ export class UaConnectionTableCollectionViewElement extends UmbLitElement {
                 },
                 {
                     columnAlias: "alias",
-                    value: item.alias,
+                    value: item.alias
+                        ? html`<uui-tag look="secondary" color="default">${item.alias}</uui-tag>`
+                        : "",
                 },
                 {
                     columnAlias: "type",

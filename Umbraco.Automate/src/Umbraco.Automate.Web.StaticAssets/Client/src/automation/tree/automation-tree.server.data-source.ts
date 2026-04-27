@@ -14,6 +14,7 @@ import {
     UA_AUTOMATION_GROUP_ENTITY_TYPE,
     UA_AUTOMATION_ROOT_ENTITY_TYPE,
 } from "../entity.js";
+import { UA_AUTOMATION_PENDING_CHANGES_FLAG } from "./constants.js";
 import type { UaAutomationTreeItemModel } from "./types.js";
 
 export class UaAutomationTreeServerDataSource
@@ -118,6 +119,17 @@ export class UaAutomationTreeServerDataSource
             icon: "icon-mindmap",
             status: item.status,
             isEnabled: item.isEnabled,
+            triggerAlias: item.triggerAlias ?? null,
+            flags: hasPendingChanges(item) ? [{ alias: UA_AUTOMATION_PENDING_CHANGES_FLAG }] : [],
         };
     }
+}
+
+// A "Published" automation has pending changes when the draft has been edited past the
+// last published snapshot. Drafts and never-published automations don't qualify — the
+// "draft" attribute already covers them visually.
+function hasPendingChanges(item: AutomationItemResponseModel): boolean {
+    return item.status === "Published"
+        && item.publishedVersion != null
+        && item.version > item.publishedVersion;
 }

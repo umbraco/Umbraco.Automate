@@ -11,7 +11,8 @@ import type {
 import type { UmbDefaultCollectionContext } from "@umbraco-cms/backoffice/collection";
 import { UMB_COLLECTION_CONTEXT } from "@umbraco-cms/backoffice/collection";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import { formatDateTime } from "../../../../core/index.js";
+import { UmbUserItemRepository } from "@umbraco-cms/backoffice/user";
+import { formatDateTime, UA_EMPTY_GUID } from "../../../../core/index.js";
 import type { UaWorkspaceItemModel } from "../../../types.js";
 import { UA_WORKSPACE_ICON } from "../../../constants.js";
 import { UA_EDIT_WORKSPACE_MGMT_WORKSPACE_PATH_PATTERN } from "../../../workspace/workspace-mgmt/paths.js";
@@ -30,11 +31,15 @@ export class UaWorkspaceTableCollectionViewElement extends UmbLitElement {
     private _selection: Array<string> = [];
 
     #collectionContext?: UmbDefaultCollectionContext<UaWorkspaceItemModel>;
+    #userItemRepository = new UmbUserItemRepository(this);
+
+    @state()
+    private _serviceAccountNames: Map<string, string> = new Map();
 
     private _columns: UmbTableColumn[] = [
         { name: "Name", alias: "name" },
         { name: "Alias", alias: "alias" },
-        { name: "Service Account Key", alias: "serviceAccountKey" },
+        { name: "Service Account", alias: "serviceAccountKey" },
         { name: "Created", alias: "dateCreated" },
     ];
 
@@ -52,7 +57,11 @@ export class UaWorkspaceTableCollectionViewElement extends UmbLitElement {
 
         this.observe(
             this.#collectionContext.items,
-            (items) => this.#createTableItems(items as UaWorkspaceItemModel[]),
+            async (items) => {
+                const typed = items as UaWorkspaceItemModel[];
+                await this.#resolveServiceAccountNames(typed);
+                this.#createTableItems(typed);
+            },
             "umbCollectionItemsObserver",
         );
 
@@ -63,6 +72,26 @@ export class UaWorkspaceTableCollectionViewElement extends UmbLitElement {
             },
             "umbCollectionSelectionObserver",
         );
+    }
+
+    async #resolveServiceAccountNames(items: UaWorkspaceItemModel[]) {
+        const keys = Array.from(
+            new Set(
+                items
+                    .map((i) => i.serviceAccountKey)
+                    .filter((k): k is string => !!k && k !== UA_EMPTY_GUID && !this._serviceAccountNames.has(k)),
+            ),
+        );
+        if (keys.length === 0) return;
+
+        const { data } = await this.#userItemRepository.requestItems(keys);
+        if (!data) return;
+
+        const next = new Map(this._serviceAccountNames);
+        for (const user of data) {
+            next.set(user.unique, user.name);
+        }
+        this._serviceAccountNames = next;
     }
 
     #createTableItems(items: UaWorkspaceItemModel[]) {
@@ -79,11 +108,15 @@ export class UaWorkspaceTableCollectionViewElement extends UmbLitElement {
                 },
                 {
                     columnAlias: "alias",
-                    value: item.alias || "-",
+                    value: item.alias
+                        ? html`<uui-tag look="secondary" color="default">${item.alias}</uui-tag>`
+                        : "",
                 },
                 {
                     columnAlias: "serviceAccountKey",
-                    value: item.serviceAccountKey || "-",
+                    value: item.serviceAccountKey
+                        ? this._serviceAccountNames.get(item.serviceAccountKey) ?? item.serviceAccountKey
+                        : "-",
                 },
                 {
                     columnAlias: "dateCreated",

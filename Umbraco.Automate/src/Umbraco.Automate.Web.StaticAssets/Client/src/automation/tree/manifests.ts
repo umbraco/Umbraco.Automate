@@ -1,4 +1,5 @@
 import {
+    UA_AUTOMATION_PENDING_CHANGES_FLAG,
     UA_AUTOMATION_TREE_ALIAS,
     UA_AUTOMATION_TREE_REPOSITORY_ALIAS,
     UA_AUTOMATION_TREE_STORE_ALIAS,
@@ -57,9 +58,18 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
     {
         type: "treeItem",
         alias: "UmbracoAutomate.TreeItem.Automation",
-        kind: "default",
         name: "Automation Tree Item",
         forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
+        element: () => import("./automation-tree-item.element.js"),
+    },
+    {
+        type: "entitySign",
+        kind: "icon",
+        alias: "UmbracoAutomate.EntitySign.Automation.PendingChanges",
+        name: "Automation Pending Changes Entity Sign",
+        forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
+        forEntityFlags: [UA_AUTOMATION_PENDING_CHANGES_FLAG],
+        meta: { iconName: "icon-edit", label: "#uaLabels_unpublishedChanges" },
     },
     {
         type: "treeItem",

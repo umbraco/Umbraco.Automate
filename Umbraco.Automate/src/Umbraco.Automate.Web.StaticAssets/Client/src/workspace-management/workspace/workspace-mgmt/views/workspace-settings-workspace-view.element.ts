@@ -54,7 +54,6 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
                 <umb-property-layout
                     label=${this.localize.term("uaWorkspace_serviceAccountKey")}
                     description=${this.localize.term("uaWorkspace_serviceAccountDescription")}
-                    orientation="vertical"
                     mandatory
                 >
                     <umb-user-input
@@ -72,7 +71,6 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
                 <umb-property-layout
                     label=${this.localize.term("uaWorkspace_userGroups")}
                     description=${this.localize.term("uaWorkspace_userGroupsDescription")}
-                    orientation="vertical"
                     mandatory
                 >
                     <umb-user-group-input
@@ -87,7 +85,6 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
                 <umb-property-layout
                     label=${this.localize.term("uaWorkspace_allowedConnections")}
                     description=${this.localize.term("uaWorkspace_allowedConnectionsDescription")}
-                    orientation="vertical"
                 >
                     <ua-input-connection
                         slot="editor"
@@ -109,10 +106,6 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
 
             uui-box {
                 --uui-box-default-padding: 0 var(--uui-size-space-5);
-            }
-
-            umb-property-layout[orientation="vertical"]:not(:last-child) {
-                padding-bottom: 0;
             }
 
             uui-loader {

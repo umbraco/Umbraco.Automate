@@ -163,6 +163,9 @@ export class UaSettingsFormElement extends UmbLitElement {
         return config;
     }
 
+    @property({ type: Boolean, attribute: "label-on-top" })
+    labelOnTop = false;
+
     #renderField(field: EditableModelFieldDescriptorModel) {
         return html`
             <umb-property
@@ -170,7 +173,7 @@ export class UaSettingsFormElement extends UmbLitElement {
                 description=${field.description ?? ""}
                 alias=${field.key}
                 property-editor-ui-alias=${this.#resolveEditorAlias(field)}
-                .appearance=${{ labelOnTop: true }}
+                .appearance=${{ labelOnTop: this.labelOnTop }}
                 .config=${this.#buildFieldConfig(field)}
                 .validation=${{
                 mandatory: field.isRequired,

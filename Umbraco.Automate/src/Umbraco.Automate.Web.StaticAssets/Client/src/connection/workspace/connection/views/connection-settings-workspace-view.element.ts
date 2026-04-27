@@ -41,16 +41,6 @@ export class UaConnectionSettingsWorkspaceViewElement extends UmbLitElement {
         }
     }
 
-    #onTypeChange(event: Event) {
-        event.stopPropagation();
-        const target = event.target as HTMLSelectElement;
-        const alias = target.value;
-        this.#workspaceContext?.updateProperty("type", alias);
-
-        // Reset settings when type changes — different types have different schemas
-        this.#workspaceContext?.updateProperty("settings", {});
-    }
-
     #onSettingsChange(event: CustomEvent<SettingsChangeDetail>) {
         event.stopPropagation();
         this.#workspaceContext?.updateProperty("settings", event.detail.settings);
@@ -61,24 +51,19 @@ export class UaConnectionSettingsWorkspaceViewElement extends UmbLitElement {
         return this._connectionTypes.find((ct) => ct.alias === this._model!.type);
     }
 
+    // Connection type is chosen during creation and cannot be changed afterwards \u2014 render
+    // it as a read-only display rather than a select.
     #renderTypeField() {
         if (!this._model) return nothing;
-
-        const options = [
-            { name: "Select connection type\u2026", value: "", selected: !this._model.type },
-            ...this._connectionTypes.map((ct) => ({
-                name: ct.name,
-                value: ct.alias,
-                selected: ct.alias === this._model!.type,
-            })),
-        ];
-
+        const selected = this.#getSelectedConnectionType();
+        if (!selected) {
+            return html`<span class="type-display">${this._model.type || "-"}</span>`;
+        }
         return html`
-            <uui-select
-                .options=${options}
-                @change=${this.#onTypeChange}
-                label=${this.localize.term("uaLabels_type")}
-            ></uui-select>
+            <div class="type-display">
+                <umb-icon name=${selected.icon || "icon-plugin"}></umb-icon>
+                <span>${selected.name}</span>
+            </div>
         `;
     }
 
@@ -87,7 +72,7 @@ export class UaConnectionSettingsWorkspaceViewElement extends UmbLitElement {
 
         return html`
             <uui-box headline=${this.localize.term("uaLabels_connectionType")}>
-                <umb-property-layout label=${this.localize.term("uaLabels_type")} orientation="vertical">
+                <umb-property-layout label=${this.localize.term("uaLabels_type")}>
                     <div slot="editor">
                         ${this.#renderTypeField()}
                     </div>
@@ -117,8 +102,10 @@ export class UaConnectionSettingsWorkspaceViewElement extends UmbLitElement {
                 padding: var(--uui-size-layout-1);
             }
 
-            uui-select {
-                width: 100%;
+            .type-display {
+                display: inline-flex;
+                align-items: center;
+                gap: var(--uui-size-space-2);
             }
 
             uui-box:not(.settings) {

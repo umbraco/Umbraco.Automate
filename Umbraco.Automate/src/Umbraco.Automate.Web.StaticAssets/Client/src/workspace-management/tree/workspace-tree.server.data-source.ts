@@ -11,6 +11,7 @@ import { AutomationsService, WorkspacesService } from "../../api/sdk.gen.js";
 import type { AutomationAncestorResponseModel, AutomationItemResponseModel, WorkspaceItemResponseModel, WorkspaceGroupResponseModel } from "../../api/types.gen.js";
 import { UA_WORKSPACE_ENTITY_TYPE, UA_WORKSPACE_ROOT_ENTITY_TYPE } from "../entity.js";
 import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_GROUP_ENTITY_TYPE } from "../../automation/entity.js";
+import { UA_AUTOMATION_PENDING_CHANGES_FLAG } from "../../automation/tree/constants.js";
 import type { UaWorkspaceTreeItemModel } from "./types.js";
 
 export class UaWorkspaceTreeServerDataSource
@@ -306,6 +307,10 @@ export class UaWorkspaceTreeServerDataSource
         parentUnique: string,
         parentEntityType: string,
     ): UaWorkspaceTreeItemModel {
+        const pendingChanges = item.status === "Published"
+            && item.publishedVersion != null
+            && item.version > item.publishedVersion;
+
         return {
             unique: item.id,
             entityType: UA_AUTOMATION_ENTITY_TYPE,
@@ -316,6 +321,8 @@ export class UaWorkspaceTreeServerDataSource
             icon: "icon-mindmap",
             status: item.status,
             isEnabled: item.isEnabled,
+            triggerAlias: item.triggerAlias ?? null,
+            flags: pendingChanges ? [{ alias: UA_AUTOMATION_PENDING_CHANGES_FLAG }] : [],
         };
     }
 }

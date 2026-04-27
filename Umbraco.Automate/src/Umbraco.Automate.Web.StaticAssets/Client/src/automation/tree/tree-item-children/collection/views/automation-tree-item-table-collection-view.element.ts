@@ -20,7 +20,8 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
     @state()
     private _tableColumns: Array<UmbTableColumn> = [
         { name: "Name", alias: "name" },
-        { name: "Type", alias: "type" },
+        { name: "Status", alias: "status" },
+        { name: "Enabled", alias: "isEnabled" },
         { name: "", alias: "entityActions", align: "right", width: "1%" },
     ];
 
@@ -48,6 +49,15 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
         );
     }
 
+    #statusColor(status: string): string {
+        switch (status) {
+            case "Published": return "positive";
+            case "Draft": return "warning";
+            case "Inactive": return "danger";
+            default: return "default";
+        }
+    }
+
     #buildTableItem(item: UaWorkspaceTreeItemModel): UmbTableItem {
         const isAutomation = item.entityType === UA_AUTOMATION_ENTITY_TYPE;
         const href = isAutomation
@@ -60,11 +70,21 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
             data: [
                 {
                     columnAlias: "name",
-                    value: html`<uui-button href=${href} label=${item.name}></uui-button>`,
+                    value: html`<a href=${href}>${item.name}</a>`,
                 },
                 {
-                    columnAlias: "type",
-                    value: item.isFolder ? "Folder" : "Automation",
+                    columnAlias: "status",
+                    value: isAutomation && item.status
+                        ? html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">${item.status}</uui-tag>`
+                        : "",
+                },
+                {
+                    columnAlias: "isEnabled",
+                    value: isAutomation
+                        ? html`<uui-tag color=${item.isEnabled ? "positive" : "default"} look="secondary">
+                              ${item.isEnabled ? "Enabled" : "Disabled"}
+                          </uui-tag>`
+                        : "",
                 },
                 {
                     columnAlias: "entityActions",

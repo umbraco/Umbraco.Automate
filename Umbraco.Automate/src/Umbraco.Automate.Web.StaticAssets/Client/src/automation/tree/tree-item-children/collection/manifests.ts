@@ -10,6 +10,7 @@ const collection: ManifestCollection = {
     kind: "default",
     alias: UA_AUTOMATION_TREE_ITEM_CHILDREN_COLLECTION_ALIAS,
     name: "Automation Tree Item Children Collection",
+    element: () => import("./automation-tree-item-children-collection.element.js"),
     meta: {
         repositoryAlias: UA_AUTOMATION_TREE_ITEM_CHILDREN_COLLECTION_REPOSITORY_ALIAS,
     },
