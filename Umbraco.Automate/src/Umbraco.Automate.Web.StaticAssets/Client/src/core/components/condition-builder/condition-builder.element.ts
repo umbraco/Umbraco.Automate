@@ -1,61 +1,36 @@
 import { css, html, customElement, property, repeat, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import type { UmbPropertyEditorUiElement, UmbPropertyEditorConfigCollection } from "@umbraco-cms/backoffice/property-editor";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
+import { UA_CONDITION_MODAL } from "../../../automation/modals/condition/condition-modal.token.js";
+import { UNARY_OPERATORS, type Condition, type ConditionGroup, type ConditionOperator, type ConditionSet } from "./types.js";
 
-export type ConditionOperator =
-    | "Equals"
-    | "NotEquals"
-    | "Contains"
-    | "NotContains"
-    | "StartsWith"
-    | "EndsWith"
-    | "GreaterThan"
-    | "LessThan"
-    | "GreaterThanOrEquals"
-    | "LessThanOrEquals"
-    | "IsEmpty"
-    | "IsNotEmpty";
+export type { Condition, ConditionGroup, ConditionOperator, ConditionSet };
 
-export interface Condition {
-    LeftOperand: string;
-    Operator: ConditionOperator;
-    RightOperand: string;
-}
-
-export interface ConditionGroup {
-    Conditions: Condition[];
-}
-
-export interface ConditionSet {
-    Groups: ConditionGroup[];
-}
-
-const OPERATOR_OPTIONS = [
-    { name: "equals", value: "Equals" },
-    { name: "not equals", value: "NotEquals" },
-    { name: "contains", value: "Contains" },
-    { name: "not contains", value: "NotContains" },
-    { name: "starts with", value: "StartsWith" },
-    { name: "ends with", value: "EndsWith" },
-    { name: "greater than", value: "GreaterThan" },
-    { name: "less than", value: "LessThan" },
-    { name: ">=", value: "GreaterThanOrEquals" },
-    { name: "<=", value: "LessThanOrEquals" },
-    { name: "is empty", value: "IsEmpty" },
-    { name: "is not empty", value: "IsNotEmpty" },
-];
-
-const UNARY_OPERATORS: ConditionOperator[] = ["IsEmpty", "IsNotEmpty"];
+const OPERATOR_LABELS: Record<ConditionOperator, string> = {
+    Equals: "equals",
+    NotEquals: "not equals",
+    Contains: "contains",
+    NotContains: "not contains",
+    StartsWith: "starts with",
+    EndsWith: "ends with",
+    GreaterThan: ">",
+    LessThan: "<",
+    GreaterThanOrEquals: ">=",
+    LessThanOrEquals: "<=",
+    IsEmpty: "is empty",
+    IsNotEmpty: "is not empty",
+};
 
 function createEmptyCondition(): Condition {
     return { LeftOperand: "", Operator: "Equals", RightOperand: "" };
 }
 
 function createEmptyGroup(): ConditionGroup {
-    return { Conditions: [createEmptyCondition()] };
+    return { Conditions: [] };
 }
 
 function createDefaultValue(): ConditionSet {
@@ -89,7 +64,6 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
     #cloneValue(): ConditionSet {
         const val = this.value ?? createDefaultValue();
         const clone = structuredClone(val);
-        // Normalize: ensure Groups array always exists
         if (!Array.isArray(clone.Groups)) {
             clone.Groups = [createEmptyGroup()];
         }
@@ -101,38 +75,39 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
         this.dispatchEvent(new UmbChangeEvent());
     }
 
-    #onLeftOperandChange(groupIndex: number, conditionIndex: number, e: Event) {
-        const input = e.target as HTMLInputElement;
-        const newValue = this.#cloneValue();
-        newValue.Groups[groupIndex].Conditions[conditionIndex].LeftOperand = input.value;
-        this.#emitChange(newValue);
-    }
-
-    #onOperatorChange(groupIndex: number, conditionIndex: number, e: Event) {
-        const select = e.target as HTMLSelectElement & { value: string };
-        const newValue = this.#cloneValue();
-        const condition = newValue.Groups[groupIndex].Conditions[conditionIndex];
-        condition.Operator = select.value as ConditionOperator;
-        if (UNARY_OPERATORS.includes(condition.Operator)) {
-            condition.RightOperand = "";
+    async #openConditionModal(initial: Condition): Promise<Condition | null> {
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager) return null;
+        const modal = modalManager.open(this, UA_CONDITION_MODAL, {
+            data: { condition: initial, bindingSources: this.bindingSources },
+        });
+        try {
+            const { condition } = await modal.onSubmit();
+            return condition;
+        } catch {
+            return null;
         }
-        this.#emitChange(newValue);
     }
 
-    #onRightOperandChange(groupIndex: number, conditionIndex: number, e: Event) {
-        const input = e.target as HTMLInputElement;
+    async #addCondition(groupIndex: number) {
+        const result = await this.#openConditionModal(createEmptyCondition());
+        if (!result) return;
         const newValue = this.#cloneValue();
-        newValue.Groups[groupIndex].Conditions[conditionIndex].RightOperand = input.value;
+        newValue.Groups[groupIndex].Conditions.push(result);
         this.#emitChange(newValue);
     }
 
-    #addCondition(groupIndex: number) {
+    async #editCondition(groupIndex: number, conditionIndex: number) {
+        const current = this.value.Groups[groupIndex].Conditions[conditionIndex];
+        const result = await this.#openConditionModal(current);
+        if (!result) return;
         const newValue = this.#cloneValue();
-        newValue.Groups[groupIndex].Conditions.push(createEmptyCondition());
+        newValue.Groups[groupIndex].Conditions[conditionIndex] = result;
         this.#emitChange(newValue);
     }
 
-    #removeCondition(groupIndex: number, conditionIndex: number) {
+    #removeCondition(groupIndex: number, conditionIndex: number, e: Event) {
+        e.stopPropagation();
         const newValue = this.#cloneValue();
         newValue.Groups[groupIndex].Conditions.splice(conditionIndex, 1);
         this.#emitChange(newValue);
@@ -150,92 +125,44 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
         this.#emitChange(newValue);
     }
 
-    #getBindingOptions(selectedValue: string): Array<{ name: string; value: string; selected: boolean }> {
-        const options: Array<{ name: string; value: string; selected: boolean }> = [
-            { name: this.localize.term("uaConditionBuilder_selectBinding"), value: "", selected: !selectedValue },
-        ];
-
-        for (const source of this.bindingSources) {
-            for (const leaf of source.leaves) {
-                const expression = `\${ ${source.bindingPrefix}.${leaf.path} }`;
-                options.push({
-                    name: `${source.label} — ${leaf.path}`,
-                    value: expression,
-                    selected: expression === selectedValue,
-                });
-            }
+    #summarise(condition: Condition): string {
+        const op = OPERATOR_LABELS[condition.Operator];
+        const left = condition.LeftOperand || "(empty)";
+        if (UNARY_OPERATORS.includes(condition.Operator)) {
+            return `${left} ${op}`;
         }
-
-        return options;
+        const right = condition.RightOperand || "(empty)";
+        return `${left} ${op} ${right}`;
     }
 
-    #renderCondition(groupIndex: number, conditionIndex: number, condition: Condition, conditionCount: number) {
-        const isUnary = UNARY_OPERATORS.includes(condition.Operator);
-        const operatorOptions = OPERATOR_OPTIONS.map((opt) => ({
-            ...opt,
-            selected: opt.value === condition.Operator,
-        }));
-
-        const hasBindingSources = this.bindingSources.length > 0;
-
+    #renderCondition(groupIndex: number, conditionIndex: number, condition: Condition) {
         return html`
-            <div class="condition-row">
-                ${hasBindingSources
-                    ? html`<uui-select
-                          class="operand-input"
-                          label=${this.localize.term("uaConditionBuilder_leftOperandPlaceholder")}
-                          .options=${this.#getBindingOptions(condition.LeftOperand)}
-                          @change=${(e: Event) => this.#onLeftOperandChange(groupIndex, conditionIndex, e)}
-                      ></uui-select>`
-                    : html`<uui-input
-                          class="operand-input"
-                          placeholder=${this.localize.term("uaConditionBuilder_leftOperandPlaceholder")}
-                          .value=${condition.LeftOperand}
-                          @change=${(e: Event) => this.#onLeftOperandChange(groupIndex, conditionIndex, e)}
-                      ></uui-input>`}
-
-                <uui-select
-                    class="operator-select"
-                    .options=${operatorOptions}
-                    @change=${(e: Event) => this.#onOperatorChange(groupIndex, conditionIndex, e)}
-                ></uui-select>
-
-                ${isUnary
-                    ? nothing
-                    : html`
-                          <uui-input
-                              class="operand-input"
-                              placeholder=${this.localize.term("uaConditionBuilder_rightOperandPlaceholder")}
-                              .value=${condition.RightOperand}
-                              @change=${(e: Event) => this.#onRightOperandChange(groupIndex, conditionIndex, e)}
-                          ></uui-input>
-                      `}
-
-                ${conditionCount > 1
-                    ? html`
-                          <uui-button
-                              class="remove-btn"
-                              look="secondary"
-                              compact
-                              label=${this.localize.term("uaConditionBuilder_removeCondition")}
-                              @click=${() => this.#removeCondition(groupIndex, conditionIndex)}
-                          >
-                              <uui-icon name="icon-trash"></uui-icon>
-                          </uui-button>
-                      `
-                    : nothing}
-            </div>
+            <uui-ref-node
+                name=${this.#summarise(condition)}
+                detail=${condition.LeftOperand || ""}
+                @open=${() => this.#editCondition(groupIndex, conditionIndex)}
+            >
+                <uui-icon slot="icon" name="icon-filter"></uui-icon>
+                <uui-action-bar slot="actions">
+                    <uui-button
+                        label=${this.localize.term("uaGeneral_delete")}
+                        @click=${(e: Event) => this.#removeCondition(groupIndex, conditionIndex, e)}
+                    >
+                        <uui-icon name="icon-trash"></uui-icon>
+                    </uui-button>
+                </uui-action-bar>
+            </uui-ref-node>
         `;
     }
 
     #renderGroup(groupIndex: number, group: ConditionGroup) {
+        const hasMultipleGroups = this.value.Groups.length > 1;
         return html`
             <div class="group">
-                <div class="group-header">
-                    ${this.value.Groups.length > 1
-                        ? html`
+                ${hasMultipleGroups
+                    ? html`
+                          <div class="group-header">
                               <uui-button
-                                  class="remove-group-btn"
                                   look="secondary"
                                   compact
                                   label=${this.localize.term("uaConditionBuilder_removeGroup")}
@@ -243,21 +170,28 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
                               >
                                   <uui-icon name="icon-trash"></uui-icon>
                               </uui-button>
-                          `
-                        : nothing}
-                </div>
-                <div class="conditions">
-                    ${repeat(
-                        group.Conditions,
-                        (_condition, index) => `${groupIndex}-${index}`,
-                        (condition, index) => html`
-                            ${index > 0 ? html`<span class="and-separator">${this.localize.term("uaConditionBuilder_and")}</span>` : nothing}
-                            ${this.#renderCondition(groupIndex, index, condition, group.Conditions.length)}
-                        `,
-                    )}
-                </div>
+                          </div>
+                      `
+                    : nothing}
+
+                ${group.Conditions.length > 0
+                    ? html`
+                          <uui-ref-list>
+                              ${repeat(
+                                  group.Conditions,
+                                  (_c, i) => `${groupIndex}-${i}`,
+                                  (condition, index) => html`
+                                      ${index > 0
+                                          ? html`<span class="and-separator">${this.localize.term("uaConditionBuilder_and")}</span>`
+                                          : nothing}
+                                      ${this.#renderCondition(groupIndex, index, condition)}
+                                  `,
+                              )}
+                          </uui-ref-list>
+                      `
+                    : html`<p class="empty-group">${this.localize.term("uaConditionBuilder_noConditions")}</p>`}
+
                 <uui-button
-                    class="add-condition-btn"
                     look="placeholder"
                     label=${this.localize.term("uaConditionBuilder_addCondition")}
                     @click=${() => this.#addCondition(groupIndex)}
@@ -275,14 +209,19 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
             <div class="condition-builder">
                 ${repeat(
                     groups,
-                    (_group, index) => index,
+                    (_g, i) => i,
                     (group, index) => html`
-                        ${index > 0 ? html`<div class="or-separator"><uui-tag look="secondary" color="default">${this.localize.term("uaConditionBuilder_or")}</uui-tag></div>` : nothing}
+                        ${index > 0
+                            ? html`<div class="or-separator">
+                                  <uui-tag look="secondary" color="default">
+                                      ${this.localize.term("uaConditionBuilder_or")}
+                                  </uui-tag>
+                              </div>`
+                            : nothing}
                         ${this.#renderGroup(index, group)}
                     `,
                 )}
                 <uui-button
-                    class="add-group-btn"
                     look="placeholder"
                     label=${this.localize.term("uaConditionBuilder_addGroup")}
                     @click=${() => this.#addGroup()}
@@ -311,38 +250,25 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
                 border-radius: var(--uui-border-radius);
                 padding: var(--uui-size-space-4);
                 background: var(--uui-color-surface);
-            }
-
-            .group-header {
-                display: flex;
-                justify-content: flex-end;
-                margin-bottom: var(--uui-size-space-2);
-            }
-
-            .group-header:empty {
-                display: none;
-            }
-
-            .conditions {
                 display: flex;
                 flex-direction: column;
                 gap: var(--uui-size-space-3);
             }
 
-            .condition-row {
+            .group-header {
                 display: flex;
-                align-items: center;
-                gap: var(--uui-size-space-3);
+                justify-content: flex-end;
             }
 
-            .operand-input,
-            .operator-select {
-                flex: 1;
+            uui-ref-list {
+                display: block;
             }
 
-            .remove-btn,
-            .remove-group-btn {
-                flex-shrink: 0;
+            .empty-group {
+                color: var(--uui-color-text-alt);
+                font-style: italic;
+                margin: 0;
+                text-align: center;
             }
 
             .and-separator {
@@ -353,6 +279,7 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
                 color: var(--uui-color-text-alt);
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
+                padding: var(--uui-size-space-1) 0;
             }
 
             .or-separator {
@@ -360,14 +287,6 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
                 align-items: center;
                 justify-content: center;
                 padding: var(--uui-size-space-2) 0;
-            }
-
-            .add-condition-btn {
-                margin-top: var(--uui-size-space-3);
-            }
-
-            .add-group-btn {
-                margin-top: var(--uui-size-space-2);
             }
         `,
     ];
