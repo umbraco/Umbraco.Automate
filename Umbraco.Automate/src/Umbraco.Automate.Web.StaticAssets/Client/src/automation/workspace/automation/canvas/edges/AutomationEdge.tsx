@@ -10,6 +10,10 @@ import type { EdgeFilterData } from "../types.js";
 
 function AutomationEdge({
     id,
+    source,
+    target,
+    sourceHandleId,
+    targetHandleId,
     sourceX,
     sourceY,
     targetX,
@@ -44,6 +48,31 @@ function AutomationEdge({
         document.dispatchEvent(new CustomEvent("ua:edge-filter-open", { detail }));
     }, [id, edgeData?.filter]);
 
+    const onInsertClick = useCallback(
+        (e: React.MouseEvent) => {
+            e.stopPropagation();
+            const detail = {
+                position: {
+                    x: (sourceX + targetX) / 2 - 100,
+                    y: (sourceY + targetY) / 2,
+                },
+                insertBetween: {
+                    sourceStepId: source,
+                    sourceHandle: sourceHandleId ?? null,
+                    targetStepId: target,
+                    targetHandle: targetHandleId ?? null,
+                },
+            };
+            const event = new CustomEvent("ua:add-node-request", {
+                detail,
+                bubbles: true,
+                composed: true,
+            });
+            (e.currentTarget as HTMLElement).closest(".react-flow")?.dispatchEvent(event);
+        },
+        [source, target, sourceHandleId, targetHandleId, sourceX, sourceY, targetX, targetY],
+    );
+
     return (
         <>
             <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} interactionWidth={20} />
@@ -69,36 +98,30 @@ function AutomationEdge({
                         pointerEvents: "all",
                     }}
                 >
-                    {hasFilter && (
-                        <button
-                            className="ua-edge__filter-badge"
-                            onClick={onFilterClick}
-                            title="Edit filter"
-                            type="button"
-                        >
-                            ⚡
-                        </button>
-                    )}
-                    {selected && !hasFilter && (
-                        <button
-                            className="ua-edge__filter-badge ua-edge__filter-badge--add"
-                            onClick={onFilterClick}
-                            title="Add filter"
-                            type="button"
-                        >
-                            +⚡
-                        </button>
-                    )}
-                    {selected && (
-                        <button
-                            className="ua-edge__delete-btn"
-                            onClick={onDelete}
-                            title="Delete connection"
-                            type="button"
-                        >
-                            ✕
-                        </button>
-                    )}
+                    <button
+                        className="ua-edge__btn"
+                        onClick={onInsertClick}
+                        title="Insert action"
+                        type="button"
+                    >
+                        <uui-icon name="icon-add"></uui-icon>
+                    </button>
+                    <button
+                        className={`ua-edge__btn${hasFilter ? " ua-edge__btn--active" : ""}`}
+                        onClick={onFilterClick}
+                        title={hasFilter ? "Edit filter" : "Add filter"}
+                        type="button"
+                    >
+                        <uui-icon name="icon-filter"></uui-icon>
+                    </button>
+                    <button
+                        className="ua-edge__btn ua-edge__btn--danger"
+                        onClick={onDelete}
+                        title="Delete connection"
+                        type="button"
+                    >
+                        <uui-icon name="icon-trash"></uui-icon>
+                    </button>
                 </div>
             </EdgeLabelRenderer>
         </>

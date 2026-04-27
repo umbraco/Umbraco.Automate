@@ -231,6 +231,21 @@ export default function AutomationCanvas({
         [onAddNodeRequest],
     );
 
+    // Route placeholder-node clicks to the workflow view via a custom event so the user
+    // doesn't have to hit the inner button precisely (and React Flow's wrapper doesn't
+    // swallow the click during drag detection).
+    const handleNodeClick = useCallback(
+        (event: React.MouseEvent, node: Node) => {
+            if (node.type !== "trigger-placeholder") return;
+            const ev = new CustomEvent("ua:add-trigger-request", {
+                bubbles: true,
+                composed: true,
+            });
+            (event.target as HTMLElement).closest(".react-flow")?.dispatchEvent(ev);
+        },
+        [],
+    );
+
     return (
         <ReactFlow
             nodes={nodes}
@@ -244,6 +259,7 @@ export default function AutomationCanvas({
             onBeforeDelete={readOnly ? undefined : handleBeforeDelete}
             onInit={onInit}
             onPaneClick={readOnly ? undefined : handlePaneClick}
+            onNodeClick={readOnly ? undefined : handleNodeClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}

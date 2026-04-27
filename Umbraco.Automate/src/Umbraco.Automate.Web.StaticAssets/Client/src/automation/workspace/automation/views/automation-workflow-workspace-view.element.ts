@@ -7,7 +7,7 @@ import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context
 import type { UaAutomationDetailModel } from "../../../types.js";
 import { modelToNodes, modelToEdges, TRIGGER_NODE_ID } from "../canvas/utils/model-to-flow.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
-import type { CanvasState, CanvasChangeDetail, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
+import type { CanvasState, CanvasChangeDetail, CatalogueLookupEntry, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
 import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-settings-modal.token.js";
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
@@ -34,6 +34,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
     @state()
     private _model?: UaAutomationDetailModel;
+
+    @state()
+    private _canvasReady = false;
 
     #boundEdgeFilterOpen = this.#onEdgeFilterOpen.bind(this);
 
@@ -66,32 +69,35 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
     async #syncFromModel(model: UaAutomationDetailModel) {
         const canvasState = this.#parseCanvasState(model.canvasState);
-        const catalogueNames = await this.#buildCatalogueNames();
-        this._nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogueNames);
+        const catalogue = await this.#buildCatalogueLookup();
+        this._nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogue);
         this._edges = modelToEdges(model.connections);
-        // Only set viewport on initial load; after that the canvas manages its own position
-        if (!this._viewport) {
+        // Capture saved viewport before the canvas mounts. React Flow's defaultViewport is only
+        // honoured on initial render, so the canvas must not mount until this is set; otherwise
+        // it falls back to fitView and the saved position is lost.
+        if (!this._canvasReady) {
             this._viewport = canvasState?.viewport;
+            this._canvasReady = true;
         }
     }
 
-    async #buildCatalogueNames(): Promise<Map<string, string>> {
-        const names = new Map<string, string>();
+    async #buildCatalogueLookup(): Promise<Map<string, CatalogueLookupEntry>> {
+        const lookup = new Map<string, CatalogueLookupEntry>();
         const [triggers, actions, controlFlows] = await Promise.all([
             this.#catalogueRepository.requestTriggers(),
             this.#catalogueRepository.requestActions(),
             this.#catalogueRepository.requestControlFlows(),
         ]);
         for (const t of triggers.data ?? []) {
-            names.set(t.alias, t.name);
+            lookup.set(t.alias, { name: t.name, icon: t.icon ?? undefined });
         }
         for (const a of actions.data ?? []) {
-            names.set(a.alias, a.name);
+            lookup.set(a.alias, { name: a.name, icon: a.icon ?? undefined });
         }
         for (const cf of controlFlows.data ?? []) {
-            names.set(cf.alias, cf.name);
+            lookup.set(cf.alias, { name: cf.name, icon: cf.icon ?? undefined });
         }
-        return names;
+        return lookup;
     }
 
     #parseCanvasState(json: string | null): CanvasState | null {
@@ -292,6 +298,31 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 };
                 const updatedConnections = [...this._model.connections, newConnection];
                 this.#workspaceContext?.updateProperty("connections", updatedConnections);
+            } else if (event.detail.insertBetween) {
+                // Splice the new step onto an existing edge: A→B becomes A→new→B.
+                // Preserve the original edge's outcome and filter on the upstream half so
+                // branch labels and conditions stay attached to the source.
+                const { sourceStepId, sourceHandle, targetStepId, targetHandle } = event.detail.insertBetween;
+                const normalisedSource = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
+                const updatedConnections = this._model.connections.flatMap((conn) => {
+                    const matchesSource = conn.sourceStepId === normalisedSource
+                        && (conn.sourceHandle ?? null) === (sourceHandle ?? null);
+                    const matchesTarget = conn.targetStepId === targetStepId
+                        && (conn.targetHandle ?? null) === (targetHandle ?? null);
+                    if (!matchesSource || !matchesTarget) return [conn];
+                    return [
+                        { ...conn, targetStepId: newStepId, targetHandle: null },
+                        {
+                            sourceStepId: newStepId,
+                            sourceHandle: null,
+                            targetStepId,
+                            targetHandle: targetHandle ?? null,
+                            outcome: null,
+                            filter: null,
+                        },
+                    ];
+                });
+                this.#workspaceContext?.updateProperty("connections", updatedConnections);
             }
 
             await this.#openNodeSettingsModal(newStepId);
@@ -317,46 +348,6 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             });
 
             await this.#openTriggerSettingsModal();
-        } catch {
-            // Modal was dismissed
-        }
-    }
-
-    async #onAddAction() {
-        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-        if (!modalManager) return;
-        const modal = modalManager.open(this, UA_NODE_PICKER_MODAL, {
-            data: { mode: "action", workspaceId: this._model?.workspaceId },
-        });
-
-        try {
-            const { item } = await modal.onSubmit();
-            if (!item || !this._model) return;
-
-            const lastNode = this._nodes[this._nodes.length - 1];
-            const position = lastNode
-                ? { x: lastNode.position.x, y: lastNode.position.y + 150 }
-                : { x: 250, y: 200 };
-
-            const newStepId = crypto.randomUUID();
-            const newStep = {
-                id: newStepId,
-                actionAlias: item.alias,
-                name: item.name,
-                alias: this.#generateStepAlias(item.alias),
-                connectionId: null,
-                settings: {},
-                inputMappings: {},
-                position,
-                errorBehavior: "Terminate" as const,
-                retryInterval: null,
-                maxRetries: null,
-            };
-
-            const updatedSteps = [...this._model.steps, newStep];
-            this.#workspaceContext?.updateProperty("steps", updatedSteps);
-
-            await this.#openNodeSettingsModal(newStepId);
         } catch {
             // Modal was dismissed
         }
@@ -421,37 +412,19 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
     override render() {
         return html`
-            <div id="toolbar">
-                ${!this._model?.trigger
-                    ? html`<uui-button
-                          look="outline"
-                          color="positive"
-                          label=${this.localize.term("uaCatalogue_selectTrigger")}
-                          @click=${this.#onAddTrigger}
-                      >
-                          <uui-icon name="icon-flash"></uui-icon>
-                          Add Trigger
-                      </uui-button>`
-                    : ""}
-                <uui-button
-                    look="outline"
-                    label=${this.localize.term("uaCatalogue_selectAction")}
-                    @click=${this.#onAddAction}
-                >
-                    <uui-icon name="icon-circuits"></uui-icon>
-                    Add Action
-                </uui-button>
-            </div>
             <div id="canvas">
-                <ua-automation-canvas
-                    .nodes=${this._nodes}
-                    .edges=${this._edges}
-                    .viewport=${this._viewport}
-                    @ua:canvas-change=${this.#onCanvasChange}
-                    @ua:add-node-request=${this.#onAddNodeRequest}
-                    @ua:node-settings-open=${this.#onNodeSettingsOpen}
-                    @ua:node-delete-request=${this.#onNodeDeleteRequest}
-                ></ua-automation-canvas>
+                ${this._canvasReady
+                    ? html`<ua-automation-canvas
+                          .nodes=${this._nodes}
+                          .edges=${this._edges}
+                          .viewport=${this._viewport}
+                          @ua:canvas-change=${this.#onCanvasChange}
+                          @ua:add-node-request=${this.#onAddNodeRequest}
+                          @ua:add-trigger-request=${this.#onAddTrigger}
+                          @ua:node-settings-open=${this.#onNodeSettingsOpen}
+                          @ua:node-delete-request=${this.#onNodeDeleteRequest}
+                      ></ua-automation-canvas>`
+                    : html`<uui-loader></uui-loader>`}
             </div>
         `;
     }
@@ -463,14 +436,6 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 display: flex;
                 flex-direction: column;
                 height: 100%;
-            }
-
-            #toolbar {
-                display: flex;
-                gap: var(--uui-size-space-3);
-                padding: var(--uui-size-space-3) var(--uui-size-space-4);
-                border-bottom: 1px solid var(--uui-color-border);
-                background: var(--uui-color-surface);
             }
 
             #canvas {

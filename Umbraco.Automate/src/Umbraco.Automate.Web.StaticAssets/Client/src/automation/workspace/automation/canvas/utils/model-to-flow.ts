@@ -4,7 +4,7 @@ import type {
     StepConfigurationModel,
     StepConnectionModel,
 } from "../../../../../api/types.gen.js";
-import type { CanvasState, TriggerNodeData, ActionNodeData } from "../types.js";
+import type { CanvasState, CatalogueLookupEntry, TriggerNodeData, ActionNodeData } from "../types.js";
 
 const TRIGGER_NODE_ID = "__trigger__";
 const DEFAULT_TRIGGER_POSITION = { x: 250, y: 50 };
@@ -22,34 +22,50 @@ export function modelToNodes(
     trigger: TriggerConfigurationModel | null,
     steps: StepConfigurationModel[],
     canvasState: CanvasState | null,
-    catalogueNames?: Map<string, string>,
+    catalogue?: Map<string, CatalogueLookupEntry>,
 ): Node[] {
     const nodes: Node[] = [];
 
     if (trigger) {
         const position = canvasState?.triggerPosition ?? DEFAULT_TRIGGER_POSITION;
+        const entry = catalogue?.get(trigger.triggerAlias);
         nodes.push({
             id: TRIGGER_NODE_ID,
             type: "trigger",
             position,
             data: {
                 triggerAlias: trigger.triggerAlias,
-                label: catalogueNames?.get(trigger.triggerAlias) ?? trigger.triggerAlias,
+                label: entry?.name ?? trigger.triggerAlias,
+                icon: entry?.icon,
                 settings: trigger.settings,
             } satisfies TriggerNodeData,
+        });
+    } else {
+        // Empty-state placeholder so the user has something to click to add a trigger.
+        nodes.push({
+            id: TRIGGER_NODE_ID,
+            type: "trigger-placeholder",
+            position: canvasState?.triggerPosition ?? DEFAULT_TRIGGER_POSITION,
+            data: {},
+            draggable: false,
+            deletable: false,
+            connectable: false,
         });
     }
 
     for (const step of steps) {
         const nodeType = getNodeType(step.actionAlias);
+        const entry = catalogue?.get(step.actionAlias);
         const label = step.name === step.actionAlias
-            ? (catalogueNames?.get(step.actionAlias) ?? step.name)
+            ? (entry?.name ?? step.name)
             : step.name;
 
         const data: ActionNodeData = {
             stepId: step.id,
+            stepAlias: step.alias,
             actionAlias: step.actionAlias,
             label,
+            icon: entry?.icon,
             settings: step.settings,
         };
 

@@ -1,17 +1,25 @@
 export interface TriggerNodeData {
     triggerAlias: string;
     label: string;
+    icon?: string;
     settings: Record<string, unknown>;
     [key: string]: unknown;
 }
 
 export interface ActionNodeData {
     stepId: string;
+    stepAlias: string;
     actionAlias: string;
     label: string;
+    icon?: string;
     settings: Record<string, unknown>;
     cases?: string[];
     [key: string]: unknown;
+}
+
+export interface CatalogueLookupEntry {
+    name: string;
+    icon?: string;
 }
 
 export interface CanvasState {
@@ -36,6 +44,16 @@ export interface AddNodeRequestDetail {
     connectFrom?: {
         sourceStepId: string;
         sourceHandle?: string | null;
+    };
+    /**
+     * When set, insert the new node onto an existing edge — splice it between
+     * the source and target so the original A→B becomes A→new→B.
+     */
+    insertBetween?: {
+        sourceStepId: string;
+        sourceHandle?: string | null;
+        targetStepId: string;
+        targetHandle?: string | null;
     };
 }
 
