@@ -114,7 +114,7 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
     async #onRollback() {
         const unique = this.#workspaceContext?.getUnique();
         if (unique) {
-            await this.#workspaceContext?.load(unique);
+            await this.#workspaceContext?.reload();
             this.#eventContext?.dispatchEvent(
                 new UmbRequestReloadStructureForEntityEvent({
                     entityType: UA_AUTOMATION_ENTITY_TYPE,

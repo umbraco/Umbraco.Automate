@@ -73,7 +73,9 @@ export type AutomationItemResponseModel = {
     workspaceId: string;
     groupId?: string | null;
     status: AutomationStatusModel;
+    triggerAlias?: string | null;
     version: number;
+    publishedVersion?: number | null;
     dateCreated: string;
     dateModified: string;
 };

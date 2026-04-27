@@ -98,3 +98,5 @@ refs/
 
 # Auto Claude data directory
 .auto-claude/
+
+.playwright-mcp/

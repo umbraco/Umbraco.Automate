@@ -150,7 +150,7 @@ export const manifests: Array<UmbExtensionManifest> = [
         api: () => import("./actions/automation-run-now.action.js"),
         meta: {
             label: "#uaAutomation_runNow",
-            look: "primary",
+            look: "secondary",
             color: "default",
         },
         // Only surface for automations using the Manual Trigger, once saved. The endpoint
