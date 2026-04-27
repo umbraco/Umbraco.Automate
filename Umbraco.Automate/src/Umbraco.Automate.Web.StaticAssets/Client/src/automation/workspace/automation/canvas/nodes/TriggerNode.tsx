@@ -52,7 +52,7 @@ function TriggerNode({ data, id }: NodeProps) {
                     </span>
                 )}
                 <div className="ua-node__title">
-                    <uui-tag class="ua-node__kind-tag" look="secondary">Trigger</uui-tag>
+                    <uui-tag className="ua-node__kind-tag" look="secondary">Trigger</uui-tag>
                     <span className="ua-node__type">{nodeData.label}</span>
                 </div>
                 {!nodeData.runStatus && (
