@@ -7,7 +7,7 @@ import "../../../core/components/condition-builder/condition-builder.element.js"
 
 function toConditionSet(model: ConditionSetModel | null): ConditionSet {
     if (!model || !model.groups?.length) {
-        return { Groups: [{ Conditions: [{ LeftOperand: "", Operator: "Equals", RightOperand: "" }] }] };
+        return { Groups: [{ Conditions: [] }] };
     }
     return {
         Groups: model.groups.map((g) => ({
