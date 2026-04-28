@@ -4,7 +4,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_MODAL_MANAGER_CONTEXT, UMB_ITEM_PICKER_MODAL } from "@umbraco-cms/backoffice/modal";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import type { ChannelConfigurationModel, NotifyOnModel, NotificationChannelItemResponseModel } from "../../../../api/types.gen.js";
+import type { ChannelConfigurationModel, NotificationChannelItemResponseModel } from "../../../../api/types.gen.js";
 import { UA_NOTIFICATION_CHANNEL_MODAL } from "../../../modals/notification-channel/notification-channel-modal.token.js";
 
 @customElement("ua-automation-notifications-workspace-view")
@@ -128,21 +128,6 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
         });
     }
 
-    #notifyOnColor(notifyOn: NotifyOnModel): string {
-        switch (notifyOn) {
-            case "Failed":
-            case "FailedOrSuspended":
-                return "danger";
-            case "Suspended":
-                return "warning";
-            case "Completed":
-            case "Recovered":
-                return "positive";
-            default:
-                return "default";
-        }
-    }
-
     #renderChannel(channel: ChannelConfigurationModel, index: number) {
         const item = this.#getCatalogueItem(channel.channelAlias);
         const name = item?.name ?? channel.channelAlias;
@@ -150,19 +135,12 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
 
         return html`
             <uui-ref-node
+                class=${channel.isEnabled ? "" : "is-disabled"}
                 name=${name}
                 detail=${channel.notifyOn}
                 @open=${() => this.#editChannel(index)}
             >
                 <umb-icon slot="icon" name=${icon}></umb-icon>
-                <div slot="tag">
-                    <uui-tag look="secondary" color=${this.#notifyOnColor(channel.notifyOn)}>
-                        ${channel.notifyOn}
-                    </uui-tag>
-                    ${!channel.isEnabled
-                        ? html`<uui-tag look="secondary" color="warning">Disabled</uui-tag>`
-                        : nothing}
-                </div>
                 <uui-action-bar slot="actions">
                     <uui-button
                         label=${this.localize.term("uaGeneral_edit")}
@@ -184,28 +162,32 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
     override render() {
         return html`
             <div class="container">
-                <uui-box headline=${this.localize.term("uaNotifications_headline")}>
-                    <p class="description">${this.localize.term("uaNotifications_description")}</p>
-
-                    ${this._channels.length > 0
-                        ? html`
-                              <uui-ref-list>
-                                  ${repeat(
-                                      this._channels,
-                                      (_, i) => i,
-                                      (channel, index) => this.#renderChannel(channel, index),
-                                  )}
-                              </uui-ref-list>
-                          `
-                        : html`<p class="empty">${this.localize.term("uaNotifications_noChannels")}</p>`}
-
-                    <uui-button
-                        look="placeholder"
-                        label=${this.localize.term("uaNotifications_addChannel")}
-                        @click=${this.#addChannel}
+                <uui-box>
+                    <umb-property-layout
+                        label=${this.localize.term("uaNotifications_headline")}
+                        description=${this.localize.term("uaNotifications_description")}
                     >
-                        ${this.localize.term("uaNotifications_addChannel")}
-                    </uui-button>
+                        <div slot="editor">
+                            ${this._channels.length > 0
+                                ? html`
+                                      <uui-ref-list>
+                                          ${repeat(
+                                              this._channels,
+                                              (_, i) => i,
+                                              (channel, index) => this.#renderChannel(channel, index),
+                                          )}
+                                      </uui-ref-list>
+                                  `
+                                : nothing}
+                            <uui-button
+                                look="placeholder"
+                                label=${this.localize.term("uaNotifications_addChannel")}
+                                @click=${this.#addChannel}
+                            >
+                                ${this.localize.term("uaNotifications_addChannel")}
+                            </uui-button>
+                        </div>
+                    </umb-property-layout>
                 </uui-box>
             </div>
         `;
@@ -218,24 +200,17 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
                 padding: var(--uui-size-layout-1);
             }
 
-            .description {
-                color: var(--uui-color-text-alt);
-                margin: 0 0 var(--uui-size-space-5);
-            }
-
             uui-ref-list {
                 display: block;
-                margin-bottom: var(--uui-size-space-5);
+                margin-bottom: var(--uui-size-space-3);
+            }
+
+            uui-ref-node.is-disabled {
+                opacity: 0.5;
             }
 
             uui-button[look="placeholder"] {
                 width: 100%;
-            }
-
-            .empty {
-                color: var(--uui-color-text-alt);
-                text-align: center;
-                padding: var(--uui-size-space-5);
             }
         `,
     ];

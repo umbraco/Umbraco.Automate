@@ -1,4 +1,4 @@
-import { html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
+import { html, customElement, state, nothing, css } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import type { ChannelConfigurationModel, NotifyOnModel } from "../../../api/types.gen.js";
 import type { SettingsChangeDetail } from "../../../core/components/settings-form/settings-form.element.js";
@@ -65,27 +65,6 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
             <umb-body-layout .headline=${catalogueItem.name}>
                 <div id="content">
                     <uui-box>
-                        <umb-property-layout label=${this.localize.term("uaNotifications_notifyOn")}>
-                            <div slot="editor">
-                                <uui-select
-                                    .options=${NOTIFY_ON_OPTIONS.map((o) => ({
-                                        ...o,
-                                        selected: o.value === this._channel!.notifyOn,
-                                    }))}
-                                    @change=${this.#onNotifyOnChange}
-                                ></uui-select>
-                            </div>
-                        </umb-property-layout>
-                        <umb-property-layout label=${this.localize.term("uaLabels_enabled")}>
-                            <div slot="editor">
-                                <uui-toggle
-                                    ?checked=${this._channel.isEnabled}
-                                    @change=${this.#onEnabledChange}
-                                    label=${this.localize.term("uaLabels_enabled")}
-                                ></uui-toggle>
-                            </div>
-                        </umb-property-layout>
-
                         ${fields.length > 0
                             ? html`
                                   <ua-settings-form
@@ -97,6 +76,32 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
                                   ></ua-settings-form>
                               `
                             : nothing}
+                        <umb-property-layout
+                            label=${this.localize.term("uaNotifications_notifyOn")}
+                            orientation="vertical"
+                        >
+                            <div slot="editor">
+                                <uui-select
+                                    .options=${NOTIFY_ON_OPTIONS.map((o) => ({
+                                        ...o,
+                                        selected: o.value === this._channel!.notifyOn,
+                                    }))}
+                                    @change=${this.#onNotifyOnChange}
+                                ></uui-select>
+                            </div>
+                        </umb-property-layout>
+                        <umb-property-layout
+                            label=${this.localize.term("uaLabels_enabled")}
+                            orientation="vertical"
+                        >
+                            <div slot="editor">
+                                <uui-toggle
+                                    ?checked=${this._channel.isEnabled}
+                                    @change=${this.#onEnabledChange}
+                                    label=${this.localize.term("uaLabels_enabled")}
+                                ></uui-toggle>
+                            </div>
+                        </umb-property-layout>
                     </uui-box>
                 </div>
                 <div slot="actions">
@@ -114,6 +119,22 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
             </umb-body-layout>
         `;
     }
+
+    static override styles = [
+        css`
+            uui-select {
+                width: 100%;
+            }
+
+            umb-property-layout[orientation="vertical"] {
+                padding-bottom: 0;
+            }
+
+            umb-property-layout:first-of-type {
+                padding-top: 0;
+            }
+        `,
+    ];
 }
 
 export default UaNotificationChannelModalElement;

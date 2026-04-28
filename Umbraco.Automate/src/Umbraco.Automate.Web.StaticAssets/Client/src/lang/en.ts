@@ -120,7 +120,6 @@ export default {
         channel: "Channel",
         notifyOn: "Notify on",
         addChannel: "Add notification channel",
-        noChannels: "No notification channels configured.",
     },
     uaWorkspace: {
         deleteConfirm: "Are you sure you want to delete this workspace?",
