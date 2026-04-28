@@ -4,7 +4,7 @@ import {
     UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
 } from "@umbraco-cms/backoffice/workspace";
 import { UA_AUTOMATION_WORKSPACE_ALIAS, UA_AUTOMATION_ENTITY_TYPE } from "../../constants.js";
-import { UA_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./conditions/automation-has-manual-trigger.condition.js";
+import { UA_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./conditions/automation-has-manual-trigger.condition.constants.js";
 
 export const manifests: Array<UmbExtensionManifest> = [
     {
@@ -140,35 +140,6 @@ export const manifests: Array<UmbExtensionManifest> = [
         alias: UA_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS,
         name: "Automation Has Manual Trigger Condition",
         api: () => import("./conditions/automation-has-manual-trigger.condition.js"),
-    },
-    {
-        type: "workspaceAction",
-        kind: "default",
-        alias: "UmbracoAutomate.WorkspaceAction.Automation.RunNow",
-        name: "Run Now Automation Workspace Action",
-        weight: 90,
-        api: () => import("./actions/automation-run-now.action.js"),
-        meta: {
-            label: "#uaAutomation_runNow",
-            look: "secondary",
-            color: "default",
-        },
-        // Only surface for automations using the Manual Trigger, once saved. The endpoint
-        // itself additionally requires the automation to be published+enabled; if it isn't,
-        // the action surfaces the server's 409 problem detail as a danger notification.
-        conditions: [
-            {
-                alias: UMB_WORKSPACE_CONDITION_ALIAS,
-                match: UA_AUTOMATION_WORKSPACE_ALIAS,
-            },
-            {
-                alias: UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
-                match: false,
-            },
-            {
-                alias: UA_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS,
-            },
-        ],
     },
     {
         type: "workspaceActionMenuItem",
