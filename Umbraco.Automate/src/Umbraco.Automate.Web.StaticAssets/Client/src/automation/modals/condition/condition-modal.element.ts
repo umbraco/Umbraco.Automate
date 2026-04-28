@@ -93,13 +93,13 @@ export class UaConditionModalElement extends UmbModalBaseElement<UaConditionModa
             <umb-body-layout headline=${this.localize.term("uaConditionBuilder_editCondition")}>
                 <div id="content">
                     <uui-box>
-                        <umb-property-layout label=${this.localize.term("uaConditionBuilder_leftOperandPlaceholder")}>
+                        <umb-property-layout label=${this.localize.term("uaConditionBuilder_leftOperandPlaceholder")} orientation="vertical">
                             <div slot="editor">
                                 ${this.#renderOperandInput(this._condition.LeftOperand, "LeftOperand", hasBindings)}
                             </div>
                         </umb-property-layout>
 
-                        <umb-property-layout label=${this.localize.term("uaConditionBuilder_operator")}>
+                        <umb-property-layout label=${this.localize.term("uaConditionBuilder_operator")} orientation="vertical">
                             <div slot="editor">
                                 <uui-select
                                     .options=${operatorOptions}
@@ -111,7 +111,7 @@ export class UaConditionModalElement extends UmbModalBaseElement<UaConditionModa
                         ${isUnary
                             ? nothing
                             : html`
-                                  <umb-property-layout label=${this.localize.term("uaConditionBuilder_rightOperandPlaceholder")}>
+                                  <umb-property-layout label=${this.localize.term("uaConditionBuilder_rightOperandPlaceholder")} orientation="vertical">
                                       <div slot="editor">
                                           ${this.#renderOperandInput(this._condition.RightOperand, "RightOperand", hasBindings)}
                                       </div>
@@ -156,12 +156,6 @@ export class UaConditionModalElement extends UmbModalBaseElement<UaConditionModa
 
     static override styles = [
         css`
-            #content {
-                display: flex;
-                flex-direction: column;
-                gap: var(--uui-size-space-3);
-            }
-
             .operand-input {
                 display: flex;
                 gap: var(--uui-size-space-2);
@@ -173,6 +167,14 @@ export class UaConditionModalElement extends UmbModalBaseElement<UaConditionModa
 
             uui-select {
                 width: 100%;
+            }
+
+            umb-property-layout[orientation="vertical"] {
+                padding-bottom: 0;
+            }
+
+            umb-property-layout:first-of-type {
+                padding-top: 0;
             }
         `,
     ];

@@ -1,8 +1,10 @@
 import { html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import type { UaEdgeFilterModalData, UaEdgeFilterModalValue } from "./edge-filter-modal.token.js";
-import type { ConditionSet, ConditionOperator } from "../../../core/components/condition-builder/condition-builder.element.js";
+import type { ConditionSet, ConditionOperator, UaConditionBuilderElement } from "../../../core/components/condition-builder/condition-builder.element.js";
 import type { ConditionSetModel } from "../../workspace/automation/canvas/types.js";
+import { buildBindingSources, type BindingSource } from "../../../core/utils/binding-context.utils.js";
+import { UaCatalogueRepository } from "../../../catalogue/repository/catalogue.repository.js";
 import "../../../core/components/condition-builder/condition-builder.element.js";
 
 function toConditionSet(model: ConditionSetModel | null): ConditionSet {
@@ -44,13 +46,33 @@ export class UaEdgeFilterModalElement extends UmbModalBaseElement<
     @state()
     private _conditionSet: ConditionSet = toConditionSet(null);
 
+    @state()
+    private _bindingSources: BindingSource[] = [];
+
+    #catalogueRepo = new UaCatalogueRepository(this);
+
     override connectedCallback() {
         super.connectedCallback();
         this._conditionSet = toConditionSet(this.data?.filter ?? null);
+        this.#loadBindingSources();
     }
 
-    #onChange() {
-        this.requestUpdate();
+    async #loadBindingSources() {
+        const ctx = this.data?.automationContext;
+        const targetStepId = this.data?.targetStepId;
+        if (!ctx || !targetStepId) return;
+        this._bindingSources = await buildBindingSources(
+            targetStepId,
+            ctx.trigger,
+            ctx.steps,
+            ctx.connections,
+            this.#catalogueRepo,
+        );
+    }
+
+    #onChange(e: Event) {
+        const builder = e.target as UaConditionBuilderElement;
+        this._conditionSet = builder.value;
     }
 
     #onSubmit() {
@@ -72,6 +94,7 @@ export class UaEdgeFilterModalElement extends UmbModalBaseElement<
             <umb-body-layout headline=${this.localize.term("uaEdgeFilter_headline")}>
                 <ua-condition-builder
                     .value=${this._conditionSet}
+                    .bindingSources=${this._bindingSources}
                     @change=${this.#onChange}
                 ></ua-condition-builder>
                 <div slot="actions">

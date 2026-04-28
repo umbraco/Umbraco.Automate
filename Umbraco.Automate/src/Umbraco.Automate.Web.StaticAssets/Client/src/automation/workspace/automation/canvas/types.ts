@@ -70,6 +70,9 @@ export interface EdgeFilterData {
 }
 
 export interface EdgeFilterOpenDetail {
-    edgeId: string;
+    source: string;
+    sourceHandle: string | null;
+    target: string;
+    targetHandle: string | null;
     filter: ConditionSetModel | null;
 }

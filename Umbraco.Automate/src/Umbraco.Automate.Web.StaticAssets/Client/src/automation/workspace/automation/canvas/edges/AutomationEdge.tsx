@@ -43,9 +43,15 @@ function AutomationEdge({
     const hasFilter = edgeData?.filter && edgeData.filter.groups.length > 0;
 
     const onFilterClick = useCallback(() => {
-        const detail = { edgeId: id, filter: edgeData?.filter ?? null };
+        const detail = {
+            source,
+            sourceHandle: sourceHandleId ?? null,
+            target,
+            targetHandle: targetHandleId ?? null,
+            filter: edgeData?.filter ?? null,
+        };
         document.dispatchEvent(new CustomEvent("ua:edge-filter-open", { detail }));
-    }, [id, edgeData?.filter]);
+    }, [source, sourceHandleId, target, targetHandleId, edgeData?.filter]);
 
     const onInsertClick = useCallback(
         (e: React.MouseEvent) => {

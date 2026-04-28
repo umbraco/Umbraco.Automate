@@ -386,19 +386,31 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager || !this._model) return;
 
-        const { edgeId, filter } = event.detail;
+        const { source, sourceHandle, target, targetHandle, filter } = event.detail;
 
         const modal = modalManager.open(this, UA_EDGE_FILTER_MODAL, {
-            data: { filter },
+            data: {
+                filter,
+                targetStepId: target,
+                automationContext: {
+                    trigger: this._model.trigger ?? null,
+                    steps: this._model.steps,
+                    connections: this._model.connections,
+                },
+            },
         });
 
         try {
             const { filter: updatedFilter } = await modal.onSubmit();
 
-            // Update the connection's filter
+            const normalisedSource = source === TRIGGER_NODE_ID ? UA_EMPTY_GUID : source;
             const updatedConnections = this._model.connections.map((conn) => {
-                const connEdgeId = `${conn.sourceStepId}-${conn.sourceHandle ?? "default"}-${conn.targetStepId}-${conn.targetHandle ?? "default"}`;
-                if (connEdgeId === edgeId) {
+                if (
+                    conn.sourceStepId === normalisedSource &&
+                    (conn.sourceHandle ?? null) === (sourceHandle ?? null) &&
+                    conn.targetStepId === target &&
+                    (conn.targetHandle ?? null) === (targetHandle ?? null)
+                ) {
                     return { ...conn, filter: updatedFilter };
                 }
                 return conn;
