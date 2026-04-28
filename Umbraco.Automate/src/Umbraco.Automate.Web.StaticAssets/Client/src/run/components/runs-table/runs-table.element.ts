@@ -93,16 +93,16 @@ export class UaRunsTableElement extends UmbLitElement {
 
     #buildTableItems(): UmbTableItem[] {
         return this.items.map((item) => {
+            const onClick = (e: Event) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.#openRunModal(item.unique);
+            };
+
             const leadingCell = this.showAutomationColumn
                 ? {
                       columnAlias: "automationName",
-                      value: html`<a
-                          href="#"
-                          @click=${(e: Event) => {
-                              e.preventDefault();
-                              this.#openRunModal(item.unique);
-                          }}
-                      >
+                      value: html`<a href="javascript:void(0)" @click=${onClick}>
                           ${item.automationName
                               ?? this.automationNames.get(item.automationId)
                               ?? item.automationId}
@@ -110,13 +110,7 @@ export class UaRunsTableElement extends UmbLitElement {
                   }
                 : {
                       columnAlias: "run",
-                      value: html`<a
-                          href="#"
-                          @click=${(e: Event) => {
-                              e.preventDefault();
-                              this.#openRunModal(item.unique);
-                          }}
-                      >
+                      value: html`<a href="javascript:void(0)" @click=${onClick}>
                           ${item.unique.substring(0, 8)}
                       </a>`,
                   };
@@ -200,6 +194,7 @@ export class UaRunsTableElement extends UmbLitElement {
             a {
                 color: var(--uui-color-interactive);
                 text-decoration: none;
+                cursor: pointer;
             }
 
             a:hover {
