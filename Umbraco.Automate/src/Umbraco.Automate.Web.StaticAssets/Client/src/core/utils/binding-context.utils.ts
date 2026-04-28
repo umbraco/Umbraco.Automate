@@ -88,9 +88,9 @@ export async function buildBindingSources(
         sources.push({
             id: predId,
             label: step.name || catalogueItem.name,
-            // Surface the binding alias and action type so two steps that share a
-            // display name can still be told apart.
-            subLabel: `${catalogueItem.name} • ${bindingAlias}`,
+            // Binding alias — disambiguates two steps that share a display name and
+            // matches the alias chip shown on the canvas action node.
+            subLabel: bindingAlias,
             icon: catalogueItem.icon ?? "icon-settings",
             bindingPrefix: `steps.${bindingAlias}`,
             leaves,

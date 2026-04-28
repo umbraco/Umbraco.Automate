@@ -34,16 +34,77 @@
 .ua-node__header {
     display: flex;
     align-items: center;
-    gap: var(--uui-size-space-3, 9px);
+    gap: var(--uui-size-space-4, 12px);
     padding: var(--uui-size-space-3, 9px) var(--uui-size-space-4, 12px);
     padding-left: calc(var(--uui-size-space-4, 12px) + 4px); /* clear the stripe */
     border-bottom: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
 }
 
-/* Action button group (edit + delete) sit tight to each other */
-.ua-node__header .ua-node__settings-btn + .ua-node__delete-btn,
-.ua-node__header .ua-node__delete-btn + .ua-node__settings-btn {
-    margin-left: calc(var(--uui-size-space-3, 9px) * -1 + 2px);
+/* Connected pill action-bar (edit + delete on nodes, edit/filter/delete on edges) —
+ * mirrors the umb-block-list-entry uui-action-bar treatment: rounded pill, hairline
+ * dividers between buttons, hover background tint, danger variant for delete. */
+.ua-action-bar {
+    display: inline-flex;
+    align-items: stretch;
+    background: var(--uui-color-surface, #fff);
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    border-radius: 50px;
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
+    overflow: hidden;
+}
+
+.ua-action-bar__btn {
+    width: 28px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--uui-color-text-alt, #6b7280);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.ua-action-bar__btn + .ua-action-bar__btn {
+    border-left: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+}
+
+.ua-action-bar__btn:hover {
+    background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
+    color: var(--uui-color-text, inherit);
+}
+
+.ua-action-bar__btn:focus-visible {
+    outline: 2px solid var(--uui-color-focus, #2152a3);
+    outline-offset: -2px;
+}
+
+.ua-action-bar__btn--active {
+    color: var(--uui-color-warning, #f59e0b);
+}
+
+.ua-action-bar__btn--danger:hover {
+    background: var(--uui-color-danger, #dc2626);
+    color: #fff;
+}
+
+.ua-action-bar__btn uui-icon {
+    font-size: 14px;
+}
+
+/* Node action-bar — show on node hover only */
+.ua-node__actions {
+    opacity: 0;
+    margin-left: var(--uui-size-space-5, 18px);
+    transition: opacity 120ms ease;
+}
+
+.ua-node:hover .ua-node__actions,
+.ua-node__actions:focus-within {
+    opacity: 1;
 }
 
 .ua-node__title {
@@ -85,44 +146,6 @@
     text-overflow: ellipsis;
 }
 
-.ua-node__settings-btn,
-.ua-node__delete-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--uui-border-radius, 3px);
-    color: var(--uui-color-text, inherit);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
-}
-
-.ua-node:hover .ua-node__settings-btn,
-.ua-node:hover .ua-node__delete-btn,
-.ua-node__settings-btn:focus-visible,
-.ua-node__delete-btn:focus-visible {
-    opacity: 0.6;
-    pointer-events: auto;
-}
-
-.ua-node__settings-btn:hover {
-    opacity: 1;
-    background: var(--uui-color-surface-emphasis, rgba(0, 0, 0, 0.06));
-}
-
-.ua-node__delete-btn:hover {
-    opacity: 1;
-    background: var(--uui-color-danger, #dc2626);
-    color: #fff;
-}
-
 .ua-node__body {
     padding: var(--uui-size-space-3, 9px) var(--uui-size-space-4, 12px);
     padding-left: calc(var(--uui-size-space-4, 12px) + 4px);
@@ -140,6 +163,14 @@
     border-bottom: none;
 }
 
+.ua-node__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ua-node__chip,
 .ua-node__step-alias {
     font-family: var(--uui-font-monospace, monospace);
     font-size: 11px;
@@ -147,13 +178,21 @@
     background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
     padding: 1px 6px;
     border-radius: 3px;
-    align-self: flex-start;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
 }
 
+.ua-node__step-alias {
+    align-self: flex-start;
+}
+
+.ua-node__chip--id {
+    opacity: 0.7;
+}
+
+.dark .ua-node__chip,
 .dark .ua-node__step-alias {
     background: rgba(255, 255, 255, 0.08);
 }
@@ -250,15 +289,8 @@
     fill: var(--uui-color-text-alt, #6b7280);
 }
 
-/* Edge actions — CMS-style button group at the edge midpoint */
+/* Edge action-bar — show on edge hover/select */
 .ua-edge__actions {
-    display: inline-flex;
-    align-items: stretch;
-    background: var(--uui-color-surface, #fff);
-    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
-    border-radius: var(--uui-border-radius, 3px);
-    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
-    overflow: hidden;
     opacity: 0;
     transition: opacity 120ms ease;
 }
@@ -268,43 +300,6 @@
 .ua-edge__actions:hover,
 .ua-edge__actions:focus-within {
     opacity: 1;
-}
-
-.ua-edge__btn {
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: transparent;
-    color: var(--uui-color-text-alt, #6b7280);
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.ua-edge__btn + .ua-edge__btn {
-    border-left: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
-}
-
-.ua-edge__btn:hover {
-    background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
-    color: var(--uui-color-text, inherit);
-}
-
-.ua-edge__btn--active {
-    color: var(--uui-color-warning, #f59e0b);
-}
-
-.ua-edge__btn--danger:hover {
-    background: var(--uui-color-danger, #dc2626);
-    color: #fff;
-}
-
-.ua-edge__btn uui-icon {
-    font-size: 12px;
 }
 
 /* Node type stripe colors */

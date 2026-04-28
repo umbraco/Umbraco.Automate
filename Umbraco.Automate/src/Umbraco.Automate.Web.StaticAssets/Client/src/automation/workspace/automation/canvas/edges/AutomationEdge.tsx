@@ -90,7 +90,7 @@ function AutomationEdge({
             )}
             <EdgeLabelRenderer>
                 <div
-                    className="ua-edge__actions"
+                    className="ua-edge__actions ua-action-bar"
                     style={{
                         position: "absolute",
                         transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + (label ? 16 : 0)}px)`,
@@ -98,7 +98,7 @@ function AutomationEdge({
                     }}
                 >
                     <button
-                        className="ua-edge__btn"
+                        className="ua-action-bar__btn"
                         onClick={onInsertClick}
                         title="Insert action"
                         type="button"
@@ -106,7 +106,7 @@ function AutomationEdge({
                         <uui-icon name="icon-add"></uui-icon>
                     </button>
                     <button
-                        className={`ua-edge__btn${hasFilter ? " ua-edge__btn--active" : ""}`}
+                        className={`ua-action-bar__btn${hasFilter ? " ua-action-bar__btn--active" : ""}`}
                         onClick={onFilterClick}
                         title={hasFilter ? "Edit filter" : "Add filter"}
                         type="button"
@@ -114,7 +114,7 @@ function AutomationEdge({
                         <uui-icon name="icon-filter"></uui-icon>
                     </button>
                     <button
-                        className="ua-edge__btn ua-edge__btn--danger"
+                        className="ua-action-bar__btn ua-action-bar__btn--danger"
                         onClick={onDelete}
                         title="Delete connection"
                         type="button"

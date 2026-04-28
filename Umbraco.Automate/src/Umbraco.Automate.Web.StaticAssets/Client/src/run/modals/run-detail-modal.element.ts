@@ -231,6 +231,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                             </uui-button>
                         `,
                     )}
+                    <uui-button
+                        label=${this.localize.term("uaGeneral_close")}
+                        @click=${() => this.modalContext?.reject()}
+                    ></uui-button>
                     ${when(
                         this._run && (this._run.status === "Failed" || this._run.status === "Completed"),
                         () => html`
@@ -241,15 +245,11 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                                 ?disabled=${this._replaying}
                                 @click=${this.#onReplay}
                             >
-                                <uui-icon name="icon-redo"></uui-icon>
                                 ${this.localize.term("uaRun_replay")}
+                                <uui-icon name="icon-redo"></uui-icon>
                             </uui-button>
                         `,
                     )}
-                    <uui-button
-                        label=${this.localize.term("uaGeneral_close")}
-                        @click=${() => this.modalContext?.reject()}
-                    ></uui-button>
                 </div>
             </umb-body-layout>
         `;

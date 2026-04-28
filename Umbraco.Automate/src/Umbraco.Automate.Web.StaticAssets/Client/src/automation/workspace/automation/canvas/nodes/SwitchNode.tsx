@@ -64,9 +64,9 @@ function SwitchNode({ data, id }: NodeProps) {
                 )}
                 <span className="ua-node__type">{nodeData.label}</span>
                 {!nodeData.runStatus && (
-                    <>
+                    <div className="ua-node__actions ua-action-bar">
                         <button
-                            className="ua-node__settings-btn"
+                            className="ua-action-bar__btn"
                             onClick={onSettingsClick}
                             title="Settings"
                             type="button"
@@ -74,14 +74,14 @@ function SwitchNode({ data, id }: NodeProps) {
                             <uui-icon name="icon-edit"></uui-icon>
                         </button>
                         <button
-                            className="ua-node__delete-btn"
+                            className="ua-action-bar__btn ua-action-bar__btn--danger"
                             onClick={onDeleteClick}
                             title="Delete"
                             type="button"
                         >
                             <uui-icon name="icon-trash"></uui-icon>
                         </button>
-                    </>
+                    </div>
                 )}
             </div>
             <div className="ua-node__body">

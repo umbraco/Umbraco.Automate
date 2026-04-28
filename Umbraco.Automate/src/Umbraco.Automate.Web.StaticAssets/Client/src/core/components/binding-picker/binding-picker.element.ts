@@ -82,13 +82,22 @@ export class UaBindingPickerElement extends UmbLitElement {
     }
 
     #renderSource(source: BindingSource) {
+        // Show the source's step ID for predecessor steps (GUID-shaped id), so users
+        // can match a binding source to its node on the canvas. Skip "trigger",
+        // "previous" and "loop" pseudo-sources where the id isn't an entity key.
+        const showId = source.bindingPrefix.startsWith("steps.");
         return html`
             <uui-box>
                 <div slot="headline" class="source-headline">
                     <span>${source.label}</span>
-                    ${source.subLabel
-                        ? html`<small class="source-sub-label">${source.subLabel}</small>`
-                        : ""}
+                    <div class="source-chips">
+                        ${source.subLabel
+                            ? html`<code class="source-chip" title="Alias">${source.subLabel}</code>`
+                            : ""}
+                        ${showId
+                            ? html`<code class="source-chip source-chip--id" title="Step ID">${source.id}</code>`
+                            : ""}
+                    </div>
                 </div>
                 <uui-icon slot="header-actions" name=${source.icon}></uui-icon>
                 <uui-ref-list>
@@ -139,10 +148,28 @@ export class UaBindingPickerElement extends UmbLitElement {
                 line-height: 1.2;
             }
 
-            .source-sub-label {
-                font-size: var(--uui-type-small-size, 13px);
+            .source-chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+
+            .source-chip {
+                font-family: var(--uui-font-monospace, monospace);
+                font-size: 11px;
                 color: var(--uui-color-text-alt);
+                background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
+                padding: 1px 6px;
+                border-radius: 3px;
                 font-weight: normal;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 100%;
+            }
+
+            .source-chip--id {
+                opacity: 0.7;
             }
         `,
     ];
