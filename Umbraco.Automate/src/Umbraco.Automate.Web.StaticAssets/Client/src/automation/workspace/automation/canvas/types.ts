@@ -2,6 +2,7 @@ export interface TriggerNodeData {
     triggerAlias: string;
     label: string;
     icon?: string;
+    hasSettings?: boolean;
     settings: Record<string, unknown>;
     [key: string]: unknown;
 }
@@ -12,6 +13,7 @@ export interface ActionNodeData {
     actionAlias: string;
     label: string;
     icon?: string;
+    hasSettings?: boolean;
     settings: Record<string, unknown>;
     cases?: string[];
     [key: string]: unknown;
@@ -20,6 +22,7 @@ export interface ActionNodeData {
 export interface CatalogueLookupEntry {
     name: string;
     icon?: string;
+    hasSettings?: boolean;
 }
 
 export interface CanvasState {

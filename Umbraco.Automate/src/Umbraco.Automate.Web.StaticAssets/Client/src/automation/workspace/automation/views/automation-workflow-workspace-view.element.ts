@@ -89,13 +89,25 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             this.#catalogueRepository.requestControlFlows(),
         ]);
         for (const t of triggers.data ?? []) {
-            lookup.set(t.alias, { name: t.name, icon: t.icon ?? undefined });
+            lookup.set(t.alias, {
+                name: t.name,
+                icon: t.icon ?? undefined,
+                hasSettings: (t.settingsSchema?.fields?.length ?? 0) > 0,
+            });
         }
         for (const a of actions.data ?? []) {
-            lookup.set(a.alias, { name: a.name, icon: a.icon ?? undefined });
+            lookup.set(a.alias, {
+                name: a.name,
+                icon: a.icon ?? undefined,
+                hasSettings: (a.settingsSchema?.fields?.length ?? 0) > 0,
+            });
         }
         for (const cf of controlFlows.data ?? []) {
-            lookup.set(cf.alias, { name: cf.name, icon: cf.icon ?? undefined });
+            lookup.set(cf.alias, {
+                name: cf.name,
+                icon: cf.icon ?? undefined,
+                hasSettings: (cf.settingsSchema?.fields?.length ?? 0) > 0,
+            });
         }
         return lookup;
     }

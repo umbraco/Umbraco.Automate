@@ -27,12 +27,15 @@ function ActionNode({ data, id }: NodeProps) {
         [dispatchSettingsOpen],
     );
 
+    const hasSettings = nodeData.hasSettings ?? true;
+
     const onDoubleClick = useCallback(
         (e: React.MouseEvent) => {
+            if (!hasSettings) return;
             e.stopPropagation();
             dispatchSettingsOpen(e.currentTarget as HTMLElement);
         },
-        [dispatchSettingsOpen],
+        [hasSettings, dispatchSettingsOpen],
     );
 
     const onDeleteClick = useCallback(
@@ -55,14 +58,16 @@ function ActionNode({ data, id }: NodeProps) {
                 <span className="ua-node__type">{nodeData.label}</span>
                 {!nodeData.runStatus && (
                     <div className="ua-node__actions ua-action-bar">
-                        <button
-                            className="ua-action-bar__btn"
-                            onClick={onSettingsClick}
-                            title="Settings"
-                            type="button"
-                        >
-                            <uui-icon name="icon-edit"></uui-icon>
-                        </button>
+                        {hasSettings && (
+                            <button
+                                className="ua-action-bar__btn"
+                                onClick={onSettingsClick}
+                                title="Settings"
+                                type="button"
+                            >
+                                <uui-icon name="icon-edit"></uui-icon>
+                            </button>
+                        )}
                         <button
                             className="ua-action-bar__btn ua-action-bar__btn--danger"
                             onClick={onDeleteClick}

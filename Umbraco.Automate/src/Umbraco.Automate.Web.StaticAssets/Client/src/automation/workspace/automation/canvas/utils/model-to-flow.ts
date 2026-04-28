@@ -37,6 +37,7 @@ export function modelToNodes(
                 triggerAlias: trigger.triggerAlias,
                 label: entry?.name ?? trigger.triggerAlias,
                 icon: entry?.icon,
+                hasSettings: entry?.hasSettings ?? true,
                 settings: trigger.settings,
             } satisfies TriggerNodeData,
         });
@@ -66,6 +67,7 @@ export function modelToNodes(
             actionAlias: step.actionAlias,
             label,
             icon: entry?.icon,
+            hasSettings: entry?.hasSettings ?? true,
             settings: step.settings,
         };
 
