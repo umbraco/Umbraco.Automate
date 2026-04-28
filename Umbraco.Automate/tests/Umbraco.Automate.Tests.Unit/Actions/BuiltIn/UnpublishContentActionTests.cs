@@ -9,20 +9,30 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
+using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
 public class UnpublishContentActionTests
 {
     private readonly Mock<IContentPublishingService> _publishingService = new();
+    private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
     private readonly UnpublishContentAction _action;
 
     public UnpublishContentActionTests()
     {
+        _contextFactory
+            .Setup(x => x.EnsureUmbracoContext())
+            .Returns(new UmbracoContextReference(
+                Mock.Of<IUmbracoContext>(),
+                isRoot: false,
+                Mock.Of<IUmbracoContextAccessor>()));
+
         _action = new UnpublishContentAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _publishingService.Object,
             Mock.Of<IBackOfficeSecurityAccessor>(),
+            _contextFactory.Object,
             Mock.Of<ILogger<UnpublishContentAction>>());
     }
 

@@ -3,6 +3,7 @@ using Umbraco.Cms.Core.Models.ContentPublishing;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
+using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
@@ -17,6 +18,7 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
 {
     private readonly IContentPublishingService _contentPublishingService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
+    private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly ILogger<PublishContentAction> _logger;
 
     /// <summary>
@@ -26,11 +28,13 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
         ActionInfrastructure infrastructure,
         IContentPublishingService contentPublishingService,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IUmbracoContextFactory umbracoContextFactory,
         ILogger<PublishContentAction> logger)
         : base(infrastructure)
     {
         _contentPublishingService = contentPublishingService;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
+        _umbracoContextFactory = umbracoContextFactory;
         _logger = logger;
     }
 
@@ -56,6 +60,11 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
         var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key
             ?? context.ExecutionContext?.ServiceAccountKey
             ?? throw new InvalidOperationException("No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
+
+        // Required when running from the outbox dispatcher, which has no HTTP request
+        // scope. The publish raises notifications (e.g. webhook delivery) that resolve
+        // content URLs via UrlProvider, which requires an UmbracoContext.
+        using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();
 
         var result = await _contentPublishingService.PublishAsync(contentKey, culturesToPublish, userKey);
 

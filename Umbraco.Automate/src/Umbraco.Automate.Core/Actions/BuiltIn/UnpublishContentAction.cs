@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
+using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
@@ -16,6 +17,7 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
 {
     private readonly IContentPublishingService _contentPublishingService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
+    private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly ILogger<UnpublishContentAction> _logger;
 
     /// <summary>
@@ -25,11 +27,13 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
         ActionInfrastructure infrastructure,
         IContentPublishingService contentPublishingService,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IUmbracoContextFactory umbracoContextFactory,
         ILogger<UnpublishContentAction> logger)
         : base(infrastructure)
     {
         _contentPublishingService = contentPublishingService;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
+        _umbracoContextFactory = umbracoContextFactory;
         _logger = logger;
     }
 
@@ -55,6 +59,11 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
         var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key
             ?? context.ExecutionContext?.ServiceAccountKey
             ?? throw new InvalidOperationException("No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
+
+        // Required when running from the outbox dispatcher, which has no HTTP request
+        // scope. The unpublish raises notifications (e.g. webhook delivery) that resolve
+        // content URLs via UrlProvider, which requires an UmbracoContext.
+        using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();
 
         var result = await _contentPublishingService.UnpublishAsync(contentKey, cultures, userKey);
 

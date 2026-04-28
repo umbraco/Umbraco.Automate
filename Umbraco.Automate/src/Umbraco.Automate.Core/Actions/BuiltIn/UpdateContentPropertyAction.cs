@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
@@ -29,6 +30,7 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
     private readonly IContentService _contentService;
     private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
+    private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly ILogger<UpdateContentPropertyAction> _logger;
 
     /// <summary>
@@ -39,12 +41,14 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
         IContentService contentService,
         IUserIdKeyResolver userIdKeyResolver,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IUmbracoContextFactory umbracoContextFactory,
         ILogger<UpdateContentPropertyAction> logger)
         : base(infrastructure)
     {
         _contentService = contentService;
         _userIdKeyResolver = userIdKeyResolver;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
+        _umbracoContextFactory = umbracoContextFactory;
         _logger = logger;
     }
 
@@ -110,6 +114,11 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
             ?? throw new InvalidOperationException("No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
 
         var userId = await _userIdKeyResolver.GetAsync(userKey);
+
+        // Required when running from the outbox dispatcher, which has no HTTP request
+        // scope. The save raises notifications (e.g. webhook delivery) that resolve
+        // content URLs via UrlProvider, which requires an UmbracoContext.
+        using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();
 
         var result = _contentService.Save(content, userId);
 
