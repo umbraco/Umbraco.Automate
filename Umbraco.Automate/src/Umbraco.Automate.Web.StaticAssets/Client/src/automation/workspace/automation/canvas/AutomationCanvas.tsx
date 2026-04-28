@@ -208,6 +208,22 @@ export default function AutomationCanvas({
         rfInstance.current = instance;
     }, []);
 
+    // Persist viewport changes (pan/zoom) — onMoveEnd fires after the user finishes
+    // panning or zooming, so the saved viewport survives reload.
+    const handleMoveEnd = useCallback(
+        (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
+            if (!onCanvasChange) return;
+            setNodes((currentNodes) => {
+                setEdges((currentEdges) => {
+                    onCanvasChange({ nodes: currentNodes, edges: currentEdges, viewport: vp });
+                    return currentEdges;
+                });
+                return currentNodes;
+            });
+        },
+        [onCanvasChange, setNodes, setEdges],
+    );
+
     const handleBeforeDelete = useCallback(
         async ({ nodes: nodesToDelete }: { nodes: Node[]; edges: Edge[] }) => {
             if (nodesToDelete.length === 0 || !onDeleteRequest) return true;
@@ -258,6 +274,7 @@ export default function AutomationCanvas({
             isValidConnection={readOnly ? undefined : isValidConnection}
             onBeforeDelete={readOnly ? undefined : handleBeforeDelete}
             onInit={onInit}
+            onMoveEnd={handleMoveEnd}
             onPaneClick={readOnly ? undefined : handlePaneClick}
             onNodeClick={readOnly ? undefined : handleNodeClick}
             nodeTypes={nodeTypes}
