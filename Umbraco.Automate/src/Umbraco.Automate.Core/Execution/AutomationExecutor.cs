@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
@@ -20,6 +21,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IAutomationRunRepository _runRepository;
     private readonly IWorkspaceService _workspaceService;
     private readonly IRateLimitService _rateLimitService;
+    private readonly ConditionEvaluator _conditionEvaluator;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<AutomationExecutor> _logger;
 
@@ -30,6 +32,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IAutomationRunRepository runRepository,
         IWorkspaceService workspaceService,
         IRateLimitService rateLimitService,
+        ConditionEvaluator conditionEvaluator,
         AutomateMetrics metrics,
         ILogger<AutomationExecutor> logger)
     {
@@ -39,6 +42,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _runRepository = runRepository;
         _workspaceService = workspaceService;
         _rateLimitService = rateLimitService;
+        _conditionEvaluator = conditionEvaluator;
         _metrics = metrics;
         _logger = logger;
     }
@@ -117,6 +121,25 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             ExecutionContext = executionContext,
         };
 
+        // Trigger-edge filters can't be wired as ValueOutcomes (the trigger isn't a
+        // WorkflowCore step), so evaluate them here against trigger data only.
+        // If the entry edge's filter rejects the run, complete it without starting
+        // the workflow at all.
+        if (!EvaluateTriggerFilter(automation, workflowData))
+        {
+            run.Status = AutomationRunStatus.Completed;
+            run.CompletedUtc = DateTime.UtcNow;
+            await _runRepository.SaveAsync(run, cancellationToken);
+
+            _metrics.RunCompleted(automation.Alias);
+
+            _logger.LogInformation(
+                "Skipped run {RunId} for automation {AutomationName}: trigger-edge filter evaluated to false",
+                run.Id, automation.Name);
+
+            return run.Id;
+        }
+
         var instanceId = await _workflowHost.StartWorkflow(workflowId, workflowData);
 
         // Scoped update so lifecycle operations (suspend / resume / terminate) can
@@ -132,5 +155,46 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             workflowId, instanceId, run.Id, workspace.ServiceAccountKey);
 
         return run.Id;
+    }
+
+    /// <summary>
+    /// Evaluates filters on connections originating from the trigger (Guid.Empty source)
+    /// against trigger data only. Returns true if the run should proceed:
+    /// — no trigger-edge filter exists, or
+    /// — at least one trigger-edge filter passes.
+    /// Returns false only when every trigger-edge has a filter and all of them fail.
+    /// </summary>
+    private bool EvaluateTriggerFilter(Automation automation, AutomationWorkflowData workflowData)
+    {
+        var triggerEdges = automation.Connections
+            .Where(c => c.SourceStepId == Guid.Empty)
+            .ToList();
+
+        if (triggerEdges.Count == 0)
+        {
+            return true;
+        }
+
+        var bindingData = BindingDataBuilder.Build(workflowData);
+
+        var passed = false;
+        var any = false;
+        foreach (var edge in triggerEdges)
+        {
+            if (edge.Filter is null)
+            {
+                // An unfiltered trigger edge always proceeds.
+                return true;
+            }
+
+            any = true;
+            if (_conditionEvaluator.Evaluate(edge.Filter, bindingData))
+            {
+                passed = true;
+                break;
+            }
+        }
+
+        return !any || passed;
     }
 }

@@ -101,6 +101,7 @@ public class AutomationExecutorTests
             _runRepo.Object,
             _workspaceService.Object,
             Mock.Of<IRateLimitService>(),
+            conditionEvaluator,
             metrics,
             Mock.Of<ILogger<AutomationExecutor>>());
     }
@@ -489,6 +490,72 @@ public class AutomationExecutorTests
         ((ValueOutcome)def.Steps.FindById(0).Outcomes[0]).NextStep.ShouldBe(1);
         ((ValueOutcome)def.Steps.FindById(0).Outcomes[0]).GetValue(null!).ShouldBeNull();
     }
+
+    [Fact]
+    public async Task ExecuteAsync_TriggerEdgeFilterPasses_StartsWorkflowAsNormal()
+    {
+        StepConfiguration step = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step");
+        var filter = MakeEqualsFilter("${ trigger.country }", "DK");
+
+        var automation = new AutomationBuilder()
+            .AddStep(step)
+            .WithConnection(Guid.Empty, step.Id, outcome: null, filter: filter)
+            .Build();
+
+        var triggerData = new Dictionary<string, object?> { ["country"] = "DK" };
+        await _executor.ExecuteAsync(automation, "user", null, triggerData, CancellationToken.None);
+
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.IsAny<string>(),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TriggerEdgeFilterFails_SkipsWorkflowAndCompletesRun()
+    {
+        StepConfiguration step = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step");
+        var filter = MakeEqualsFilter("${ trigger.country }", "DK");
+
+        var automation = new AutomationBuilder()
+            .AddStep(step)
+            .WithConnection(Guid.Empty, step.Id, outcome: null, filter: filter)
+            .Build();
+
+        AutomationRun? savedRun = null;
+        _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRun, CancellationToken>((r, _) => savedRun = r)
+            .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
+
+        var triggerData = new Dictionary<string, object?> { ["country"] = "SE" };
+        await _executor.ExecuteAsync(automation, "user", null, triggerData, CancellationToken.None);
+
+        // Workflow must NOT have been started.
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.IsAny<string>(),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Never);
+
+        // Run record must have been finalised as Completed (no work to do).
+        savedRun.ShouldNotBeNull();
+        savedRun.Status.ShouldBe(AutomationRunStatus.Completed);
+        savedRun.CompletedUtc.ShouldNotBeNull();
+    }
+
+    private static ConditionSet MakeEqualsFilter(string left, string right)
+        => new()
+        {
+            Groups =
+            [
+                new ConditionGroup
+                {
+                    Conditions =
+                    [
+                        new Condition { LeftOperand = left, Operator = ConditionOperator.Equals, RightOperand = right },
+                    ],
+                },
+            ],
+        };
 
     private static Automation CreateAutomation(string actionAlias) =>
         new AutomationBuilder()
