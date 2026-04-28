@@ -7,8 +7,7 @@ import type {
 import { UmbConditionBase } from "@umbraco-cms/backoffice/extension-registry";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
-export const UA_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS =
-    "Ua.Condition.Automation.HasManualTrigger";
+export { UA_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./automation-has-manual-trigger.condition.constants.js";
 
 const MANUAL_TRIGGER_ALIAS = "umbracoAutomate.manual";
 

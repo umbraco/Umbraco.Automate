@@ -6,7 +6,7 @@ import { UaWorkspaceCollectionServerDataSource } from "../../workspace-managemen
 import { UaEntityActionEvent } from "../../core/index.js";
 import { UA_WORKSPACE_ENTITY_TYPE } from "../../workspace-management/constants.js";
 
-export const UA_WORKSPACES_EXIST_CONDITION_ALIAS = "Ua.Condition.WorkspacesExist";
+export { UA_WORKSPACES_EXIST_CONDITION_ALIAS } from "./workspaces-exist.condition.constants.js";
 
 export class UaWorkspacesExistCondition
     extends UmbConditionBase<UmbConditionConfigBase>

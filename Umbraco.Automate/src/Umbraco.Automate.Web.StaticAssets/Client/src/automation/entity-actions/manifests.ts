@@ -6,7 +6,7 @@ import {
 import { UA_WORKSPACE_ENTITY_TYPE } from "../../workspace-management/constants.js";
 import { UA_AUTOMATION_FOLDER_REPOSITORY_ALIAS } from "../tree/folder/constants.js";
 import { automationMoveManifests } from "./move/manifests.js";
-import { UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./automation-has-manual-trigger.condition.js";
+import { UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./automation-has-manual-trigger.condition.constants.js";
 
 export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
     // The "create" kind opens the entity-create-option-action-list modal

@@ -9,8 +9,7 @@ import { UMB_ENTITY_CONTEXT } from "@umbraco-cms/backoffice/entity";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { AutomationsService } from "../../api/sdk.gen.js";
 
-export const UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS =
-    "Ua.Condition.Entity.Automation.HasManualTrigger";
+export { UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./automation-has-manual-trigger.condition.constants.js";
 
 const MANUAL_TRIGGER_ALIAS = "umbracoAutomate.manual";
 
