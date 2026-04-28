@@ -139,6 +139,10 @@ export class UaInputConnectionElement extends UmbLitElement {
             #btn-add {
                 width: 100%;
             }
+
+            umb-ref-item {
+                padding: 0;
+            }
         `,
     ];
 }
