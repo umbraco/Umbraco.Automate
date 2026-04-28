@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Triggers;
 
 namespace Umbraco.Automate.Testing.Builders;
@@ -121,9 +122,15 @@ public class AutomationBuilder
             ["logLevel"] = logLevel,
         });
 
-    public AutomationBuilder WithConnection(Guid sourceStepId, Guid targetStepId, string? outcome = null)
+    public AutomationBuilder WithConnection(Guid sourceStepId, Guid targetStepId, string? outcome = null, ConditionSet? filter = null)
     {
-        _connections.Add(new StepConnection { SourceStepId = sourceStepId, TargetStepId = targetStepId, Outcome = outcome });
+        _connections.Add(new StepConnection
+        {
+            SourceStepId = sourceStepId,
+            TargetStepId = targetStepId,
+            Outcome = outcome,
+            Filter = filter,
+        });
         return this;
     }
 

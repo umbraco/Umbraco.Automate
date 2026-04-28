@@ -106,7 +106,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
 
         // Wire up step transitions (outcomes).
         // Container steps are excluded — their child relationships are handled via Children + Branch().
-        WireTransitions(definition, automation.Connections, stepIdToIndex, containerStepIds);
+        WireTransitions(definition, automation.Connections, stepIdToIndex, containerStepIds, _conditionEvaluator);
 
         // Wire up container children and convergence outcomes — must happen after all steps are indexed.
         WireContainerChildren(definition, containerScopes, stepIdToIndex);
@@ -232,11 +232,19 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         workflowStep.RetryInterval = stepConfig.RetryInterval ?? executionOptions.DefaultRetryInterval;
     }
 
+    /// <summary>
+    /// Sentinel returned by a filtered outcome's <see cref="ValueOutcome.Value"/> lambda when the
+    /// filter evaluates to false — guaranteed not to equal any real outcome value (null,
+    /// branch label, etc.) so WorkflowCore won't take the transition.
+    /// </summary>
+    private static readonly object FilterFailedSentinel = new();
+
     private static void WireTransitions(
         WorkflowDefinition definition,
         IList<StepConnection> connections,
         Dictionary<Guid, int> stepIdToIndex,
-        IReadOnlySet<Guid> containerStepIds)
+        IReadOnlySet<Guid> containerStepIds,
+        ConditionEvaluator conditionEvaluator)
     {
         if (connections.Count > 0)
         {
@@ -257,12 +265,33 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 }
 
                 var outcome = new ValueOutcome { NextStep = targetIndex };
-                if (connection.Outcome is not null)
+                var outcomeValue = connection.Outcome;
+                var filter = connection.Filter;
+
+                if (filter is null && outcomeValue is null)
                 {
-                    // WorkflowCore matches: ValueOutcome.GetValue(data) == ExecutionResult.OutcomeValue
-                    // When Value is null (no lambda), the outcome matches any result (default/sequential).
-                    var outcomeValue = connection.Outcome;
-                    Expression<Func<AutomationWorkflowData, object>> expr = _ => outcomeValue;
+                    // Plain default edge — Value stays null and matches any outcome.
+                }
+                else if (filter is null)
+                {
+                    // Branch outcome only (existing behaviour).
+                    Expression<Func<AutomationWorkflowData, object>> expr = _ => outcomeValue!;
+                    outcome.Value = expr;
+                }
+                else
+                {
+                    // Filtered edge: outcome lambda returns the matching value when the
+                    // filter passes, or a sentinel that won't match any real outcome value
+                    // when it fails (so WorkflowCore skips the transition).
+                    //
+                    // NOTE: BindingDataBuilder.Build(data) here has no ForEach iteration
+                    // context — so filters can reference trigger/steps/previous bindings
+                    // but not loop.* (the iteration context lives on IStepExecutionContext,
+                    // which outcome lambdas don't see).
+                    Expression<Func<AutomationWorkflowData, object>> expr = data =>
+                        conditionEvaluator.Evaluate(filter, BindingDataBuilder.Build(data))
+                            ? outcomeValue!
+                            : FilterFailedSentinel;
                     outcome.Value = expr;
                 }
 

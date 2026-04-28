@@ -164,6 +164,115 @@ public class WorkflowCompilerTests
     }
 
     [Fact]
+    public void Compile_ConnectionWithFilter_OutcomeMatchesWhenFilterPasses()
+    {
+        StepConfiguration stepA = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration stepB = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Step B");
+
+        var filter = MakeFilter("${ trigger.country }", ConditionOperator.Equals, "DK");
+
+        var automation = new AutomationBuilder()
+            .AddStep(stepA)
+            .AddStep(stepB)
+            .WithTriggerConnection(stepA.Id)
+            .WithConnection(stepA.Id, stepB.Id, outcome: null, filter: filter)
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+        var outcome = (ValueOutcome)definition.Steps.FindById(0).Outcomes.Single();
+        GetOutcomeLambda(outcome).ShouldNotBeNull();
+
+        // Filter passes — lambda returns null, matching the action's null OutcomeValue.
+        var passingData = WorkflowDataWithTrigger(("country", "DK"));
+        outcome.GetValue(passingData).ShouldBeNull();
+
+        // Filter fails — returns a non-null sentinel, won't match null.
+        var failingData = WorkflowDataWithTrigger(("country", "SE"));
+        outcome.GetValue(failingData).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Compile_ConnectionWithFilterAndOutcome_GatesBranchOutcome()
+    {
+        StepConfiguration ifStep = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("If");
+        StepConfiguration thenStep = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Then");
+
+        var filter = MakeFilter("${ trigger.role }", ConditionOperator.Equals, "admin");
+
+        var automation = new AutomationBuilder()
+            .AddStep(ifStep)
+            .AddStep(thenStep)
+            .WithTriggerConnection(ifStep.Id)
+            .WithConnection(ifStep.Id, thenStep.Id, outcome: "true", filter: filter)
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+        var outcome = (ValueOutcome)definition.Steps.FindById(0).Outcomes.Single();
+
+        // Filter passes — lambda returns the branch outcome value "true".
+        outcome.GetValue(WorkflowDataWithTrigger(("role", "admin"))).ShouldBe("true");
+
+        // Filter fails — sentinel won't equal "true", so the branch is not taken.
+        outcome.GetValue(WorkflowDataWithTrigger(("role", "guest"))).ShouldNotBe("true");
+    }
+
+    [Fact]
+    public void Compile_ConnectionWithoutFilter_RetainsExistingBehaviour()
+    {
+        StepConfiguration stepA = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Step A");
+        StepConfiguration stepB = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Step B");
+
+        var automation = new AutomationBuilder()
+            .AddStep(stepA)
+            .AddStep(stepB)
+            .WithTriggerConnection(stepA.Id)
+            .WithConnection(stepA.Id, stepB.Id)
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+        var outcome = (ValueOutcome)definition.Steps.FindById(0).Outcomes.Single();
+
+        // No filter, no outcome — Value lambda is null (matches anything).
+        GetOutcomeLambda(outcome).ShouldBeNull();
+    }
+
+    private static System.Linq.Expressions.LambdaExpression? GetOutcomeLambda(ValueOutcome outcome)
+        => (System.Linq.Expressions.LambdaExpression?)typeof(ValueOutcome)
+            .GetField("_value", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(outcome);
+
+    private static ConditionSet MakeFilter(string left, ConditionOperator op, string right)
+        => new()
+        {
+            Groups =
+            [
+                new ConditionGroup
+                {
+                    Conditions =
+                    [
+                        new Condition { LeftOperand = left, Operator = op, RightOperand = right },
+                    ],
+                },
+            ],
+        };
+
+    private static AutomationWorkflowData WorkflowDataWithTrigger(params (string Key, object? Value)[] entries)
+    {
+        var data = new AutomationWorkflowData();
+        foreach (var (key, value) in entries)
+        {
+            data.TriggerOutput[key] = value;
+        }
+        return data;
+    }
+
+    [Fact]
     public void Compile_DisconnectedSteps_AreExcludedFromWorkflow()
     {
         StepConfiguration connected = new StepConfigurationBuilder()
