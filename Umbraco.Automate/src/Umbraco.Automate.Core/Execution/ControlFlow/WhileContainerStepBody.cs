@@ -18,17 +18,20 @@ internal sealed class WhileContainerStepBody : StepBody
     private readonly WhileControlFlowSettings _settings;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
+    private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
 
     public WhileContainerStepBody(
         StepConfiguration stepConfig,
         WhileControlFlowSettings settings,
         ConditionEvaluator conditionEvaluator,
-        IAutomationRunRepository runRepository)
+        IAutomationRunRepository runRepository,
+        IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         _stepConfig = stepConfig;
         _settings = settings;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
+        _branchEdges = branchEdges;
     }
 
     public override ExecutionResult Run(IStepExecutionContext context)
@@ -52,9 +55,19 @@ internal sealed class WhileContainerStepBody : StepBody
             return ExecutionResult.Next();
         }
 
-        // Evaluate conditions.
+        // Evaluate While's own conditions.
         var conditionsTrue = _conditionEvaluator.Evaluate(_settings.Conditions, bindingData);
         if (!conditionsTrue)
+        {
+            TrackStepRun(data, context.CancellationToken, iteration);
+            return ExecutionResult.Next();
+        }
+
+        // Evaluate outgoing-edge filters once with workflow data. While does not expose
+        // a per-item iteration value, so loop.* is unavailable here. If every edge has
+        // a filter and they all fail, treat the loop as done — the alternative (looping
+        // forever on filters that never become true) would be worse than terminating.
+        if (!AnyEdgePasses(bindingData))
         {
             TrackStepRun(data, context.CancellationToken, iteration);
             return ExecutionResult.Next();
@@ -65,6 +78,38 @@ internal sealed class WhileContainerStepBody : StepBody
         return ExecutionResult.Branch(
             [new ForEachIterationContext(null, iteration)],
             new ControlFlowPersistenceData(nameof(WhileContainerStepBody)) { Metadata = nextIteration.ToString() });
+    }
+
+    private bool AnyEdgePasses(IReadOnlyDictionary<string, object?> bindingData)
+    {
+        if (_branchEdges.Count == 0)
+        {
+            return true;
+        }
+
+        var hasAnyFilter = false;
+        foreach (var edge in _branchEdges)
+        {
+            if (edge.Filter is not null)
+            {
+                hasAnyFilter = true;
+                break;
+            }
+        }
+        if (!hasAnyFilter)
+        {
+            return true;
+        }
+
+        foreach (var edge in _branchEdges)
+        {
+            if (edge.Filter is null || _conditionEvaluator.Evaluate(edge.Filter, bindingData))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void TrackStepRun(AutomationWorkflowData data, CancellationToken ct, int totalIterations)

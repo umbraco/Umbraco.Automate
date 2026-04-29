@@ -1,5 +1,6 @@
 using Shouldly;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.ControlFlow.BuiltIn;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
@@ -14,11 +15,13 @@ namespace Umbraco.Automate.Tests.Unit.Execution.ControlFlow;
 public class ForEachContainerStepBodyTests
 {
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly ConditionEvaluator _conditionEvaluator;
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
 
     public ForEachContainerStepBodyTests()
     {
         _bindingEvaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
+        _conditionEvaluator = new ConditionEvaluator(_bindingEvaluator);
         _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
     }
@@ -116,11 +119,19 @@ public class ForEachContainerStepBodyTests
         saved.IterationTotal.ShouldBe(3);
     }
 
-    private ForEachContainerStepBody CreateBody(ForEachControlFlowSettings settings)
+    private ForEachContainerStepBody CreateBody(
+        ForEachControlFlowSettings settings,
+        IReadOnlyList<ContainerBranchEdge>? branchEdges = null)
     {
         StepConfiguration stepConfig = new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
-        return new ForEachContainerStepBody(stepConfig, settings, _bindingEvaluator, _runRepo.Object);
+        return new ForEachContainerStepBody(
+            stepConfig,
+            settings,
+            _bindingEvaluator,
+            _conditionEvaluator,
+            _runRepo.Object,
+            branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
     private static IStepExecutionContext CreateContext(

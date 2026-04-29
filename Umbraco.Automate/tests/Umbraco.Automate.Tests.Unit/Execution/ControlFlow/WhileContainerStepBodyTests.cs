@@ -97,11 +97,18 @@ public class WhileContainerStepBodyTests
         saved.Status.ShouldBe(StepRunStatus.Completed);
     }
 
-    private WhileContainerStepBody CreateBody(WhileControlFlowSettings settings)
+    private WhileContainerStepBody CreateBody(
+        WhileControlFlowSettings settings,
+        IReadOnlyList<ContainerBranchEdge>? branchEdges = null)
     {
         StepConfiguration stepConfig = new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.while").WithName("While");
-        return new WhileContainerStepBody(stepConfig, settings, _conditionEvaluator, _runRepo.Object);
+        return new WhileContainerStepBody(
+            stepConfig,
+            settings,
+            _conditionEvaluator,
+            _runRepo.Object,
+            branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
     private static WhileControlFlowSettings AlwaysTrueSettings() => new()

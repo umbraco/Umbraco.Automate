@@ -82,6 +82,11 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         // Run graph analysis to determine children and convergence for containers.
         var containerScopes = GraphAnalyzer.Analyze(automation.Connections, containerStepIds);
 
+        // Build the per-container outgoing edge list (target + optional filter). Containers
+        // need this at runtime to evaluate filters in iteration context — the filter cannot
+        // ride on a WorkflowCore outcome because outcome lambdas have no access to loop.*.
+        var containerBranchEdges = BuildContainerBranchEdges(automation.Connections, containerStepIds);
+
         // Sort steps by connections to determine execution order.
         var orderedSteps = TopologicalSort(automation.Steps, automation.Connections);
         var stepIndex = 0;
@@ -89,7 +94,11 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
 
         foreach (var stepConfig in orderedSteps)
         {
-            var workflowStep = CompileStep(stepConfig);
+            var edges = containerBranchEdges.TryGetValue(stepConfig.Id, out var e)
+                ? e
+                : Array.Empty<ContainerBranchEdge>();
+
+            var workflowStep = CompileStep(stepConfig, edges);
             if (workflowStep is null)
             {
                 continue;
@@ -105,13 +114,45 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         }
 
         // Wire up step transitions (outcomes).
-        // Container steps are excluded — their child relationships are handled via Children + Branch().
+        // Container steps are excluded — their child relationships are handled via Children + Branch(),
+        // and any filters on edges leaving a container are honoured by the container body itself
+        // (see ContainerBranchEdge plumbing above).
         WireTransitions(definition, automation.Connections, stepIdToIndex, containerStepIds, _conditionEvaluator);
 
         // Wire up container children and convergence outcomes — must happen after all steps are indexed.
         WireContainerChildren(definition, containerScopes, stepIdToIndex);
 
         return definition;
+    }
+
+    /// <summary>
+    /// Indexes the connections leaving each container step. Each entry pairs the target
+    /// step ID with the connection's filter (if any) so the container's runtime body can
+    /// evaluate the filter with iteration context.
+    /// </summary>
+    private static Dictionary<Guid, IReadOnlyList<ContainerBranchEdge>> BuildContainerBranchEdges(
+        IList<StepConnection> connections,
+        IReadOnlySet<Guid> containerStepIds)
+    {
+        var result = new Dictionary<Guid, List<ContainerBranchEdge>>();
+
+        foreach (var connection in connections)
+        {
+            if (!containerStepIds.Contains(connection.SourceStepId))
+            {
+                continue;
+            }
+
+            if (!result.TryGetValue(connection.SourceStepId, out var list))
+            {
+                list = [];
+                result[connection.SourceStepId] = list;
+            }
+
+            list.Add(new ContainerBranchEdge(connection.TargetStepId, connection.Filter));
+        }
+
+        return result.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<ContainerBranchEdge>)kv.Value);
     }
 
     private HashSet<Guid> IdentifyContainerSteps(IList<StepConfiguration> steps)
@@ -130,7 +171,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         return containerIds;
     }
 
-    private WorkflowStep? CompileStep(StepConfiguration stepConfig)
+    private WorkflowStep? CompileStep(StepConfiguration stepConfig, IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         // Try action collection first.
         var action = _actions.GetByAlias(stepConfig.ActionAlias);
@@ -158,7 +199,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         var controlFlow = _controlFlows.GetByAlias(stepConfig.ActionAlias);
         if (controlFlow is not null)
         {
-            return CompileControlFlowStep(stepConfig, controlFlow);
+            return CompileControlFlowStep(stepConfig, controlFlow, branchEdges);
         }
 
         _logger.LogWarning("Step type '{ActionAlias}' not found in action or control flow collections, skipping step {StepId}",
@@ -166,7 +207,10 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         return null;
     }
 
-    private ControlFlowWorkflowStep? CompileControlFlowStep(StepConfiguration stepConfig, IControlFlow controlFlow)
+    private ControlFlowWorkflowStep? CompileControlFlowStep(
+        StepConfiguration stepConfig,
+        IControlFlow controlFlow,
+        IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         switch (controlFlow)
         {
@@ -185,18 +229,20 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             case ForEachControlFlow:
             {
                 var settings = ResolveSettings<ForEachControlFlowSettings>(stepConfig, controlFlow) ?? new ForEachControlFlowSettings();
-                return new ControlFlowWorkflowStep(new ForEachContainerStepBody(stepConfig, settings, _bindingEvaluator, _runRepository));
+                return new ControlFlowWorkflowStep(new ForEachContainerStepBody(
+                    stepConfig, settings, _bindingEvaluator, _conditionEvaluator, _runRepository, branchEdges));
             }
 
             case WhileControlFlow:
             {
                 var settings = ResolveSettings<WhileControlFlowSettings>(stepConfig, controlFlow) ?? new WhileControlFlowSettings();
-                return new ControlFlowWorkflowStep(new WhileContainerStepBody(stepConfig, settings, _conditionEvaluator, _runRepository));
+                return new ControlFlowWorkflowStep(new WhileContainerStepBody(
+                    stepConfig, settings, _conditionEvaluator, _runRepository, branchEdges));
             }
 
             case ParallelControlFlow:
             {
-                return new ControlFlowWorkflowStep(new ParallelContainerStepBody());
+                return new ControlFlowWorkflowStep(new ParallelContainerStepBody(_conditionEvaluator, branchEdges));
             }
 
             default:
@@ -285,9 +331,12 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                     // when it fails (so WorkflowCore skips the transition).
                     //
                     // NOTE: BindingDataBuilder.Build(data) here has no ForEach iteration
-                    // context — so filters can reference trigger/steps/previous bindings
-                    // but not loop.* (the iteration context lives on IStepExecutionContext,
-                    // which outcome lambdas don't see).
+                    // context — filters wired through ValueOutcome can reference
+                    // trigger/steps/previous bindings but not loop.* (the iteration context
+                    // lives on IStepExecutionContext, which outcome lambdas don't see).
+                    // Filters that need loop.* belong on edges leaving a container; those
+                    // are intercepted before this loop and applied by the container body
+                    // itself via ContainerBranchEdge plumbing in WorkflowCompiler.Compile.
                     Expression<Func<AutomationWorkflowData, object>> expr = data =>
                         conditionEvaluator.Evaluate(filter, BindingDataBuilder.Build(data))
                             ? outcomeValue!
