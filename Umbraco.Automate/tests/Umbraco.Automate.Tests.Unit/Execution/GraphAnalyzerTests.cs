@@ -94,7 +94,39 @@ public class GraphAnalyzerTests
 
         var scope = result[forEach];
         scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a, b, c }, ignoreOrder: true);
+        // BranchEntry is only the direct successor — body is reached via outcome routing.
+        scope.BranchEntryStepIds.ShouldBe(new HashSet<Guid> { a }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Analyze_BranchEntryStepIds_OnlyImmediateSuccessors()
+    {
+        // ForEach → A1 (branch1) → A2 → Merge
+        //         → B1 (branch2)      → Merge
+        // BranchEntry must contain only the immediate successors (A1, B1), not A2.
+        var forEach = Guid.NewGuid();
+        var a1 = Guid.NewGuid();
+        var a2 = Guid.NewGuid();
+        var b1 = Guid.NewGuid();
+        var merge = Guid.NewGuid();
+
+        var connections = new List<StepConnection>
+        {
+            Conn(forEach, a1, "branch1"),
+            Conn(forEach, b1, "branch2"),
+            Conn(a1, a2),
+            Conn(a2, merge),
+            Conn(b1, merge),
+        };
+
+        var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { forEach });
+
+        var scope = result[forEach];
+        scope.BranchEntryStepIds.ShouldBe(new HashSet<Guid> { a1, b1 }, ignoreOrder: true);
+        scope.BranchEntryStepIds.ShouldNotContain(a2);
+        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a1, a2, b1 }, ignoreOrder: true);
+        scope.ConvergenceStepId.ShouldBe(merge);
     }
 
     [Fact]
