@@ -1,4 +1,3 @@
-using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Conditions;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
