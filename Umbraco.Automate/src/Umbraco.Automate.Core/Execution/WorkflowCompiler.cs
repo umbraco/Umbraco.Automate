@@ -309,9 +309,15 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     }
 
     /// <summary>
-    /// Populates <see cref="WorkflowStep.Children"/> for container control flow steps
-    /// using the graph analysis results. This is required for WorkflowCore's
-    /// <c>ExecutionResult.Branch()</c> to know which steps belong to the container body.
+    /// Populates <see cref="WorkflowStep.Children"/> for container control flow steps using
+    /// the graph analysis results. Only the container's <em>direct successors</em> (branch
+    /// entry points) are added. Further siblings inside the body are reached via outcome
+    /// routing, like a normal flow — which is critical because WorkflowCore's
+    /// <c>ExecutionResultProcessor</c> spawns one <em>immediately-active</em> child pointer
+    /// per <c>(branch value, child step ID)</c> pair when a container branches. If we added
+    /// every transitive body step to <c>Children</c>, every body step would execute in
+    /// parallel per iteration, bypassing all in-body outcome routing (e.g. an If step's
+    /// <c>true</c>/<c>false</c> outcomes would be ignored).
     /// </summary>
     private static void WireContainerChildren(
         WorkflowDefinition definition,
@@ -327,10 +333,13 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
 
             var containerStep = definition.Steps.FindById(containerIndex);
 
-            // Add child step indices.
-            foreach (var childStepId in scope.ChildStepIds)
+            // Add only the direct branch-entry step indices. WorkflowCore's
+            // BuildNextPointer carries ContextItem and Scope through outcome chains, so
+            // iteration context propagates to deeper body steps without enrolling them
+            // here.
+            foreach (var entryStepId in scope.BranchEntryStepIds)
             {
-                if (stepIdToIndex.TryGetValue(childStepId, out var childIndex))
+                if (stepIdToIndex.TryGetValue(entryStepId, out var childIndex))
                 {
                     containerStep.Children.Add(childIndex);
                 }
