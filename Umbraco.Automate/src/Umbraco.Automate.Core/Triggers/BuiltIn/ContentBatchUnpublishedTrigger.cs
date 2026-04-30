@@ -46,7 +46,7 @@ public sealed class ContentBatchUnpublishedTrigger
         yield return new TriggerEvent<BatchTriggerOutput<ContentUnpublishedTriggerOutput>>
         {
             TriggerAlias = Alias,
-            InitiatorType = "system",
+            InitiatorType = TriggerInitiatorType.System,
             IdempotencyKey = IdempotencyKeyFactory.ForContentBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentUnpublishedTriggerOutput>
             {

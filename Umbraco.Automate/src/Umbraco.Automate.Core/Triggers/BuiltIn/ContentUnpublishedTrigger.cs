@@ -28,7 +28,7 @@ public sealed class ContentUnpublishedTrigger
             yield return new TriggerEvent<ContentUnpublishedTriggerOutput>
             {
                 TriggerAlias = Alias,
-                InitiatorType = "system",
+                InitiatorType = TriggerInitiatorType.System,
                 // The content was just unpublished — PublishedVersionId identifies the
                 // version that was live up until this event. Two unpublish notifications
                 // for the same event share this id; a re-publish-then-unpublish produces

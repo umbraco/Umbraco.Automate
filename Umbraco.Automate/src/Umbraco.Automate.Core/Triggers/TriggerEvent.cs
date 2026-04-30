@@ -11,7 +11,7 @@ public class TriggerEvent
     public required string TriggerAlias { get; init; }
 
     /// <summary>
-    /// Gets the type of initiator ("system", "user", "webhook", "ai-agent").
+    /// Gets the type of initiator. Use <see cref="TriggerInitiatorType"/> constants.
     /// </summary>
     public required string InitiatorType { get; init; }
 

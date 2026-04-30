@@ -136,7 +136,7 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                 var triggerEvent = new TriggerEvent
                 {
                     TriggerAlias = automation.Trigger.TriggerAlias,
-                    InitiatorType = "scheduled",
+                    InitiatorType = TriggerInitiatorType.Scheduled,
                     IdempotencyKey = $"scheduled:{automationId}:{nextOccurrence:O}",
                 };
 

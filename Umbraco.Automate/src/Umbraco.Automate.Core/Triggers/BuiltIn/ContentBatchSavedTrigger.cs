@@ -46,7 +46,7 @@ public sealed class ContentBatchSavedTrigger
         yield return new TriggerEvent<BatchTriggerOutput<ContentSavedTriggerOutput>>
         {
             TriggerAlias = Alias,
-            InitiatorType = "system",
+            InitiatorType = TriggerInitiatorType.System,
             IdempotencyKey = IdempotencyKeyFactory.ForContentSaveBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentSavedTriggerOutput>
             {

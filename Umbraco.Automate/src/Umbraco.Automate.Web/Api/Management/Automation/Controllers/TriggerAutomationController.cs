@@ -72,7 +72,7 @@ public sealed class TriggerAutomationController : AutomationControllerBase
             new TriggerEvent
             {
                 TriggerAlias = triggerAlias,
-                InitiatorType = "user",
+                InitiatorType = TriggerInitiatorType.User,
             },
             cancellationToken);
 

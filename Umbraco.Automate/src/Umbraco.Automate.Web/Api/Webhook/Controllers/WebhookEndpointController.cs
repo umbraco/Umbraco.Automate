@@ -233,7 +233,7 @@ public sealed class WebhookEndpointController : ControllerBase
             new TriggerEvent<WebhookTriggerOutput>
             {
                 TriggerAlias = triggerAlias,
-                InitiatorType = "webhook",
+                InitiatorType = TriggerInitiatorType.Webhook,
                 Output = output,
             },
             cancellationToken);

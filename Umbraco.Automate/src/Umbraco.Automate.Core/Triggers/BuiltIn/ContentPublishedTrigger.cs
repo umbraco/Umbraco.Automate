@@ -28,7 +28,7 @@ public sealed class ContentPublishedTrigger
             yield return new TriggerEvent<ContentPublishedTriggerOutput>
             {
                 TriggerAlias = Alias,
-                InitiatorType = "system",
+                InitiatorType = TriggerInitiatorType.System,
                 // Key on the version that just got published: rapid successive publishes
                 // get distinct PublishedVersionIds and therefore distinct keys, while a
                 // duplicate notification for the same publish collapses to one message.
