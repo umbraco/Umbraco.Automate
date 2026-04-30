@@ -51,7 +51,7 @@ internal sealed class AuditTrailMiddleware : IActionMiddleware
                 eventDateUtc: DateTime.UtcNow,
                 affectedUserKey: null,
                 affectedDetails: $"Action: {context.ActionAlias}",
-                eventType: $"umbraco/automate/{context.ActionAlias}",
+                eventType: BuildEventType(context.ActionAlias),
                 eventDetails: eventDetails);
         }
         catch (Exception ex)
@@ -65,4 +65,10 @@ internal sealed class AuditTrailMiddleware : IActionMiddleware
 
         return result;
     }
+
+    // Umbraco's audit eventType only permits alphanumerics, hyphens, and '/' separators.
+    // Action aliases use dotted segments (e.g. "umbracoAutomate.publishContent"), so promote
+    // each dot to a category separator.
+    private static string BuildEventType(string actionAlias)
+        => $"umbraco/automate/{actionAlias.Replace('.', '/')}";
 }

@@ -84,6 +84,37 @@ public class AuditTrailMiddlewareTests
     }
 
     [Fact]
+    public async Task ApplyAsync_CmsAction_Success_BuildsEventTypeWithoutDots()
+    {
+        var cmsAction = new Mock<IAction>();
+        cmsAction.As<ICmsAction>();
+
+        var ctx = CreateContext(cmsAction.Object, CreateExecutionContext());
+        var successResult = ActionResult.Success();
+
+        string? capturedEventType = null;
+        _auditEntryService
+            .Setup(a => a.WriteAsync(
+                It.IsAny<Guid?>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<DateTime>(), It.IsAny<Guid?>(), It.IsAny<string?>(),
+                It.IsAny<string>(), It.IsAny<string>()))
+            .Callback<Guid?, string, string, DateTime, Guid?, string?, string, string>(
+                (_, _, _, _, _, _, eventType, _) => capturedEventType = eventType)
+            .ReturnsAsync(Mock.Of<IAuditEntry>());
+
+        await _middleware.ApplyAsync(
+            ctx,
+            (_, _) => Task.FromResult(successResult),
+            CancellationToken.None);
+
+        // Action alias is "umbracoAutomate.publishContent" — the dot would fail Umbraco's
+        // eventType validation (alphanumerics, hyphens, and '/' only), so each dotted segment
+        // must be promoted to a category separator.
+        capturedEventType.ShouldBe("umbraco/automate/umbracoAutomate/publishContent");
+        capturedEventType!.ShouldNotContain(".");
+    }
+
+    [Fact]
     public async Task ApplyAsync_NonCmsAction_DoesNotWriteAudit()
     {
         var action = Mock.Of<IAction>();
