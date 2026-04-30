@@ -1,4 +1,6 @@
 using Shouldly;
+using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
 using WorkflowCore.Interface;
@@ -8,10 +10,17 @@ namespace Umbraco.Automate.Tests.Unit.Execution.ControlFlow;
 
 public class ParallelContainerStepBodyTests
 {
+    private static ParallelContainerStepBody CreateBody(IReadOnlyList<ContainerBranchEdge>? branchEdges = null)
+    {
+        var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
+        var conditionEvaluator = new ConditionEvaluator(evaluator);
+        return new ParallelContainerStepBody(conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
+    }
+
     [Fact]
     public void Run_WithChildren_BranchesOnePerChild()
     {
-        var body = new ParallelContainerStepBody();
+        var body = CreateBody();
         var context = CreateContext(childCount: 3);
         var result = body.Run(context);
 
@@ -22,7 +31,7 @@ public class ParallelContainerStepBodyTests
     [Fact]
     public void Run_NoChildren_ReturnsNext()
     {
-        var body = new ParallelContainerStepBody();
+        var body = CreateBody();
         var context = CreateContext(childCount: 0);
         var result = body.Run(context);
 
@@ -33,7 +42,7 @@ public class ParallelContainerStepBodyTests
     [Fact]
     public void Run_BranchValues_ContainIterationContext()
     {
-        var body = new ParallelContainerStepBody();
+        var body = CreateBody();
         var context = CreateContext(childCount: 2);
         var result = body.Run(context);
 
@@ -42,6 +51,44 @@ public class ParallelContainerStepBodyTests
 
         branch0.Index.ShouldBe(0);
         branch1.Index.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Run_AllEdgeFiltersFail_SuppressesBranch()
+    {
+        var alwaysFalse = new ConditionSet
+        {
+            Groups =
+            [
+                new ConditionGroup { Conditions = [new Condition { LeftOperand = "a", Operator = ConditionOperator.Equals, RightOperand = "b" }] },
+            ],
+        };
+
+        var body = CreateBody(branchEdges: [new ContainerBranchEdge(Guid.NewGuid(), alwaysFalse)]);
+        var context = CreateContext(childCount: 3);
+        var result = body.Run(context);
+
+        result.Proceed.ShouldBeTrue();
+        result.BranchValues.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_AnyEdgeFilterPasses_BranchesAllChildren()
+    {
+        var alwaysTrue = new ConditionSet
+        {
+            Groups =
+            [
+                new ConditionGroup { Conditions = [new Condition { LeftOperand = "a", Operator = ConditionOperator.Equals, RightOperand = "a" }] },
+            ],
+        };
+
+        var body = CreateBody(branchEdges: [new ContainerBranchEdge(Guid.NewGuid(), alwaysTrue)]);
+        var context = CreateContext(childCount: 3);
+        var result = body.Run(context);
+
+        result.BranchValues.ShouldNotBeNull();
+        result.BranchValues.Count.ShouldBe(3);
     }
 
     private static IStepExecutionContext CreateContext(int childCount)

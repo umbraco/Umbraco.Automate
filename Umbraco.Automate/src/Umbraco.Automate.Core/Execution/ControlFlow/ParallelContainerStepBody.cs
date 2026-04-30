@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Conditions;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -10,6 +11,17 @@ namespace Umbraco.Automate.Core.Execution.ControlFlow;
 /// </summary>
 internal sealed class ParallelContainerStepBody : StepBody
 {
+    private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
+
+    public ParallelContainerStepBody(
+        ConditionEvaluator conditionEvaluator,
+        IReadOnlyList<ContainerBranchEdge> branchEdges)
+    {
+        _conditionEvaluator = conditionEvaluator;
+        _branchEdges = branchEdges;
+    }
+
     public override ExecutionResult Run(IStepExecutionContext context)
     {
         // Create one branch per child step. WorkflowCore's executor uses the branch list
@@ -18,6 +30,18 @@ internal sealed class ParallelContainerStepBody : StepBody
         var childCount = context.Step.Children.Count;
 
         if (childCount == 0)
+        {
+            return ExecutionResult.Next();
+        }
+
+        // Outgoing-edge filters gate the parallel branch as a whole. If every outgoing
+        // edge has a filter and they all fail, suppress the branch entirely. (We cannot
+        // skip individual children selectively because WorkflowCore cross-products
+        // BranchValues × step.Children when spawning child pointers.)
+        var data = (AutomationWorkflowData)context.Workflow.Data;
+        var bindingData = BindingDataBuilder.Build(data);
+
+        if (!ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData))
         {
             return ExecutionResult.Next();
         }

@@ -62,15 +62,19 @@ internal static class GraphAnalyzer
     {
         if (!forwardAdj.TryGetValue(containerId, out var outgoing) || outgoing.Count == 0)
         {
-            return new ContainerScope(new HashSet<Guid>(), null);
+            return new ContainerScope(new HashSet<Guid>(), new HashSet<Guid>(), null);
         }
 
-        // Collect branch start steps — immediate successors of the container.
-        var branchStarts = outgoing.Select(o => o.Target).ToList();
+        // Collect branch entry steps — immediate successors of the container.
+        // These are the only steps that go into WorkflowStep.Children. Steps further
+        // down the body chain are reached via outcome routing, not by being spawned
+        // as additional children when the container branches.
+        var branchEntries = new HashSet<Guid>(outgoing.Select(o => o.Target));
 
-        // For each branch, walk forward collecting all reachable steps.
+        // For each branch entry, walk forward collecting all reachable steps. This
+        // gives us the transitive body membership, used for convergence detection.
         var branchReachable = new List<HashSet<Guid>>();
-        foreach (var start in branchStarts)
+        foreach (var start in branchEntries)
         {
             var reachable = new HashSet<Guid>();
             WalkForward(start, forwardAdj, containerStepIds, reachable);
@@ -96,23 +100,23 @@ internal static class GraphAnalyzer
             }
         }
 
-        // Children = all steps reachable from branch starts, minus the convergence point and beyond.
-        var children = new HashSet<Guid>();
+        // Body membership = all steps reachable from branch entries, minus the convergence point and beyond.
+        var bodyMembers = new HashSet<Guid>();
         foreach (var reachable in branchReachable)
         {
-            children.UnionWith(reachable);
+            bodyMembers.UnionWith(reachable);
         }
 
         if (convergenceId.HasValue)
         {
             // Remove the convergence point and everything reachable from it.
-            children.Remove(convergenceId.Value);
+            bodyMembers.Remove(convergenceId.Value);
             var beyondConvergence = new HashSet<Guid>();
             WalkForward(convergenceId.Value, forwardAdj, containerStepIds, beyondConvergence);
-            children.ExceptWith(beyondConvergence);
+            bodyMembers.ExceptWith(beyondConvergence);
         }
 
-        return new ContainerScope(children, convergenceId);
+        return new ContainerScope(bodyMembers, branchEntries, convergenceId);
     }
 
     private static void WalkForward(
@@ -190,6 +194,14 @@ internal static class GraphAnalyzer
 /// Represents the scope of a container control flow step — which steps are its children
 /// and where the execution converges back to the main flow.
 /// </summary>
-/// <param name="ChildStepIds">The set of step IDs that are children of this container.</param>
+/// <param name="BodyMemberStepIds">All step IDs that belong to this container's body (transitive body membership).</param>
+/// <param name="BranchEntryStepIds">
+/// Direct successors of the container — the steps that act as branch entry points when the
+/// container spawns child execution pointers. Only these are added to <c>WorkflowStep.Children</c>;
+/// further siblings inside the body are reached via outcome routing.
+/// </param>
 /// <param name="ConvergenceStepId">The step ID where branches converge (the container's successor), or null if terminal.</param>
-internal sealed record ContainerScope(IReadOnlySet<Guid> ChildStepIds, Guid? ConvergenceStepId);
+internal sealed record ContainerScope(
+    IReadOnlySet<Guid> BodyMemberStepIds,
+    IReadOnlySet<Guid> BranchEntryStepIds,
+    Guid? ConvergenceStepId);

@@ -117,6 +117,103 @@ public class WorkflowCompilerTests
     }
 
     [Fact]
+    public void Compile_ForEachContainer_OnlyDirectSuccessorsAddedToChildren()
+    {
+        // Regression: WorkflowCore's ExecutionResultProcessor cross-products BranchValues
+        // with step.Children when a container branches, spawning every listed child as an
+        // immediately-active pointer. If transitive body steps are enrolled in Children,
+        // they all run in parallel per iteration, bypassing in-body outcome routing.
+        // This test pins step.Children to the single body entry; the chain entry → mid →
+        // last must be reached via Outcomes.
+        StepConfiguration forEach = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
+        StepConfiguration entry = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Entry");
+        StepConfiguration mid = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Mid");
+        StepConfiguration last = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("Last");
+
+        var automation = new AutomationBuilder()
+            .AddStep(forEach)
+            .AddStep(entry)
+            .AddStep(mid)
+            .AddStep(last)
+            .WithTriggerConnection(forEach.Id)
+            .WithConnection(forEach.Id, entry.Id)
+            .WithConnection(entry.Id, mid.Id)
+            .WithConnection(mid.Id, last.Id)
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+
+        var forEachStep = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "ForEach");
+        var entryIndex = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "Entry").Id;
+        var midIndex = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "Mid").Id;
+        var lastIndex = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "Last").Id;
+
+        // Children must contain ONLY the direct successor (Entry).
+        forEachStep.Children.ShouldBe(new[] { entryIndex });
+        forEachStep.Children.ShouldNotContain(midIndex);
+        forEachStep.Children.ShouldNotContain(lastIndex);
+
+        // The chain Entry → Mid → Last is wired via Outcomes.
+        var entryStep = definition.Steps.FindById(entryIndex);
+        entryStep.Outcomes.ShouldHaveSingleItem();
+        ((ValueOutcome)entryStep.Outcomes[0]).NextStep.ShouldBe(midIndex);
+
+        var midStep = definition.Steps.FindById(midIndex);
+        midStep.Outcomes.ShouldHaveSingleItem();
+        ((ValueOutcome)midStep.Outcomes[0]).NextStep.ShouldBe(lastIndex);
+    }
+
+    [Fact]
+    public void Compile_ForEachContainer_OutcomeRoutingInsideBody_IsPreserved()
+    {
+        // Regression for the scenario reported in the bug: forEach → findContent →
+        // if → (true) → updateContent. Inside the loop body, the if's "true" outcome
+        // must gate the transition to updateContent. Before the fix, all four were in
+        // step.Children and all four spawned per iteration, ignoring the outcome guard.
+        StepConfiguration forEach = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
+        StepConfiguration findContent = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("FindContent");
+        StepConfiguration ifStep = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("If");
+        StepConfiguration updateContent = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("UpdateContent");
+
+        var automation = new AutomationBuilder()
+            .AddStep(forEach)
+            .AddStep(findContent)
+            .AddStep(ifStep)
+            .AddStep(updateContent)
+            .WithTriggerConnection(forEach.Id)
+            .WithConnection(forEach.Id, findContent.Id)
+            .WithConnection(findContent.Id, ifStep.Id)
+            .WithConnection(ifStep.Id, updateContent.Id, outcome: "true")
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+
+        var forEachStep = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "ForEach");
+        var findContentIndex = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "FindContent").Id;
+        var ifIndex = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "If").Id;
+        var updateContentIndex = definition.Steps.Cast<WorkflowStep>().Single(s => s.Name == "UpdateContent").Id;
+
+        // Only FindContent (the body entry) is a child of ForEach.
+        forEachStep.Children.ShouldBe(new[] { findContentIndex });
+        forEachStep.Children.ShouldNotContain(ifIndex);
+        forEachStep.Children.ShouldNotContain(updateContentIndex);
+
+        // The "true" outcome of the If step routes only when OutcomeValue == "true".
+        var ifWorkflowStep = definition.Steps.FindById(ifIndex);
+        var trueOutcome = (ValueOutcome)ifWorkflowStep.Outcomes.Single();
+        trueOutcome.NextStep.ShouldBe(updateContentIndex);
+        trueOutcome.GetValue(new AutomationWorkflowData()).ShouldBe("true");
+    }
+
+    [Fact]
     public void Compile_ForEachContainer_BodyType_IsForEachContainerStepBody()
     {
         StepConfiguration forEach = new StepConfigurationBuilder()

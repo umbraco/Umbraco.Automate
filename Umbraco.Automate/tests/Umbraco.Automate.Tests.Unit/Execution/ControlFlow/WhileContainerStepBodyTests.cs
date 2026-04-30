@@ -82,6 +82,51 @@ public class WhileContainerStepBodyTests
     }
 
     [Fact]
+    public void Run_AllEdgeFiltersFail_TerminatesLoop()
+    {
+        // While does not expose a per-item value, so a filter that doesn't reference
+        // workflow data can never become true on a later iteration. Terminating is
+        // safer than spinning forever.
+        var alwaysFalse = new ConditionSet
+        {
+            Groups =
+            [
+                new ConditionGroup { Conditions = [new Condition { LeftOperand = "a", Operator = ConditionOperator.Equals, RightOperand = "b" }] },
+            ],
+        };
+
+        var body = CreateBody(
+            AlwaysTrueSettings(),
+            branchEdges: [new ContainerBranchEdge(Guid.NewGuid(), alwaysFalse)]);
+
+        var result = body.Run(CreateContext());
+
+        result.Proceed.ShouldBeTrue();
+        result.BranchValues.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_AnyEdgeFilterPasses_BranchesChildren()
+    {
+        var alwaysTrue = new ConditionSet
+        {
+            Groups =
+            [
+                new ConditionGroup { Conditions = [new Condition { LeftOperand = "a", Operator = ConditionOperator.Equals, RightOperand = "a" }] },
+            ],
+        };
+
+        var body = CreateBody(
+            AlwaysTrueSettings(),
+            branchEdges: [new ContainerBranchEdge(Guid.NewGuid(), alwaysTrue)]);
+
+        var result = body.Run(CreateContext());
+
+        result.BranchValues.ShouldNotBeNull();
+        result.BranchValues.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public void Run_TracksStepRunOnExit()
     {
         StepRun? saved = null;
@@ -97,11 +142,18 @@ public class WhileContainerStepBodyTests
         saved.Status.ShouldBe(StepRunStatus.Completed);
     }
 
-    private WhileContainerStepBody CreateBody(WhileControlFlowSettings settings)
+    private WhileContainerStepBody CreateBody(
+        WhileControlFlowSettings settings,
+        IReadOnlyList<ContainerBranchEdge>? branchEdges = null)
     {
         StepConfiguration stepConfig = new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.while").WithName("While");
-        return new WhileContainerStepBody(stepConfig, settings, _conditionEvaluator, _runRepo.Object);
+        return new WhileContainerStepBody(
+            stepConfig,
+            settings,
+            _conditionEvaluator,
+            _runRepo.Object,
+            branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
     private static WhileControlFlowSettings AlwaysTrueSettings() => new()
