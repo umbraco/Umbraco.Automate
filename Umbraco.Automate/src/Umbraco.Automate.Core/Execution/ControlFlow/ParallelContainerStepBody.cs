@@ -41,7 +41,7 @@ internal sealed class ParallelContainerStepBody : StepBody
         var data = (AutomationWorkflowData)context.Workflow.Data;
         var bindingData = BindingDataBuilder.Build(data);
 
-        if (!AnyEdgePasses(bindingData))
+        if (!ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData))
         {
             return ExecutionResult.Next();
         }
@@ -51,37 +51,5 @@ internal sealed class ParallelContainerStepBody : StepBody
             .ToList();
 
         return ExecutionResult.Branch(branches, new ControlFlowPersistenceData(nameof(ParallelContainerStepBody)));
-    }
-
-    private bool AnyEdgePasses(IReadOnlyDictionary<string, object?> bindingData)
-    {
-        if (_branchEdges.Count == 0)
-        {
-            return true;
-        }
-
-        var hasAnyFilter = false;
-        foreach (var edge in _branchEdges)
-        {
-            if (edge.Filter is not null)
-            {
-                hasAnyFilter = true;
-                break;
-            }
-        }
-        if (!hasAnyFilter)
-        {
-            return true;
-        }
-
-        foreach (var edge in _branchEdges)
-        {
-            if (edge.Filter is null || _conditionEvaluator.Evaluate(edge.Filter, bindingData))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

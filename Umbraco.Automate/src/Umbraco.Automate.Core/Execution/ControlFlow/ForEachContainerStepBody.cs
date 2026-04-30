@@ -125,40 +125,15 @@ internal sealed class ForEachContainerStepBody : StepBody
 
     private bool AnyEdgePassesForItem(AutomationWorkflowData data, object? item, int index)
     {
-        if (_branchEdges.Count == 0)
-        {
-            // No outgoing edges recorded — defer to the legacy "always branch" behaviour.
-            // (Container with no outgoing connection won't be branched against anything anyway.)
-            return true;
-        }
-
-        // If no edge has a filter, all pass trivially.
-        var hasAnyFilter = false;
-        foreach (var edge in _branchEdges)
-        {
-            if (edge.Filter is not null)
-            {
-                hasAnyFilter = true;
-                break;
-            }
-        }
-        if (!hasAnyFilter)
+        // Skip per-item binding-data construction when no edge gates the branch.
+        if (_branchEdges.Count == 0 || !ContainerBranchEdge.AnyHaveFilter(_branchEdges))
         {
             return true;
         }
 
         var iterationContext = new ForEachIterationContext(item, index);
         var bindingData = BindingDataBuilder.Build(data, iterationContext);
-
-        foreach (var edge in _branchEdges)
-        {
-            if (edge.Filter is null || _conditionEvaluator.Evaluate(edge.Filter, bindingData))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData);
     }
 
     private void TrackStepRun(AutomationWorkflowData data, CancellationToken ct, int? iterationIndex, int iterationTotal)

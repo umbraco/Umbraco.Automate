@@ -16,4 +16,48 @@ namespace Umbraco.Automate.Core.Execution.ControlFlow;
 /// </remarks>
 /// <param name="TargetStepId">The body branch entry step ID.</param>
 /// <param name="Filter">Optional filter — if all filters across outgoing edges fail, the container suppresses the branch.</param>
-internal sealed record ContainerBranchEdge(Guid TargetStepId, ConditionSet? Filter);
+internal sealed record ContainerBranchEdge(Guid TargetStepId, ConditionSet? Filter)
+{
+    /// <summary>
+    /// Returns true if at least one edge carries a filter. Useful for skipping
+    /// expensive per-item binding-data construction when no edge gates the branch.
+    /// </summary>
+    public static bool AnyHaveFilter(IReadOnlyList<ContainerBranchEdge> edges)
+    {
+        foreach (var edge in edges)
+        {
+            if (edge.Filter is not null)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Returns true when the container should branch — at least one outgoing edge
+    /// either has no filter or has a filter that evaluates true against
+    /// <paramref name="bindingData"/>. With no edges recorded, defers to the legacy
+    /// "always branch" behaviour.
+    /// </summary>
+    public static bool AnyEdgePasses(
+        IReadOnlyList<ContainerBranchEdge> edges,
+        ConditionEvaluator evaluator,
+        IReadOnlyDictionary<string, object?> bindingData)
+    {
+        if (edges.Count == 0 || !AnyHaveFilter(edges))
+        {
+            return true;
+        }
+
+        foreach (var edge in edges)
+        {
+            if (edge.Filter is null || evaluator.Evaluate(edge.Filter, bindingData))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
