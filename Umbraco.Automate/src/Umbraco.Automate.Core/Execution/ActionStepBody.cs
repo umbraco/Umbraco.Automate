@@ -177,7 +177,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             case ActionSuspension.WaitForEvent wait:
                 stepRun.Status = StepRunStatus.WaitingForInput;
-                StoreOutputData(result.OutputData, stepRun, data);
+                StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
                 _logger.LogInformation(
@@ -188,7 +188,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
             case ActionSuspension.Sleep sleep:
                 stepRun.Status = StepRunStatus.Sleeping;
-                StoreOutputData(result.OutputData, stepRun, data);
+                StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
 
                 _logger.LogInformation(
@@ -213,7 +213,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             case ActionResultStatus.Success:
                 stepRun.Status = StepRunStatus.Completed;
-                StoreOutputData(result.OutputData, stepRun, data);
+                StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 _metrics.StepExecuted(_action.Alias);
                 break;
 
@@ -410,7 +410,7 @@ internal sealed class ActionStepBody : StepBodyAsync
                 decision.ApprovedByUserKey,
                 decision.DecisionUtc,
             };
-            StoreOutputData(outputData, stepRun, data);
+            StoreOutputData(outputData, stepRun, data, context.Item as ForEachIterationContext);
         }
 
         if (stepRun.Duration.HasValue)
@@ -474,7 +474,11 @@ internal sealed class ActionStepBody : StepBodyAsync
         return ExecutionResult.Next();
     }
 
-    private void StoreOutputData(object? outputData, StepRun stepRun, AutomationWorkflowData data)
+    private void StoreOutputData(
+        object? outputData,
+        StepRun stepRun,
+        AutomationWorkflowData data,
+        ForEachIterationContext? iterationContext)
     {
         if (outputData is null)
         {
@@ -487,8 +491,29 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Deserialize to a case-insensitive dictionary with plain .NET types (not JsonElement)
         // so values survive the WorkflowCore Newtonsoft.Json persistence round-trip and are
         // accessible to BindingEvaluator.ResolvePath.
-        data.StepOutputs[_stepConfig.Id] = Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
+        var unwrapped = Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
+
+        // Write to the run-global table so steps after the loop (and external observers)
+        // can still read the most recent value. Inside an iteration the global entry is
+        // last-write-wins, which is fine — body steps resolve through the iteration scope.
+        data.StepOutputs[_stepConfig.Id] = unwrapped;
         data.LastCompletedStepId = _stepConfig.Id;
+
+        // Inside a ForEach/While/Parallel iteration, also record the output under the
+        // iteration's scope path so siblings further down the body chain can read this
+        // iteration's output without being clobbered by later iterations re-running the
+        // same step.
+        if (iterationContext is not null)
+        {
+            var scopePath = iterationContext.ScopePath;
+            if (!data.IterationStepOutputs.TryGetValue(scopePath, out var iterOutputs))
+            {
+                iterOutputs = [];
+                data.IterationStepOutputs[scopePath] = iterOutputs;
+            }
+            iterOutputs[_stepConfig.Id] = unwrapped;
+            data.IterationLastCompletedStepId[scopePath] = _stepConfig.Id;
+        }
     }
 
     private async Task<ConfiguredConnection?> ResolveConnectionByTypeAsync(

@@ -6,14 +6,18 @@ using Umbraco.Automate.Core.ControlFlow.BuiltIn;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using WorkflowCore.Primitives;
 
 namespace Umbraco.Automate.Core.Execution.ControlFlow;
 
 /// <summary>
 /// WorkflowCore step body for ForEach container control flow.
 /// Evaluates a collection binding expression and branches child steps for each item.
+/// Mirrors the re-invocation pattern of <see cref="WorkflowCore.Primitives.Foreach"/>:
+/// branch with <see cref="IteratorPersistenceData"/>, then on each re-entry use
+/// <see cref="WorkflowInstance.IsBranchComplete"/> to wait for descendants to drain.
 /// </summary>
-internal sealed class ForEachContainerStepBody : StepBody
+internal sealed class ForEachContainerStepBody : ContainerStepBody
 {
     private readonly StepConfiguration _stepConfig;
     private readonly ForEachControlFlowSettings _settings;
@@ -41,81 +45,96 @@ internal sealed class ForEachContainerStepBody : StepBody
     public override ExecutionResult Run(IStepExecutionContext context)
     {
         var data = (AutomationWorkflowData)context.Workflow.Data;
-        var bindingData = BindingDataBuilder.Build(data);
+        var parentIteration = context.Item as ForEachIterationContext;
 
-        // Evaluate the collection expression.
-        var collectionValue = _bindingEvaluator.Evaluate(_settings.Collection, bindingData);
+        // Re-entry path. WorkflowCore re-invokes the container after spawning children;
+        // wait for the entire body branch (including outcome-chain successors, which
+        // inherit the container's Scope and so are covered by IsBranchComplete) to drain
+        // before deciding what to do next. ExecutionResult.Persist keeps the parent
+        // pointer Active without setting SleepUntil — the executor naturally re-runs
+        // it the moment the last descendant completes.
+        if (context.PersistenceData is IteratorPersistenceData persistence && persistence.ChildrenActive)
+        {
+            if (!context.Workflow.IsBranchComplete(context.ExecutionPointer.Id))
+            {
+                return ExecutionResult.Persist(persistence);
+            }
 
-        var items = ResolveCollection(collectionValue);
-        if (items.Count == 0)
+            if (_settings.RunParallel)
+            {
+                return ExecutionResult.Next();
+            }
+
+            // Sequential: advance to the next passing index.
+            var bindingData = BindingDataBuilder.Build(data, parentIteration);
+            var items = ResolveCollection(_bindingEvaluator.Evaluate(_settings.Collection, bindingData));
+            var nextIndex = FindNextPassingIndex(data, items, persistence.Index + 1, parentIteration);
+            if (nextIndex < 0)
+            {
+                return ExecutionResult.Next();
+            }
+
+            var nextItem = new ForEachIterationContext(items[nextIndex], nextIndex, _stepConfig.Id, parentIteration);
+            return ExecutionResult.Branch(
+                [nextItem],
+                new IteratorPersistenceData { ChildrenActive = true, Index = nextIndex });
+        }
+
+        // First entry — evaluate the collection and branch.
+        var initialBindingData = BindingDataBuilder.Build(data, parentIteration);
+        var collectionValue = _bindingEvaluator.Evaluate(_settings.Collection, initialBindingData);
+        var initialItems = ResolveCollection(collectionValue);
+
+        if (initialItems.Count == 0)
         {
             TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: 0);
             return ExecutionResult.Next();
         }
 
-        // Branch for each item.
         if (_settings.RunParallel)
         {
             // Filter items whose outgoing-edge filters all fail. The branch entries themselves
             // (step.Children) cannot be filtered per-item — WorkflowCore cross-products
             // BranchValues × Children — so the filter gates the iteration as a whole. For the
             // common single-entry case this is the natural "skip this item" behaviour.
-            var passing = items
+            var passing = initialItems
                 .Select((item, index) => (Item: item, Index: index))
-                .Where(t => AnyEdgePassesForItem(data, t.Item, t.Index))
+                .Where(t => AnyEdgePassesForItem(data, t.Item, t.Index, parentIteration))
                 .ToList();
 
-            TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: items.Count);
+            TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: initialItems.Count);
 
             if (passing.Count == 0)
             {
                 return ExecutionResult.Next();
             }
 
-            var branches = passing.Select(t => (object)new ForEachIterationContext(t.Item, t.Index)).ToList();
-            return ExecutionResult.Branch(branches, new ControlFlowPersistenceData(nameof(ForEachContainerStepBody)));
+            var branches = passing
+                .Select(t => (object)new ForEachIterationContext(t.Item, t.Index, _stepConfig.Id, parentIteration))
+                .ToList();
+            return ExecutionResult.Branch(branches, new IteratorPersistenceData { ChildrenActive = true });
         }
 
-        // Sequential: walk forward from the next index, skipping items whose filters fail.
-        var startIndex = 0;
-        var firstIteration = true;
-        if (context.PersistenceData is ControlFlowPersistenceData persistence &&
-            persistence.Metadata is not null &&
-            int.TryParse(persistence.Metadata, out var lastIndex))
+        // Sequential — branch the first passing item.
+        var firstIndex = FindNextPassingIndex(data, initialItems, 0, parentIteration);
+        if (firstIndex < 0)
         {
-            startIndex = lastIndex + 1;
-            firstIteration = false;
-        }
-
-        var nextIndex = FindNextPassingIndex(data, items, startIndex);
-
-        if (nextIndex < 0)
-        {
-            if (firstIteration)
-            {
-                // Nothing in the collection passes the filter — record total but don't branch.
-                TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: items.Count);
-            }
-
+            TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: initialItems.Count);
             return ExecutionResult.Next();
         }
 
-        if (firstIteration)
-        {
-            TrackStepRun(data, context.CancellationToken, iterationIndex: nextIndex, iterationTotal: items.Count);
-        }
-
-        var nextItem = new ForEachIterationContext(items[nextIndex], nextIndex);
+        TrackStepRun(data, context.CancellationToken, iterationIndex: firstIndex, iterationTotal: initialItems.Count);
+        var firstItem = new ForEachIterationContext(initialItems[firstIndex], firstIndex, _stepConfig.Id, parentIteration);
         return ExecutionResult.Branch(
-            [nextItem],
-            new ControlFlowPersistenceData(nameof(ForEachContainerStepBody)) { Metadata = nextIndex.ToString() });
+            [firstItem],
+            new IteratorPersistenceData { ChildrenActive = true, Index = firstIndex });
     }
 
-    private int FindNextPassingIndex(AutomationWorkflowData data, IReadOnlyList<object?> items, int from)
+    private int FindNextPassingIndex(AutomationWorkflowData data, IReadOnlyList<object?> items, int from, ForEachIterationContext? parent)
     {
         for (var i = from; i < items.Count; i++)
         {
-            if (AnyEdgePassesForItem(data, items[i], i))
+            if (AnyEdgePassesForItem(data, items[i], i, parent))
             {
                 return i;
             }
@@ -123,7 +142,7 @@ internal sealed class ForEachContainerStepBody : StepBody
         return -1;
     }
 
-    private bool AnyEdgePassesForItem(AutomationWorkflowData data, object? item, int index)
+    private bool AnyEdgePassesForItem(AutomationWorkflowData data, object? item, int index, ForEachIterationContext? parent)
     {
         // Skip per-item binding-data construction when no edge gates the branch.
         if (_branchEdges.Count == 0 || !ContainerBranchEdge.AnyHaveFilter(_branchEdges))
@@ -131,7 +150,7 @@ internal sealed class ForEachContainerStepBody : StepBody
             return true;
         }
 
-        var iterationContext = new ForEachIterationContext(item, index);
+        var iterationContext = new ForEachIterationContext(item, index, _stepConfig.Id, parent);
         var bindingData = BindingDataBuilder.Build(data, iterationContext);
         return ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData);
     }

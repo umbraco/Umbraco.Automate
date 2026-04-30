@@ -84,7 +84,7 @@ public class ForEachContainerStepBodyTests
     public void Run_Sequential_ResumeIteration_AdvancesIndex()
     {
         var body = CreateBody(new ForEachControlFlowSettings { Collection = "a, b, c", RunParallel = false });
-        var persistence = new ControlFlowPersistenceData(nameof(ForEachContainerStepBody)) { Metadata = "1" };
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
         var result = body.Run(CreateContext(persistenceData: persistence));
 
         result.BranchValues.ShouldNotBeNull();
@@ -97,7 +97,7 @@ public class ForEachContainerStepBodyTests
     public void Run_Sequential_LastIteration_ReturnsNext()
     {
         var body = CreateBody(new ForEachControlFlowSettings { Collection = "a, b", RunParallel = false });
-        var persistence = new ControlFlowPersistenceData(nameof(ForEachContainerStepBody)) { Metadata = "1" };
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
         var result = body.Run(CreateContext(persistenceData: persistence));
 
         result.BranchValues.ShouldBeEmpty();
@@ -172,9 +172,10 @@ public class ForEachContainerStepBodyTests
         iteration.Index.ShouldBe(1);
         iteration.Item.ShouldBe("b");
 
-        var persistence = result.PersistenceData as ControlFlowPersistenceData;
+        var persistence = result.PersistenceData as IteratorPersistenceData;
         persistence.ShouldNotBeNull();
-        persistence!.Metadata.ShouldBe("1");
+        persistence.ChildrenActive.ShouldBeTrue();
+        persistence.Index.ShouldBe(1);
     }
 
     [Fact]
@@ -210,7 +211,7 @@ public class ForEachContainerStepBodyTests
             new ForEachControlFlowSettings { Collection = "a, b, c", RunParallel = false },
             branchEdges: [new ContainerBranchEdge(Guid.NewGuid(), filter)]);
 
-        var persistence = new ControlFlowPersistenceData(nameof(ForEachContainerStepBody)) { Metadata = "0" };
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 0 };
         var result = body.Run(CreateContext(persistenceData: persistence));
 
         var iteration = (ForEachIterationContext)result.BranchValues![0];
@@ -303,7 +304,8 @@ public class ForEachContainerStepBodyTests
         workflow.Object.Data = data;
         context.Setup(c => c.Workflow).Returns(workflow.Object);
         context.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
-        context.Setup(c => c.PersistenceData).Returns(persistenceData);
+        context.Setup(c => c.PersistenceData).Returns(persistenceData!);
+        context.Setup(c => c.ExecutionPointer).Returns(new ExecutionPointer { Id = Guid.NewGuid().ToString() });
         return context.Object;
     }
 }

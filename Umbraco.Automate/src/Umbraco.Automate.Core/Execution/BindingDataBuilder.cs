@@ -18,14 +18,26 @@ internal static class BindingDataBuilder
     public static Dictionary<string, object?> Build(AutomationWorkflowData data, ForEachIterationContext? iterationContext = null)
     {
         var stepsDict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        // Layer 1 — global step outputs (steps outside any iteration scope).
         foreach (var (stepId, outputs) in data.StepOutputs)
         {
-            stepsDict[stepId.ToString()] = outputs;
+            AddStepEntry(stepsDict, data, stepId, outputs);
+        }
 
-            // Also register by alias so both ${steps.GUID.field} and ${steps.alias.field} work.
-            if (data.StepAliases.TryGetValue(stepId, out var alias))
+        // Layer 2 — iteration-scoped outputs from this iteration and its ancestors.
+        // Walking outermost → innermost lets the deepest scope win on conflicts, which
+        // matches lexical scoping in nested ForEach loops.
+        foreach (var ancestor in EnumerateAncestorsOutermostFirst(iterationContext))
+        {
+            if (!data.IterationStepOutputs.TryGetValue(ancestor.ScopePath, out var iterOutputs))
             {
-                stepsDict[alias] = outputs;
+                continue;
+            }
+
+            foreach (var (stepId, outputs) in iterOutputs)
+            {
+                AddStepEntry(stepsDict, data, stepId, outputs);
             }
         }
 
@@ -35,11 +47,18 @@ internal static class BindingDataBuilder
             ["steps"] = stepsDict,
         };
 
-        // Add "previous" key pointing to the last completed step's outputs.
-        if (data.LastCompletedStepId.HasValue
-            && data.StepOutputs.TryGetValue(data.LastCompletedStepId.Value, out var previousOutputs))
+        // The "previous" key prefers an iteration-scoped last-completed step (so the first
+        // body step in each iteration reads the iteration's own preceding step) and falls
+        // back to the run-global pointer for steps outside any loop.
+        var previousStepId = ResolvePreviousStepId(data, iterationContext);
+        if (previousStepId.HasValue && stepsDict.TryGetValue(previousStepId.Value.ToString(), out var previousOutputs))
         {
             bindingData["previous"] = previousOutputs;
+        }
+        else if (previousStepId.HasValue && data.StepAliases.TryGetValue(previousStepId.Value, out var previousAlias)
+            && stepsDict.TryGetValue(previousAlias, out var previousByAlias))
+        {
+            bindingData["previous"] = previousByAlias;
         }
 
         if (iterationContext is not null)
@@ -52,6 +71,58 @@ internal static class BindingDataBuilder
         }
 
         return bindingData;
+    }
+
+    private static void AddStepEntry(
+        Dictionary<string, object?> stepsDict,
+        AutomationWorkflowData data,
+        Guid stepId,
+        object? outputs)
+    {
+        stepsDict[stepId.ToString()] = outputs;
+
+        // Also register by alias so both ${steps.GUID.field} and ${steps.alias.field} work.
+        if (data.StepAliases.TryGetValue(stepId, out var alias))
+        {
+            stepsDict[alias] = outputs;
+        }
+    }
+
+    private static IEnumerable<ForEachIterationContext> EnumerateAncestorsOutermostFirst(ForEachIterationContext? iterationContext)
+    {
+        if (iterationContext is null)
+        {
+            yield break;
+        }
+
+        var stack = new Stack<ForEachIterationContext>();
+        var current = iterationContext;
+        while (current is not null)
+        {
+            stack.Push(current);
+            current = current.Parent;
+        }
+
+        while (stack.Count > 0)
+        {
+            yield return stack.Pop();
+        }
+    }
+
+    private static Guid? ResolvePreviousStepId(AutomationWorkflowData data, ForEachIterationContext? iterationContext)
+    {
+        // Innermost iteration scope wins; fall back to outer scopes and finally the run-global pointer.
+        var current = iterationContext;
+        while (current is not null)
+        {
+            if (data.IterationLastCompletedStepId.TryGetValue(current.ScopePath, out var iterPrev) && iterPrev.HasValue)
+            {
+                return iterPrev;
+            }
+            current = current.Parent;
+        }
+
+        return data.LastCompletedStepId;
     }
 
     /// <summary>

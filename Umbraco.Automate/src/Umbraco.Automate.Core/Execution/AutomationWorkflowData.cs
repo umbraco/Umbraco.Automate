@@ -45,6 +45,24 @@ public sealed class AutomationWorkflowData
     public Guid? LastCompletedStepId { get; set; }
 
     /// <summary>
+    /// Gets or sets per-iteration step outputs, keyed by the iteration scope path
+    /// (see <c>ForEachIterationContext.ScopePath</c>) and then by step id.
+    /// Body steps inside a ForEach/While/Parallel iteration record their outputs here so that
+    /// later steps in the same iteration resolve <c>${ steps.&lt;alias&gt; }</c> bindings to
+    /// their iteration's value rather than whichever iteration most recently overwrote
+    /// the global <see cref="StepOutputs"/> entry. Without this, sequential ForEach bodies
+    /// that re-run the same step across iterations would clobber one another's outputs.
+    /// </summary>
+    public Dictionary<string, Dictionary<Guid, Dictionary<string, object?>>> IterationStepOutputs { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the most recently completed step id within each iteration scope.
+    /// Used by <see cref="BindingDataBuilder"/> to give an iteration-scoped <c>previous</c>
+    /// binding rather than reading the run-global <see cref="LastCompletedStepId"/>.
+    /// </summary>
+    public Dictionary<string, Guid?> IterationLastCompletedStepId { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets the execution context carrying the service account identity and workspace info.
     /// </summary>
     public AutomationExecutionContext? ExecutionContext { get; set; }

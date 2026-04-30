@@ -52,7 +52,7 @@ public class WhileContainerStepBodyTests
         settings.MaxIterations = 5;
 
         var body = CreateBody(settings);
-        var persistence = new ControlFlowPersistenceData(nameof(WhileContainerStepBody)) { Metadata = "5" };
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 5 };
         var result = body.Run(CreateContext(persistenceData: persistence));
 
         result.BranchValues.ShouldBeEmpty();
@@ -65,17 +65,17 @@ public class WhileContainerStepBodyTests
         var body = CreateBody(AlwaysTrueSettings());
         var result = body.Run(CreateContext());
 
-        var persistence = result.PersistenceData as ControlFlowPersistenceData;
+        var persistence = result.PersistenceData as IteratorPersistenceData;
         persistence.ShouldNotBeNull();
-        persistence.Metadata.ShouldBe("1");
+        persistence.ChildrenActive.ShouldBeTrue();
+        persistence.Index.ShouldBe(1);
     }
 
     [Fact]
-    public void Run_CorruptedPersistenceData_TreatsAsFirstIteration()
+    public void Run_UnrecognisedPersistenceData_TreatsAsFirstIteration()
     {
         var body = CreateBody(AlwaysTrueSettings());
-        var persistence = new ControlFlowPersistenceData(nameof(WhileContainerStepBody)) { Metadata = "not-a-number" };
-        var result = body.Run(CreateContext(persistenceData: persistence));
+        var result = body.Run(CreateContext(persistenceData: new object()));
 
         // Should not throw, treats as iteration 0.
         result.BranchValues.ShouldNotBeNull();
@@ -184,7 +184,8 @@ public class WhileContainerStepBodyTests
         };
         context.Setup(c => c.Workflow).Returns(workflow.Object);
         context.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
-        context.Setup(c => c.PersistenceData).Returns(persistenceData);
+        context.Setup(c => c.PersistenceData).Returns(persistenceData!);
+        context.Setup(c => c.ExecutionPointer).Returns(new ExecutionPointer { Id = Guid.NewGuid().ToString() });
         return context.Object;
     }
 }

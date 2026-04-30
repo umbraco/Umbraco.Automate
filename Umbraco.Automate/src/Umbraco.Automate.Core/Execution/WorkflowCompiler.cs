@@ -242,7 +242,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
 
             case ParallelControlFlow:
             {
-                return new ControlFlowWorkflowStep(new ParallelContainerStepBody(_conditionEvaluator, branchEdges));
+                return new ControlFlowWorkflowStep(new ParallelContainerStepBody(stepConfig, _conditionEvaluator, branchEdges));
             }
 
             default:

@@ -1,29 +1,44 @@
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Conditions;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using WorkflowCore.Primitives;
 
 namespace Umbraco.Automate.Core.Execution.ControlFlow;
 
 /// <summary>
 /// WorkflowCore step body for Parallel container control flow.
-/// Branches all children simultaneously. WorkflowCore waits for all branches
-/// to complete before proceeding to the convergence step.
+/// Branches all children simultaneously, then waits for them to drain via
+/// <see cref="WorkflowInstance.IsBranchComplete"/> before converging.
 /// </summary>
-internal sealed class ParallelContainerStepBody : StepBody
+internal sealed class ParallelContainerStepBody : ContainerStepBody
 {
+    private readonly StepConfiguration _stepConfig;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
 
     public ParallelContainerStepBody(
+        StepConfiguration stepConfig,
         ConditionEvaluator conditionEvaluator,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
+        _stepConfig = stepConfig;
         _conditionEvaluator = conditionEvaluator;
         _branchEdges = branchEdges;
     }
 
     public override ExecutionResult Run(IStepExecutionContext context)
     {
+        // Re-entry: wait for the parallel branches to drain before converging.
+        if (context.PersistenceData is ControlPersistenceData persistence && persistence.ChildrenActive)
+        {
+            if (!context.Workflow.IsBranchComplete(context.ExecutionPointer.Id))
+            {
+                return ExecutionResult.Persist(persistence);
+            }
+            return ExecutionResult.Next();
+        }
+
         // Create one branch per child step. WorkflowCore's executor uses the branch list
         // combined with step.Children to spawn parallel execution pointers.
         // Each item in the branch list becomes context.Item for the child execution.
@@ -39,7 +54,8 @@ internal sealed class ParallelContainerStepBody : StepBody
         // skip individual children selectively because WorkflowCore cross-products
         // BranchValues × step.Children when spawning child pointers.)
         var data = (AutomationWorkflowData)context.Workflow.Data;
-        var bindingData = BindingDataBuilder.Build(data);
+        var parentIteration = context.Item as ForEachIterationContext;
+        var bindingData = BindingDataBuilder.Build(data, parentIteration);
 
         if (!ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData))
         {
@@ -47,9 +63,9 @@ internal sealed class ParallelContainerStepBody : StepBody
         }
 
         var branches = Enumerable.Range(0, childCount)
-            .Select(i => (object)new ForEachIterationContext(null, i))
+            .Select(i => (object)new ForEachIterationContext(null, i, _stepConfig.Id, parentIteration))
             .ToList();
 
-        return ExecutionResult.Branch(branches, new ControlFlowPersistenceData(nameof(ParallelContainerStepBody)));
+        return ExecutionResult.Branch(branches, new ControlPersistenceData { ChildrenActive = true });
     }
 }

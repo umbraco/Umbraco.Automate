@@ -1,8 +1,9 @@
-using Shouldly;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
+using Umbraco.Automate.Testing.Builders;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -14,7 +15,9 @@ public class ParallelContainerStepBodyTests
     {
         var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
         var conditionEvaluator = new ConditionEvaluator(evaluator);
-        return new ParallelContainerStepBody(conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.parallel").WithName("Parallel");
+        return new ParallelContainerStepBody(stepConfig, conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
     [Fact]
@@ -26,6 +29,9 @@ public class ParallelContainerStepBodyTests
 
         result.BranchValues.ShouldNotBeNull();
         result.BranchValues.Count.ShouldBe(3);
+        var persistence = result.PersistenceData as ControlPersistenceData;
+        persistence.ShouldNotBeNull();
+        persistence.ChildrenActive.ShouldBeTrue();
     }
 
     [Fact]
@@ -91,7 +97,21 @@ public class ParallelContainerStepBodyTests
         result.BranchValues.Count.ShouldBe(3);
     }
 
-    private static IStepExecutionContext CreateContext(int childCount)
+    [Fact]
+    public void Run_ReentryWithChildrenComplete_ReturnsNext()
+    {
+        // After branching, WorkflowCore re-invokes the parent. With ChildrenActive=true and
+        // no live descendants in scope (mock has empty ExecutionPointers), IsBranchComplete
+        // is vacuously true and the body should converge.
+        var body = CreateBody();
+        var context = CreateContext(childCount: 2, persistenceData: new ControlPersistenceData { ChildrenActive = true });
+        var result = body.Run(context);
+
+        result.Proceed.ShouldBeTrue();
+        result.BranchValues.ShouldBeEmpty();
+    }
+
+    private static IStepExecutionContext CreateContext(int childCount, object? persistenceData = null)
     {
         var step = new WorkflowStep<ParallelContainerStepBody> { Id = 0 };
         for (var i = 0; i < childCount; i++)
@@ -109,6 +129,8 @@ public class ParallelContainerStepBodyTests
         };
         context.Setup(c => c.Workflow).Returns(workflow.Object);
         context.Setup(c => c.Step).Returns(step);
+        context.Setup(c => c.PersistenceData).Returns(persistenceData!);
+        context.Setup(c => c.ExecutionPointer).Returns(new ExecutionPointer { Id = Guid.NewGuid().ToString() });
         return context.Object;
     }
 }
