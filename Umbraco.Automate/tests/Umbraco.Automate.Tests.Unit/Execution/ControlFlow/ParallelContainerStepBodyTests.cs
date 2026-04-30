@@ -53,6 +53,44 @@ public class ParallelContainerStepBodyTests
         branch1.Index.ShouldBe(1);
     }
 
+    [Fact]
+    public void Run_AllEdgeFiltersFail_SuppressesBranch()
+    {
+        var alwaysFalse = new ConditionSet
+        {
+            Groups =
+            [
+                new ConditionGroup { Conditions = [new Condition { LeftOperand = "a", Operator = ConditionOperator.Equals, RightOperand = "b" }] },
+            ],
+        };
+
+        var body = CreateBody(branchEdges: [new ContainerBranchEdge(Guid.NewGuid(), alwaysFalse)]);
+        var context = CreateContext(childCount: 3);
+        var result = body.Run(context);
+
+        result.Proceed.ShouldBeTrue();
+        result.BranchValues.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_AnyEdgeFilterPasses_BranchesAllChildren()
+    {
+        var alwaysTrue = new ConditionSet
+        {
+            Groups =
+            [
+                new ConditionGroup { Conditions = [new Condition { LeftOperand = "a", Operator = ConditionOperator.Equals, RightOperand = "a" }] },
+            ],
+        };
+
+        var body = CreateBody(branchEdges: [new ContainerBranchEdge(Guid.NewGuid(), alwaysTrue)]);
+        var context = CreateContext(childCount: 3);
+        var result = body.Run(context);
+
+        result.BranchValues.ShouldNotBeNull();
+        result.BranchValues.Count.ShouldBe(3);
+    }
+
     private static IStepExecutionContext CreateContext(int childCount)
     {
         var step = new WorkflowStep<ParallelContainerStepBody> { Id = 0 };
