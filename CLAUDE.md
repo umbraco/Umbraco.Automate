@@ -90,6 +90,15 @@ Built on [WorkflowCore](https://github.com/danielgerlag/workflow-core) with a pr
 
 See [docs/vocabulary.md](docs/vocabulary.md) for the complete terminology reference.
 
+### WorkflowCore First
+
+**Always prefer existing WorkflowCore features over building custom equivalents.** Before implementing anything related to workflow execution, persistence, scheduling, events, retries, compensation, branching, or step orchestration, check whether WorkflowCore already provides it (see the [WorkflowCore docs](https://github.com/danielgerlag/workflow-core) and source).
+
+- Reuse built-in step bodies, control-flow primitives (`If`, `While`, `ForEach`, `Parallel`, `Schedule`, `Saga`, etc.), event handling, and persistence interfaces wherever possible.
+- Extend via the documented extension points (custom `IStepBody`, `IWorkflowMiddleware`, `IPersistenceProvider`, `ILifeCycleEventHub`, etc.) rather than wrapping or replacing the engine.
+- Only build a custom implementation when there is a concrete, documented reason WorkflowCore cannot meet the requirement (e.g. EF Core version conflict in the existing `IPersistenceProvider`, or a feature genuinely missing from the engine). Capture the reason in a comment, commit message, or design doc so future maintainers know why the deviation exists.
+- When in doubt, ask before reimplementing — a custom implementation is the exception, not the default.
+
 ### Key Domain Services
 
 | Service | Responsibility |
