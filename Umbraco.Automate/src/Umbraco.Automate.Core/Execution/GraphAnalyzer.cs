@@ -194,7 +194,7 @@ internal static class GraphAnalyzer
 /// Represents the scope of a container control flow step — which steps are its children
 /// and where the execution converges back to the main flow.
 /// </summary>
-/// <param name="ChildStepIds">All step IDs that belong to this container's body (transitive body membership).</param>
+/// <param name="BodyMemberStepIds">All step IDs that belong to this container's body (transitive body membership).</param>
 /// <param name="BranchEntryStepIds">
 /// Direct successors of the container — the steps that act as branch entry points when the
 /// container spawns child execution pointers. Only these are added to <c>WorkflowStep.Children</c>;
@@ -202,6 +202,6 @@ internal static class GraphAnalyzer
 /// </param>
 /// <param name="ConvergenceStepId">The step ID where branches converge (the container's successor), or null if terminal.</param>
 internal sealed record ContainerScope(
-    IReadOnlySet<Guid> ChildStepIds,
+    IReadOnlySet<Guid> BodyMemberStepIds,
     IReadOnlySet<Guid> BranchEntryStepIds,
     Guid? ConvergenceStepId);

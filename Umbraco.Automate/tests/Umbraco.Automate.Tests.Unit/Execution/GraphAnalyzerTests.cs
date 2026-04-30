@@ -46,7 +46,7 @@ public class GraphAnalyzerTests
 
         result.ShouldContainKey(forEach);
         var scope = result[forEach];
-        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a, b }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a, b }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBe(merge);
     }
 
@@ -69,7 +69,7 @@ public class GraphAnalyzerTests
         var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { forEach });
 
         var scope = result[forEach];
-        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a, b }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a, b }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBeNull();
     }
 
@@ -93,7 +93,7 @@ public class GraphAnalyzerTests
         var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { forEach });
 
         var scope = result[forEach];
-        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a, b, c }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a, b, c }, ignoreOrder: true);
         // BranchEntry is only the direct successor — body is reached via outcome routing.
         scope.BranchEntryStepIds.ShouldBe(new HashSet<Guid> { a }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBeNull();
@@ -125,7 +125,7 @@ public class GraphAnalyzerTests
         var scope = result[forEach];
         scope.BranchEntryStepIds.ShouldBe(new HashSet<Guid> { a1, b1 }, ignoreOrder: true);
         scope.BranchEntryStepIds.ShouldNotContain(a2);
-        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a1, a2, b1 }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a1, a2, b1 }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBe(merge);
     }
 
@@ -157,7 +157,7 @@ public class GraphAnalyzerTests
         var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { switchStep });
 
         var scope = result[switchStep];
-        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a, b, c }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a, b, c }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBe(merge);
     }
 
@@ -184,7 +184,7 @@ public class GraphAnalyzerTests
         var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { forEach });
 
         var scope = result[forEach];
-        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a, a2, b }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a, a2, b }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBe(merge);
     }
 
@@ -211,9 +211,9 @@ public class GraphAnalyzerTests
         var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { forEach });
 
         var scope = result[forEach];
-        scope.ChildStepIds.ShouldBe(new HashSet<Guid> { a, b }, ignoreOrder: true);
-        scope.ChildStepIds.ShouldNotContain(merge);
-        scope.ChildStepIds.ShouldNotContain(final);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a, b }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldNotContain(merge);
+        scope.BodyMemberStepIds.ShouldNotContain(final);
         scope.ConvergenceStepId.ShouldBe(merge);
     }
 
@@ -227,7 +227,7 @@ public class GraphAnalyzerTests
         var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { forEach });
 
         var scope = result[forEach];
-        scope.ChildStepIds.ShouldBeEmpty();
+        scope.BodyMemberStepIds.ShouldBeEmpty();
         scope.ConvergenceStepId.ShouldBeNull();
     }
 
@@ -247,7 +247,7 @@ public class GraphAnalyzerTests
 
         var scope = result[forEach];
         // Single branch — merge is the only step, and it's a child (no convergence with 1 branch)
-        scope.ChildStepIds.ShouldContain(merge);
+        scope.BodyMemberStepIds.ShouldContain(merge);
         scope.ConvergenceStepId.ShouldBeNull();
     }
 }
