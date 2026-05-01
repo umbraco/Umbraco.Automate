@@ -37,16 +37,12 @@ public class TriggerEvent
     public Guid? OriginRunId { get; set; }
 
     /// <summary>
-    /// Gets the automation ID that originated this event, paired with <see cref="OriginRunId"/>.
+    /// Gets the automation cascade chain that produced this event — ordered list of
+    /// automation IDs (oldest to newest) including the most recent automation as the last
+    /// entry. Empty for events raised outside an automation. Receivers detect cycles by
+    /// checking whether their own automation ID appears in this chain.
     /// </summary>
-    public Guid? OriginAutomationId { get; set; }
-
-    /// <summary>
-    /// Gets the automation chain depth carried by this event. Equals
-    /// <c>origin.ChainDepth + 1</c> when stamped from an automation; 0 otherwise. The
-    /// receiving handler uses this to enforce a global maximum chain depth.
-    /// </summary>
-    public int ChainDepth { get; set; }
+    public IReadOnlyList<Guid> OriginAutomationChain { get; set; } = [];
 }
 
 /// <summary>

@@ -109,7 +109,6 @@ public class AutomationOriginAccessorTests
 
     private static AutomationOrigin CreateOrigin() => new(
         RunId: Guid.NewGuid(),
-        AutomationId: Guid.NewGuid(),
         WorkspaceId: Guid.NewGuid(),
-        ChainDepth: 0);
+        AutomationChain: [Guid.NewGuid()]);
 }

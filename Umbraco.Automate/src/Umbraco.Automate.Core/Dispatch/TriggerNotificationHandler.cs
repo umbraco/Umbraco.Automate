@@ -68,8 +68,7 @@ internal sealed class TriggerNotificationHandler<TNotification>(
                 if (origin is not null)
                 {
                     evt.OriginRunId = origin.RunId;
-                    evt.OriginAutomationId = origin.AutomationId;
-                    evt.ChainDepth = origin.ChainDepth + 1;
+                    evt.OriginAutomationChain = origin.AutomationChain;
                 }
 
                 await dispatcher.DispatchAsync(evt, cancellationToken);

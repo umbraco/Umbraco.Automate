@@ -34,9 +34,11 @@ public class AutomationOriginMiddlewareTests
     }
 
     [Fact]
-    public async Task ApplyAsync_WithExecutionContext_PushesOrigin()
+    public async Task ApplyAsync_WithExecutionContext_PushesOriginWithCurrentAutomationAppended()
     {
-        var executionContext = CreateExecutionContext(chainDepth: 0);
+        // Top-level run (no upstream chain) — middleware should push a chain containing
+        // only the current automation so any side effects can detect a self-loop.
+        var executionContext = CreateExecutionContext(originChain: []);
         var context = CreateContext(executionContext);
 
         AutomationOrigin? observed = null;
@@ -52,16 +54,20 @@ public class AutomationOriginMiddlewareTests
 
         observed.ShouldNotBeNull();
         observed!.RunId.ShouldBe(executionContext.RunId);
-        observed.AutomationId.ShouldBe(executionContext.AutomationId);
         observed.WorkspaceId.ShouldBe(executionContext.WorkspaceId);
-        observed.ChainDepth.ShouldBe(0);
+        observed.AutomationChain.ShouldBe([context.AutomationId]);
     }
 
     [Fact]
-    public async Task ApplyAsync_PropagatesChainDepth()
+    public async Task ApplyAsync_AppendsCurrentAutomationToInheritedChain()
     {
-        var executionContext = CreateExecutionContext(chainDepth: 3);
+        // Downstream run inheriting an upstream chain — middleware appends the current
+        // automation so the resulting chain reflects the full lineage A → B for any
+        // side-effect events this run dispatches.
+        var upstreamA = Guid.NewGuid();
+        var executionContext = CreateExecutionContext(originChain: [upstreamA]);
         var context = CreateContext(executionContext);
+
         AutomationOrigin? observed = null;
 
         await _middleware.ApplyAsync(
@@ -73,7 +79,7 @@ public class AutomationOriginMiddlewareTests
             },
             CancellationToken.None);
 
-        observed!.ChainDepth.ShouldBe(3);
+        observed!.AutomationChain.ShouldBe([upstreamA, context.AutomationId]);
     }
 
     [Fact]
@@ -103,7 +109,7 @@ public class AutomationOriginMiddlewareTests
         _accessor.Current.ShouldBeNull();
     }
 
-    private static AutomationExecutionContext CreateExecutionContext(int chainDepth = 0) => new()
+    private static AutomationExecutionContext CreateExecutionContext(IReadOnlyList<Guid>? originChain = null) => new()
     {
         ServiceAccountKey = Guid.NewGuid(),
         WorkspaceId = Guid.NewGuid(),
@@ -113,7 +119,7 @@ public class AutomationOriginMiddlewareTests
         RunId = Guid.NewGuid(),
         InitiatorType = "test",
         AllowedConnections = [],
-        ChainDepth = chainDepth,
+        OriginChain = originChain ?? [],
     };
 
     private static ActionContext CreateContext(AutomationExecutionContext? executionContext) => new()

@@ -53,12 +53,13 @@ public sealed class AutomationExecutionContext
     public required IReadOnlyList<Guid> AllowedConnections { get; init; }
 
     /// <summary>
-    /// Gets the automation chain depth for this run. A run started by a non-automation
-    /// trigger has depth 0. When a run's actions cause notifications that start downstream
-    /// runs, those runs inherit <c>parent.ChainDepth + 1</c>. Used by the dispatch path to
-    /// drop runaway cascades.
+    /// Gets the upstream automation chain for this run — the ordered list of automation IDs
+    /// (oldest to newest) that caused this run, NOT including the current run's automation.
+    /// Empty for runs started by a non-automation source. The middleware appends the current
+    /// automation when pushing the ambient origin, so events dispatched from within this run
+    /// carry <c>OriginChain ∪ { this.AutomationId }</c>.
     /// </summary>
-    public int ChainDepth { get; init; }
+    public IReadOnlyList<Guid> OriginChain { get; init; } = [];
 
     /// <summary>
     /// Formats the <c>PerformingDetails</c> string for the CMS audit trail.

@@ -26,11 +26,22 @@ internal sealed class AutomationOriginMiddleware : IActionMiddleware
             return await next(context, cancellationToken);
         }
 
+        // Build the lineage that any side effect of this action will carry: upstream chain
+        // received from the trigger, plus this run's own automation. Receivers detect cycles
+        // by looking for their own ID in this chain.
+        var inheritedChain = context.ExecutionContext.OriginChain;
+        var chain = new Guid[inheritedChain.Count + 1];
+        for (var i = 0; i < inheritedChain.Count; i++)
+        {
+            chain[i] = inheritedChain[i];
+        }
+
+        chain[inheritedChain.Count] = context.AutomationId;
+
         var origin = new AutomationOrigin(
             RunId: context.ExecutionContext.RunId,
-            AutomationId: context.AutomationId,
             WorkspaceId: context.ExecutionContext.WorkspaceId,
-            ChainDepth: context.ExecutionContext.ChainDepth);
+            AutomationChain: chain);
 
         using var _ = _originAccessor.Push(origin);
 

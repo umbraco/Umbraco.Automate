@@ -60,16 +60,17 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
         _logger.LogDebug("Received trigger event for {TriggerAlias}", message.TriggerAlias);
 
-        // Global chain-depth backstop: drop the event before doing any work if the cascade
-        // length has exceeded the configured limit. This catches loops the per-trigger
-        // SkipAutomationOriginatedEvents toggle misses (e.g. two automations ping-ponging
-        // when an operator has turned the toggle off intentionally).
+        // Global chain-length backstop: drop the event before doing any work if the cascade
+        // chain has exceeded the configured limit. This catches loops the per-trigger
+        // SkipAutomationOriginatedEvents toggle misses (e.g. operator deliberately turned
+        // the toggle off, or a chain that doesn't repeat any automation but goes too deep).
         var maxChainDepth = _executionOptions.CurrentValue.MaxChainDepth;
-        if (message.ChainDepth > maxChainDepth)
+        if (message.OriginAutomationChain.Count > maxChainDepth)
         {
             _logger.LogWarning(
-                "Dropping trigger {TriggerAlias} — chain depth {ChainDepth} exceeded MaxChainDepth {MaxChainDepth} (origin run {OriginRunId})",
-                message.TriggerAlias, message.ChainDepth, maxChainDepth, message.OriginRunId);
+                "Dropping trigger {TriggerAlias} — chain length {ChainLength} exceeded MaxChainDepth {MaxChainDepth} (origin run {OriginRunId}, chain {Chain})",
+                message.TriggerAlias, message.OriginAutomationChain.Count, maxChainDepth, message.OriginRunId,
+                string.Join(" -> ", message.OriginAutomationChain));
             return;
         }
 
@@ -147,18 +148,20 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 {
                     var resolvedSettings = trigger.ResolveSettings(triggerSettings);
 
-                    // Per-automation loop-prevention: if the event was stamped with an
-                    // origin and the trigger settings opt in to the skip behaviour, drop
-                    // the event for this automation. Default is opt-in for built-in
-                    // content trigger settings, so a fresh automation cannot trigger
-                    // itself by saving its own content.
-                    if (message.OriginRunId is not null
+                    // Cycle prevention: if accepting this event would re-enter an automation
+                    // that already participated in this cascade, skip — provided the
+                    // automation has opted in via ISkipAutomationOriginatedEvents (default
+                    // on for built-in content trigger settings). Catches direct self-loops
+                    // (A's action saves → A would re-trigger) and indirect cycles
+                    // (A → B → A) in one rule.
+                    if (message.OriginAutomationChain.Contains(executionAutomation.Id)
                         && resolvedSettings is ISkipAutomationOriginatedEvents skipFlag
                         && skipFlag.SkipAutomationOriginatedEvents)
                     {
                         _logger.LogDebug(
-                            "Automation {AutomationId} skipped — trigger {TriggerAlias} event originated from automation run {OriginRunId}",
-                            executionAutomation.Id, message.TriggerAlias, message.OriginRunId);
+                            "Automation {AutomationId} skipped — trigger {TriggerAlias} event would close cycle in chain {Chain}",
+                            executionAutomation.Id, message.TriggerAlias,
+                            string.Join(" -> ", message.OriginAutomationChain));
                         continue;
                     }
 
@@ -182,7 +185,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 message.InitiatorId,
                 triggerOutputData,
                 cancellationToken,
-                chainDepth: message.ChainDepth);
+                originChain: message.OriginAutomationChain);
         }
     }
 

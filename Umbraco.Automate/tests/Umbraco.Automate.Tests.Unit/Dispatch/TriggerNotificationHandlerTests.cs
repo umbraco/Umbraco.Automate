@@ -173,17 +173,17 @@ public class TriggerNotificationHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_OriginPresent_StampsEventsWithOriginAndIncrementsChainDepth()
+    public async Task HandleAsync_OriginPresent_StampsEventsWithFullChain()
     {
         // Models the in-process loop case: an action is running, the accessor carries the
-        // origin, and a save (or other notification) fires inside the action's await.
-        // The handler must stamp every dispatched event with that origin and bump depth so
-        // downstream filtering / backstop logic can see the chain.
+        // ambient origin (chain assembled by the middleware), and a save fires inside the
+        // action's await. The handler must copy that chain onto every dispatched event so
+        // downstream cycle detection sees the full lineage.
+        var chain = new[] { Guid.NewGuid(), Guid.NewGuid() };
         var origin = new AutomationOrigin(
             RunId: Guid.NewGuid(),
-            AutomationId: Guid.NewGuid(),
             WorkspaceId: Guid.NewGuid(),
-            ChainDepth: 2);
+            AutomationChain: chain);
 
         var accessor = new Mock<IAutomationOriginAccessor>();
         accessor.SetupGet(a => a.Current).Returns(origin);
@@ -216,8 +216,7 @@ public class TriggerNotificationHandlerTests
         foreach (var evt in captured)
         {
             evt.OriginRunId.ShouldBe(origin.RunId);
-            evt.OriginAutomationId.ShouldBe(origin.AutomationId);
-            evt.ChainDepth.ShouldBe(origin.ChainDepth + 1);
+            evt.OriginAutomationChain.ShouldBe(chain);
         }
     }
 
@@ -247,8 +246,7 @@ public class TriggerNotificationHandlerTests
 
         captured.ShouldHaveSingleItem();
         captured[0].OriginRunId.ShouldBeNull();
-        captured[0].OriginAutomationId.ShouldBeNull();
-        captured[0].ChainDepth.ShouldBe(0);
+        captured[0].OriginAutomationChain.ShouldBeEmpty();
     }
 
     public class TestNotification : INotification;

@@ -75,7 +75,7 @@ public class TriggerEventHandlerTests
             "system",
             null,
             null,
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class TriggerEventHandlerTests
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class TriggerEventHandlerTests
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class TriggerEventHandlerTests
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Exactly(2));
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Exactly(2));
     }
 
     [Fact]
@@ -166,8 +166,8 @@ public class TriggerEventHandlerTests
                 It.IsAny<string?>(),
                 It.IsAny<Dictionary<string, object?>?>(),
                 It.IsAny<CancellationToken>(),
-                It.IsAny<int>()))
-            .Callback<Automation, string, string?, Dictionary<string, object?>?, CancellationToken, int>(
+                It.IsAny<IReadOnlyList<Guid>>()))
+            .Callback<Automation, string, string?, Dictionary<string, object?>?, CancellationToken, IReadOnlyList<Guid>?>(
                 (_, _, _, data, _, _) => capturedData = data)
             .ReturnsAsync(Guid.NewGuid());
 
@@ -206,7 +206,7 @@ public class TriggerEventHandlerTests
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     [Fact]
@@ -264,14 +264,14 @@ public class TriggerEventHandlerTests
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
 
         _executor.Verify(e => e.ExecuteAsync(
             nonMatching,
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     [Fact]
@@ -306,14 +306,14 @@ public class TriggerEventHandlerTests
             It.IsAny<string>(),
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
     }
 
     [Fact]
-    public async Task HandleAsync_ChainDepthExceedsLimit_DropsEvent()
+    public async Task HandleAsync_ChainLengthExceedsLimit_DropsEvent()
     {
         // Belt-and-braces backstop: even if a per-trigger SkipAutomationOriginatedEvents
-        // toggle is off, runaway cascades stop here.
+        // toggle is off, runaway cascades stop here when the chain grows past the limit.
         var handler = new TriggerEventHandler(
             _automationService.Object,
             Mock.Of<IEntityVersionService>(),
@@ -327,8 +327,8 @@ public class TriggerEventHandlerTests
         {
             TriggerAlias = "myTrigger",
             InitiatorType = "system",
-            ChainDepth = 4,
             OriginRunId = Guid.NewGuid(),
+            OriginAutomationChain = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()],
         });
 
         await handler.HandleAsync(body, CancellationToken.None);
@@ -340,15 +340,18 @@ public class TriggerEventHandlerTests
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
-            It.IsAny<int>()), Times.Never);
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     [Fact]
-    public async Task HandleAsync_OriginPresentAndSettingsSkipEnabled_SkipsAutomation()
+    public async Task HandleAsync_AutomationInChainAndSkipEnabled_SkipsAsCycle()
     {
-        // Built-in content trigger settings default SkipAutomationOriginatedEvents to true;
-        // an event carrying an origin must be dropped for those automations.
+        // Direct self-loop: A's action saves → event chain contains A → A would re-trigger
+        // itself → drop. Models the "save inside an automation re-fires the same automation"
+        // scenario the loop-prevention is built for.
+        var automationId = Guid.NewGuid();
         var automation = new AutomationBuilder()
+            .WithId(automationId)
             .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
             {
                 ["skipAutomationOriginatedEvents"] = true,
@@ -358,22 +361,13 @@ public class TriggerEventHandlerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var output = new ContentSavedTriggerOutput
-        {
-            ContentKey = Guid.NewGuid(),
-            ContentName = "Page",
-            ContentTypeKey = Guid.NewGuid(),
-            ContentTypeAlias = "blogPost",
-        };
-
         var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "umbracoAutomate.contentSaved",
             InitiatorType = "system",
-            OutputData = JsonSerializer.Serialize(output, JsonOptions.Default),
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
             OriginRunId = Guid.NewGuid(),
-            OriginAutomationId = Guid.NewGuid(),
-            ChainDepth = 1,
+            OriginAutomationChain = [automationId],
         });
 
         await _handler.HandleAsync(body, CancellationToken.None);
@@ -384,14 +378,98 @@ public class TriggerEventHandlerTests
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
-            It.IsAny<int>()), Times.Never);
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     [Fact]
-    public async Task HandleAsync_OriginPresentAndSettingsSkipDisabled_RunsAutomation()
+    public async Task HandleAsync_PingPongCycleAtoBtoA_SkipsA()
     {
-        // Operator opts out of skip — the chain is intentional, run it.
+        // Indirect cycle: A's action saved content, B fired, B's action saved again, the
+        // resulting chain is [A, B]. A receiving that event finds itself in the chain and
+        // skips — proving the chain catches A → B → A patterns where a single-ID compare
+        // would have missed it.
+        var idA = Guid.NewGuid();
+        var idB = Guid.NewGuid();
+
+        var automationA = new AutomationBuilder()
+            .WithId(idA)
+            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
+            {
+                ["skipAutomationOriginatedEvents"] = true,
+            })
+            .Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automationA });
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
+            OriginRunId = Guid.NewGuid(),
+            OriginAutomationChain = [idA, idB],
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            It.IsAny<Automation>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AutomationNotInChain_RunsWithChainPropagated()
+    {
+        // Pure observer: B is listening to content saves but isn't part of any cycle
+        // upstream. Chain is [A], B is not in it, so B runs — and inherits the chain so
+        // its own side effects extend it correctly.
+        var idA = Guid.NewGuid();
+        var idB = Guid.NewGuid();
+
+        var automationB = new AutomationBuilder()
+            .WithId(idB)
+            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
+            {
+                ["skipAutomationOriginatedEvents"] = true,
+            })
+            .Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automationB });
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
+            OriginRunId = Guid.NewGuid(),
+            OriginAutomationChain = [idA],
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            automationB,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.Is<IReadOnlyList<Guid>?>(c => c != null && c.SequenceEqual(new[] { idA }))), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AutomationInChainButSkipDisabled_RunsAnyway()
+    {
+        // Operator deliberately turned the toggle off — chain membership doesn't matter,
+        // run it. Depth backstop is the only remaining safety net here.
+        var automationId = Guid.NewGuid();
         var automation = new AutomationBuilder()
+            .WithId(automationId)
             .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
             {
                 ["skipAutomationOriginatedEvents"] = false,
@@ -401,21 +479,13 @@ public class TriggerEventHandlerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var output = new ContentSavedTriggerOutput
-        {
-            ContentKey = Guid.NewGuid(),
-            ContentName = "Page",
-            ContentTypeKey = Guid.NewGuid(),
-            ContentTypeAlias = "blogPost",
-        };
-
         var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "umbracoAutomate.contentSaved",
             InitiatorType = "system",
-            OutputData = JsonSerializer.Serialize(output, JsonOptions.Default),
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
             OriginRunId = Guid.NewGuid(),
-            ChainDepth = 1,
+            OriginAutomationChain = [automationId],
         });
 
         await _handler.HandleAsync(body, CancellationToken.None);
@@ -426,14 +496,14 @@ public class TriggerEventHandlerTests
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
-            1), Times.Once);
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
     }
 
     [Fact]
-    public async Task HandleAsync_NoOrigin_RunsAutomationRegardlessOfSkipSetting()
+    public async Task HandleAsync_NoOriginChain_RunsAutomationWithEmptyChain()
     {
-        // A user-initiated save carries no origin. Even with the skip toggle on
-        // (the default), the automation must run.
+        // User-initiated save: chain is empty, automation runs and inherits empty chain
+        // (its own actions will be the start of any new cascade).
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
             {
@@ -444,19 +514,11 @@ public class TriggerEventHandlerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        var output = new ContentSavedTriggerOutput
-        {
-            ContentKey = Guid.NewGuid(),
-            ContentName = "Page",
-            ContentTypeKey = Guid.NewGuid(),
-            ContentTypeAlias = "blogPost",
-        };
-
         var body = SerializeMessage(new TriggerEventMessage
         {
             TriggerAlias = "umbracoAutomate.contentSaved",
             InitiatorType = "user",
-            OutputData = JsonSerializer.Serialize(output, JsonOptions.Default),
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
         });
 
         await _handler.HandleAsync(body, CancellationToken.None);
@@ -467,8 +529,16 @@ public class TriggerEventHandlerTests
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
-            0), Times.Once);
+            It.Is<IReadOnlyList<Guid>?>(c => c != null && c.Count == 0)), Times.Once);
     }
+
+    private static ContentSavedTriggerOutput BuildContentSavedOutput() => new()
+    {
+        ContentKey = Guid.NewGuid(),
+        ContentName = "Page",
+        ContentTypeKey = Guid.NewGuid(),
+        ContentTypeAlias = "blogPost",
+    };
 
     private static string SerializeMessage(TriggerEventMessage message)
         => JsonSerializer.Serialize(message, JsonOptions.Default);
