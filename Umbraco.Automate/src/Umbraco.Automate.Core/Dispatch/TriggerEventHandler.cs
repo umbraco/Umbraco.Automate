@@ -148,21 +148,32 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 {
                     var resolvedSettings = trigger.ResolveSettings(triggerSettings);
 
-                    // Cycle prevention: if accepting this event would re-enter an automation
-                    // that already participated in this cascade, skip — provided the
-                    // automation has opted in via ISkipAutomationOriginatedEvents (default
-                    // on for built-in content trigger settings). Catches direct self-loops
-                    // (A's action saves → A would re-trigger) and indirect cycles
-                    // (A → B → A) in one rule.
-                    if (message.OriginAutomationChain.Contains(executionAutomation.Id)
-                        && resolvedSettings is ISkipAutomationOriginatedEvents skipFlag
-                        && skipFlag.SkipAutomationOriginatedEvents)
+                    // Origin-aware filtering: only relevant when the event was caused by an
+                    // automation (chain non-empty). Three postures, configured per trigger:
+                    //   - Run        : always fire
+                    //   - SkipOnCycle: skip when this automation is in the chain (direct or
+                    //                  indirect cycle); default for built-in content triggers
+                    //   - SkipAlways : skip whenever any automation caused the event
+                    if (message.OriginAutomationChain.Count > 0
+                        && resolvedSettings is IAutomationOriginatedEventBehavior behaviorConfig)
                     {
-                        _logger.LogDebug(
-                            "Automation {AutomationId} skipped — trigger {TriggerAlias} event would close cycle in chain {Chain}",
-                            executionAutomation.Id, message.TriggerAlias,
-                            string.Join(" -> ", message.OriginAutomationChain));
-                        continue;
+                        var behavior = behaviorConfig.OnAutomationOriginated;
+                        var shouldSkip = behavior switch
+                        {
+                            AutomationOriginatedEventBehavior.SkipAlways => true,
+                            AutomationOriginatedEventBehavior.SkipOnCycle =>
+                                message.OriginAutomationChain.Contains(executionAutomation.Id),
+                            _ => false,
+                        };
+
+                        if (shouldSkip)
+                        {
+                            _logger.LogDebug(
+                                "Automation {AutomationId} skipped — trigger {TriggerAlias} behavior {Behavior} blocks event from chain {Chain}",
+                                executionAutomation.Id, message.TriggerAlias, behavior,
+                                string.Join(" -> ", message.OriginAutomationChain));
+                            continue;
+                        }
                     }
 
                     if (!trigger.CanHandle(typedOutput, resolvedSettings))

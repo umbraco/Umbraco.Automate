@@ -344,19 +344,13 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_AutomationInChainAndSkipEnabled_SkipsAsCycle()
+    public async Task HandleAsync_SkipOnCycle_AutomationInChain_SkipsAsCycle()
     {
         // Direct self-loop: A's action saves → event chain contains A → A would re-trigger
         // itself → drop. Models the "save inside an automation re-fires the same automation"
         // scenario the loop-prevention is built for.
         var automationId = Guid.NewGuid();
-        var automation = new AutomationBuilder()
-            .WithId(automationId)
-            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
-            {
-                ["skipAutomationOriginatedEvents"] = true,
-            })
-            .Build();
+        var automation = BuildContentSavedAutomation(automationId, AutomationOriginatedEventBehavior.SkipOnCycle);
 
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
@@ -382,7 +376,7 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_PingPongCycleAtoBtoA_SkipsA()
+    public async Task HandleAsync_SkipOnCycle_PingPongAtoBtoA_SkipsA()
     {
         // Indirect cycle: A's action saved content, B fired, B's action saved again, the
         // resulting chain is [A, B]. A receiving that event finds itself in the chain and
@@ -390,14 +384,7 @@ public class TriggerEventHandlerTests
         // would have missed it.
         var idA = Guid.NewGuid();
         var idB = Guid.NewGuid();
-
-        var automationA = new AutomationBuilder()
-            .WithId(idA)
-            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
-            {
-                ["skipAutomationOriginatedEvents"] = true,
-            })
-            .Build();
+        var automationA = BuildContentSavedAutomation(idA, AutomationOriginatedEventBehavior.SkipOnCycle);
 
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automationA });
@@ -423,21 +410,15 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_AutomationNotInChain_RunsWithChainPropagated()
+    public async Task HandleAsync_SkipOnCycle_AutomationNotInChain_RunsWithChainPropagated()
     {
         // Pure observer: B is listening to content saves but isn't part of any cycle
         // upstream. Chain is [A], B is not in it, so B runs — and inherits the chain so
-        // its own side effects extend it correctly.
+        // its own side effects extend it correctly. SkipAlways behavior would block this;
+        // SkipOnCycle is the more precise default.
         var idA = Guid.NewGuid();
         var idB = Guid.NewGuid();
-
-        var automationB = new AutomationBuilder()
-            .WithId(idB)
-            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
-            {
-                ["skipAutomationOriginatedEvents"] = true,
-            })
-            .Build();
+        var automationB = BuildContentSavedAutomation(idB, AutomationOriginatedEventBehavior.SkipOnCycle);
 
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automationB });
@@ -459,22 +440,48 @@ public class TriggerEventHandlerTests
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
-            It.Is<IReadOnlyList<Guid>?>(c => c != null && c.SequenceEqual(new[] { idA }))), Times.Once);
+            It.Is<IReadOnlyList<Guid>>(c => c != null && c.SequenceEqual(new[] { idA }))), Times.Once);
     }
 
     [Fact]
-    public async Task HandleAsync_AutomationInChainButSkipDisabled_RunsAnyway()
+    public async Task HandleAsync_SkipAlways_BlocksAnyAutomationOriginatedEvent()
     {
-        // Operator deliberately turned the toggle off — chain membership doesn't matter,
-        // run it. Depth backstop is the only remaining safety net here.
+        // Strict mode: this trigger should only fire on external input. Any chain — even
+        // one that doesn't contain this automation — drops the event.
+        var idA = Guid.NewGuid();
+        var idB = Guid.NewGuid();
+        var automationB = BuildContentSavedAutomation(idB, AutomationOriginatedEventBehavior.SkipAlways);
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automationB });
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
+            OriginRunId = Guid.NewGuid(),
+            OriginAutomationChain = [idA],
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            It.IsAny<Automation>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Run_IgnoresChainAndAlwaysFires()
+    {
+        // Operator opted into "Run" — chains are intentional, fire even when this automation
+        // is in the chain. Chain-length backstop is the only remaining safety net.
         var automationId = Guid.NewGuid();
-        var automation = new AutomationBuilder()
-            .WithId(automationId)
-            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
-            {
-                ["skipAutomationOriginatedEvents"] = false,
-            })
-            .Build();
+        var automation = BuildContentSavedAutomation(automationId, AutomationOriginatedEventBehavior.Run);
 
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
@@ -500,16 +507,11 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_NoOriginChain_RunsAutomationWithEmptyChain()
+    public async Task HandleAsync_NoOriginChain_RunsRegardlessOfBehavior()
     {
-        // User-initiated save: chain is empty, automation runs and inherits empty chain
-        // (its own actions will be the start of any new cascade).
-        var automation = new AutomationBuilder()
-            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
-            {
-                ["skipAutomationOriginatedEvents"] = true,
-            })
-            .Build();
+        // User-initiated save: no chain → no origin-aware filtering applies. SkipAlways
+        // explicitly should still permit this case because no automation caused the event.
+        var automation = BuildContentSavedAutomation(Guid.NewGuid(), AutomationOriginatedEventBehavior.SkipAlways);
 
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
@@ -529,8 +531,17 @@ public class TriggerEventHandlerTests
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
-            It.Is<IReadOnlyList<Guid>?>(c => c != null && c.Count == 0)), Times.Once);
+            It.Is<IReadOnlyList<Guid>>(c => c != null && c.Count == 0)), Times.Once);
     }
+
+    private static Automation BuildContentSavedAutomation(Guid id, AutomationOriginatedEventBehavior behavior)
+        => new AutomationBuilder()
+            .WithId(id)
+            .WithTrigger("umbracoAutomate.contentSaved", new Dictionary<string, object?>
+            {
+                ["onAutomationOriginatedEvent"] = behavior.ToString(),
+            })
+            .Build();
 
     private static ContentSavedTriggerOutput BuildContentSavedOutput() => new()
     {

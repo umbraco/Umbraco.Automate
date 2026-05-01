@@ -5,7 +5,7 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 /// <summary>
 /// Settings for the <see cref="ContentUnpublishedTrigger"/>.
 /// </summary>
-public sealed class ContentUnpublishedTriggerSettings : ISkipAutomationOriginatedEvents
+public sealed class ContentUnpublishedTriggerSettings : IAutomationOriginatedEventBehavior
 {
     /// <summary>
     /// Gets or sets the content type unique IDs to filter on (comma-separated). If null, all content types match.
@@ -17,15 +17,21 @@ public sealed class ContentUnpublishedTriggerSettings : ISkipAutomationOriginate
     public string? ContentTypes { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether unpublishes performed by another automation
-    /// should be ignored. Defaults to <c>true</c> so an automation that unpublishes content
-    /// cannot re-trigger itself (or another listening automation in a cycle). Disable only
-    /// when chaining automations across unpublishes is intentional.
+    /// Gets or sets how the trigger should react to unpublishes performed by another automation.
+    /// Stored as a string so the dropdown picker round-trips cleanly — parsed via the
+    /// <see cref="IAutomationOriginatedEventBehavior"/> implementation below.
     /// </summary>
     [Field(
-        Label = "Skip automation-originated unpublishes",
-        Description = "Don't fire when the unpublish was performed by another automation. Prevents trigger loops.",
-        EditorUiAlias = "Umb.PropertyEditorUi.Toggle",
+        Label = "On automation-originated unpublish",
+        Description = "Run: always fire (chains are intentional). Skip if this would loop: drop unpublishes where this automation is already in the cascade chain — prevents direct and indirect cycles. Skip all: only fire for human or external unpublishes, never as a side effect of any automation.",
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorConfig = """[{ "alias": "items", "value": ["Run", "SkipOnCycle", "SkipAlways"] }]""",
         Group = "Advanced")]
-    public bool SkipAutomationOriginatedEvents { get; set; } = true;
+    public string OnAutomationOriginatedEvent { get; set; } = nameof(AutomationOriginatedEventBehavior.SkipOnCycle);
+
+    /// <inheritdoc />
+    AutomationOriginatedEventBehavior IAutomationOriginatedEventBehavior.OnAutomationOriginated
+        => Enum.TryParse<AutomationOriginatedEventBehavior>(OnAutomationOriginatedEvent, ignoreCase: true, out var value)
+            ? value
+            : AutomationOriginatedEventBehavior.SkipOnCycle;
 }
