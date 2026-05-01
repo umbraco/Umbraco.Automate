@@ -172,6 +172,85 @@ public class TriggerNotificationHandlerTests
         dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task HandleAsync_OriginPresent_StampsEventsWithOriginAndIncrementsChainDepth()
+    {
+        // Models the in-process loop case: an action is running, the accessor carries the
+        // origin, and a save (or other notification) fires inside the action's await.
+        // The handler must stamp every dispatched event with that origin and bump depth so
+        // downstream filtering / backstop logic can see the chain.
+        var origin = new AutomationOrigin(
+            RunId: Guid.NewGuid(),
+            AutomationId: Guid.NewGuid(),
+            WorkspaceId: Guid.NewGuid(),
+            ChainDepth: 2);
+
+        var accessor = new Mock<IAutomationOriginAccessor>();
+        accessor.SetupGet(a => a.Current).Returns(origin);
+
+        var captured = new List<TriggerEvent>();
+        var dispatcher = new Mock<ITriggerDispatcher>();
+        dispatcher
+            .Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((evt, _) => captured.Add(evt))
+            .Returns(Task.CompletedTask);
+
+        var trigger = new Mock<INotificationTrigger<TestNotification>>();
+        trigger.Setup(t => t.MapEvent(It.IsAny<TestNotification>()))
+            .Returns([
+                new TriggerEvent { TriggerAlias = "t1", InitiatorType = "system" },
+                new TriggerEvent { TriggerAlias = "t2", InitiatorType = "system" },
+            ]);
+
+        var handler = new TriggerNotificationHandler<TestNotification>(
+            [trigger.Object],
+            dispatcher.Object,
+            CreateAcceptAllRegistry().Object,
+            accessor.Object,
+            CreateRunningRuntimeState().Object,
+            Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
+
+        await handler.HandleAsync(new TestNotification(), CancellationToken.None);
+
+        captured.Count.ShouldBe(2);
+        foreach (var evt in captured)
+        {
+            evt.OriginRunId.ShouldBe(origin.RunId);
+            evt.OriginAutomationId.ShouldBe(origin.AutomationId);
+            evt.ChainDepth.ShouldBe(origin.ChainDepth + 1);
+        }
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoOrigin_LeavesEventsUnstamped()
+    {
+        var captured = new List<TriggerEvent>();
+        var dispatcher = new Mock<ITriggerDispatcher>();
+        dispatcher
+            .Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((evt, _) => captured.Add(evt))
+            .Returns(Task.CompletedTask);
+
+        var trigger = new Mock<INotificationTrigger<TestNotification>>();
+        trigger.Setup(t => t.MapEvent(It.IsAny<TestNotification>()))
+            .Returns([new TriggerEvent { TriggerAlias = "t1", InitiatorType = "user" }]);
+
+        var handler = new TriggerNotificationHandler<TestNotification>(
+            [trigger.Object],
+            dispatcher.Object,
+            CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
+            CreateRunningRuntimeState().Object,
+            Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
+
+        await handler.HandleAsync(new TestNotification(), CancellationToken.None);
+
+        captured.ShouldHaveSingleItem();
+        captured[0].OriginRunId.ShouldBeNull();
+        captured[0].OriginAutomationId.ShouldBeNull();
+        captured[0].ChainDepth.ShouldBe(0);
+    }
+
     public class TestNotification : INotification;
 
     /// <summary>
