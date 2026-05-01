@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
@@ -42,7 +44,15 @@ public class TriggerEventHandlerTests
             _executor.Object,
             _nodeEligibility.Object,
             _triggers,
+            CreateExecutionOptionsMonitor(),
             Mock.Of<ILogger<TriggerEventHandler>>());
+    }
+
+    private static IOptionsMonitor<ExecutionOptions> CreateExecutionOptionsMonitor(int maxChainDepth = 5)
+    {
+        var monitor = new Mock<IOptionsMonitor<ExecutionOptions>>();
+        monitor.SetupGet(m => m.CurrentValue).Returns(new ExecutionOptions { MaxChainDepth = maxChainDepth });
+        return monitor.Object;
     }
 
     [Fact]

@@ -34,4 +34,22 @@ internal sealed class TriggerEventMessage
     /// Gets or sets an optional idempotency key for duplicate prevention.
     /// </summary>
     public string? IdempotencyKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets the run ID of the automation that produced this event as a side
+    /// effect, or <c>null</c> when raised from outside an automation. Used by receivers
+    /// to skip looping on their own changes.
+    /// </summary>
+    public Guid? OriginRunId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the automation ID that originated this event.
+    /// </summary>
+    public Guid? OriginAutomationId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the automation chain depth carried with this event. Used to enforce
+    /// a global maximum cascade length.
+    /// </summary>
+    public int ChainDepth { get; set; }
 }

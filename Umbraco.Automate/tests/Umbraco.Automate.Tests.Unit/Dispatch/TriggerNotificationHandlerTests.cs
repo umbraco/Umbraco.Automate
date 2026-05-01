@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Core;
@@ -26,6 +27,13 @@ public class TriggerNotificationHandlerTests
             .Setup(r => r.HasSubscribersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         return registry;
+    }
+
+    private static IAutomationOriginAccessor CreateEmptyOriginAccessor()
+    {
+        var accessor = new Mock<IAutomationOriginAccessor>();
+        accessor.SetupGet(a => a.Current).Returns((AutomationOrigin?)null);
+        return accessor.Object;
     }
 
     [Fact]
@@ -55,6 +63,7 @@ public class TriggerNotificationHandlerTests
             [trigger1.Object, trigger2.Object],
             dispatcher.Object,
             CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -74,6 +83,7 @@ public class TriggerNotificationHandlerTests
             [],
             dispatcher.Object,
             CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -97,6 +107,7 @@ public class TriggerNotificationHandlerTests
             [trigger.Object],
             dispatcher.Object,
             CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
             runtimeState.Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -122,6 +133,7 @@ public class TriggerNotificationHandlerTests
             [trigger.Object],
             dispatcher.Object,
             registry.Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -151,6 +163,7 @@ public class TriggerNotificationHandlerTests
             [trigger.Object],
             dispatcher.Object,
             registry.Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 

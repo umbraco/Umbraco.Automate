@@ -92,6 +92,14 @@ public sealed class ExecutionOptions
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Gets or sets the maximum automation chain depth. When an event carries a chain
+    /// depth at or above this limit, the dispatcher drops it instead of starting another
+    /// run. Hard backstop against runaway cascades; per-trigger
+    /// <c>SkipAutomationOriginatedEvents</c> is the first line of defence.
+    /// </summary>
+    public int MaxChainDepth { get; set; } = 5;
+
+    /// <summary>
     /// Gets or sets the execution mode for workflow processing.
     /// </summary>
     /// <remarks>

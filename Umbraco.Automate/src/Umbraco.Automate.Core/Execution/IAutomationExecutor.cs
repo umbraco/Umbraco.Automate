@@ -15,11 +15,16 @@ public interface IAutomationExecutor
     /// <param name="initiatorId">An optional identifier for the initiator.</param>
     /// <param name="triggerOutputData">The trigger output data, if any.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <param name="chainDepth">
+    /// Inherited automation chain depth. 0 for runs started by a non-automation source;
+    /// otherwise <c>parent.ChainDepth + 1</c>, propagated by the dispatch path.
+    /// </param>
     /// <returns>The ID of the created run.</returns>
     Task<Guid> ExecuteAsync(
         Automation automation,
         string initiatorType,
         string? initiatorId,
         Dictionary<string, object?>? triggerOutputData,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        int chainDepth = 0);
 }

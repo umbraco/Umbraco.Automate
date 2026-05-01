@@ -27,6 +27,26 @@ public class TriggerEvent
     /// (e.g. "{triggerAlias}:{entityKey}:{eventTimestamp}").
     /// </summary>
     public string? IdempotencyKey { get; init; }
+
+    /// <summary>
+    /// Gets the run ID of the automation run that produced this event as a side effect,
+    /// or <c>null</c> when the event was raised outside an automation (user save, scheduled
+    /// trigger, external webhook, etc.). Stamped by the dispatch path from the ambient
+    /// <see cref="Execution.IAutomationOriginAccessor"/>.
+    /// </summary>
+    public Guid? OriginRunId { get; set; }
+
+    /// <summary>
+    /// Gets the automation ID that originated this event, paired with <see cref="OriginRunId"/>.
+    /// </summary>
+    public Guid? OriginAutomationId { get; set; }
+
+    /// <summary>
+    /// Gets the automation chain depth carried by this event. Equals
+    /// <c>origin.ChainDepth + 1</c> when stamped from an automation; 0 otherwise. The
+    /// receiving handler uses this to enforce a global maximum chain depth.
+    /// </summary>
+    public int ChainDepth { get; set; }
 }
 
 /// <summary>
