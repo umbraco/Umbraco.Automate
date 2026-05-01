@@ -1958,7 +1958,7 @@ On import, the admin is prompted to fill in the missing sensitive values before 
 
 ### Deploy Connector Implementation
 
-Ships as `Umbraco.Automate.Deploy` — a separate package that registers Umbraco Deploy artifacts and value connectors:
+Ships as `Umbraco.Deploy.Automate` — a separate package that registers Umbraco Deploy artifacts and value connectors:
 
 ```csharp
 // Registers automation as a deployable entity type
@@ -2185,7 +2185,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 - **Named Connections** entity (alias → environment-specific credentials, encrypted via `[Field(IsSensitive = true)]`)
 - OAuth2 support in connections (authorization code flow + automatic refresh)
 - Connection management UI in settings panel
-- **Umbraco Deploy connector** (`Umbraco.Automate.Deploy`) — content transfer with credential stripping, disabled-on-arrival, missing connection validation
+- **Umbraco Deploy connector** (`Umbraco.Deploy.Automate`) — content transfer with credential stripping, disabled-on-arrival, missing connection validation
 - Dead letter queue
 - Run replay ("Retry" button)
 - Startup validation of automation definitions (including missing connections)

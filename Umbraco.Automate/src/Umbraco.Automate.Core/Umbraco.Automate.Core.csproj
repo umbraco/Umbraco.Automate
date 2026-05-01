@@ -28,7 +28,10 @@
             <_Parameter1>Umbraco.Automate.Startup</_Parameter1>
         </AssemblyAttribute>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>Umbraco.Automate.Deploy</_Parameter1>
+            <_Parameter1>Umbraco.Deploy.Automate</_Parameter1>
+        </AssemblyAttribute>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>Umbraco.Deploy.Automate.Tests.Unit</_Parameter1>
         </AssemblyAttribute>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>Umbraco.Automate.Testing</_Parameter1>

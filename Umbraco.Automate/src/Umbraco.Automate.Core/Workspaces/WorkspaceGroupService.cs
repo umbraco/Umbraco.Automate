@@ -101,31 +101,6 @@ internal sealed class WorkspaceGroupService : IWorkspaceGroupService
         return saved;
     }
 
-    public async Task<WorkspaceGroup> SaveGroupForDeployAsync(WorkspaceGroup group, CancellationToken cancellationToken = default)
-    {
-        if (group.Id == Guid.Empty)
-        {
-            group.Id = Guid.NewGuid();
-        }
-
-        using ICoreScope scope = _scopeProvider.CreateCoreScope();
-
-        var eventMessages = _eventMessagesFactory.Get();
-
-        var savingNotification = new WorkspaceGroupSavingNotification(group, eventMessages);
-        if (scope.Notifications.PublishCancelable(savingNotification))
-        {
-            throw new OperationCanceledException("Workspace group save was cancelled by a notification handler.");
-        }
-
-        var saved = await _groupRepository.SaveAsync(group, cancellationToken);
-
-        scope.Notifications.Publish(new WorkspaceGroupSavedNotification(saved, eventMessages));
-        scope.Complete();
-
-        return saved;
-    }
-
     public async Task<bool> DeleteGroupAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var group = await _groupRepository.GetAsync(id, cancellationToken);
@@ -142,7 +117,7 @@ internal sealed class WorkspaceGroupService : IWorkspaceGroupService
     private async Task CascadeDeleteAsync(Guid groupId, CancellationToken cancellationToken)
     {
         // Delete child groups recursively — each fires its own deletion notification so
-        // Deploy (and other subscribers) can keep per-group artifacts in sync.
+        // subscribers can keep per-group state in sync.
         var childIds = await _groupRepository.GetChildIdsAsync(groupId, cancellationToken);
         foreach (var childId in childIds)
         {

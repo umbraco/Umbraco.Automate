@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Umbraco.Automate.Deploy.Tests.Unit/Umbraco.Automate.Deploy.Tests.Unit.csproj" />
-  </Folder>
-</Solution>

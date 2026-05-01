@@ -139,10 +139,6 @@ add_product_projects "Umbraco.Automate.OpenIddict" "OpenIddict"
 echo "Adding Umbraco.Automate.Slack projects..."
 add_product_projects "Umbraco.Automate.Slack" "Slack"
 
-# Step 7b: Add Deploy projects
-echo "Adding Umbraco.Automate.Deploy projects..."
-add_product_projects "Umbraco.Automate.Deploy" "Deploy"
-
 # Step 8: Add demo site to solution
 echo "Adding demo site to solution..."
 dotnet sln "Umbraco.Automate.local.slnx" add "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
@@ -163,11 +159,6 @@ fi
 # Slack add-on
 if [ -f "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj" ]; then
     dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj"
-fi
-
-# Deploy add-on
-if [ -f "Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj" ]; then
-    dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj"
 fi
 
 echo ""

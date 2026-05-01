@@ -15,10 +15,6 @@ parameters:
           - name: Umbraco.Automate.OpenIddict
             changeVar: OpeniddictChanged
             hasNpm: false
-          # Deploy (Umbraco Deploy integration - wwwroot only, no npm toolchain)
-          - name: Umbraco.Automate.Deploy
-            changeVar: DeployChanged
-            hasNpm: false
     - name: level2Products
       type: object
       default:

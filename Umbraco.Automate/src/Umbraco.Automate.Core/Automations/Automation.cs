@@ -10,7 +10,7 @@ public sealed class Automation : IPublishableEntity
 {
     /// <inheritdoc />
     [JsonInclude]
-    public Guid Id { get; internal set; }
+    public Guid Id { get; set; }
 
     /// <summary>
     /// Gets or sets the unique, URL-safe alias (e.g. "publishSlackNotification").
