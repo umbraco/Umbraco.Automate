@@ -23,9 +23,15 @@ public sealed class ContentUnpublishedTriggerSettings : IAutomationOriginatedEve
     /// </summary>
     [Field(
         Label = "On automation-originated unpublish",
-        Description = "Run: always fire (chains are intentional). Skip if this would loop: drop unpublishes where this automation is already in the cascade chain — prevents direct and indirect cycles. Skip all: only fire for human or external unpublishes, never as a side effect of any automation.",
+        Description = "How to handle unpublishes performed by another automation.",
         EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
-        EditorConfig = """[{ "alias": "items", "value": ["Run", "SkipOnCycle", "SkipAlways"] }]""",
+        EditorConfig = """
+            [{ "alias": "items", "value": [
+                { "name": "Always run", "value": "Run" },
+                { "name": "Skip if this would loop", "value": "SkipOnCycle" },
+                { "name": "Skip all automation-originated unpublishes", "value": "SkipAlways" }
+            ] }]
+            """,
         Group = "Advanced")]
     public string OnAutomationOriginatedEvent { get; set; } = nameof(AutomationOriginatedEventBehavior.SkipOnCycle);
 

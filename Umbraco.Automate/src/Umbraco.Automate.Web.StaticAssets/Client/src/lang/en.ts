@@ -57,6 +57,9 @@ export default {
         runInfo: "Run Info",
         search: "Search",
     },
+    uaFieldGroups: {
+        advancedLabel: "Advanced",
+    },
     uaPlaceholders: {
         enterName: "Enter a name...",
         enterAlias: "Enter an alias...",
