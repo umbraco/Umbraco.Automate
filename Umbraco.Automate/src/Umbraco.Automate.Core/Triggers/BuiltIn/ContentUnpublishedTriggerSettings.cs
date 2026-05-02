@@ -22,14 +22,14 @@ public sealed class ContentUnpublishedTriggerSettings : IAutomationOriginatedEve
     /// <see cref="IAutomationOriginatedEventBehavior"/> implementation below.
     /// </summary>
     [Field(
-        Label = "On automation-originated unpublish",
+        Label = "When triggered by another automation",
         Description = "How to handle unpublishes performed by another automation.",
         EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
         EditorConfig = """
             [{ "alias": "items", "value": [
                 { "name": "Always run", "value": "Run" },
                 { "name": "Skip if this would loop", "value": "SkipOnCycle" },
-                { "name": "Skip all automation-originated unpublishes", "value": "SkipAlways" }
+                { "name": "Skip entirely", "value": "SkipAlways" }
             ] }]
             """,
         Group = "Advanced")]

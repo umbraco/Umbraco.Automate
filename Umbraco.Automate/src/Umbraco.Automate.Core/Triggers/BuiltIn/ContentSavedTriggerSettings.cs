@@ -22,14 +22,14 @@ public sealed class ContentSavedTriggerSettings : IAutomationOriginatedEventBeha
     /// <see cref="IAutomationOriginatedEventBehavior"/> implementation below.
     /// </summary>
     [Field(
-        Label = "On automation-originated save",
+        Label = "When triggered by another automation",
         Description = "How to handle saves performed by another automation.",
         EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
         EditorConfig = """
             [{ "alias": "items", "value": [
                 { "name": "Always run", "value": "Run" },
                 { "name": "Skip if this would loop", "value": "SkipOnCycle" },
-                { "name": "Skip all automation-originated saves", "value": "SkipAlways" }
+                { "name": "Skip entirely", "value": "SkipAlways" }
             ] }]
             """,
         Group = "Advanced")]
