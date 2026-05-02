@@ -240,6 +240,13 @@ internal sealed class AutomationService : IAutomationService
         var automation = await _automationRepository.GetAsync(id, cancellationToken)
             ?? throw new InvalidOperationException($"Automation '{id}' not found.");
 
+        if (automation.Status != AutomationStatus.Published)
+        {
+            throw new AutomationValidationException(
+                $"Cannot unpublish automation '{automation.Name}'.",
+                [$"Only published automations can be unpublished (current status: {automation.Status})."]);
+        }
+
         var eventMessages = _eventMessagesFactory.Get();
 
         var unpublishingNotification = new AutomationUnpublishingNotification(automation, eventMessages);

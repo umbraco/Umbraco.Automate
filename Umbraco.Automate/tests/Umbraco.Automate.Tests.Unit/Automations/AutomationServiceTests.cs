@@ -124,6 +124,42 @@ public class AutomationServiceTests
     }
 
     [Fact]
+    public async Task UnpublishAutomationAsync_DraftAutomation_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var automation = new AutomationBuilder().WithId(id).AsDraft().Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.UnpublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains("Draft"));
+        _repo.Verify(
+            r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UnpublishAutomationAsync_InactiveAutomation_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var automation = new AutomationBuilder().WithId(id).AsInactive().Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.UnpublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains("Inactive"));
+        _repo.Verify(
+            r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task CreateAutomationAsync_AssignsIdWhenEmpty()
     {
         Automation automation = new AutomationBuilder().AsDraft();
