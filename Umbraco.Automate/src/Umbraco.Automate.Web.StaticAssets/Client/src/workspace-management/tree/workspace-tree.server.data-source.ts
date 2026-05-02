@@ -11,7 +11,7 @@ import { AutomationsService, WorkspacesService } from "../../api/sdk.gen.js";
 import type { AutomationAncestorResponseModel, AutomationItemResponseModel, WorkspaceItemResponseModel, WorkspaceGroupResponseModel } from "../../api/types.gen.js";
 import { UA_WORKSPACE_ENTITY_TYPE, UA_WORKSPACE_ROOT_ENTITY_TYPE } from "../entity.js";
 import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_GROUP_ENTITY_TYPE } from "../../automation/entity.js";
-import { UA_AUTOMATION_DISABLED_FLAG, UA_AUTOMATION_PENDING_CHANGES_FLAG } from "../../automation/tree/constants.js";
+import { UA_AUTOMATION_PENDING_CHANGES_FLAG } from "../../automation/tree/constants.js";
 import type { UaWorkspaceTreeItemModel } from "./types.js";
 
 export class UaWorkspaceTreeServerDataSource
@@ -313,9 +313,6 @@ export class UaWorkspaceTreeServerDataSource
             && item.version > item.publishedVersion) {
             flags.push({ alias: UA_AUTOMATION_PENDING_CHANGES_FLAG });
         }
-        if (item.status === "Published" && item.isEnabled === false) {
-            flags.push({ alias: UA_AUTOMATION_DISABLED_FLAG });
-        }
 
         return {
             unique: item.id,
@@ -326,7 +323,6 @@ export class UaWorkspaceTreeServerDataSource
             isFolder: false,
             icon: "icon-mindmap",
             status: item.status,
-            isEnabled: item.isEnabled,
             triggerAlias: item.triggerAlias ?? null,
             flags,
         };

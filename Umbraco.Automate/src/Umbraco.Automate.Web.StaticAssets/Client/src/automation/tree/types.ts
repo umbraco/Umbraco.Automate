@@ -5,7 +5,6 @@ import type { AutomationStatusModel } from "../../api/types.gen.js";
 export interface UaAutomationTreeItemModel extends UmbTreeItemModel {
     entityType: UaAutomationEntityType | UaAutomationGroupEntityType;
     status?: AutomationStatusModel;
-    isEnabled?: boolean;
     triggerAlias?: string | null;
 }
 

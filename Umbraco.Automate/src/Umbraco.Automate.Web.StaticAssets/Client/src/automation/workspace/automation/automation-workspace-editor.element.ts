@@ -6,7 +6,6 @@ import { umbBindToValidation, UmbFormControlMixin } from "@umbraco-cms/backoffic
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "./automation-workspace.context-token.js";
 import { UA_AUTOMATION_WORKSPACE_ALIAS } from "../../constants.js";
 import type { UaAutomationDetailModel } from "../../types.js";
-import "../../../core/components/status-selector/status-selector.element.js";
 
 @customElement("ua-automation-workspace-editor")
 export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbLitElement) {
@@ -74,11 +73,6 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
         this.#workspaceContext?.updateProperty("description", target.value.toString());
     }
 
-    #onEnabledChange(event: CustomEvent<{ value: boolean }>) {
-        event.stopPropagation();
-        this.#workspaceContext?.updateProperty("isEnabled", event.detail.value);
-    }
-
     #generateAlias(name: string): string {
         return name
             .toLowerCase()
@@ -130,13 +124,6 @@ export class UaAutomationWorkspaceEditorElement extends UmbFormControlMixin(UmbL
                             @input=${this.#onDescriptionChange}
                         ></uui-input>
                     </div>
-
-                    <ua-status-selector
-                        active-label=${this.localize.term("uaLabels_enabled")}
-                        inactive-label=${this.localize.term("uaLabels_disabled")}
-                        .value=${this._model.isEnabled}
-                        @change=${this.#onEnabledChange}
-                    ></ua-status-selector>
                 </div>
 
                 ${when(

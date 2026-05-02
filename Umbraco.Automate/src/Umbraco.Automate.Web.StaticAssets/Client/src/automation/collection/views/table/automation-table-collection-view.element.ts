@@ -34,7 +34,6 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
     private _columns: UmbTableColumn[] = [
         { name: "Name", alias: "name" },
         { name: "Status", alias: "status" },
-        { name: "Enabled", alias: "isEnabled" },
         { name: "Modified", alias: "dateModified" },
     ];
 
@@ -94,12 +93,6 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
                     columnAlias: "status",
                     value: html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">
                         ${item.status}
-                    </uui-tag>`,
-                },
-                {
-                    columnAlias: "isEnabled",
-                    value: html`<uui-tag color=${item.isEnabled ? "positive" : "default"} look="secondary">
-                        ${item.isEnabled ? "Enabled" : "Disabled"}
                     </uui-tag>`,
                 },
                 {

@@ -66,11 +66,11 @@ public sealed class ReplayRunController : RunControllerBase
             return forbidden;
         }
 
-        if (automation.Status != AutomationStatus.Published || !automation.IsEnabled)
+        if (automation.Status != AutomationStatus.Published)
         {
             return Conflict(new ProblemDetailsBuilder()
                 .WithTitle("Automation not active")
-                .WithDetail("The automation must be published and enabled to replay a run.")
+                .WithDetail("The automation must be published to replay a run.")
                 .Build());
         }
 

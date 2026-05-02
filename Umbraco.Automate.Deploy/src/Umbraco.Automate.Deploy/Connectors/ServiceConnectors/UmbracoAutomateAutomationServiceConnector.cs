@@ -204,8 +204,8 @@ public class UmbracoAutomateAutomationServiceConnector(
         if (state.Entity != null)
         {
             // Update existing automation — preserve the target environment's lifecycle state
-            // (published/draft, enabled/disabled) so redeploys don't knock a live automation
-            // back to draft. Only the content (alias, steps, trigger, etc.) is replaced.
+            // (published/draft) so redeploys don't knock a live automation back to draft.
+            // Only the content (alias, steps, trigger, etc.) is replaced.
             var automation = state.Entity;
             automation.Alias = artifact.Alias!;
             automation.Name = artifact.Name;
@@ -222,8 +222,8 @@ public class UmbracoAutomateAutomationServiceConnector(
         }
         else
         {
-            // Create new automation as disabled draft for safety — an operator must explicitly
-            // enable/publish after the first deploy. Preserve the artifact UDI as the entity ID
+            // Create new automation as a draft for safety — an operator must explicitly
+            // publish after the first deploy. Preserve the artifact UDI as the entity ID
             // so redeployment of the same artifact stays idempotent.
             var automation = new Automation
             {
@@ -231,7 +231,6 @@ public class UmbracoAutomateAutomationServiceConnector(
                 Alias = artifact.Alias!,
                 Name = artifact.Name,
                 Description = artifact.Description,
-                IsEnabled = false,
                 Status = AutomationStatus.Draft,
                 WorkspaceId = workspace.Id,
                 GroupId = artifact.GroupId,

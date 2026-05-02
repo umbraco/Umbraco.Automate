@@ -5,8 +5,8 @@ namespace Umbraco.Automate.Core.Triggers;
 
 /// <summary>
 /// Default <see cref="ITriggerSubscriptionRegistry"/>. Lazily caches the set of trigger
-/// aliases that have at least one published+enabled automation subscribed, and rebuilds
-/// the cache after invalidation.
+/// aliases that have at least one published automation subscribed, and rebuilds the cache
+/// after invalidation.
 /// </summary>
 internal sealed class TriggerSubscriptionRegistry : ITriggerSubscriptionRegistry, IDisposable
 {
@@ -80,7 +80,6 @@ internal sealed class TriggerSubscriptionRegistry : ITriggerSubscriptionRegistry
         foreach (var automation in automations)
         {
             if (automation.Status == AutomationStatus.Published
-                && automation.IsEnabled
                 && automation.Trigger?.TriggerAlias is { Length: > 0 } alias)
             {
                 set.Add(alias);

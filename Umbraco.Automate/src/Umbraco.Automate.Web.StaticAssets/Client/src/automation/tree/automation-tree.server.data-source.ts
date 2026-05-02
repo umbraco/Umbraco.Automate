@@ -14,7 +14,7 @@ import {
     UA_AUTOMATION_GROUP_ENTITY_TYPE,
     UA_AUTOMATION_ROOT_ENTITY_TYPE,
 } from "../entity.js";
-import { UA_AUTOMATION_DISABLED_FLAG, UA_AUTOMATION_PENDING_CHANGES_FLAG } from "./constants.js";
+import { UA_AUTOMATION_PENDING_CHANGES_FLAG } from "./constants.js";
 import type { UaAutomationTreeItemModel } from "./types.js";
 
 export class UaAutomationTreeServerDataSource
@@ -118,7 +118,6 @@ export class UaAutomationTreeServerDataSource
             isFolder: false,
             icon: "icon-mindmap",
             status: item.status,
-            isEnabled: item.isEnabled,
             triggerAlias: item.triggerAlias ?? null,
             flags: buildFlags(item),
         };
@@ -128,7 +127,6 @@ export class UaAutomationTreeServerDataSource
 function buildFlags(item: AutomationItemResponseModel): Array<{ alias: string }> {
     const flags: Array<{ alias: string }> = [];
     if (hasPendingChanges(item)) flags.push({ alias: UA_AUTOMATION_PENDING_CHANGES_FLAG });
-    if (isDisabledPublished(item)) flags.push({ alias: UA_AUTOMATION_DISABLED_FLAG });
     return flags;
 }
 
@@ -139,11 +137,4 @@ function hasPendingChanges(item: AutomationItemResponseModel): boolean {
     return item.status === "Published"
         && item.publishedVersion != null
         && item.version > item.publishedVersion;
-}
-
-// Disabled is only meaningful for published automations — a disabled draft would just
-// look the same as an enabled draft (neither runs). The sign warns that the published
-// automation isn't currently firing.
-function isDisabledPublished(item: AutomationItemResponseModel): boolean {
-    return item.status === "Published" && item.isEnabled === false;
 }

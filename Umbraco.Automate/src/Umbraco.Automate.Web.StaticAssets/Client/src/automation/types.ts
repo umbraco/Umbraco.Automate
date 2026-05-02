@@ -13,7 +13,6 @@ export interface UaAutomationDetailModel extends UmbEntityModel {
     alias: string;
     name: string;
     description: string | null;
-    isEnabled: boolean;
     workspaceId: string;
     groupId: string | null;
     status: AutomationStatusModel;
@@ -35,7 +34,6 @@ export interface UaAutomationItemModel extends UmbEntityModel {
     alias: string;
     name: string;
     description: string | null;
-    isEnabled: boolean;
     status: AutomationStatusModel;
     version: number;
     dateCreated: string;

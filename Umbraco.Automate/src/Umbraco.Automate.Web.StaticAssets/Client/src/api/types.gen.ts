@@ -69,7 +69,6 @@ export type AutomationItemResponseModel = {
     alias: string;
     name: string;
     description?: string | null;
-    isEnabled: boolean;
     workspaceId: string;
     groupId?: string | null;
     status: AutomationStatusModel;
@@ -89,7 +88,6 @@ export type AutomationResponseModel = {
     alias: string;
     name: string;
     description?: string | null;
-    isEnabled: boolean;
     status: AutomationStatusModel;
     publishedVersion?: number | null;
     workspaceId: string;
@@ -220,7 +218,6 @@ export type CreateAutomationRequestModel = {
     name: string;
     description?: string | null;
     workspaceId: string;
-    isEnabled: boolean;
     groupId?: string | null;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
@@ -476,7 +473,6 @@ export type UpdateAutomationRequestModel = {
     alias: string;
     name: string;
     description?: string | null;
-    isEnabled: boolean;
     groupId?: string | null;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;

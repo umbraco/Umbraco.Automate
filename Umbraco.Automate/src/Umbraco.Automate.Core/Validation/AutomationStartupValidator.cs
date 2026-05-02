@@ -8,7 +8,7 @@ using Umbraco.Automate.Core.Triggers;
 namespace Umbraco.Automate.Core.Validation;
 
 /// <summary>
-/// Background service that validates all published and enabled automations on startup,
+/// Background service that validates all published automations on startup,
 /// checking that their trigger and step action aliases resolve to registered types.
 /// </summary>
 internal sealed class AutomationStartupValidator : BackgroundService
@@ -44,16 +44,16 @@ internal sealed class AutomationStartupValidator : BackgroundService
         {
             var automations = await _automationService.GetAllAutomationsAsync(stoppingToken);
             var active = automations
-                .Where(a => a.Status == AutomationStatus.Published && a.IsEnabled)
+                .Where(a => a.Status == AutomationStatus.Published)
                 .ToList();
 
             if (active.Count == 0)
             {
-                _logger.LogDebug("No published and enabled automations to validate");
+                _logger.LogDebug("No published automations to validate");
                 return;
             }
 
-            _logger.LogInformation("Validating {Count} published and enabled automations", active.Count);
+            _logger.LogInformation("Validating {Count} published automations", active.Count);
 
             var invalidCount = 0;
             foreach (var automation in active)
