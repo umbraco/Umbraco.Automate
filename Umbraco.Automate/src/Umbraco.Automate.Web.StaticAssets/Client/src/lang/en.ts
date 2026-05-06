@@ -83,6 +83,8 @@ export default {
         runNow: "Run now",
         runNowStarted: "Automation triggered",
         runNowFailed: "Could not run this automation",
+        unpublishSuccess: "Automation unpublished",
+        unpublishFailed: "Could not unpublish this automation",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
