@@ -15,11 +15,12 @@ import {
     type ColorMode,
     type Connection,
 } from "@xyflow/react";
-import { nodeTypes } from "./nodes/node-types.js";
+import { nodeTypes as defaultNodeTypes } from "./nodes/node-types.js";
 import AutomationEdge from "./edges/AutomationEdge.js";
 import type { CanvasChangeDetail, AddNodeRequestDetail } from "./types.js";
+import type { NodeTypes, EdgeTypes } from "@xyflow/react";
 
-const edgeTypes = {
+const defaultEdgeTypes: EdgeTypes = {
     automation: AutomationEdge,
 };
 
@@ -34,6 +35,8 @@ interface AutomationCanvasProps {
     viewport?: Viewport;
     colorMode?: ColorMode;
     readOnly?: boolean;
+    nodeTypes?: NodeTypes;
+    edgeTypes?: EdgeTypes;
     onCanvasChange?: (detail: CanvasChangeDetail) => void;
     onAddNodeRequest?: (detail: AddNodeRequestDetail) => void;
     onDeleteRequest?: (nodes: Node[]) => Promise<boolean>;
@@ -45,6 +48,8 @@ export default function AutomationCanvas({
     viewport,
     colorMode = "light",
     readOnly = false,
+    nodeTypes = defaultNodeTypes,
+    edgeTypes = defaultEdgeTypes,
     onCanvasChange,
     onAddNodeRequest,
     onDeleteRequest,

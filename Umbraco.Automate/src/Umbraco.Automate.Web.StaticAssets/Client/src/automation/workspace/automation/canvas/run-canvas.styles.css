@@ -1,0 +1,236 @@
+/* Run-canvas-only styles. Loaded as `extraStyles` on ua-automation-canvas
+ * when in run-view mode. Coexists with canvas.styles.css; does not affect editor cards. */
+
+.ua-run-node {
+    position: relative;
+    background: var(--uui-color-surface, #fff);
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    border-radius: 8px;
+    min-width: 240px;
+    max-width: 300px;
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.12));
+    font-family: var(--uui-font-family, inherit);
+    font-size: var(--uui-type-small-size, 13px);
+    transition: box-shadow 120ms ease, transform 120ms ease;
+}
+
+.ua-run-node:hover {
+    box-shadow: var(--uui-shadow-depth-2, 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.16));
+}
+
+/* Eyebrow label — uppercase pill above the card (the "Start" label on the trigger). */
+.ua-run-node__eyebrow {
+    position: absolute;
+    top: -22px;
+    left: 0;
+    background: var(--uui-color-surface, #fff);
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--uui-color-text-alt, #6b7280);
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+.ua-run-node__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+}
+
+.ua-run-node__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: var(--uui-color-text-alt, #6b7280);
+}
+
+.ua-run-node__icon uui-icon {
+    font-size: 18px;
+}
+
+.ua-run-node__title-block {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ua-run-node__title {
+    font-weight: 600;
+    color: var(--uui-color-text, #1f2937);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ua-run-node__subtitle {
+    font-family: var(--uui-font-monospace, monospace);
+    font-size: 10px;
+    color: var(--uui-color-text-alt, #9ca3af);
+    background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
+    padding: 1px 6px;
+    border-radius: 3px;
+    align-self: flex-start;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Status dot — replaces the editor canvas's status border. */
+.ua-run-node__status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--uui-color-divider-emphasis, #c4c4c4);
+}
+
+.ua-run-node__status-dot--completed { background: #22c55e; }
+.ua-run-node__status-dot--running { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
+.ua-run-node__status-dot--failed { background: #ef4444; }
+.ua-run-node__status-dot--waitingforinput { background: #f59e0b; }
+.ua-run-node__status-dot--sleeping { background: #6366f1; }
+.ua-run-node__status-dot--skipped { background: #d1d5db; }
+.ua-run-node__status-dot--pending { background: transparent; border: 1px solid #d1d5db; }
+
+/* Body — flat rows, no internal divider (mirrors the reference image). */
+.ua-run-node__body {
+    border-top: 1px solid var(--uui-color-divider-standalone, #f0f0f1);
+    padding: 8px 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ua-run-node__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 18px;
+}
+
+.ua-run-node__row-key {
+    color: var(--uui-color-text-alt, #6b7280);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.ua-run-node__row-val {
+    flex: 1;
+    text-align: right;
+    color: var(--uui-color-text, #1f2937);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ua-run-node__error {
+    color: #ef4444;
+    font-family: var(--uui-font-monospace, monospace);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 100%;
+}
+
+/* Branch pill — replaces "True/False" labels on If/Switch outputs. */
+.ua-run-node__branch-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.ua-run-node__branch-pill--true,
+.ua-run-node__branch-pill--taken {
+    background: rgba(34, 197, 94, 0.12);
+    color: #15803d;
+}
+
+.ua-run-node__branch-pill--false {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}
+
+.ua-run-node__branch-pill--skipped {
+    background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
+    color: var(--uui-color-text-alt, #9ca3af);
+}
+
+/* Pending nodes are dimmed — they didn't run. */
+.ua-run-node.run-status-pending,
+.ua-run-node.run-status-skipped {
+    opacity: 0.55;
+}
+
+/* Edges */
+.ua-run-edge {
+    stroke: #1f2937;
+    stroke-width: 1.5;
+    fill: none;
+}
+
+.ua-run-edge--taken {
+    stroke: #1f2937;
+}
+
+.ua-run-edge--skipped {
+    stroke: #d1d5db;
+    stroke-dasharray: 4 4;
+}
+
+/* True/false branch colouring (matches the reference image). */
+.ua-run-edge--true.ua-run-edge--taken {
+    stroke: #22c55e;
+}
+
+.ua-run-edge--false.ua-run-edge--taken {
+    stroke: #ef4444;
+}
+
+.ua-run-edge__label {
+    font-size: 10px;
+    fill: var(--uui-color-text-alt, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+}
+
+/* Handles — keep them small but invisible-ish since the canvas is read-only. */
+.react-flow__handle {
+    width: 6px;
+    height: 6px;
+    background: var(--uui-color-divider-emphasis, #d1d5db);
+    border: none;
+}
+
+/* Dark mode tweaks */
+.dark .ua-run-node {
+    background: var(--uui-color-surface, #1f2937);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .ua-run-node__body {
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark .ua-run-edge,
+.dark .ua-run-edge--taken {
+    stroke: #e5e7eb;
+}

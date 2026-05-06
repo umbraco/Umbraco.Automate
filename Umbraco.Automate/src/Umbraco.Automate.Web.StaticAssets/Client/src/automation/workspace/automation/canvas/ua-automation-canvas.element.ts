@@ -2,7 +2,7 @@ import { css, html, customElement, property, state } from "@umbraco-cms/backoffi
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
-import type { Node, Edge, Viewport, ColorMode } from "@xyflow/react";
+import type { Node, Edge, Viewport, ColorMode, NodeTypes, EdgeTypes } from "@xyflow/react";
 import AutomationCanvas from "./AutomationCanvas.js";
 import type { CanvasChangeDetail, AddNodeRequestDetail, NodeDeleteRequestDetail } from "./types.js";
 import { UMB_THEME_CONTEXT } from "@umbraco-cms/backoffice/themes";
@@ -24,6 +24,15 @@ export class UaAutomationCanvasElement extends UmbLitElement {
 
     @property({ type: Boolean, attribute: "read-only" })
     readOnly = false;
+
+    @property({ attribute: false })
+    nodeTypes?: NodeTypes;
+
+    @property({ attribute: false })
+    edgeTypes?: EdgeTypes;
+
+    @property({ attribute: false })
+    extraStyles?: string;
 
     @state()
     private _mounted = false;
@@ -50,7 +59,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
     override firstUpdated() {
         // Inject React Flow + custom styles into the shadow root
         const styleEl = document.createElement("style");
-        styleEl.textContent = reactFlowCss + "\n" + canvasCss;
+        styleEl.textContent = reactFlowCss + "\n" + canvasCss + (this.extraStyles ? "\n" + this.extraStyles : "");
         this.shadowRoot!.prepend(styleEl);
 
         this.#container = this.shadowRoot!.querySelector<HTMLDivElement>("#canvas-container");
@@ -63,7 +72,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
 
     override updated(changedProperties: Map<string, unknown>) {
         super.updated(changedProperties);
-        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport") || changedProperties.has("readOnly"))) {
+        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport") || changedProperties.has("readOnly") || changedProperties.has("nodeTypes") || changedProperties.has("edgeTypes"))) {
             this.#renderReact();
         }
     }
@@ -85,6 +94,8 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 viewport: this.viewport,
                 colorMode: this._colorMode,
                 readOnly: this.readOnly,
+                nodeTypes: this.nodeTypes,
+                edgeTypes: this.edgeTypes,
                 onCanvasChange: this.#onCanvasChange,
                 onAddNodeRequest: this.#onAddNodeRequest,
                 onDeleteRequest: this.#onDeleteRequest,

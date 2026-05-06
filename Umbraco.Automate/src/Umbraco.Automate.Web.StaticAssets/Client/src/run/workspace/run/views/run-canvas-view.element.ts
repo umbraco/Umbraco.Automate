@@ -3,14 +3,22 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { Node, Edge } from "@xyflow/react";
 import { UA_RUN_WORKSPACE_CONTEXT } from "../run-workspace.context-token.js";
-import type { UaRunDetailModel } from "../../../types.js";
+import type { UaRunDetailModel, UaStepRunModel } from "../../../types.js";
 import type { UaAutomationDetailModel } from "../../../../automation/types.js";
 import { modelToNodes, modelToEdges } from "../../../../automation/workspace/automation/canvas/utils/model-to-flow.js";
 import type { CanvasState, CatalogueLookupEntry } from "../../../../automation/workspace/automation/canvas/types.js";
+import { runNodeTypes } from "../../../../automation/workspace/automation/canvas/nodes/run/run-node-types.js";
+import RunEdge from "../../../../automation/workspace/automation/canvas/edges/RunEdge.js";
+import { computeBranchState } from "../../../../automation/workspace/automation/canvas/nodes/run/run-node-utils.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import "../../../../automation/workspace/automation/canvas/ua-automation-canvas.element.js";
+import runCanvasCss from "../../../../automation/workspace/automation/canvas/run-canvas.styles.css?inline";
 
 const TRIGGER_NODE_ID = "__trigger__";
+
+const runEdgeTypes = {
+    automation: RunEdge,
+};
 
 @customElement("ua-run-canvas-view")
 export class UaRunCanvasViewElement extends UmbLitElement {
@@ -51,39 +59,72 @@ export class UaRunCanvasViewElement extends UmbLitElement {
 
         const canvasState = this.#parseCanvasState(this.#automation.canvasState);
         const catalogue = await this.#buildCatalogueLookup();
-        const nodes = modelToNodes(this.#automation.trigger, this.#automation.steps, canvasState, catalogue);
-        const edges = modelToEdges(this.#automation.connections);
+        const baseNodes = modelToNodes(this.#automation.trigger, this.#automation.steps, canvasState, catalogue);
+        const baseEdges = modelToEdges(this.#automation.connections);
 
-        // Apply step run status as CSS classes via node data
-        this._nodes = nodes.map((node) => {
+        const stepRunsByStepId = new Map<string, UaStepRunModel>();
+        for (const sr of this._run.stepRuns) {
+            stepRunsByStepId.set(sr.stepId, sr);
+        }
+
+        this._nodes = baseNodes.map((node) => {
             if (node.id === TRIGGER_NODE_ID) {
-                // Trigger status based on overall run status
                 const triggerStatus = this._run!.status === "Pending" ? "Pending" : "Completed";
                 return {
                     ...node,
-                    className: `run-status-${triggerStatus.toLowerCase()}`,
-                    data: { ...node.data, runStatus: triggerStatus },
+                    data: {
+                        ...node.data,
+                        runStatus: triggerStatus,
+                        startedUtc: this._run!.startedUtc,
+                    },
                     draggable: false,
                     connectable: false,
                 };
             }
 
-            const stepRun = this._run!.stepRuns.find((sr) => sr.stepId === node.id);
+            const stepRun = stepRunsByStepId.get(node.id);
             const status = stepRun?.status ?? "Pending";
+            const data: Record<string, unknown> = {
+                ...node.data,
+                runStatus: status,
+                stepRun,
+            };
+
+            if (node.type === "if") {
+                data.branches = {
+                    true: computeBranchState(node.id, "true", baseEdges, stepRunsByStepId),
+                    false: computeBranchState(node.id, "false", baseEdges, stepRunsByStepId),
+                };
+            } else if (node.type === "switch") {
+                const branches: Record<string, ReturnType<typeof computeBranchState>> = {};
+                const cases = (node.data as { cases?: string[] }).cases ?? [];
+                for (const c of [...cases, "default"]) {
+                    branches[c] = computeBranchState(node.id, c, baseEdges, stepRunsByStepId);
+                }
+                data.branches = branches;
+            }
+
             return {
                 ...node,
-                className: `run-status-${status.toLowerCase()}`,
-                data: { ...node.data, runStatus: status, stepRun },
+                data,
                 draggable: false,
                 connectable: false,
             };
         });
 
-        this._edges = edges.map((edge) => ({
-            ...edge,
-            animated: false,
-            selectable: false,
-        }));
+        this._edges = baseEdges.map((edge) => {
+            const sourceRun = edge.source === TRIGGER_NODE_ID
+                ? (this._run!.status !== "Pending")
+                : stepRunsByStepId.get(edge.source)?.status === "Completed";
+            const targetRun = stepRunsByStepId.get(edge.target);
+            const taken = !!sourceRun && !!targetRun && targetRun.status !== "Pending" && targetRun.status !== "Skipped";
+            return {
+                ...edge,
+                animated: false,
+                selectable: false,
+                data: { ...edge.data, taken },
+            };
+        });
 
         this._viewport = canvasState?.viewport;
     }
@@ -123,6 +164,9 @@ export class UaRunCanvasViewElement extends UmbLitElement {
                 .nodes=${this._nodes}
                 .edges=${this._edges}
                 .viewport=${this._viewport}
+                .nodeTypes=${runNodeTypes}
+                .edgeTypes=${runEdgeTypes}
+                .extraStyles=${runCanvasCss}
             ></ua-automation-canvas>
         `;
     }
