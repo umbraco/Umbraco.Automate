@@ -97,6 +97,10 @@ public static partial class UmbracoBuilderExtensions
         // Wire run-completed notification → notification channel dispatcher
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
 
+        // Bridge run lifecycle notifications onto the backoffice server-events SignalR channel
+        builder.AddNotificationAsyncHandler<AutomationRunStartedNotification, RunServerEventBridge>();
+        builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunServerEventBridge>();
+
         // Action middleware — ordered pipeline:
         //   1. ErrorHandling — catches exceptions from everything inside
         //   2. BackOfficeIdentity — resolves the workspace service principal so all

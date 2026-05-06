@@ -1,4 +1,4 @@
-import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, property, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { Node, Edge } from "@xyflow/react";
@@ -9,7 +9,7 @@ import { modelToNodes, modelToEdges } from "../../../../automation/workspace/aut
 import type { CanvasState, CatalogueLookupEntry } from "../../../../automation/workspace/automation/canvas/types.js";
 import { runNodeTypes } from "../../../../automation/workspace/automation/canvas/nodes/run/run-node-types.js";
 import RunEdge from "../../../../automation/workspace/automation/canvas/edges/RunEdge.js";
-import { computeBranchState } from "../../../../automation/workspace/automation/canvas/nodes/run/run-node-utils.js";
+import { aggregateStatus, computeBranchState } from "../../../../automation/workspace/automation/canvas/nodes/run/run-node-utils.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import "../../../../automation/workspace/automation/canvas/ua-automation-canvas.element.js";
 import runCanvasCss from "../../../../automation/workspace/automation/canvas/run-canvas.styles.css?inline";
@@ -31,10 +31,33 @@ export class UaRunCanvasViewElement extends UmbLitElement {
     private _edges: Edge[] = [];
 
     @state()
-    private _viewport?: { x: number; y: number; zoom: number };
+    private _run?: UaRunDetailModel;
 
     @state()
-    private _run?: UaRunDetailModel;
+    private _automation?: UaAutomationDetailModel;
+
+    /**
+     * Optional explicit run override — when set, takes precedence over the workspace context.
+     * Lets the view be embedded outside the run workspace (e.g. inside a detail modal).
+     */
+    @property({ attribute: false })
+    set run(value: UaRunDetailModel | undefined) {
+        this._run = value;
+        this.#rebuildCanvas();
+    }
+    get run() {
+        return this._run;
+    }
+
+    /** Optional explicit automation override — see {@link run}. */
+    @property({ attribute: false })
+    set automation(value: UaAutomationDetailModel | undefined) {
+        this._automation = value;
+        this.#rebuildCanvas();
+    }
+    get automation() {
+        return this._automation;
+    }
 
     constructor() {
         super();
@@ -42,29 +65,34 @@ export class UaRunCanvasViewElement extends UmbLitElement {
         this.consumeContext(UA_RUN_WORKSPACE_CONTEXT, (context) => {
             if (!context) return;
             this.observe(context.run, (run) => {
+                if (this._run) return; // explicit prop takes precedence
                 this._run = run;
                 this.#rebuildCanvas();
             });
             this.observe(context.automation, (automation) => {
-                this.#automation = automation;
+                if (this._automation) return; // explicit prop takes precedence
+                this._automation = automation;
                 this.#rebuildCanvas();
             });
         });
     }
 
-    #automation?: UaAutomationDetailModel;
-
     async #rebuildCanvas() {
-        if (!this.#automation || !this._run) return;
+        if (!this._automation || !this._run) return;
 
-        const canvasState = this.#parseCanvasState(this.#automation.canvasState);
+        const canvasState = this.#parseCanvasState(this._automation.canvasState);
         const catalogue = await this.#buildCatalogueLookup();
-        const baseNodes = modelToNodes(this.#automation.trigger, this.#automation.steps, canvasState, catalogue);
-        const baseEdges = modelToEdges(this.#automation.connections);
+        const baseNodes = modelToNodes(this._automation.trigger, this._automation.steps, canvasState, catalogue);
+        const baseEdges = modelToEdges(this._automation.connections);
 
-        const stepRunsByStepId = new Map<string, UaStepRunModel>();
+        // A step can have multiple stepRuns when it lives under a control-flow body
+        // (forEach, while, parallel iterations) — group by stepId so the node can
+        // surface iteration count and aggregate status/duration.
+        const stepRunsByStepId = new Map<string, UaStepRunModel[]>();
         for (const sr of this._run.stepRuns) {
-            stepRunsByStepId.set(sr.stepId, sr);
+            const list = stepRunsByStepId.get(sr.stepId) ?? [];
+            list.push(sr);
+            stepRunsByStepId.set(sr.stepId, list);
         }
 
         this._nodes = baseNodes.map((node) => {
@@ -82,12 +110,12 @@ export class UaRunCanvasViewElement extends UmbLitElement {
                 };
             }
 
-            const stepRun = stepRunsByStepId.get(node.id);
-            const status = stepRun?.status ?? "Pending";
+            const stepRuns = stepRunsByStepId.get(node.id) ?? [];
+            const status = aggregateStatus(stepRuns);
             const data: Record<string, unknown> = {
                 ...node.data,
                 runStatus: status,
-                stepRun,
+                stepRuns,
             };
 
             if (node.type === "if") {
@@ -104,6 +132,17 @@ export class UaRunCanvasViewElement extends UmbLitElement {
                 data.branches = branches;
             }
 
+            // Surface iteration metadata for control-flow container actions (forEach today;
+            // while/parallel can join later by alias). bodyIterations comes from the runtime —
+            // count of stepRuns on the first downstream body node, which equals the loop count.
+            const actionAlias = (node.data as { actionAlias?: string }).actionAlias;
+            if (actionAlias === "umbracoAutomate.forEach") {
+                const settings = (node.data as { settings?: Record<string, unknown> }).settings ?? {};
+                const collection = (settings.Collection ?? settings.collection) as string | undefined;
+                if (collection) data.collectionBinding = collection;
+                data.bodyIterations = countBodyIterations(node.id, baseEdges, stepRunsByStepId);
+            }
+
             return {
                 ...node,
                 data,
@@ -113,11 +152,11 @@ export class UaRunCanvasViewElement extends UmbLitElement {
         });
 
         this._edges = baseEdges.map((edge) => {
-            const sourceRun = edge.source === TRIGGER_NODE_ID
+            const sourceCompleted = edge.source === TRIGGER_NODE_ID
                 ? (this._run!.status !== "Pending")
-                : stepRunsByStepId.get(edge.source)?.status === "Completed";
-            const targetRun = stepRunsByStepId.get(edge.target);
-            const taken = !!sourceRun && !!targetRun && targetRun.status !== "Pending" && targetRun.status !== "Skipped";
+                : aggregateStatus(stepRunsByStepId.get(edge.source) ?? []) === "Completed";
+            const targetStatus = aggregateStatus(stepRunsByStepId.get(edge.target) ?? []);
+            const taken = sourceCompleted && targetStatus !== "Pending" && targetStatus !== "Skipped";
             return {
                 ...edge,
                 animated: false,
@@ -126,7 +165,9 @@ export class UaRunCanvasViewElement extends UmbLitElement {
             };
         });
 
-        this._viewport = canvasState?.viewport;
+        // Intentionally not propagating canvasState.viewport: a run is read-only and the
+        // editor's last-saved pan/zoom is irrelevant. Leaving `viewport` undefined makes
+        // the canvas fitView on mount so every node is visible.
     }
 
     async #buildCatalogueLookup(): Promise<Map<string, CatalogueLookupEntry>> {
@@ -154,7 +195,7 @@ export class UaRunCanvasViewElement extends UmbLitElement {
     }
 
     override render() {
-        if (!this._run || !this.#automation) {
+        if (!this._run || !this._automation) {
             return html`<div class="center"><uui-loader></uui-loader></div>`;
         }
 
@@ -163,7 +204,6 @@ export class UaRunCanvasViewElement extends UmbLitElement {
                 read-only
                 .nodes=${this._nodes}
                 .edges=${this._edges}
-                .viewport=${this._viewport}
                 .nodeTypes=${runNodeTypes}
                 .edgeTypes=${runEdgeTypes}
                 .extraStyles=${runCanvasCss}
@@ -191,6 +231,26 @@ export class UaRunCanvasViewElement extends UmbLitElement {
 }
 
 export default UaRunCanvasViewElement;
+
+/**
+ * Count how many times a control-flow container's body executed at runtime by reading
+ * the stepRun count of the first downstream node. Inside a forEach the body runs once
+ * per item in the collection, so this equals the realised iteration count (0 when the
+ * collection was empty).
+ */
+function countBodyIterations(
+    containerNodeId: string,
+    edges: Array<{ source: string; target: string }>,
+    stepRunsByStepId: Map<string, ReadonlyArray<UaStepRunModel>>,
+): number {
+    let max = 0;
+    for (const edge of edges) {
+        if (edge.source !== containerNodeId) continue;
+        const count = stepRunsByStepId.get(edge.target)?.length ?? 0;
+        if (count > max) max = count;
+    }
+    return max;
+}
 
 declare global {
     interface HTMLElementTagNameMap {

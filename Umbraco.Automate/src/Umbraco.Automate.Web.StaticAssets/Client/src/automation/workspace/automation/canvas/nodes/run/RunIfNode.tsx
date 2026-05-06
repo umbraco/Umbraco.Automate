@@ -3,17 +3,19 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import RunNodeShell, { RunMetaRow } from "./RunNodeShell.js";
 import type { ActionNodeData } from "../../types.js";
 import type { UaStepRunModel } from "../../../../../../run/types.js";
-import { formatDuration, type RunNodeStatus, type RunBranchState } from "./run-node-utils.js";
+import { formatDuration, totalDurationMs, type RunNodeStatus, type RunBranchState } from "./run-node-utils.js";
 
 interface RunIfNodeData extends ActionNodeData {
     runStatus: RunNodeStatus;
-    stepRun?: UaStepRunModel;
+    stepRuns: UaStepRunModel[];
     branches?: { true?: RunBranchState; false?: RunBranchState };
 }
 
 function RunIfNode({ data }: NodeProps) {
     const nodeData = data as RunIfNodeData;
-    const duration = formatDuration(nodeData.stepRun?.durationMs);
+    const stepRuns = nodeData.stepRuns ?? [];
+    const iterations = stepRuns.length;
+    const duration = formatDuration(totalDurationMs(stepRuns));
     const branches = nodeData.branches ?? {};
 
     return (
@@ -26,13 +28,18 @@ function RunIfNode({ data }: NodeProps) {
                 status={nodeData.runStatus}
                 subtitle={nodeData.stepAlias || undefined}
             >
+                {iterations > 1 && <RunMetaRow label="Iterations">{iterations}</RunMetaRow>}
                 <RunMetaRow label="True">
                     <BranchPill state={branches.true} variant="true" />
                 </RunMetaRow>
                 <RunMetaRow label="False">
                     <BranchPill state={branches.false} variant="false" />
                 </RunMetaRow>
-                {duration && <RunMetaRow label="Duration">{duration}</RunMetaRow>}
+                {duration && (
+                    <RunMetaRow label={iterations > 1 ? "Total time" : "Duration"}>
+                        {duration}
+                    </RunMetaRow>
+                )}
             </RunNodeShell>
             <Handle type="source" position={Position.Bottom} id="true" style={{ left: "30%" }} isConnectable={false} />
             <Handle type="source" position={Position.Bottom} id="false" style={{ left: "70%" }} isConnectable={false} />

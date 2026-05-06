@@ -146,6 +146,20 @@
     max-width: 100%;
 }
 
+.ua-run-node__binding {
+    font-family: var(--uui-font-monospace, monospace);
+    font-size: 11px;
+    color: var(--uui-color-text-alt, #6b7280);
+    background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 100%;
+}
+
 /* Branch pill — replaces "True/False" labels on If/Switch outputs. */
 .ua-run-node__branch-pill {
     display: inline-flex;

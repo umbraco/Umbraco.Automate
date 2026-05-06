@@ -35,6 +35,31 @@ export interface RunBranchState {
 }
 
 /**
+ * Reduces a list of step-run iterations down to a single status. Failures dominate;
+ * Running > WaitingForInput > Sleeping > Completed > Skipped > Pending.
+ */
+export function aggregateStatus(stepRuns: ReadonlyArray<UaStepRunModel>): RunNodeStatus {
+    if (stepRuns.length === 0) return "Pending";
+    let worst: RunNodeStatus = stepRuns[0].status;
+    for (let i = 1; i < stepRuns.length; i++) {
+        worst = worsen(worst, stepRuns[i].status);
+    }
+    return worst;
+}
+
+/**
+ * Sums runtime durations across iterations. `null` if no iteration recorded one.
+ */
+export function totalDurationMs(stepRuns: ReadonlyArray<UaStepRunModel>): number | null {
+    let total: number | null = null;
+    for (const sr of stepRuns) {
+        if (sr.durationMs == null) continue;
+        total = (total ?? 0) + sr.durationMs;
+    }
+    return total;
+}
+
+/**
  * Walks downstream from a (sourceNodeId, sourceHandle) edge to determine whether the
  * branch was taken at runtime, by checking whether any reachable step has a non-Pending
  * stepRun.
@@ -43,7 +68,7 @@ export function computeBranchState(
     sourceNodeId: string,
     sourceHandle: string | null | undefined,
     edges: Array<{ source: string; target: string; sourceHandle?: string | null }>,
-    stepRunsByStepId: Map<string, UaStepRunModel>,
+    stepRunsByStepId: Map<string, ReadonlyArray<UaStepRunModel>>,
 ): RunBranchState {
     const visited = new Set<string>();
     const queue: string[] = [];
@@ -61,8 +86,8 @@ export function computeBranchState(
         if (visited.has(id)) continue;
         visited.add(id);
 
-        const run = stepRunsByStepId.get(id);
-        if (run) worst = worsen(worst, run.status);
+        const runs = stepRunsByStepId.get(id);
+        if (runs && runs.length > 0) worst = worsen(worst, aggregateStatus(runs));
 
         for (const edge of edges) {
             if (edge.source === id) queue.push(edge.target);

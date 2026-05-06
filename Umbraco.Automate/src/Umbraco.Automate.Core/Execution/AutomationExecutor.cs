@@ -3,8 +3,11 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Diagnostics;
+using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Scoping;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Core.Execution;
@@ -22,6 +25,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IWorkspaceService _workspaceService;
     private readonly IRateLimitService _rateLimitService;
     private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly ICoreScopeProvider _scopeProvider;
+    private readonly IEventMessagesFactory _eventMessagesFactory;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<AutomationExecutor> _logger;
 
@@ -33,6 +38,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IWorkspaceService workspaceService,
         IRateLimitService rateLimitService,
         ConditionEvaluator conditionEvaluator,
+        ICoreScopeProvider scopeProvider,
+        IEventMessagesFactory eventMessagesFactory,
         AutomateMetrics metrics,
         ILogger<AutomationExecutor> logger)
     {
@@ -43,6 +50,8 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _workspaceService = workspaceService;
         _rateLimitService = rateLimitService;
         _conditionEvaluator = conditionEvaluator;
+        _scopeProvider = scopeProvider;
+        _eventMessagesFactory = eventMessagesFactory;
         _metrics = metrics;
         _logger = logger;
     }
@@ -79,6 +88,12 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         };
 
         await _runRepository.SaveAsync(run, cancellationToken);
+
+        using (var scope = _scopeProvider.CreateCoreScope())
+        {
+            scope.Notifications.Publish(new AutomationRunStartedNotification(run, _eventMessagesFactory.Get()));
+            scope.Complete();
+        }
 
         _metrics.RunStarted(automation.Alias);
 

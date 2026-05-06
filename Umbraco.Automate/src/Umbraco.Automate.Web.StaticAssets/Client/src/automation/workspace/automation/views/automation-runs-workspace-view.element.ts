@@ -1,8 +1,10 @@
 import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_MANAGEMENT_API_SERVER_EVENT_CONTEXT } from "@umbraco-cms/backoffice/management-api";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import { UaRunCollectionRepository } from "../../../../run/repository/collection/run-collection.repository.js";
+import { UA_RUN_EVENT_SOURCE, UA_RUN_EVENT_TYPES } from "../../../../run/constants.js";
 import type { UaRunItemModel } from "../../../../run/types.js";
 
 import "../../../../run/components/runs-table/runs-table.element.js";
@@ -17,6 +19,8 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
     @state()
     private _loading = true;
 
+    #automationId?: string;
+
     constructor() {
         super();
         this.#runCollectionRepo = new UaRunCollectionRepository(this);
@@ -25,10 +29,32 @@ export class UaAutomationRunsWorkspaceViewElement extends UmbLitElement {
             if (!context) return;
             this.observe(context.unique, (unique) => {
                 if (unique) {
+                    this.#automationId = unique;
                     this.#loadRuns(unique);
                 }
             });
         });
+
+        this.consumeContext(UMB_MANAGEMENT_API_SERVER_EVENT_CONTEXT, (context) => {
+            if (!context) return;
+            this.observe(
+                context.byEventSourcesAndEventTypes([UA_RUN_EVENT_SOURCE], [...UA_RUN_EVENT_TYPES]),
+                (event) => {
+                    if (!event || !this.#automationId) return;
+                    this.#scheduleReload();
+                },
+                "ua-automation-runs-server-events",
+            );
+        });
+    }
+
+    #reloadHandle?: ReturnType<typeof setTimeout>;
+    #scheduleReload() {
+        if (this.#reloadHandle !== undefined) return;
+        this.#reloadHandle = setTimeout(() => {
+            this.#reloadHandle = undefined;
+            if (this.#automationId) this.#loadRuns(this.#automationId);
+        }, 500);
     }
 
     async #loadRuns(automationId: string) {

@@ -72,6 +72,20 @@ public sealed class AutomationRunStartingNotification(AutomationRun target, Even
     : CancelableObjectNotification<AutomationRun>(target, messages);
 
 /// <summary>
+/// Notification fired after an automation run row has been persisted, before workflow
+/// execution begins. Lets observers (e.g. the backoffice live-updates bridge) react to
+/// the existence of a new run.
+/// </summary>
+public sealed class AutomationRunStartedNotification(AutomationRun target, EventMessages messages)
+    : ObjectNotification<AutomationRun>(target, messages)
+{
+    /// <summary>
+    /// Gets the newly started automation run.
+    /// </summary>
+    public AutomationRun Run { get; } = target;
+}
+
+/// <summary>
 /// Notification fired after an automation run has completed (any status).
 /// </summary>
 public sealed class AutomationRunCompletedNotification(AutomationRun target, EventMessages messages)

@@ -1,8 +1,10 @@
 import { css, html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_MANAGEMENT_API_SERVER_EVENT_CONTEXT } from "@umbraco-cms/backoffice/management-api";
 import { UaAutomationCollectionServerDataSource } from "../../automation/repository/collection/automation-collection.server.data-source.js";
 import { UaRunCollectionServerDataSource } from "../repository/collection/run-collection.server.data-source.js";
+import { UA_RUN_EVENT_SOURCE, UA_RUN_EVENT_TYPES } from "../constants.js";
 import type { UaRunItemModel } from "../types.js";
 
 import "../components/runs-table/runs-table.element.js";
@@ -24,6 +26,31 @@ export class UaRunDashboardElement extends UmbLitElement {
     override connectedCallback() {
         super.connectedCallback();
         this.#loadData();
+
+        this.consumeContext(UMB_MANAGEMENT_API_SERVER_EVENT_CONTEXT, (context) => {
+            if (!context) return;
+            this.observe(
+                context.byEventSourcesAndEventTypes([UA_RUN_EVENT_SOURCE], [...UA_RUN_EVENT_TYPES]),
+                (event) => {
+                    if (!event) return;
+                    this.#scheduleReload();
+                },
+                "ua-run-dashboard-server-events",
+            );
+        });
+    }
+
+    #reloadHandle?: ReturnType<typeof setTimeout>;
+    /**
+     * Coalesce server events that arrive in bursts (e.g. start + complete in quick
+     * succession) into a single reload so we don't hammer the server.
+     */
+    #scheduleReload() {
+        if (this.#reloadHandle !== undefined) return;
+        this.#reloadHandle = setTimeout(() => {
+            this.#reloadHandle = undefined;
+            this.#loadData();
+        }, 500);
     }
 
     async #loadData() {

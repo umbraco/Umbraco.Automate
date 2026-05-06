@@ -1,20 +1,31 @@
 import { css, html, customElement, state, nothing, repeat, when } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_MANAGEMENT_API_SERVER_EVENT_CONTEXT } from "@umbraco-cms/backoffice/management-api";
 import { UaRunDetailServerDataSource } from "../repository/detail/run-detail.server.data-source.js";
+import { UaAutomationDetailServerDataSource } from "../../automation/repository/detail/automation-detail.server.data-source.js";
 import { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repository.js";
 import { formatDateTime } from "../../core/index.js";
 import { client } from "../../api/client.gen.js";
+import { UA_RUN_EVENT_SOURCE, UA_RUN_EVENT_TYPES } from "../constants.js";
 import type { UaRunDetailModel, UaStepRunModel } from "../types.js";
+import type { UaAutomationDetailModel } from "../../automation/types.js";
 import type { UaRunDetailModalData } from "./run-detail-modal.token.js";
+import "../workspace/run/views/run-canvas-view.element.js";
+
+type ModalTab = "steps" | "canvas";
 
 @customElement("ua-run-detail-modal")
 export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModalData> {
     #dataSource = new UaRunDetailServerDataSource(this);
+    #automationDataSource = new UaAutomationDetailServerDataSource(this);
     #catalogueRepository = new UaCatalogueRepository(this);
 
     @state()
     private _run?: UaRunDetailModel;
+
+    @state()
+    private _automation?: UaAutomationDetailModel;
 
     @state()
     private _loading = true;
@@ -31,11 +42,38 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
     @state()
     private _actionNames = new Map<string, string>();
 
+    @state()
+    private _activeTab: ModalTab = "canvas";
+
     override connectedCallback() {
         super.connectedCallback();
         if (this.data?.runId) {
             this.#loadRun(this.data.runId);
         }
+
+        this.consumeContext(UMB_MANAGEMENT_API_SERVER_EVENT_CONTEXT, (context) => {
+            if (!context) return;
+            this.observe(
+                context.byEventSourcesAndEventTypes([UA_RUN_EVENT_SOURCE], [...UA_RUN_EVENT_TYPES]),
+                (event) => {
+                    if (!event || !this.data?.runId) return;
+                    // Only re-read when the event references this open run.
+                    if (event.key !== this.data.runId) return;
+                    this.#refreshRun();
+                },
+                "ua-run-modal-server-events",
+            );
+        });
+    }
+
+    /**
+     * Re-read the open run without flipping the loading state, so the modal updates
+     * in place while the user is looking at it.
+     */
+    async #refreshRun() {
+        if (!this.data?.runId) return;
+        const { data: run } = await this.#dataSource.read(this.data.runId);
+        if (run) this._run = run;
     }
 
     async #loadRun(runId: string) {
@@ -51,6 +89,12 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             const firstFailed = run.stepRuns.find((sr) => sr.status === "Failed");
             if (firstFailed) {
                 this._expandedStep = firstFailed.id;
+            }
+
+            // Load the associated automation so the canvas tab can render the flow.
+            const { data: automation } = await this.#automationDataSource.read(run.automationId);
+            if (automation) {
+                this._automation = automation;
             }
         }
 
@@ -179,7 +223,8 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             : this.localize.term("uaLabels_runInfo");
 
         return html`
-            <umb-body-layout .headline=${headline}>
+            <umb-body-layout main-no-padding .headline=${headline}>
+                ${this._run ? this.#renderTabs() : nothing}
                 ${this._loading
                     ? html`<div class="center"><uui-loader></uui-loader></div>`
                     : this._run
@@ -255,7 +300,51 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
         `;
     }
 
+    #renderCanvas() {
+        if (!this._run) return nothing;
+        if (!this._automation) {
+            return html`<div class="canvas-loader"><uui-loader></uui-loader></div>`;
+        }
+        return html`
+            <ua-run-canvas-view
+                class="canvas-tab"
+                .run=${this._run}
+                .automation=${this._automation}
+            ></ua-run-canvas-view>
+        `;
+    }
+
+    #renderTabs() {
+        return html`
+            <uui-tab-group slot="navigation" data-mark="run:view-links">
+                <uui-tab
+                    label="Canvas"
+                    ?active=${this._activeTab === "canvas"}
+                    @click=${() => (this._activeTab = "canvas")}
+                    data-mark="run:view-link:canvas"
+                >
+                    <uui-icon slot="icon" name="icon-mindmap"></uui-icon>
+                    Canvas
+                </uui-tab>
+                <uui-tab
+                    label="Info"
+                    ?active=${this._activeTab === "steps"}
+                    @click=${() => (this._activeTab = "steps")}
+                    data-mark="run:view-link:info"
+                >
+                    <uui-icon slot="icon" name="icon-info"></uui-icon>
+                    Info
+                </uui-tab>
+            </uui-tab-group>
+        `;
+    }
+
     #renderContent() {
+        if (!this._run) return nothing;
+        return this._activeTab === "canvas" ? this.#renderCanvas() : this.#renderStepsTab();
+    }
+
+    #renderStepsTab() {
         if (!this._run) return nothing;
 
         return html`
@@ -325,6 +414,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                 display: grid;
                 gap: var(--uui-size-layout-1);
                 grid-template-columns: 1fr 350px;
+                padding: var(--uui-size-layout-1);
             }
 
             .main,
@@ -332,6 +422,27 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                 display: flex;
                 flex-direction: column;
                 gap: var(--uui-size-layout-1);
+            }
+
+            uui-tab-group[slot="navigation"] {
+                --uui-tab-divider: var(--uui-color-border);
+                border-left: 1px solid var(--uui-color-border);
+                border-right: 1px solid var(--uui-color-border);
+            }
+
+            ua-run-canvas-view.canvas-tab {
+                display: block;
+                width: 100%;
+                height: 100%;
+                min-height: 400px;
+            }
+
+            .canvas-loader {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100%;
+                min-height: 400px;
             }
 
             .main uui-box {

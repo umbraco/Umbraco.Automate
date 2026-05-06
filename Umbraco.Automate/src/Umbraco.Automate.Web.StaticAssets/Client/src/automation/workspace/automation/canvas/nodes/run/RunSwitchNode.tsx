@@ -3,17 +3,19 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import RunNodeShell, { RunMetaRow } from "./RunNodeShell.js";
 import type { ActionNodeData } from "../../types.js";
 import type { UaStepRunModel } from "../../../../../../run/types.js";
-import { formatDuration, type RunNodeStatus, type RunBranchState } from "./run-node-utils.js";
+import { formatDuration, totalDurationMs, type RunNodeStatus, type RunBranchState } from "./run-node-utils.js";
 
 interface RunSwitchNodeData extends ActionNodeData {
     runStatus: RunNodeStatus;
-    stepRun?: UaStepRunModel;
+    stepRuns: UaStepRunModel[];
     branches?: Record<string, RunBranchState>;
 }
 
 function RunSwitchNode({ data }: NodeProps) {
     const nodeData = data as RunSwitchNodeData;
-    const duration = formatDuration(nodeData.stepRun?.durationMs);
+    const stepRuns = nodeData.stepRuns ?? [];
+    const iterations = stepRuns.length;
+    const duration = formatDuration(totalDurationMs(stepRuns));
     const branches = nodeData.branches ?? {};
 
     const handles = useMemo(() => {
@@ -36,6 +38,7 @@ function RunSwitchNode({ data }: NodeProps) {
                 status={nodeData.runStatus}
                 subtitle={nodeData.stepAlias || undefined}
             >
+                {iterations > 1 && <RunMetaRow label="Iterations">{iterations}</RunMetaRow>}
                 {handles.map((handle) => {
                     const state = branches[handle.id];
                     const taken = !!state?.taken;
@@ -49,7 +52,11 @@ function RunSwitchNode({ data }: NodeProps) {
                         </RunMetaRow>
                     );
                 })}
-                {duration && <RunMetaRow label="Duration">{duration}</RunMetaRow>}
+                {duration && (
+                    <RunMetaRow label={iterations > 1 ? "Total time" : "Duration"}>
+                        {duration}
+                    </RunMetaRow>
+                )}
             </RunNodeShell>
             {handles.map((handle) => (
                 <Handle
