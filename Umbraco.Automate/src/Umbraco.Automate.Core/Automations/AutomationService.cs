@@ -165,14 +165,6 @@ internal sealed class AutomationService : IAutomationService
         }
 
         automation.PublishedVersion = automation.Version;
-
-        // Only enable on first publish (Draft → Published). Re-publishing an already-published
-        // automation preserves the user's enabled/disabled choice.
-        if (automation.Status != AutomationStatus.Published)
-        {
-            automation.IsEnabled = true;
-        }
-
         automation.Status = AutomationStatus.Published;
 
         var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
@@ -324,7 +316,7 @@ internal sealed class AutomationService : IAutomationService
             ?? throw new InvalidOperationException($"Version {targetVersion} not found for automation '{automationId}'.");
 
         // Rollback is a draft-only operation: restore content fields from the target version
-        // into a new draft. Lifecycle state (PublishedVersion, Status, IsEnabled) is preserved
+        // into a new draft. Lifecycle state (PublishedVersion, Status) is preserved
         // from the current entity — the user must explicitly re-publish if desired.
         var current = await _automationRepository.GetAsync(automationId, cancellationToken)
             ?? throw new InvalidOperationException($"Automation '{automationId}' not found.");
@@ -491,7 +483,6 @@ internal sealed class AutomationService : IAutomationService
             Alias = def.Alias,
             Name = def.Name,
             Description = def.Description,
-            IsEnabled = false,
             Status = AutomationStatus.Draft,
             WorkspaceId = workspaceId,
             Trigger = def.Trigger,

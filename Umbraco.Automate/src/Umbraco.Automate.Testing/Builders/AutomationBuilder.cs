@@ -14,7 +14,6 @@ public class AutomationBuilder
     private string _name = "Test Automation";
     private string? _description;
     private AutomationStatus _status = AutomationStatus.Published;
-    private bool _isEnabled = true;
     private int? _publishedVersion = 1;
     private int _version = 1;
     private Guid _workspaceId = Guid.NewGuid();
@@ -33,7 +32,6 @@ public class AutomationBuilder
     public AutomationBuilder WithName(string name) { _name = name; return this; }
     public AutomationBuilder WithDescription(string? description) { _description = description; return this; }
     public AutomationBuilder WithStatus(AutomationStatus status) { _status = status; return this; }
-    public AutomationBuilder WithIsEnabled(bool isEnabled) { _isEnabled = isEnabled; return this; }
     public AutomationBuilder WithVersion(int version) { _version = version; return this; }
     public AutomationBuilder WithPublishedVersion(int? publishedVersion) { _publishedVersion = publishedVersion; return this; }
     public AutomationBuilder WithWorkspaceId(Guid workspaceId) { _workspaceId = workspaceId; return this; }
@@ -147,7 +145,6 @@ public class AutomationBuilder
     {
         _status = AutomationStatus.Draft;
         _publishedVersion = null;
-        _isEnabled = false;
         return this;
     }
 
@@ -157,7 +154,6 @@ public class AutomationBuilder
     public AutomationBuilder AsInactive()
     {
         _status = AutomationStatus.Inactive;
-        _isEnabled = false;
         return this;
     }
 
@@ -168,7 +164,6 @@ public class AutomationBuilder
         Name = _name,
         Description = _description,
         Status = _status,
-        IsEnabled = _isEnabled,
         PublishedVersion = _publishedVersion,
         Version = _version,
         WorkspaceId = _workspaceId,

@@ -59,7 +59,6 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
         CompareScalar(changes, "Alias", from.Alias, to.Alias);
         CompareScalar(changes, "Name", from.Name, to.Name);
         CompareScalar(changes, "Description", from.Description, to.Description);
-        CompareScalar(changes, "IsEnabled", from.IsEnabled.ToString(), to.IsEnabled.ToString());
         CompareScalar(changes, "Status", from.Status.ToString(), to.Status.ToString());
         CompareScalar(changes, "WorkspaceId", from.WorkspaceId.ToString(), to.WorkspaceId.ToString());
         CompareScalar(changes, "GroupId", from.GroupId?.ToString(), to.GroupId?.ToString());

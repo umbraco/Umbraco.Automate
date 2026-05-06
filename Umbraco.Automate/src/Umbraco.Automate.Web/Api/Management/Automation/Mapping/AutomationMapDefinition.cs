@@ -38,7 +38,6 @@ public class AutomationMapDefinition : IMapDefinition
     private static void MapFromCreateRequest(CreateAutomationRequestModel source, Core.Automations.Automation target, MapperContext context)
     {
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
@@ -54,7 +53,6 @@ public class AutomationMapDefinition : IMapDefinition
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
@@ -70,7 +68,6 @@ public class AutomationMapDefinition : IMapDefinition
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.Status = source.Status;
         target.PublishedVersion = source.PublishedVersion;
         target.WorkspaceId = source.WorkspaceId;
@@ -92,7 +89,6 @@ public class AutomationMapDefinition : IMapDefinition
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.WorkspaceId = source.WorkspaceId;
         target.GroupId = source.GroupId;
         target.Status = source.Status;

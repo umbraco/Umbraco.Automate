@@ -23,9 +23,6 @@ public sealed class AutomationResponseModel
     /// <summary>Optional description.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; set; }
-
     /// <summary>The lifecycle status.</summary>
     [Required]
     public AutomationStatus Status { get; set; }

@@ -99,7 +99,6 @@ public class ScheduledTriggerBackgroundJobTests
         {
             Alias = "test",
             Name = "Test",
-            IsEnabled = true,
             Status = AutomationStatus.Published,
             Trigger = new TriggerConfiguration
             {
@@ -144,7 +143,6 @@ public class ScheduledTriggerBackgroundJobTests
         {
             Alias = "test",
             Name = "Test",
-            IsEnabled = true,
             Status = AutomationStatus.Published,
             Trigger = new TriggerConfiguration
             {
@@ -172,7 +170,7 @@ public class ScheduledTriggerBackgroundJobTests
     }
 
     [Fact]
-    public async Task PerformExecuteAsync_DisabledAutomation_DoesNotDispatch()
+    public async Task PerformExecuteAsync_AutomationWithoutTrigger_DoesNotDispatch()
     {
         var automationId = Guid.NewGuid();
 
@@ -183,8 +181,7 @@ public class ScheduledTriggerBackgroundJobTests
         {
             Alias = "test",
             Name = "Test",
-            IsEnabled = false,
-            Trigger = new TriggerConfiguration { TriggerAlias = ScheduledTriggerAlias, Settings = [] },
+            Trigger = null,
         };
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);

@@ -1,5 +1,4 @@
 import {
-    UA_AUTOMATION_DISABLED_FLAG,
     UA_AUTOMATION_PENDING_CHANGES_FLAG,
     UA_AUTOMATION_TREE_ALIAS,
     UA_AUTOMATION_TREE_REPOSITORY_ALIAS,
@@ -71,15 +70,6 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
         forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
         forEntityFlags: [UA_AUTOMATION_PENDING_CHANGES_FLAG],
         meta: { iconName: "icon-edit", label: "#uaLabels_unpublishedChanges" },
-    },
-    {
-        type: "entitySign",
-        kind: "icon",
-        alias: "UmbracoAutomate.EntitySign.Automation.Disabled",
-        name: "Automation Disabled Entity Sign",
-        forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
-        forEntityFlags: [UA_AUTOMATION_DISABLED_FLAG],
-        meta: { iconName: "icon-block", label: "#uaLabels_disabled" },
     },
     {
         type: "treeItem",

@@ -83,12 +83,12 @@ public sealed class WebhookEndpointController : ControllerBase
             return NotFound();
         }
 
-        if (automation.Status != AutomationStatus.Published || !automation.IsEnabled)
+        if (automation.Status != AutomationStatus.Published)
         {
             return Conflict(new ProblemDetails
             {
                 Title = "Automation not active",
-                Detail = "The automation must be published and enabled to receive webhooks.",
+                Detail = "The automation must be published to receive webhooks.",
                 Status = StatusCodes.Status409Conflict,
             });
         }

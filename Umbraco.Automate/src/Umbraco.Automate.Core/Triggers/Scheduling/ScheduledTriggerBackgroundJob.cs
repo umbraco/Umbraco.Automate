@@ -82,7 +82,7 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
             try
             {
                 var automation = await automationService.GetAutomationAsync(automationId, CancellationToken.None);
-                if (automation is not { IsEnabled: true, Trigger: not null })
+                if (automation?.Trigger is null)
                 {
                     continue;
                 }

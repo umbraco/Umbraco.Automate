@@ -21,7 +21,6 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
     private _tableColumns: Array<UmbTableColumn> = [
         { name: "Name", alias: "name" },
         { name: "Status", alias: "status" },
-        { name: "Enabled", alias: "isEnabled" },
         { name: "", alias: "entityActions", align: "right", width: "1%" },
     ];
 
@@ -76,14 +75,6 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
                     columnAlias: "status",
                     value: isAutomation && item.status
                         ? html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">${item.status}</uui-tag>`
-                        : "",
-                },
-                {
-                    columnAlias: "isEnabled",
-                    value: isAutomation
-                        ? html`<uui-tag color=${item.isEnabled ? "positive" : "default"} look="secondary">
-                              ${item.isEnabled ? "Enabled" : "Disabled"}
-                          </uui-tag>`
                         : "",
                 },
                 {

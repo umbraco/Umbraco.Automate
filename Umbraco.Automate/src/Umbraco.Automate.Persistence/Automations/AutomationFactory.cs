@@ -51,7 +51,6 @@ internal sealed class AutomationFactory
             Alias = entity.Alias,
             Name = entity.Name,
             Description = entity.Description,
-            IsEnabled = entity.IsEnabled,
             Status = (AutomationStatus)entity.Status,
             PublishedVersion = entity.PublishedVersion,
             WorkspaceId = entity.WorkspaceId,
@@ -77,7 +76,6 @@ internal sealed class AutomationFactory
             Alias = automation.Alias,
             Name = automation.Name,
             Description = automation.Description,
-            IsEnabled = automation.IsEnabled,
             Status = (int)automation.Status,
             PublishedVersion = automation.PublishedVersion,
             WorkspaceId = automation.WorkspaceId,
@@ -96,7 +94,6 @@ internal sealed class AutomationFactory
         entity.Alias = automation.Alias;
         entity.Name = automation.Name;
         entity.Description = automation.Description;
-        entity.IsEnabled = automation.IsEnabled;
         entity.Status = (int)automation.Status;
         entity.PublishedVersion = automation.PublishedVersion;
         entity.WorkspaceId = automation.WorkspaceId;
@@ -111,7 +108,6 @@ internal sealed class AutomationFactory
     public void UpdateMetadata(AutomationEntity entity, Automation automation)
     {
         entity.Status = (int)automation.Status;
-        entity.IsEnabled = automation.IsEnabled;
         entity.PublishedVersion = automation.PublishedVersion;
         entity.GroupId = automation.GroupId;
         entity.Version = automation.Version;

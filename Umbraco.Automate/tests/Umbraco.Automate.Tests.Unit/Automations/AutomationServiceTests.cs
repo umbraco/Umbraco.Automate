@@ -81,16 +81,14 @@ public class AutomationServiceTests
 
         result.PublishedVersion.ShouldBe(3);
         result.Status.ShouldBe(AutomationStatus.Published);
-        result.IsEnabled.ShouldBeTrue();
     }
 
     [Fact]
-    public async Task UnpublishAutomationAsync_SetsInactive_PreservesIsEnabled()
+    public async Task UnpublishAutomationAsync_SetsInactive()
     {
         var id = Guid.NewGuid();
         Automation automation = new AutomationBuilder().WithId(id);
         automation.Status = AutomationStatus.Published;
-        automation.IsEnabled = true;
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
@@ -100,7 +98,6 @@ public class AutomationServiceTests
         var result = await _service.UnpublishAutomationAsync(id);
 
         result.Status.ShouldBe(AutomationStatus.Inactive);
-        result.IsEnabled.ShouldBeTrue();
     }
 
     [Fact]

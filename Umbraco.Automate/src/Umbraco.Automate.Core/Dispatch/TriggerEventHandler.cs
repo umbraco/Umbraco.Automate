@@ -55,17 +55,17 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
         _logger.LogDebug("Received trigger event for {TriggerAlias}", message.TriggerAlias);
 
-        // Find all published & enabled automations that use this trigger.
+        // Find all published automations that use this trigger.
         var automations = await _automationService.GetAllAutomationsAsync(cancellationToken);
         var matching = automations
-            .Where(a => a is { Status: AutomationStatus.Published, IsEnabled: true }
+            .Where(a => a.Status == AutomationStatus.Published
                         && a.Trigger?.TriggerAlias == message.TriggerAlias)
             .ToList();
 
         if (matching.Count == 0)
         {
             _logger.LogInformation(
-                "No published & enabled automations matched trigger {TriggerAlias} — event dropped",
+                "No published automations matched trigger {TriggerAlias} — event dropped",
                 message.TriggerAlias);
             return;
         }

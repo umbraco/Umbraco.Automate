@@ -63,13 +63,6 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                             </uui-tag>
                         </div>
                     </umb-property-layout>
-                    <umb-property-layout label=${this.localize.term("uaLabels_enabled")} orientation="vertical">
-                        <div slot="editor">
-                            <uui-tag color=${this._model.isEnabled ? "positive" : "default"} look="secondary">
-                                ${this._model.isEnabled ? this.localize.term("uaLabels_enabled") : this.localize.term("uaLabels_disabled")}
-                            </uui-tag>
-                        </div>
-                    </umb-property-layout>
                     ${this._model.dateCreated
                         ? html`
                               <umb-property-layout label=${this.localize.term("uaLabels_dateCreated")} orientation="vertical">
