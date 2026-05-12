@@ -16,6 +16,20 @@ public class AutomateOptions
     /// Gets or sets whether the automation engine is enabled.
     /// </summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether Automate should share the Umbraco CMS connection string
+    /// (<c>umbracoDbDSN</c>) instead of requiring a dedicated <c>umbracoAutomateDbDSN</c>.
+    /// </summary>
+    /// <remarks>
+    /// Sharing the CMS database is opt-in because it can have performance implications:
+    /// Automate writes outbox messages, run history and WorkflowCore engine tables that
+    /// add traffic to the same database. This flag exists primarily for hosting environments
+    /// (e.g. Umbraco Cloud) where the CMS connection string is not user-editable so cannot
+    /// be copied into <c>umbracoAutomateDbDSN</c>. Cannot be combined with an explicit
+    /// <c>umbracoAutomateDbDSN</c> — configure one or the other.
+    /// </remarks>
+    public bool UseUmbracoDbDSN { get; set; }
 }
 
 /// <summary>
