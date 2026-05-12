@@ -7,28 +7,24 @@ namespace Umbraco.Automate.Core.Persistence;
 /// Resolves the database connection string and provider name for Automate packages.
 /// </summary>
 /// <remarks>
-/// Sharing the CMS database is opt-in to keep the performance impact a conscious choice.
-/// Resolution order:
-/// <list type="number">
-///   <item><description>A dedicated <c>umbracoAutomateDbDSN</c> connection string.</description></item>
-///   <item><description>The <c>Umbraco:Automate:UseUmbracoDbDSN</c> flag — falls back to
-///     <c>umbracoDbDSN</c>. Intended for hosts (e.g. Umbraco Cloud) where the CMS
-///     connection string isn't user-editable so cannot be copied to
-///     <c>umbracoAutomateDbDSN</c>.</description></item>
-/// </list>
-/// Setting both is a configuration error and throws at startup.
+/// The connection-string name is taken from <c>Umbraco:Automate:UseNamedConnectionString</c>
+/// and defaults to <c>umbracoAutomateDbDSN</c>. Pointing the setting at another entry
+/// (e.g. <c>umbracoDbDSN</c>) lets Automate share an existing connection — opt-in because
+/// the additional traffic from outbox messages, run history and engine tables can affect
+/// the named database's performance.
 /// </remarks>
 public static class DatabaseConnectionInfo
 {
     /// <summary>
-    /// The connection string name for the dedicated Automate database.
+    /// The default connection string name used when
+    /// <see cref="UseNamedConnectionStringConfigKey"/> is not configured.
     /// </summary>
     public const string ConnectionStringName = "umbracoAutomateDbDSN";
 
     /// <summary>
-    /// Configuration key for the opt-in flag that allows sharing the Umbraco CMS connection.
+    /// Configuration key naming the connection string Automate should resolve.
     /// </summary>
-    public const string UseUmbracoDbDSNConfigKey = "Umbraco:Automate:UseUmbracoDbDSN";
+    public const string UseNamedConnectionStringConfigKey = "Umbraco:Automate:UseNamedConnectionString";
 
     /// <summary>
     /// The custom migrations history table name used by Automate's EF Core migrations.
@@ -37,44 +33,28 @@ public static class DatabaseConnectionInfo
 
     /// <summary>
     /// Resolves the connection string and provider name from configuration.
-    /// Throws <see cref="InvalidOperationException"/> if not configured, or if both
-    /// <c>umbracoAutomateDbDSN</c> and <c>Umbraco:Automate:UseUmbracoDbDSN</c> are set.
+    /// Throws <see cref="InvalidOperationException"/> if the named connection string
+    /// is not configured.
     /// </summary>
     public static (string ConnectionString, string ProviderName) Resolve(IConfiguration config)
     {
-        var automateConnectionString = config.GetUmbracoConnectionString(ConnectionStringName, out var automateProviderName);
-        var useUmbracoDbDSN = config.GetValue<bool>(UseUmbracoDbDSNConfigKey);
+        var name = config[UseNamedConnectionStringConfigKey];
+        if (string.IsNullOrEmpty(name))
+        {
+            name = ConnectionStringName;
+        }
 
-        if (!string.IsNullOrEmpty(automateConnectionString) && useUmbracoDbDSN)
+        var connectionString = config.GetUmbracoConnectionString(name, out var providerName);
+        if (string.IsNullOrEmpty(connectionString))
         {
             throw new InvalidOperationException(
-                $"Both '{ConnectionStringName}' and '{UseUmbracoDbDSNConfigKey}' are configured. " +
-                $"Please configure only one — either set a dedicated '{ConnectionStringName}' " +
-                $"connection string, or set '{UseUmbracoDbDSNConfigKey}: true' to share the Umbraco CMS database.");
+                $"Umbraco Automate requires a database connection string named '{name}'. " +
+                $"Either configure a '{name}' entry under 'ConnectionStrings', or set " +
+                $"'{UseNamedConnectionStringConfigKey}' to the name of an existing connection " +
+                $"string to reuse (e.g. 'umbracoDbDSN' to share the Umbraco CMS database).");
         }
 
-        if (!string.IsNullOrEmpty(automateConnectionString))
-        {
-            return (automateConnectionString, NormalizeProviderName(automateProviderName));
-        }
-
-        if (useUmbracoDbDSN)
-        {
-            var umbracoConnectionString = config.GetUmbracoConnectionString(out var umbracoProviderName);
-            if (string.IsNullOrEmpty(umbracoConnectionString))
-            {
-                throw new InvalidOperationException(
-                    $"'{UseUmbracoDbDSNConfigKey}' is set but the Umbraco CMS connection string " +
-                    $"('umbracoDbDSN') is not configured.");
-            }
-
-            return (umbracoConnectionString, NormalizeProviderName(umbracoProviderName));
-        }
-
-        throw new InvalidOperationException(
-            $"Umbraco Automate requires an explicit database configuration. " +
-            $"Either configure a dedicated '{ConnectionStringName}' connection string, " +
-            $"or set '{UseUmbracoDbDSNConfigKey}: true' to share the Umbraco CMS database.");
+        return (connectionString, NormalizeProviderName(providerName));
     }
 
     private static string NormalizeProviderName(string? providerName)

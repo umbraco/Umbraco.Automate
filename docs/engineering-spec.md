@@ -873,9 +873,9 @@ WorkflowCore has three pluggable infrastructure abstractions: `IQueueProvider`, 
 - Lock: in-memory (single-node)
 - Migrations tracked in `__UmbracoAutomate_MigrationsHistory` (separate from Umbraco core and other products)
 
-**Database configuration is explicit** — Automate does not silently share the Umbraco CMS database, because the additional traffic from outbox messages, run history and WorkflowCore engine tables can affect CMS performance. One of the following must be configured:
+**Database configuration is explicit** — Automate does not silently share another product's database, because the additional traffic from outbox messages, run history and WorkflowCore engine tables can affect the host's performance. Automate resolves whatever connection string `Umbraco:Automate:UseNamedConnectionString` points at; this setting defaults to `umbracoAutomateDbDSN`.
 
-**Option 1 — Dedicated database** (recommended; follows the Umbraco Commerce connection-string convention):
+**Default — dedicated database** (recommended; follows the Umbraco Commerce connection-string convention):
 ```json
 {
     "ConnectionStrings": {
@@ -885,19 +885,17 @@ WorkflowCore has three pluggable infrastructure abstractions: `IQueueProvider`, 
 }
 ```
 
-**Option 2 — Share the Umbraco CMS database** (for hosts like Umbraco Cloud where the CMS connection string is not user-editable so cannot be copied into `umbracoAutomateDbDSN`):
+**Share an existing connection string** — point `UseNamedConnectionString` at any registered DSN (e.g. `umbracoDbDSN` to share the Umbraco CMS database, or a custom name shared across products). Useful for hosts like Umbraco Cloud where the CMS connection string is not user-editable so cannot be copied into `umbracoAutomateDbDSN`:
 ```json
 {
     "Umbraco": {
         "Automate": {
-            "UseUmbracoDbDSN": true
+            "UseNamedConnectionString": "umbracoDbDSN"
         }
     }
 }
 ```
-With this flag set, Automate resolves the Umbraco CMS connection string at startup. Tables coexist in the Umbraco database, distinguished by the `umbracoAutomate*` table prefix and a separate `__UmbracoAutomate_MigrationsHistory` table.
-
-Setting both `umbracoAutomateDbDSN` and `Umbraco:Automate:UseUmbracoDbDSN` is a configuration error and fails fast at startup.
+With this set, Automate resolves the named connection string at startup. Tables coexist in the target database, distinguished by the `umbracoAutomate*` table prefix and a separate `__UmbracoAutomate_MigrationsHistory` table.
 
 ```csharp
 // Default — just works, uses Umbraco's connection string

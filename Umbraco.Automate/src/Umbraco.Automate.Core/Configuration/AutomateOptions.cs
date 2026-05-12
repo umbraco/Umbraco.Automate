@@ -18,18 +18,21 @@ public class AutomateOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets whether Automate should share the Umbraco CMS connection string
-    /// (<c>umbracoDbDSN</c>) instead of requiring a dedicated <c>umbracoAutomateDbDSN</c>.
+    /// Gets or sets the name of the connection string Automate resolves from
+    /// <c>ConnectionStrings</c>. Defaults to <c>umbracoAutomateDbDSN</c> so a standard
+    /// dedicated configuration just works. Set to <c>umbracoDbDSN</c> to share the
+    /// Umbraco CMS database, or to any other named entry so multiple products can share
+    /// a single DSN.
     /// </summary>
     /// <remarks>
-    /// Sharing the CMS database is opt-in because it can have performance implications:
-    /// Automate writes outbox messages, run history and WorkflowCore engine tables that
-    /// add traffic to the same database. This flag exists primarily for hosting environments
-    /// (e.g. Umbraco Cloud) where the CMS connection string is not user-editable so cannot
-    /// be copied into <c>umbracoAutomateDbDSN</c>. Cannot be combined with an explicit
-    /// <c>umbracoAutomateDbDSN</c> — configure one or the other.
+    /// Pointing at a shared connection is opt-in (i.e. you must explicitly change this
+    /// value) because reuse can have performance implications: Automate writes outbox
+    /// messages, run history and WorkflowCore engine tables that add traffic to the
+    /// named database. The setting exists primarily for hosting environments (e.g.
+    /// Umbraco Cloud) where the CMS connection string is not user-editable so cannot
+    /// be copied into <c>umbracoAutomateDbDSN</c>.
     /// </remarks>
-    public bool UseUmbracoDbDSN { get; set; }
+    public string UseNamedConnectionString { get; set; } = "umbracoAutomateDbDSN";
 }
 
 /// <summary>

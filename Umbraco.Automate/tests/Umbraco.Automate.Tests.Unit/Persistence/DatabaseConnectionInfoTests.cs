@@ -7,7 +7,7 @@ namespace Umbraco.Automate.Tests.Unit.Persistence;
 public class DatabaseConnectionInfoTests
 {
     [Fact]
-    public void Resolve_with_dedicated_dsn_returns_it()
+    public void Resolve_uses_umbracoAutomateDbDSN_by_default()
     {
         var config = BuildConfig(new Dictionary<string, string?>
         {
@@ -22,13 +22,13 @@ public class DatabaseConnectionInfoTests
     }
 
     [Fact]
-    public void Resolve_with_use_umbraco_db_dsn_falls_back_to_cms_connection()
+    public void Resolve_follows_UseNamedConnectionString_to_a_different_entry()
     {
         var config = BuildConfig(new Dictionary<string, string?>
         {
             ["ConnectionStrings:umbracoDbDSN"] = "Server=cms;Database=Umbraco;",
             ["ConnectionStrings:umbracoDbDSN_ProviderName"] = "Microsoft.Data.SqlClient",
-            ["Umbraco:Automate:UseUmbracoDbDSN"] = "true",
+            ["Umbraco:Automate:UseNamedConnectionString"] = "umbracoDbDSN",
         });
 
         var (cs, provider) = DatabaseConnectionInfo.Resolve(config);
@@ -38,13 +38,28 @@ public class DatabaseConnectionInfoTests
     }
 
     [Fact]
+    public void Resolve_can_target_any_named_connection_string()
+    {
+        var config = BuildConfig(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:SharedProductDb"] = "Server=shared;Database=Shared;",
+            ["ConnectionStrings:SharedProductDb_ProviderName"] = "Microsoft.Data.SqlClient",
+            ["Umbraco:Automate:UseNamedConnectionString"] = "SharedProductDb",
+        });
+
+        var (cs, _) = DatabaseConnectionInfo.Resolve(config);
+
+        cs.ShouldBe("Server=shared;Database=Shared;");
+    }
+
+    [Fact]
     public void Resolve_normalises_legacy_System_Data_SqlClient_provider()
     {
         var config = BuildConfig(new Dictionary<string, string?>
         {
             ["ConnectionStrings:umbracoDbDSN"] = "Server=cms;Database=Umbraco;",
             ["ConnectionStrings:umbracoDbDSN_ProviderName"] = "System.Data.SqlClient",
-            ["Umbraco:Automate:UseUmbracoDbDSN"] = "true",
+            ["Umbraco:Automate:UseNamedConnectionString"] = "umbracoDbDSN",
         });
 
         var (_, provider) = DatabaseConnectionInfo.Resolve(config);
@@ -53,40 +68,24 @@ public class DatabaseConnectionInfoTests
     }
 
     [Fact]
-    public void Resolve_throws_when_both_dedicated_dsn_and_flag_are_set()
+    public void Resolve_throws_when_the_named_connection_string_does_not_exist()
     {
         var config = BuildConfig(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:umbracoAutomateDbDSN"] = "Server=automate;",
-            ["ConnectionStrings:umbracoAutomateDbDSN_ProviderName"] = "Microsoft.Data.SqlClient",
-            ["ConnectionStrings:umbracoDbDSN"] = "Server=cms;",
-            ["ConnectionStrings:umbracoDbDSN_ProviderName"] = "Microsoft.Data.SqlClient",
-            ["Umbraco:Automate:UseUmbracoDbDSN"] = "true",
+            ["Umbraco:Automate:UseNamedConnectionString"] = "doesNotExist",
         });
 
         Should.Throw<InvalidOperationException>(() => DatabaseConnectionInfo.Resolve(config))
-            .Message.ShouldContain("Both");
+            .Message.ShouldContain("doesNotExist");
     }
 
     [Fact]
-    public void Resolve_throws_when_flag_is_set_but_umbraco_dsn_is_missing()
-    {
-        var config = BuildConfig(new Dictionary<string, string?>
-        {
-            ["Umbraco:Automate:UseUmbracoDbDSN"] = "true",
-        });
-
-        Should.Throw<InvalidOperationException>(() => DatabaseConnectionInfo.Resolve(config))
-            .Message.ShouldContain("umbracoDbDSN");
-    }
-
-    [Fact]
-    public void Resolve_throws_when_nothing_is_configured()
+    public void Resolve_throws_when_no_connection_string_is_configured()
     {
         var config = BuildConfig(new Dictionary<string, string?>());
 
         Should.Throw<InvalidOperationException>(() => DatabaseConnectionInfo.Resolve(config))
-            .Message.ShouldContain("requires an explicit database configuration");
+            .Message.ShouldContain("umbracoAutomateDbDSN");
     }
 
     private static IConfiguration BuildConfig(Dictionary<string, string?> values) =>

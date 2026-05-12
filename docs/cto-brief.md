@@ -49,7 +49,7 @@ A lightweight custom outbox built on EF Core handles both trigger event dispatch
 
 ### Database
 
-Database configuration is explicit: either a dedicated `umbracoAutomateDbDSN` connection string (recommended; follows the Umbraco Commerce convention) or `Umbraco:Automate:UseUmbracoDbDSN: true` to share the CMS database. Sharing is opt-in so the performance impact of co-locating Automate's outbox, run history and engine tables with CMS data is a conscious decision. EF Core migrations prefixed with `UmbracoAutomate_`.
+Database configuration is explicit: by default Automate resolves a dedicated `umbracoAutomateDbDSN` connection string (recommended; follows the Umbraco Commerce convention). Point `Umbraco:Automate:UseNamedConnectionString` at another entry (e.g. `umbracoDbDSN` to share the CMS database, or a custom name shared across products) to reuse an existing connection. Reuse is opt-in so the performance impact of co-locating Automate's outbox, run history and engine tables is a conscious decision. EF Core migrations prefixed with `UmbracoAutomate_`.
 
 ---
 
