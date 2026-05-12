@@ -56,11 +56,11 @@ public sealed class TriggerAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        if (automation.Status != AutomationStatus.Published || !automation.IsEnabled)
+        if (automation.Status != AutomationStatus.Published)
         {
             return Conflict(new ProblemDetailsBuilder()
                 .WithTitle("Automation not active")
-                .WithDetail("The automation must be published and enabled to be triggered.")
+                .WithDetail("The automation must be published to be triggered.")
                 .Build());
         }
 

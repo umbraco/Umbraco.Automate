@@ -81,9 +81,9 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_AutomationNotEnabled_Returns409()
+    public async Task ReceiveWebhook_AutomationInactive_Returns409()
     {
-        var automation = CreateAutomation(AutomationStatus.Published, isEnabled: false);
+        var automation = CreateAutomation(AutomationStatus.Inactive);
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -325,7 +325,6 @@ public class WebhookEndpointControllerTests
         // don't 404 at the routing layer before the allow-list check runs.
         var automation = new AutomationBuilder()
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .WithWebhookTrigger(
                 PlainSecretWebhookAuthenticator.WellKnownAlias,
                 new PlainSecretWebhookAuthenticatorSettings { Secret = "ping" })
@@ -378,14 +377,12 @@ public class WebhookEndpointControllerTests
 
     private static Automation CreateAutomation(
         AutomationStatus status = AutomationStatus.Published,
-        bool isEnabled = true,
         string triggerAlias = "umbracoAutomate.webhook",
         string? authenticatorAlias = null,
         object? authenticatorSettings = null)
     {
         var builder = new AutomationBuilder()
-            .WithStatus(status)
-            .WithIsEnabled(isEnabled);
+            .WithStatus(status);
 
         if (triggerAlias == "umbracoAutomate.webhook")
         {

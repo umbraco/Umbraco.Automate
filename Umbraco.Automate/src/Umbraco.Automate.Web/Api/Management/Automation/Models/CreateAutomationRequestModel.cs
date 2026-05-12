@@ -23,9 +23,6 @@ public sealed class CreateAutomationRequestModel
     [Required]
     public required Guid WorkspaceId { get; init; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; init; }
-
     /// <summary>The group (folder) to place this automation in, or null for root.</summary>
     public Guid? GroupId { get; init; }
 

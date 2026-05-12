@@ -405,7 +405,6 @@ public class AutomationTransferTests
 
         captured.ShouldNotBeNull();
         captured!.Status.ShouldBe(AutomationStatus.Draft);
-        captured.IsEnabled.ShouldBeFalse();
         captured.WorkspaceId.ShouldBe(workspaceId);
     }
 
@@ -440,7 +439,6 @@ public class AutomationTransferTests
             .WithName("Old Name")
             .WithWorkspaceId(workspaceId)
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .WithPublishedVersion(3)
             .Build();
 
@@ -466,7 +464,6 @@ public class AutomationTransferTests
         captured!.Id.ShouldBe(existingId);
         captured.WorkspaceId.ShouldBe(workspaceId);
         captured.Status.ShouldBe(AutomationStatus.Published);
-        captured.IsEnabled.ShouldBeTrue();
         captured.Description.ShouldBe("Updated from import");
     }
 

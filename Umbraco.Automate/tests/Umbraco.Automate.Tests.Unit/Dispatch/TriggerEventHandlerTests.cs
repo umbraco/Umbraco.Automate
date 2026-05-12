@@ -92,32 +92,6 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_DisabledAutomation_DoesNotExecute()
-    {
-        Automation automation = new AutomationBuilder()
-            .WithTrigger("myTrigger")
-            .WithIsEnabled(false);
-
-        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[] { automation });
-
-        var body = SerializeMessage(new TriggerEventMessage
-        {
-            TriggerAlias = "myTrigger",
-            InitiatorType = "system",
-        });
-
-        await _handler.HandleAsync(body, CancellationToken.None);
-
-        _executor.Verify(e => e.ExecuteAsync(
-            It.IsAny<Automation>(),
-            It.IsAny<string>(),
-            It.IsAny<string?>(),
-            It.IsAny<Dictionary<string, object?>?>(),
-            It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
     public async Task HandleAsync_DraftAutomation_DoesNotExecute()
     {
         Automation automation = new AutomationBuilder()

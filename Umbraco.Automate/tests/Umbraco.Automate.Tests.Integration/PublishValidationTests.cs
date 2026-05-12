@@ -72,7 +72,6 @@ public class PublishValidationTests
         var result = await _service.PublishAutomationAsync(automation.Id);
 
         result.Status.ShouldBe(AutomationStatus.Published);
-        result.IsEnabled.ShouldBeTrue();
     }
 
     [Fact]

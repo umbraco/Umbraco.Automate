@@ -5,6 +5,7 @@ import {
 } from "@umbraco-cms/backoffice/workspace";
 import { UA_AUTOMATION_WORKSPACE_ALIAS, UA_AUTOMATION_ENTITY_TYPE } from "../../constants.js";
 import { UA_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./conditions/automation-has-manual-trigger.condition.constants.js";
+import { UA_AUTOMATION_IS_PUBLISHED_CONDITION_ALIAS } from "./conditions/automation-is-published.condition.constants.js";
 
 export const manifests: Array<UmbExtensionManifest> = [
     {
@@ -142,6 +143,12 @@ export const manifests: Array<UmbExtensionManifest> = [
         api: () => import("./conditions/automation-has-manual-trigger.condition.js"),
     },
     {
+        type: "condition",
+        alias: UA_AUTOMATION_IS_PUBLISHED_CONDITION_ALIAS,
+        name: "Automation Is Published Condition",
+        api: () => import("./conditions/automation-is-published.condition.js"),
+    },
+    {
         type: "workspaceActionMenuItem",
         kind: "default",
         alias: "UmbracoAutomate.WorkspaceActionMenuItem.Automation.Unpublish",
@@ -161,6 +168,9 @@ export const manifests: Array<UmbExtensionManifest> = [
             {
                 alias: UMB_WORKSPACE_ENTITY_IS_NEW_CONDITION_ALIAS,
                 match: false,
+            },
+            {
+                alias: UA_AUTOMATION_IS_PUBLISHED_CONDITION_ALIAS,
             },
         ],
     },

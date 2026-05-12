@@ -37,6 +37,7 @@ public sealed class UnpublishAutomationController : AutomationControllerBase
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UnpublishAutomation(
         Guid id,
         CancellationToken cancellationToken = default)
@@ -53,7 +54,20 @@ public sealed class UnpublishAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        await _automationService.UnpublishAutomationAsync(id, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        try
+        {
+            await _automationService.UnpublishAutomationAsync(id, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        }
+        catch (AutomationValidationException ex)
+        {
+            return UnprocessableEntity(new ProblemDetails
+            {
+                Title = "Validation failed",
+                Detail = ex.Message,
+                Status = StatusCodes.Status422UnprocessableEntity,
+                Extensions = { ["errors"] = ex.Errors },
+            });
+        }
 
         return Ok();
     }

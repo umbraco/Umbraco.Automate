@@ -23,9 +23,6 @@ public sealed class AutomationItemResponseModel
     /// <summary>Optional description.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; set; }
-
     /// <summary>The workspace this automation belongs to.</summary>
     [Required]
     public Guid WorkspaceId { get; set; }

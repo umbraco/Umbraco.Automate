@@ -81,16 +81,14 @@ public class AutomationServiceTests
 
         result.PublishedVersion.ShouldBe(3);
         result.Status.ShouldBe(AutomationStatus.Published);
-        result.IsEnabled.ShouldBeTrue();
     }
 
     [Fact]
-    public async Task UnpublishAutomationAsync_SetsInactive_PreservesIsEnabled()
+    public async Task UnpublishAutomationAsync_SetsInactive()
     {
         var id = Guid.NewGuid();
         Automation automation = new AutomationBuilder().WithId(id);
         automation.Status = AutomationStatus.Published;
-        automation.IsEnabled = true;
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
@@ -100,7 +98,6 @@ public class AutomationServiceTests
         var result = await _service.UnpublishAutomationAsync(id);
 
         result.Status.ShouldBe(AutomationStatus.Inactive);
-        result.IsEnabled.ShouldBeTrue();
     }
 
     [Fact]
@@ -121,6 +118,42 @@ public class AutomationServiceTests
 
         await Should.ThrowAsync<InvalidOperationException>(
             () => _service.UnpublishAutomationAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task UnpublishAutomationAsync_DraftAutomation_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var automation = new AutomationBuilder().WithId(id).AsDraft().Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.UnpublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains("Draft"));
+        _repo.Verify(
+            r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UnpublishAutomationAsync_InactiveAutomation_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+        var automation = new AutomationBuilder().WithId(id).AsInactive().Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.UnpublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains("Inactive"));
+        _repo.Verify(
+            r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

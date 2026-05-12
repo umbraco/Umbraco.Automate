@@ -28,11 +28,6 @@ public sealed class Automation : IPublishableEntity
     public string? Description { get; set; }
 
     /// <summary>
-    /// Gets or sets whether triggers are active for this automation.
-    /// </summary>
-    public bool IsEnabled { get; set; }
-
-    /// <summary>
     /// Gets or sets the lifecycle status.
     /// </summary>
     public AutomationStatus Status { get; set; } = AutomationStatus.Draft;
