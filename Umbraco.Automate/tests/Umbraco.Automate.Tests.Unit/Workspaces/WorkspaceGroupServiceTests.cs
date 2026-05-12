@@ -228,51 +228,6 @@ public class WorkspaceGroupServiceTests
     }
 
     [Fact]
-    public async Task SaveGroupForDeployAsync_Upserts_BypassingInteractiveValidations()
-    {
-        // Deploy orders artifacts via its own dependency graph and may land a nested
-        // group at the root temporarily. The interactive create validators (workspace
-        // existence, parent existence, unique name) would fail in that window, so the
-        // Deploy-facing save must skip them while still going through the repository
-        // and firing notifications.
-        var workspaceId = Guid.NewGuid();
-        var group = new WorkspaceGroup
-        {
-            Id = Guid.NewGuid(),
-            Name = "Campaigns",
-            WorkspaceId = workspaceId,
-            ParentId = null,
-        };
-
-        _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Workspace?)null);
-        _groupRepo.Setup(r => r.NameExistsAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-        _groupRepo.Setup(r => r.SaveAsync(It.IsAny<WorkspaceGroup>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((WorkspaceGroup g, CancellationToken _) => g);
-
-        var result = await _service.SaveGroupForDeployAsync(group);
-
-        result.Id.ShouldBe(group.Id);
-        _groupRepo.Verify(r => r.SaveAsync(group, It.IsAny<CancellationToken>()), Times.Once);
-        _workspaceService.Verify(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
-        _groupRepo.Verify(r => r.NameExistsAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task SaveGroupForDeployAsync_AssignsNewId_WhenEmpty()
-    {
-        var group = new WorkspaceGroup { Name = "Campaigns", WorkspaceId = Guid.NewGuid() };
-
-        _groupRepo.Setup(r => r.SaveAsync(It.IsAny<WorkspaceGroup>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((WorkspaceGroup g, CancellationToken _) => g);
-
-        var result = await _service.SaveGroupForDeployAsync(group);
-
-        result.Id.ShouldNotBe(Guid.Empty);
-    }
-
-    [Fact]
     public async Task DeleteGroupAsync_NotFound_ReturnsFalse()
     {
         _groupRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))

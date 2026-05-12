@@ -68,7 +68,7 @@ Triggers and actions are the extension points. Third-party developers (and DXP p
 | `Umbraco.Workflow.Automate` | Workflow team | Approval Requested trigger, Approve Content action |
 | `Umbraco.Engage.Automate` | Engage team | Segment Entered trigger, Assign Persona action |
 | `Umbraco.AI.Automate` | AI team | AI agents as actions, AI events as triggers, automations as agent tools |
-| `Umbraco.Automate.Deploy` | Automate team | Deploy integration for transferring automations between environments |
+| `Umbraco.Deploy.Automate` | Deploy team | Deploy integration for transferring automations between environments |
 
 **Naming convention**: `{OwningProduct}.Automate` — follows the established DXP pattern (e.g. `Umbraco.Commerce.Deploy`). Each product team owns their Automate integration because they know their events and domain model best. Products depend only on `Umbraco.Automate.Core`, not on each other.
 

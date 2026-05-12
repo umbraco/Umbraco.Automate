@@ -9,7 +9,7 @@ namespace Umbraco.Automate.Core.Connections;
 public sealed class Connection : IVersionableEntity
 {
     /// <inheritdoc />
-    public Guid Id { get; internal set; }
+    public Guid Id { get; set; }
 
     /// <summary>
     /// Gets or sets the unique, URL-safe alias (used for Deploy transfer).
