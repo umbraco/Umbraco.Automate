@@ -270,8 +270,8 @@ A new backoffice section with:
 ## Database & Infrastructure
 
 - **SQL Server and SQLite** supported (same as Umbraco CMS)
-- **Shared database by default** — tables coexist with Umbraco, prefixed with `UmbracoAutomate_`
-- **Separate database optional** — configure `umbracoAutomateDbDSN` connection string (follows Umbraco Commerce convention)
+- **Explicit database configuration** — choose either a dedicated `umbracoAutomateDbDSN` connection string (recommended) or set `Umbraco:Automate:UseUmbracoDbDSN: true` to share the CMS database. Sharing is opt-in because the additional traffic can affect CMS performance.
+- **Tables coexist cleanly** when sharing — prefixed with `umbracoAutomate*` and tracked in a separate migrations history table
 - **Distributed deployment** — swap in Redis, Azure, RabbitMQ, or AWS queue/lock providers via NuGet packages
 - **Health checks** — engine status, queue depth, and data retention registered with Umbraco's health check system
 - **OpenTelemetry** — metrics for runs, failures, and step duration (Prometheus, Application Insights, etc.)

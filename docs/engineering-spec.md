@@ -554,17 +554,17 @@ internal static IUmbracoBuilder AddUmbracoAutomateCore(this IUmbracoBuilder buil
     return builder;
 }
 
-// Registers EF Core persistence — follows Umbraco Commerce's connection string convention
+// Registers EF Core persistence — resolved via DatabaseConnectionInfo (explicit opt-in)
 internal static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
 {
     builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-        (serviceProvider, options, umbracoConnectionString, umbracoProviderName) =>
+        (serviceProvider, options, _, _) =>
     {
         var config = serviceProvider.GetRequiredService<IConfiguration>();
 
-        // Follow Commerce convention: check for dedicated connection string, fall back to Umbraco's
-        var connectionString = config.GetConnectionString("umbracoAutomateDbDSN") ?? umbracoConnectionString;
-        var providerName = config["ConnectionStrings:umbracoAutomateDbDSN_ProviderName"] ?? umbracoProviderName;
+        // Resolve from dedicated umbracoAutomateDbDSN, OR umbracoDbDSN when
+        // Umbraco:Automate:UseUmbracoDbDSN is explicitly set. Throws if neither is configured.
+        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(config);
 
         switch (providerName)
         {
@@ -871,21 +871,33 @@ WorkflowCore has three pluggable infrastructure abstractions: `IQueueProvider`, 
 **Default behavior** (zero configuration):
 - Queue: in-memory
 - Lock: in-memory (single-node)
-- Persistence: Umbraco's own connection string and database
 - Migrations tracked in `__UmbracoAutomate_MigrationsHistory` (separate from Umbraco core and other products)
 
-**Custom database** (follows the Umbraco Commerce convention — named connection string):
+**Database configuration is explicit** — Automate does not silently share the Umbraco CMS database, because the additional traffic from outbox messages, run history and WorkflowCore engine tables can affect CMS performance. One of the following must be configured:
+
+**Option 1 — Dedicated database** (recommended; follows the Umbraco Commerce connection-string convention):
 ```json
 {
     "ConnectionStrings": {
-        "umbracoDbDSN": "Server=...;Database=myUmbracoDb;...",
-        "umbracoDbDSN_ProviderName": "Microsoft.Data.SqlClient",
         "umbracoAutomateDbDSN": "Server=...;Database=myUmbracoAutomateDb;...",
         "umbracoAutomateDbDSN_ProviderName": "Microsoft.Data.SqlClient"
     }
 }
 ```
-When `umbracoAutomateDbDSN` is present, all Automate tables (domain + WorkflowCore engine state) and migrations target the separate database. When absent (default), falls back to `umbracoDbDSN` — tables coexist in the Umbraco database, distinguished by the `UmbracoAutomate_` table prefix and separate migrations history table.
+
+**Option 2 — Share the Umbraco CMS database** (for hosts like Umbraco Cloud where the CMS connection string is not user-editable so cannot be copied into `umbracoAutomateDbDSN`):
+```json
+{
+    "Umbraco": {
+        "Automate": {
+            "UseUmbracoDbDSN": true
+        }
+    }
+}
+```
+With this flag set, Automate resolves the Umbraco CMS connection string at startup. Tables coexist in the Umbraco database, distinguished by the `umbracoAutomate*` table prefix and a separate `__UmbracoAutomate_MigrationsHistory` table.
+
+Setting both `umbracoAutomateDbDSN` and `Umbraco:Automate:UseUmbracoDbDSN` is a configuration error and fails fast at startup.
 
 ```csharp
 // Default — just works, uses Umbraco's connection string
