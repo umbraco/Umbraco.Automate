@@ -99,13 +99,16 @@ public static partial class UmbracoBuilderExtensions
 
         // Action middleware — ordered pipeline:
         //   1. ErrorHandling — catches exceptions from everything inside
-        //   2. BackOfficeIdentity — resolves the workspace service principal so all
+        //   2. AutomationOrigin — publishes the running run's identity to AsyncLocal so
+        //      side-effect notifications (e.g. content saves) can be stamped with it
+        //   3. BackOfficeIdentity — resolves the workspace service principal so all
         //      subsequent middleware and the action itself execute as that identity
-        //   3. StepRunLogging — logs execution timing (excludes identity resolution overhead)
-        //   4. SettingsValidation — validates before audit so invalid configs aren't trailed
-        //   5. AuditTrail — writes CMS audit entry on success
+        //   4. StepRunLogging — logs execution timing (excludes identity resolution overhead)
+        //   5. SettingsValidation — validates before audit so invalid configs aren't trailed
+        //   6. AuditTrail — writes CMS audit entry on success
         builder.AutomateActionMiddleware()
             .Append<ErrorHandlingMiddleware>()
+            .Append<AutomationOriginMiddleware>()
             .Append<BackOfficeIdentityMiddleware>()
             .Append<StepRunLoggingMiddleware>()
             .Append<SettingsValidationMiddleware>()
@@ -174,6 +177,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Automation execution
+        builder.Services.AddSingleton<IAutomationOriginAccessor, AutomationOriginAccessor>();
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IExecutionNodeEligibility, ExecutionNodeEligibility>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();

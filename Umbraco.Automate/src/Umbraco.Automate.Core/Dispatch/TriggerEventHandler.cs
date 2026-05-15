@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Triggers;
@@ -18,6 +20,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly IAutomationExecutor _executor;
     private readonly IExecutionNodeEligibility _nodeEligibility;
     private readonly TriggerCollection _triggers;
+    private readonly IOptionsMonitor<ExecutionOptions> _executionOptions;
     private readonly ILogger<TriggerEventHandler> _logger;
 
     public TriggerEventHandler(
@@ -26,6 +29,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
         IAutomationExecutor executor,
         IExecutionNodeEligibility nodeEligibility,
         TriggerCollection triggers,
+        IOptionsMonitor<ExecutionOptions> executionOptions,
         ILogger<TriggerEventHandler> logger)
     {
         _automationService = automationService;
@@ -33,6 +37,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
         _executor = executor;
         _nodeEligibility = nodeEligibility;
         _triggers = triggers;
+        _executionOptions = executionOptions;
         _logger = logger;
     }
 
@@ -54,6 +59,20 @@ internal sealed class TriggerEventHandler : IMessageHandler
                       ?? throw new InvalidOperationException("Failed to deserialize TriggerEventMessage");
 
         _logger.LogDebug("Received trigger event for {TriggerAlias}", message.TriggerAlias);
+
+        // Global chain-length backstop: drop the event before doing any work if the cascade
+        // chain has exceeded the configured limit. This catches loops the per-trigger
+        // SkipAutomationOriginatedEvents toggle misses (e.g. operator deliberately turned
+        // the toggle off, or a chain that doesn't repeat any automation but goes too deep).
+        var maxChainDepth = _executionOptions.CurrentValue.MaxChainDepth;
+        if (message.OriginAutomationChain.Count > maxChainDepth)
+        {
+            _logger.LogWarning(
+                "Dropping trigger {TriggerAlias} — chain length {ChainLength} exceeded MaxChainDepth {MaxChainDepth} (origin run {OriginRunId}, chain {Chain})",
+                message.TriggerAlias, message.OriginAutomationChain.Count, maxChainDepth, message.OriginRunId,
+                string.Join(" -> ", message.OriginAutomationChain));
+            return;
+        }
 
         // Find all published automations that use this trigger.
         var automations = await _automationService.GetAllAutomationsAsync(cancellationToken);
@@ -128,6 +147,35 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 if (typedOutput is not null)
                 {
                     var resolvedSettings = trigger.ResolveSettings(triggerSettings);
+
+                    // Origin-aware filtering: only relevant when the event was caused by an
+                    // automation (chain non-empty). Three postures, configured per trigger:
+                    //   - Run        : always fire
+                    //   - SkipOnCycle: skip when this automation is in the chain (direct or
+                    //                  indirect cycle); default for built-in content triggers
+                    //   - SkipAlways : skip whenever any automation caused the event
+                    if (message.OriginAutomationChain.Count > 0
+                        && resolvedSettings is IAutomationOriginatedEventBehavior behaviorConfig)
+                    {
+                        var behavior = behaviorConfig.OnAutomationOriginated;
+                        var shouldSkip = behavior switch
+                        {
+                            AutomationOriginatedEventBehavior.SkipAlways => true,
+                            AutomationOriginatedEventBehavior.SkipOnCycle =>
+                                message.OriginAutomationChain.Contains(executionAutomation.Id),
+                            _ => false,
+                        };
+
+                        if (shouldSkip)
+                        {
+                            _logger.LogDebug(
+                                "Automation {AutomationId} skipped — trigger {TriggerAlias} behavior {Behavior} blocks event from chain {Chain}",
+                                executionAutomation.Id, message.TriggerAlias, behavior,
+                                string.Join(" -> ", message.OriginAutomationChain));
+                            continue;
+                        }
+                    }
+
                     if (!trigger.CanHandle(typedOutput, resolvedSettings))
                     {
                         _logger.LogDebug(
@@ -147,7 +195,8 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 message.InitiatorType,
                 message.InitiatorId,
                 triggerOutputData,
-                cancellationToken);
+                cancellationToken,
+                originChain: message.OriginAutomationChain);
         }
     }
 

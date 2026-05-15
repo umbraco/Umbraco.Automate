@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
@@ -189,6 +190,7 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
             triggers,
+            _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }
 

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Core;
@@ -26,6 +27,13 @@ public class TriggerNotificationHandlerTests
             .Setup(r => r.HasSubscribersAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         return registry;
+    }
+
+    private static IAutomationOriginAccessor CreateEmptyOriginAccessor()
+    {
+        var accessor = new Mock<IAutomationOriginAccessor>();
+        accessor.SetupGet(a => a.Current).Returns((AutomationOrigin?)null);
+        return accessor.Object;
     }
 
     [Fact]
@@ -55,6 +63,7 @@ public class TriggerNotificationHandlerTests
             [trigger1.Object, trigger2.Object],
             dispatcher.Object,
             CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -74,6 +83,7 @@ public class TriggerNotificationHandlerTests
             [],
             dispatcher.Object,
             CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -97,6 +107,7 @@ public class TriggerNotificationHandlerTests
             [trigger.Object],
             dispatcher.Object,
             CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
             runtimeState.Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -122,6 +133,7 @@ public class TriggerNotificationHandlerTests
             [trigger.Object],
             dispatcher.Object,
             registry.Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
@@ -151,12 +163,90 @@ public class TriggerNotificationHandlerTests
             [trigger.Object],
             dispatcher.Object,
             registry.Object,
+            CreateEmptyOriginAccessor(),
             CreateRunningRuntimeState().Object,
             Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
 
         await handler.HandleAsync(new TestNotification(), CancellationToken.None);
 
         dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_OriginPresent_StampsEventsWithFullChain()
+    {
+        // Models the in-process loop case: an action is running, the accessor carries the
+        // ambient origin (chain assembled by the middleware), and a save fires inside the
+        // action's await. The handler must copy that chain onto every dispatched event so
+        // downstream cycle detection sees the full lineage.
+        var chain = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        var origin = new AutomationOrigin(
+            RunId: Guid.NewGuid(),
+            WorkspaceId: Guid.NewGuid(),
+            AutomationChain: chain);
+
+        var accessor = new Mock<IAutomationOriginAccessor>();
+        accessor.SetupGet(a => a.Current).Returns(origin);
+
+        var captured = new List<TriggerEvent>();
+        var dispatcher = new Mock<ITriggerDispatcher>();
+        dispatcher
+            .Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((evt, _) => captured.Add(evt))
+            .Returns(Task.CompletedTask);
+
+        var trigger = new Mock<INotificationTrigger<TestNotification>>();
+        trigger.Setup(t => t.MapEvent(It.IsAny<TestNotification>()))
+            .Returns([
+                new TriggerEvent { TriggerAlias = "t1", InitiatorType = "system" },
+                new TriggerEvent { TriggerAlias = "t2", InitiatorType = "system" },
+            ]);
+
+        var handler = new TriggerNotificationHandler<TestNotification>(
+            [trigger.Object],
+            dispatcher.Object,
+            CreateAcceptAllRegistry().Object,
+            accessor.Object,
+            CreateRunningRuntimeState().Object,
+            Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
+
+        await handler.HandleAsync(new TestNotification(), CancellationToken.None);
+
+        captured.Count.ShouldBe(2);
+        foreach (var evt in captured)
+        {
+            evt.OriginRunId.ShouldBe(origin.RunId);
+            evt.OriginAutomationChain.ShouldBe(chain);
+        }
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoOrigin_LeavesEventsUnstamped()
+    {
+        var captured = new List<TriggerEvent>();
+        var dispatcher = new Mock<ITriggerDispatcher>();
+        dispatcher
+            .Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((evt, _) => captured.Add(evt))
+            .Returns(Task.CompletedTask);
+
+        var trigger = new Mock<INotificationTrigger<TestNotification>>();
+        trigger.Setup(t => t.MapEvent(It.IsAny<TestNotification>()))
+            .Returns([new TriggerEvent { TriggerAlias = "t1", InitiatorType = "user" }]);
+
+        var handler = new TriggerNotificationHandler<TestNotification>(
+            [trigger.Object],
+            dispatcher.Object,
+            CreateAcceptAllRegistry().Object,
+            CreateEmptyOriginAccessor(),
+            CreateRunningRuntimeState().Object,
+            Mock.Of<ILogger<TriggerNotificationHandler<TestNotification>>>());
+
+        await handler.HandleAsync(new TestNotification(), CancellationToken.None);
+
+        captured.ShouldHaveSingleItem();
+        captured[0].OriginRunId.ShouldBeNull();
+        captured[0].OriginAutomationChain.ShouldBeEmpty();
     }
 
     public class TestNotification : INotification;

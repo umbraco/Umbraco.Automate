@@ -199,12 +199,12 @@ export class UaSettingsFormElement extends UmbLitElement {
             <umb-property-dataset .value=${this._propertyValues} @change=${this.#onChange}>
                 ${grouped.map((g) =>
                     this.noBox
-                        ? html`${g.group ? html`<span class="group-headline">${g.group}</span>` : nothing}
+                        ? html`${g.group ? html`<span class="group-headline">${this.localize.string(g.group)}</span>` : nothing}
                               ${g.fields.map((f) => this.#renderField(f))}`
-                        : g.group
+                        : this.localize.string(g.group)
                           ? html`
                                 <uui-box class="uui-text">
-                                    <span slot="headline">${g.group}</span>
+                                    <span slot="headline">${this.localize.string(g.group)}</span>
                                     ${g.fields.map((f) => this.#renderField(f))}
                                 </uui-box>
                             `
@@ -223,6 +223,10 @@ export class UaSettingsFormElement extends UmbLitElement {
                 display: flex;
                 flex-direction: column;
                 gap: var(--uui-size-layout-1);
+            }
+
+            uui-box + uui-box {
+                margin-top: var(--uui-size-layout-2);
             }
 
             umb-property {

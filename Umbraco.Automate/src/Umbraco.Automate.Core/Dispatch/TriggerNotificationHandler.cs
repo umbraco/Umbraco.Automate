@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Core;
@@ -23,6 +24,7 @@ internal sealed class TriggerNotificationHandler<TNotification>(
     IEnumerable<INotificationTrigger<TNotification>> triggers,
     ITriggerDispatcher dispatcher,
     ITriggerSubscriptionRegistry subscriptionRegistry,
+    IAutomationOriginAccessor originAccessor,
     IRuntimeState runtimeState,
     ILogger<TriggerNotificationHandler<TNotification>> logger) : INotificationAsyncHandler<TNotification>
     where TNotification : INotification
@@ -35,6 +37,12 @@ internal sealed class TriggerNotificationHandler<TNotification>(
         {
             return;
         }
+
+        // Read once: if this notification is firing as a side effect of an action, the
+        // origin accessor carries the run that caused it via AsyncLocal. We stamp every
+        // dispatched event with that origin so downstream automations can filter loops
+        // and the chain-depth backstop has something to count.
+        var origin = originAccessor.Current;
 
         foreach (var trigger in triggers)
         {
@@ -57,6 +65,12 @@ internal sealed class TriggerNotificationHandler<TNotification>(
 
             foreach (var evt in trigger.MapEvent(notification))
             {
+                if (origin is not null)
+                {
+                    evt.OriginRunId = origin.RunId;
+                    evt.OriginAutomationChain = origin.AutomationChain;
+                }
+
                 await dispatcher.DispatchAsync(evt, cancellationToken);
             }
         }
