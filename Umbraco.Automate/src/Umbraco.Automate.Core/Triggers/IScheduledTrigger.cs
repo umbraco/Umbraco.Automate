@@ -12,4 +12,12 @@ public interface IScheduledTrigger
     /// <param name="settings">The deserialized trigger settings, or null.</param>
     /// <returns>A CRON expression string.</returns>
     string GetCronExpression(object? settings);
+
+    /// <summary>
+    /// Gets the time zone the CRON expression should be evaluated in.
+    /// Defaults to <see cref="TimeZoneInfo.Utc"/>.
+    /// </summary>
+    /// <param name="settings">The deserialized trigger settings, or null.</param>
+    /// <returns>The <see cref="TimeZoneInfo"/> the schedule is evaluated in.</returns>
+    TimeZoneInfo GetTimeZone(object? settings) => TimeZoneInfo.Utc;
 }

@@ -21,4 +21,7 @@ public abstract class ScheduledTriggerBase<TSettings, TOutput>
 
     /// <inheritdoc />
     public abstract string GetCronExpression(object? settings);
+
+    /// <inheritdoc />
+    public virtual TimeZoneInfo GetTimeZone(object? settings) => TimeZoneInfo.Utc;
 }

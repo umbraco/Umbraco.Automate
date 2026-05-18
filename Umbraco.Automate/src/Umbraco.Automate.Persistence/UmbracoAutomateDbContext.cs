@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Connections;
@@ -84,6 +85,20 @@ public class UmbracoAutomateDbContext : DbContext
                     $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
         }
     }
+
+    // All DateTime columns in this DbContext represent UTC instants. Neither SQL Server's
+    // datetime2 nor SQLite's TEXT format preserves DateTimeKind across a round-trip, so
+    // these converters reattach Kind=Utc on read (and normalize stray Local values on write)
+    // for every DateTime/DateTime? property in the model. Without this, callers that rely
+    // on the kind — Cronos, the API's UtcDateTimeJsonConverter, anything calling
+    // ToUniversalTime — would silently shift values by the server's local offset.
+    private static readonly ValueConverter<DateTime, DateTime> s_utcConverter = new(
+        v => v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : v,
+        v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+    private static readonly ValueConverter<DateTime?, DateTime?> s_utcNullableConverter = new(
+        v => v.HasValue && v.Value.Kind == DateTimeKind.Local ? v.Value.ToUniversalTime() : v,
+        v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -337,5 +352,25 @@ public class UmbracoAutomateDbContext : DbContext
             // a unique filtered index (WHERE IdempotencyKey IS NOT NULL) for safety.
             entity.HasIndex(e => new { e.Topic, e.IdempotencyKey });
         });
+
+        ApplyUtcDateTimeConverters(modelBuilder);
+    }
+
+    private static void ApplyUtcDateTimeConverters(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetValueConverter(s_utcConverter);
+                }
+                else if (property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(s_utcNullableConverter);
+                }
+            }
+        }
     }
 }
