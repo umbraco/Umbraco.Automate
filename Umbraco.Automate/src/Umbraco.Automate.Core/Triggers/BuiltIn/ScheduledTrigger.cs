@@ -29,4 +29,27 @@ public sealed class ScheduledTrigger : ScheduledTriggerBase<ScheduledTriggerSett
 
         return "0 * * * *"; // Default: every hour
     }
+
+    /// <inheritdoc />
+    public override TimeZoneInfo GetTimeZone(object? settings)
+    {
+        if (settings is not ScheduledTriggerSettings typedSettings
+            || string.IsNullOrWhiteSpace(typedSettings.TimeZone))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(typedSettings.TimeZone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+    }
 }

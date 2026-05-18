@@ -120,9 +120,11 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                     continue;
                 }
 
+                var timeZone = scheduledTrigger.GetTimeZone(triggerSettings);
+
                 var lastFired = await stateStore.GetLastFiredAsync(automationId, CancellationToken.None);
                 var baseTime = lastFired ?? now.AddMinutes(-1);
-                var nextOccurrence = cron.GetNextOccurrence(baseTime, inclusive: false);
+                var nextOccurrence = cron.GetNextOccurrence(baseTime, timeZone, inclusive: false);
 
                 if (nextOccurrence is null || nextOccurrence > now)
                 {
@@ -130,8 +132,8 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                 }
 
                 _logger.LogInformation(
-                    "Dispatching scheduled trigger for automation {AutomationId} (CRON: {CronExpression})",
-                    automationId, cronExpression);
+                    "Dispatching scheduled trigger for automation {AutomationId} (CRON: {CronExpression}, TimeZone: {TimeZoneId})",
+                    automationId, cronExpression, timeZone.Id);
 
                 var triggerEvent = new TriggerEvent
                 {
