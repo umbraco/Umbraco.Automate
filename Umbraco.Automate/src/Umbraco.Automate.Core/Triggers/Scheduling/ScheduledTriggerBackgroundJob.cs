@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Runtime;
 using Umbraco.Cms.Core.Services;
@@ -20,6 +21,7 @@ namespace Umbraco.Automate.Core.Triggers.Scheduling;
 internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
 {
     private readonly IServiceProvider _serviceProvider;
+    private readonly IOptionsMonitor<ScheduledTriggerOptions> _options;
     private readonly IRuntimeState _runtimeState;
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IMainDom _mainDom;
@@ -35,6 +37,7 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
         : base(logger, options.CurrentValue.PollInterval, options.CurrentValue.StartupDelay)
     {
         _serviceProvider = serviceProvider;
+        _options = options;
         _runtimeState = runtimeState;
         _serverRoleAccessor = serverRoleAccessor;
         _mainDom = mainDom;
@@ -126,14 +129,37 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                 var baseTime = lastFired ?? now.AddMinutes(-1);
                 var nextOccurrence = cron.GetNextOccurrence(baseTime, timeZone, inclusive: false);
 
-                if (nextOccurrence is null || nextOccurrence > now)
+                if (nextOccurrence is null)
+                {
+                    continue;
+                }
+
+                var timing = ResolveTiming(triggerSettings);
+                var offset = ScheduledTriggerJitter.ComputeOffset(automationId, timing, _options.CurrentValue.MaxJitter);
+
+                // Don't let jitter push us past the next cron occurrence.
+                if (offset > TimeSpan.Zero)
+                {
+                    var nextAfter = cron.GetNextOccurrence(nextOccurrence.Value, timeZone, inclusive: false);
+                    if (nextAfter is not null)
+                    {
+                        var maxOffset = nextAfter.Value - nextOccurrence.Value - TimeSpan.FromSeconds(1);
+                        if (offset > maxOffset)
+                        {
+                            offset = maxOffset > TimeSpan.Zero ? maxOffset : TimeSpan.Zero;
+                        }
+                    }
+                }
+
+                var dueAt = nextOccurrence.Value + offset;
+                if (dueAt > now)
                 {
                     continue;
                 }
 
                 _logger.LogInformation(
-                    "Dispatching scheduled trigger for automation {AutomationId} (CRON: {CronExpression}, TimeZone: {TimeZoneId})",
-                    automationId, cronExpression, timeZone.Id);
+                    "Dispatching scheduled trigger for automation {AutomationId} (CRON: {CronExpression}, TimeZone: {TimeZoneId}, Timing: {Timing}, Offset: {Offset})",
+                    automationId, cronExpression, timeZone.Id, timing, offset);
 
                 var triggerEvent = new TriggerEvent
                 {
@@ -150,5 +176,16 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                 _logger.LogError(ex, "Failed to evaluate scheduled trigger for automation {AutomationId}", automationId);
             }
         }
+    }
+
+    private static ScheduleTiming ResolveTiming(object? triggerSettings)
+    {
+        if (triggerSettings is ScheduledTriggerSettings sts
+            && Enum.TryParse<ScheduleTiming>(sts.Timing, ignoreCase: true, out var parsed))
+        {
+            return parsed;
+        }
+
+        return ScheduleTiming.Flexible;
     }
 }
