@@ -22,21 +22,12 @@ internal sealed class ScheduledTriggerStateStore : IScheduledTriggerStateStore
         var entity = await db.ScheduledTriggerStates
             .FirstOrDefaultAsync(e => e.AutomationId == automationId, cancellationToken);
 
-        // EF Core does not preserve DateTimeKind across the DB round-trip; the column
-        // is UTC by contract, so re-attach the kind for callers that require it
-        // (e.g. Cronos rejects DateTime values with Kind=Unspecified).
-        return entity is null
-            ? null
-            : DateTime.SpecifyKind(entity.LastFiredUtc, DateTimeKind.Utc);
+        return entity?.LastFiredUtc;
     }
 
     public async Task SetLastFiredAsync(Guid automationId, DateTime firedUtc, CancellationToken cancellationToken)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        var normalized = firedUtc.Kind == DateTimeKind.Utc
-            ? firedUtc
-            : firedUtc.ToUniversalTime();
 
         var entity = await db.ScheduledTriggerStates
             .FirstOrDefaultAsync(e => e.AutomationId == automationId, cancellationToken);
@@ -46,13 +37,13 @@ internal sealed class ScheduledTriggerStateStore : IScheduledTriggerStateStore
             entity = new ScheduledTriggerStateEntity
             {
                 AutomationId = automationId,
-                LastFiredUtc = normalized,
+                LastFiredUtc = firedUtc,
             };
             db.ScheduledTriggerStates.Add(entity);
         }
         else
         {
-            entity.LastFiredUtc = normalized;
+            entity.LastFiredUtc = firedUtc;
         }
 
         await db.SaveChangesAsync(cancellationToken);

@@ -3,6 +3,9 @@ using Umbraco.Automate.Tests.Common.Fixtures;
 
 namespace Umbraco.Automate.Tests.Integration;
 
+// See also UtcDateTimeRoundTripTests for the cross-cutting converter coverage
+// across other entities (AutomationRun, etc.).
+
 /// <summary>
 /// Verifies the state store survives the DB round-trip without losing
 /// <see cref="DateTimeKind.Utc"/> — Cronos requires Utc-kinded DateTimes
