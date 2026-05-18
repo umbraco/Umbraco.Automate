@@ -50,6 +50,30 @@ internal static class IdempotencyKeyFactory
         => $"{alias}:{entityKey}:v{versionId}:u{updateDate.Ticks}";
 
     /// <summary>
+    /// Builds an idempotency key of the form <c>{alias}:{entityKey}:u{ticks}</c> for a
+    /// save event on an entity that does not have a CMS version id (e.g. <c>IUser</c>).
+    /// <c>UpdateDate.Ticks</c> distinguishes legitimate sequential saves while still
+    /// collapsing a duplicate notification for the same save.
+    /// </summary>
+    /// <param name="alias">The trigger alias.</param>
+    /// <param name="entityKey">The entity key.</param>
+    /// <param name="updateDate">The entity's <c>UpdateDate</c> captured at save time.</param>
+    public static string ForVersionlessEntitySaveEvent(string alias, Guid entityKey, DateTime updateDate)
+        => $"{alias}:{entityKey}:u{updateDate.Ticks}";
+
+    /// <summary>
+    /// Builds an idempotency key of the form <c>{alias}:{affectedUserId}:t{ticks}</c> for
+    /// a user auth event (login, lockout, password change). CMS doesn't double-raise these,
+    /// but the timestamp makes the key deterministic so a duplicate-with-same-ticks safely
+    /// collapses.
+    /// </summary>
+    /// <param name="alias">The trigger alias.</param>
+    /// <param name="affectedUserId">The affected user id from the notification.</param>
+    /// <param name="dateTimeUtc">The notification's <c>DateTimeUtc</c>.</param>
+    public static string ForUserAuthEvent(string alias, string? affectedUserId, DateTime dateTimeUtc)
+        => $"{alias}:{affectedUserId ?? "unknown"}:t{dateTimeUtc.Ticks}";
+
+    /// <summary>
     /// Builds an idempotency key for a batch trigger event by hashing the sorted set of
     /// <c>(entityKey, versionId)</c> pairs in the batch. Two duplicate notifications for
     /// the exact same batch produce the same hash and dedupe; any change to the membership
