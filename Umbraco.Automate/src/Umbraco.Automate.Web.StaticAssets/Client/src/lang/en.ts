@@ -62,14 +62,11 @@ export default {
     },
     uaFields: {
         scheduledTriggerSettingsCronExpressionLabel: "CRON Expression",
-        scheduledTriggerSettingsCronExpressionDescription:
-            "A CRON expression defining the schedule (e.g. '0 9 * * 1-5' for weekdays at 9am).",
+        scheduledTriggerSettingsCronExpressionDescription: "A CRON expression defining the schedule (e.g. '0 9 * * 1-5' for weekdays at 9am).",
         scheduledTriggerSettingsTimeZoneLabel: "Time Zone",
-        scheduledTriggerSettingsTimeZoneDescription:
-            "IANA time zone ID (e.g. 'Europe/London'). Defaults to UTC.",
+        scheduledTriggerSettingsTimeZoneDescription: "IANA time zone ID (e.g. 'Europe/London'). Defaults to UTC.",
         scheduledTriggerSettingsTimingLabel: "Timing",
-        scheduledTriggerSettingsTimingDescription:
-            "Choose Flexible to spread the load and run around the scheduled time, or Precise to run right on the tick.",
+        scheduledTriggerSettingsTimingDescription: "Choose Flexible to spread the load and run around the scheduled time, or Precise to run right on the tick.",
     },
     uaPlaceholders: {
         enterName: "Enter a name...",
