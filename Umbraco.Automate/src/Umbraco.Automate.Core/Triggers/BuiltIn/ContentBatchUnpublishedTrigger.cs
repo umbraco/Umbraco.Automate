@@ -47,7 +47,7 @@ public sealed class ContentBatchUnpublishedTrigger
         {
             TriggerAlias = Alias,
             InitiatorType = TriggerInitiatorType.System,
-            IdempotencyKey = IdempotencyKeyFactory.ForContentBatch(Alias, batchIdentity),
+            IdempotencyKey = IdempotencyKeyFactory.ForEntityBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentUnpublishedTriggerOutput>
             {
                 Items = items,
@@ -69,7 +69,7 @@ public sealed class ContentBatchUnpublishedTrigger
 
         foreach (var item in output.Items)
         {
-            if (ContentTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
+            if (EntityTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
             {
                 return true;
             }
