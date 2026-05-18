@@ -272,7 +272,7 @@ public class ScheduledTriggerBackgroundJobTests
             .ReturnsAsync(automation);
 
         _mockTrigger.Setup(t => t.SettingsType).Returns(typeof(ScheduledTriggerSettings));
-        _mockTrigger.Setup(t => t.ResolveSettings(It.IsAny<IDictionary<string, object?>>()))
+        _mockTrigger.Setup(t => t.ResolveSettings(It.IsAny<Dictionary<string, object?>>()))
             .Returns(new ScheduledTriggerSettings { Timing = nameof(ScheduleTiming.Precise) });
 
         var scheduled = _mockTrigger.As<IScheduledTrigger>();
