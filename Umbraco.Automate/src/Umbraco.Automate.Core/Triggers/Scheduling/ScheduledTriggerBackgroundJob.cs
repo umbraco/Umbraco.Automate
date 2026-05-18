@@ -126,7 +126,11 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                 var timeZone = scheduledTrigger.GetTimeZone(triggerSettings);
 
                 var lastFired = await stateStore.GetLastFiredAsync(automationId, CancellationToken.None);
-                var baseTime = lastFired ?? now.AddMinutes(-1);
+                // For first-fire (lastFired is null), the lookback must span the jitter window
+                // plus a poll's worth of slack so a tick we observed but skipped (because the
+                // jittered dueAt was in the future) is still in scope on the next poll.
+                var lookback = _options.CurrentValue.MaxJitter + _options.CurrentValue.PollInterval;
+                var baseTime = lastFired ?? now - lookback;
                 var nextOccurrence = cron.GetNextOccurrence(baseTime, timeZone, inclusive: false);
 
                 if (nextOccurrence is null)
