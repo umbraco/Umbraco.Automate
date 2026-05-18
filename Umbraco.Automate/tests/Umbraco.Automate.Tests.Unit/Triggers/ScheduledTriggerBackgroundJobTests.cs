@@ -7,6 +7,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Triggers.Scheduling;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Runtime;
@@ -244,6 +245,92 @@ public class ScheduledTriggerBackgroundJobTests
         _dispatcher.Verify(
             d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_PreciseTiming_DispatchesOnTick()
+    {
+        // With Timing = Precise, jitter must be zero — automation must fire as soon as the
+        // cron tick is in the past, regardless of MaxJitter.
+        var automationId = Guid.NewGuid();
+
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
+
+        var automation = new Automation
+        {
+            Alias = "test",
+            Name = "Test",
+            Status = AutomationStatus.Published,
+            Trigger = new TriggerConfiguration
+            {
+                TriggerAlias = ScheduledTriggerAlias,
+                Settings = new Dictionary<string, object?> { ["Timing"] = "Precise" },
+            },
+        };
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns(typeof(ScheduledTriggerSettings));
+        _mockTrigger.Setup(t => t.ResolveSettings(It.IsAny<IDictionary<string, object?>>()))
+            .Returns(new ScheduledTriggerSettings { Timing = nameof(ScheduleTiming.Precise) });
+
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTime.UtcNow.AddSeconds(-90));
+
+        await _job.PerformExecuteAsync(null);
+
+        _dispatcher.Verify(
+            d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_FlexibleTiming_IdempotencyKeyUsesCronTick()
+    {
+        // Regression: the idempotency key must stay on the raw cron tick (not the jittered
+        // dueAt), so a restart during the jitter window doesn't double-dispatch via a
+        // different key. For `* * * * *` the next-occurrence is always a whole minute,
+        // so the key timestamp must end at the minute boundary.
+        var automationId = Guid.NewGuid();
+
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
+
+        var automation = new Automation
+        {
+            Alias = "test",
+            Name = "Test",
+            Status = AutomationStatus.Published,
+            Trigger = new TriggerConfiguration { TriggerAlias = ScheduledTriggerAlias, Settings = [] },
+        };
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        // Last fired well in the past so the cron tick is definitely behind us even after jitter.
+        _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTime.UtcNow.AddMinutes(-10));
+
+        TriggerEvent? captured = null;
+        _dispatcher.Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _job.PerformExecuteAsync(null);
+
+        captured.ShouldNotBeNull();
+        captured!.IdempotencyKey.ShouldStartWith($"scheduled:{automationId}:");
+        // The timestamp portion ends with :00.0000000Z because the cron tick is a whole minute.
+        captured.IdempotencyKey.ShouldContain(":00.0000000");
     }
 
     [Fact]
