@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Triggers.BuiltIn;
 
 namespace Umbraco.Automate.Core.Configuration;
 
@@ -178,4 +179,12 @@ public sealed class ScheduledTriggerOptions
     /// Gets or sets the startup delay before the first poll.
     /// </summary>
     public TimeSpan StartupDelay { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Gets or sets the maximum jitter applied to scheduled triggers configured as
+    /// <see cref="ScheduleTiming.Flexible"/>. Each automation gets a deterministic
+    /// per-id offset within <c>[0, MaxJitter]</c>, spreading load when many automations
+    /// share a CRON tick. Set to <see cref="TimeSpan.Zero"/> to disable jitter entirely.
+    /// </summary>
+    public TimeSpan MaxJitter { get; set; } = TimeSpan.FromMinutes(5);
 }
