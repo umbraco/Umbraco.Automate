@@ -47,7 +47,7 @@ public sealed class ContentBatchSavedTrigger
         {
             TriggerAlias = Alias,
             InitiatorType = TriggerInitiatorType.System,
-            IdempotencyKey = IdempotencyKeyFactory.ForContentSaveBatch(Alias, batchIdentity),
+            IdempotencyKey = IdempotencyKeyFactory.ForEntitySaveBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentSavedTriggerOutput>
             {
                 Items = items,
@@ -69,7 +69,7 @@ public sealed class ContentBatchSavedTrigger
 
         foreach (var item in output.Items)
         {
-            if (ContentTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
+            if (EntityTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
             {
                 return true;
             }

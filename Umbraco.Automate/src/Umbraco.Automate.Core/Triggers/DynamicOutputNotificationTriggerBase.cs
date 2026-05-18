@@ -24,12 +24,12 @@ public abstract class DynamicOutputNotificationTriggerBase<TSettings, TNotificat
     public abstract IEnumerable<TriggerEvent> MapEvent(TNotification notification);
 
     /// <summary>
-    /// Generates a deterministic idempotency key for a content-based trigger event.
-    /// A duplicate notification for the same (content, version) collapses to the same
+    /// Generates a deterministic idempotency key for an entity-based trigger event.
+    /// A duplicate notification for the same (entity, version) collapses to the same
     /// key and is deduped by the outbox; genuinely separate events produce distinct keys.
     /// </summary>
-    /// <param name="contentKey">The content item's unique key.</param>
-    /// <param name="versionId">The CMS version id that represents the event (publish/save/unpublish).</param>
-    protected string GenerateIdempotencyKey(Guid contentKey, int versionId)
-        => IdempotencyKeyFactory.ForContentEvent(Alias, contentKey, versionId);
+    /// <param name="entityKey">The Umbraco entity's unique key (content, media, etc.).</param>
+    /// <param name="versionId">The CMS version id that represents the event (publish/save/unpublish/trash/delete).</param>
+    protected string GenerateIdempotencyKey(Guid entityKey, int versionId)
+        => IdempotencyKeyFactory.ForEntityEvent(Alias, entityKey, versionId);
 }

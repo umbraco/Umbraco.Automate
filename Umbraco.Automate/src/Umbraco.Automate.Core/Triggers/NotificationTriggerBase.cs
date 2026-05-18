@@ -27,15 +27,15 @@ public abstract class NotificationTriggerBase<TSettings, TOutput, TNotification>
     public abstract IEnumerable<TriggerEvent> MapEvent(TNotification notification);
 
     /// <summary>
-    /// Generates a deterministic idempotency key for a publish/unpublish trigger event
-    /// where <paramref name="versionId"/> uniquely identifies the event. A duplicate
-    /// notification for the same (content, version) collapses to the same key and is
-    /// deduped by the outbox; genuinely separate events produce distinct keys.
+    /// Generates a deterministic idempotency key for a publish/unpublish/trash/delete trigger
+    /// event where <paramref name="versionId"/> uniquely identifies the event. A duplicate
+    /// notification for the same (entity, version) collapses to the same key and is deduped
+    /// by the outbox; genuinely separate events produce distinct keys.
     /// </summary>
-    /// <param name="contentKey">The content item's unique key.</param>
-    /// <param name="versionId">The CMS version id — typically <c>IContent.PublishedVersionId</c>.</param>
-    protected string GenerateIdempotencyKey(Guid contentKey, int versionId)
-        => IdempotencyKeyFactory.ForContentEvent(Alias, contentKey, versionId);
+    /// <param name="entityKey">The Umbraco entity's unique key (content, media, etc.).</param>
+    /// <param name="versionId">The CMS version id — typically <c>IContent.PublishedVersionId</c> or <c>IContentBase.VersionId</c>.</param>
+    protected string GenerateIdempotencyKey(Guid entityKey, int versionId)
+        => IdempotencyKeyFactory.ForEntityEvent(Alias, entityKey, versionId);
 
     /// <summary>
     /// Generates a deterministic idempotency key for a save trigger event. Umbraco reuses
@@ -43,9 +43,9 @@ public abstract class NotificationTriggerBase<TSettings, TOutput, TNotification>
     /// is included to distinguish legitimate sequential saves while still collapsing a
     /// duplicate notification for the same save.
     /// </summary>
-    /// <param name="contentKey">The content item's unique key.</param>
+    /// <param name="entityKey">The Umbraco entity's unique key (content, media, etc.).</param>
     /// <param name="versionId">The current CMS version id.</param>
-    /// <param name="updateDate">The <c>IContent.UpdateDate</c> captured at save time.</param>
-    protected string GenerateIdempotencyKey(Guid contentKey, int versionId, DateTime updateDate)
-        => IdempotencyKeyFactory.ForContentSaveEvent(Alias, contentKey, versionId, updateDate);
+    /// <param name="updateDate">The entity's <c>UpdateDate</c> captured at save time.</param>
+    protected string GenerateIdempotencyKey(Guid entityKey, int versionId, DateTime updateDate)
+        => IdempotencyKeyFactory.ForEntitySaveEvent(Alias, entityKey, versionId, updateDate);
 }
