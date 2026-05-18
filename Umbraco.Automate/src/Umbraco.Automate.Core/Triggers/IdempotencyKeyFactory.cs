@@ -62,6 +62,16 @@ internal static class IdempotencyKeyFactory
         => $"{alias}:{entityKey}:u{updateDate.Ticks}";
 
     /// <summary>
+    /// Builds an idempotency key of the form <c>{alias}:{entityKey}</c> for a terminal
+    /// event (delete) on an entity without a CMS version id. The entity key alone is
+    /// sufficient — a duplicate delete notification carries the same key.
+    /// </summary>
+    /// <param name="alias">The trigger alias.</param>
+    /// <param name="entityKey">The entity key.</param>
+    public static string ForVersionlessEntityEvent(string alias, Guid entityKey)
+        => $"{alias}:{entityKey}";
+
+    /// <summary>
     /// Builds an idempotency key of the form <c>{alias}:{affectedUserId}:t{ticks}</c> for
     /// a user auth event (login, lockout, password change). CMS doesn't double-raise these,
     /// but the timestamp makes the key deterministic so a duplicate-with-same-ticks safely

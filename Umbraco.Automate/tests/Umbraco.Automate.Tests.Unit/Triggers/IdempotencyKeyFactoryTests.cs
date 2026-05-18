@@ -270,4 +270,21 @@ public class IdempotencyKeyFactoryTests
         var key = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", time);
         key.ShouldBe($"test.trigger:user-123:t{time.Ticks}");
     }
+
+    [Fact]
+    public void ForVersionlessEntityEvent_SameEntity_ProducesSameKey()
+    {
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        var b = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForVersionlessEntityEvent_KeyFormat_IsStable()
+    {
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var key = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        key.ShouldBe("test.trigger:11111111-1111-1111-1111-111111111111");
+    }
 }
