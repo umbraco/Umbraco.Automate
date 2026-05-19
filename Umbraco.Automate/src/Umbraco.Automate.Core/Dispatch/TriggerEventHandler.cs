@@ -5,8 +5,12 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
@@ -20,6 +24,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly IAutomationExecutor _executor;
     private readonly IExecutionNodeEligibility _nodeEligibility;
     private readonly TriggerCollection _triggers;
+    private readonly IWorkspaceService _workspaceService;
+    private readonly IUserService _userService;
+    private readonly ISectionAccessChecker _sectionAccessChecker;
     private readonly IOptionsMonitor<ExecutionOptions> _executionOptions;
     private readonly ILogger<TriggerEventHandler> _logger;
 
@@ -29,6 +36,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
         IAutomationExecutor executor,
         IExecutionNodeEligibility nodeEligibility,
         TriggerCollection triggers,
+        IWorkspaceService workspaceService,
+        IUserService userService,
+        ISectionAccessChecker sectionAccessChecker,
         IOptionsMonitor<ExecutionOptions> executionOptions,
         ILogger<TriggerEventHandler> logger)
     {
@@ -37,6 +47,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
         _executor = executor;
         _nodeEligibility = nodeEligibility;
         _triggers = triggers;
+        _workspaceService = workspaceService;
+        _userService = userService;
+        _sectionAccessChecker = sectionAccessChecker;
         _executionOptions = executionOptions;
         _logger = logger;
     }
@@ -107,6 +120,11 @@ internal sealed class TriggerEventHandler : IMessageHandler
         // trigger settings. Deserialize lazily to avoid the cost on the common no-filter path.
         object? typedOutput = null;
         var typedOutputAttempted = false;
+
+        // Per-invocation cache of service-account resolution per workspace. Avoids repeating
+        // the IUserService.GetAsync round-trip when several published automations subscribe
+        // to the same trigger from the same workspace.
+        var serviceAccountCache = new Dictionary<Guid, IUser?>();
 
         foreach (var automation in matching)
         {
@@ -186,6 +204,22 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 }
             }
 
+            // Runtime section guard: even if the trigger was permitted at publish time,
+            // the workspace's service account may have been downgraded since. Skip the run
+            // (no run record, no payload exposure) when the account no longer has the
+            // sections the trigger requires.
+            if (trigger is not null && trigger.RequiredSections.Count > 0)
+            {
+                var serviceAccount = await ResolveServiceAccountAsync(executionAutomation.WorkspaceId, serviceAccountCache, cancellationToken);
+                if (serviceAccount is null || !_sectionAccessChecker.CanAccess(serviceAccount, trigger))
+                {
+                    _logger.LogWarning(
+                        "Automation {AutomationId} skipped — workspace service account does not satisfy trigger {TriggerAlias} section requirements ({Sections}). Republish or update the service account.",
+                        executionAutomation.Id, message.TriggerAlias, string.Join(", ", trigger.RequiredSections));
+                    continue;
+                }
+            }
+
             _logger.LogInformation(
                 "Starting run for automation {AutomationAlias} ({AutomationId}) version {Version} from trigger {TriggerAlias}",
                 executionAutomation.Alias, executionAutomation.Id, executionAutomation.Version, message.TriggerAlias);
@@ -198,6 +232,28 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 cancellationToken,
                 originChain: message.OriginAutomationChain);
         }
+    }
+
+    private async Task<IUser?> ResolveServiceAccountAsync(
+        Guid workspaceId,
+        Dictionary<Guid, IUser?> cache,
+        CancellationToken cancellationToken)
+    {
+        if (cache.TryGetValue(workspaceId, out var cached))
+        {
+            return cached;
+        }
+
+        var workspace = await _workspaceService.GetWorkspaceAsync(workspaceId, cancellationToken);
+        if (workspace is null || workspace.ServiceAccountKey == Guid.Empty)
+        {
+            cache[workspaceId] = null;
+            return null;
+        }
+
+        var user = await _userService.GetAsync(workspace.ServiceAccountKey);
+        cache[workspaceId] = user;
+        return user;
     }
 
     private object? DeserializeTypedOutput(string? outputData, Type? outputType)

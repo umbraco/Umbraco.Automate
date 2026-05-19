@@ -18,6 +18,7 @@ using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -26,6 +27,8 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -109,6 +112,12 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
             .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
 
+        var userService = new Mock<IUserService>();
+        userService.Setup(u => u.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
+        services.AddSingleton(userService.Object);
+        services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
+
         services.AddSingleton(Mock.Of<IConnectionService>());
 
         services.Configure<RateLimitingOptions>(o => o.Enabled = false);
@@ -190,6 +199,9 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
             triggers,
+            _provider.GetRequiredService<IWorkspaceService>(),
+            _provider.GetRequiredService<IUserService>(),
+            _provider.GetRequiredService<ISectionAccessChecker>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }

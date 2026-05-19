@@ -7,11 +7,15 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
 
@@ -20,12 +24,21 @@ public class TriggerEventHandlerTests
     private readonly Mock<IAutomationService> _automationService = new();
     private readonly Mock<IAutomationExecutor> _executor = new();
     private readonly Mock<IExecutionNodeEligibility> _nodeEligibility = new();
+    private readonly Mock<IWorkspaceService> _workspaceService = new();
+    private readonly Mock<IUserService> _userService = new();
     private readonly TriggerCollection _triggers;
     private readonly TriggerEventHandler _handler;
 
     public TriggerEventHandlerTests()
     {
         _nodeEligibility.Setup(e => e.CanExecuteWorkflows()).Returns(true);
+
+        // Default workspace + service-account mocks so the runtime section guard passes.
+        // Individual tests can override these to exercise the deny path.
+        _workspaceService.Setup(s => s.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid id, CancellationToken _) => new WorkspaceBuilder().WithId(id).Build());
+        _userService.Setup(s => s.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
 
         var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
         _triggers = new TriggerCollection(() =>
@@ -44,6 +57,9 @@ public class TriggerEventHandlerTests
             _executor.Object,
             _nodeEligibility.Object,
             _triggers,
+            _workspaceService.Object,
+            _userService.Object,
+            new SectionAccessChecker(),
             CreateExecutionOptionsMonitor(),
             Mock.Of<ILogger<TriggerEventHandler>>());
     }
@@ -320,6 +336,9 @@ public class TriggerEventHandlerTests
             _executor.Object,
             _nodeEligibility.Object,
             _triggers,
+            _workspaceService.Object,
+            _userService.Object,
+            new SectionAccessChecker(),
             CreateExecutionOptionsMonitor(maxChainDepth: 3),
             Mock.Of<ILogger<TriggerEventHandler>>());
 
@@ -532,6 +551,70 @@ public class TriggerEventHandlerTests
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
             It.Is<IReadOnlyList<Guid>>(c => c != null && c.Count == 0)), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ServiceAccountLacksTriggerSection_SkipsAutomation()
+    {
+        // Trigger requires `content`; service account only has `media` → runtime guard skips
+        // the automation without starting a run. Models post-publish service-account downgrade.
+        var automation = new AutomationBuilder()
+            .WithTrigger("umbracoAutomate.contentSaved")
+            .Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automation });
+
+        _userService.Setup(s => s.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "media" }));
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            It.IsAny<Automation>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ServiceAccountMissing_SkipsAutomationWithSectionedTrigger()
+    {
+        var automation = new AutomationBuilder()
+            .WithTrigger("umbracoAutomate.contentSaved")
+            .Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automation });
+
+        _userService.Setup(s => s.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((IUser?)null);
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            It.IsAny<Automation>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     private static Automation BuildContentSavedAutomation(Guid id, AutomationOriginatedEventBehavior behavior)

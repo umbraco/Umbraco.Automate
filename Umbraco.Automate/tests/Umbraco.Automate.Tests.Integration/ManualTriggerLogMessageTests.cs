@@ -18,6 +18,7 @@ using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
@@ -25,6 +26,8 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -98,6 +101,14 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
 
+        // User service + section access checker — required by the dispatch-time section guard
+        // even though this test's manual trigger declares no section requirements.
+        var userService = new Mock<IUserService>();
+        userService.Setup(u => u.GetAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
+        services.AddSingleton(userService.Object);
+        services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
+
         services.AddSingleton(Mock.Of<IConnectionService>());
 
         // Rate limiting — disabled for tests.
@@ -139,6 +150,9 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
             triggers,
+            _provider.GetRequiredService<IWorkspaceService>(),
+            _provider.GetRequiredService<IUserService>(),
+            _provider.GetRequiredService<ISectionAccessChecker>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }
