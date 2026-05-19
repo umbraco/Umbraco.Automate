@@ -49,6 +49,7 @@ public class PublishValidationTests
         var actions = new ActionCollection(() => []);
         var triggers = new TriggerCollection(() => []);
         var controlFlows = new ControlFlowCollection(() => []);
+        var connectionTypes = new ConnectionTypeCollection(() => []);
 
         _service = new AutomationService(
             _repo.Object,
@@ -61,7 +62,7 @@ public class PublishValidationTests
             actions,
             triggers,
             controlFlows,
-            new SensitiveSettingsStripper(actions, triggers, controlFlows));
+            new SensitiveSettingsStripper(actions, triggers, controlFlows, connectionTypes));
     }
 
     [Fact]

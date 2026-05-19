@@ -47,6 +47,7 @@ public class AutomationTransferTests
         _actions = new ActionCollection(() => []);
         _triggers = new TriggerCollection(() => []);
         _controlFlows = new ControlFlowCollection(() => []);
+        var connectionTypes = new ConnectionTypeCollection(() => []);
 
         _service = new AutomationService(
             _repo.Object,
@@ -59,7 +60,7 @@ public class AutomationTransferTests
             _actions,
             _triggers,
             _controlFlows,
-            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows));
+            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows, connectionTypes));
     }
 
     #region Export Tests
