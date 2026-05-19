@@ -11,10 +11,10 @@ export class UaCatalogueServerDataSource {
         this.#host = host;
     }
 
-    async getActions(): Promise<{ data?: UaActionCatalogueItemModel[]; error?: unknown }> {
+    async getActions(workspaceId?: string): Promise<{ data?: UaActionCatalogueItemModel[]; error?: unknown }> {
         const { data, error } = await tryExecute(
             this.#host,
-            CatalogueService.getCatalogueActions(),
+            CatalogueService.getCatalogueActions({ query: workspaceId ? { workspaceId } : undefined }),
         );
 
         if (error || !data) {
@@ -24,10 +24,10 @@ export class UaCatalogueServerDataSource {
         return { data: data.map(UaCatalogueTypeMapper.toActionModel) };
     }
 
-    async getTriggers(): Promise<{ data?: UaTriggerCatalogueItemModel[]; error?: unknown }> {
+    async getTriggers(workspaceId?: string): Promise<{ data?: UaTriggerCatalogueItemModel[]; error?: unknown }> {
         const { data, error } = await tryExecute(
             this.#host,
-            CatalogueService.getCatalogueTriggers(),
+            CatalogueService.getCatalogueTriggers({ query: workspaceId ? { workspaceId } : undefined }),
         );
 
         if (error || !data) {

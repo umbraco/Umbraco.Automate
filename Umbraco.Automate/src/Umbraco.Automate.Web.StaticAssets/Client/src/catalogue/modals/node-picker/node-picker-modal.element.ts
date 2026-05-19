@@ -41,10 +41,11 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
         this._error = false;
 
         const mode = this.data?.mode ?? "action";
+        const workspaceId = this.data?.workspaceId;
         let items: UaCatalogueItemModel[] = [];
 
         if (mode === "trigger") {
-            const result = await this.#repository!.requestTriggers();
+            const result = await this.#repository!.requestTriggers(workspaceId);
             if (result.error || !result.data) {
                 this._error = true;
                 this._loading = false;
@@ -52,9 +53,10 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
             }
             items = result.data;
         } else {
-            // Load actions and control flows, merged into one picker
+            // Load actions and control flows, merged into one picker. Actions are scoped to the
+            // workspace's service account section access; control flows are workspace-agnostic.
             const [actionsResult, controlFlowsResult] = await Promise.all([
-                this.#repository!.requestActions(),
+                this.#repository!.requestActions(workspaceId),
                 this.#repository!.requestControlFlows(),
             ]);
             if (actionsResult.error && controlFlowsResult.error) {

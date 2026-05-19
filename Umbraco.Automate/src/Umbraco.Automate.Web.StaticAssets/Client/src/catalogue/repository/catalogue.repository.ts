@@ -6,10 +6,14 @@ import { UaCatalogueServerDataSource } from "./catalogue.server.data-source.js";
 import type { NotificationChannelItemResponseModel } from "../../api/types.gen.js";
 import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
 
+const UNSCOPED_CACHE_KEY = "__all__";
+
 export class UaCatalogueRepository extends UmbRepositoryBase {
     #dataSource: UaCatalogueServerDataSource;
-    #actionsCache: UaActionCatalogueItemModel[] | undefined;
-    #triggersCache: UaTriggerCatalogueItemModel[] | undefined;
+    // Cached per workspace scope — different workspaces filter to different subsets, so a flat
+    // cache would return the wrong set when the picker is opened against another workspace.
+    #actionsCache = new Map<string, UaActionCatalogueItemModel[]>();
+    #triggersCache = new Map<string, UaTriggerCatalogueItemModel[]>();
     #connectionTypesCache: UaConnectionTypeCatalogueItemModel[] | undefined;
     #controlFlowsCache: UaControlFlowCatalogueItemModel[] | undefined;
 
@@ -18,26 +22,30 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
         this.#dataSource = new UaCatalogueServerDataSource(host);
     }
 
-    async requestActions(): Promise<{ data?: UaActionCatalogueItemModel[]; error?: unknown }> {
-        if (this.#actionsCache) {
-            return { data: this.#actionsCache };
+    async requestActions(workspaceId?: string): Promise<{ data?: UaActionCatalogueItemModel[]; error?: unknown }> {
+        const key = workspaceId ?? UNSCOPED_CACHE_KEY;
+        const cached = this.#actionsCache.get(key);
+        if (cached) {
+            return { data: cached };
         }
 
-        const result = await this.#dataSource.getActions();
+        const result = await this.#dataSource.getActions(workspaceId);
         if (result.data) {
-            this.#actionsCache = result.data;
+            this.#actionsCache.set(key, result.data);
         }
         return result;
     }
 
-    async requestTriggers(): Promise<{ data?: UaTriggerCatalogueItemModel[]; error?: unknown }> {
-        if (this.#triggersCache) {
-            return { data: this.#triggersCache };
+    async requestTriggers(workspaceId?: string): Promise<{ data?: UaTriggerCatalogueItemModel[]; error?: unknown }> {
+        const key = workspaceId ?? UNSCOPED_CACHE_KEY;
+        const cached = this.#triggersCache.get(key);
+        if (cached) {
+            return { data: cached };
         }
 
-        const result = await this.#dataSource.getTriggers();
+        const result = await this.#dataSource.getTriggers(workspaceId);
         if (result.data) {
-            this.#triggersCache = result.data;
+            this.#triggersCache.set(key, result.data);
         }
         return result;
     }
@@ -75,8 +83,8 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
     }
 
     clearCache() {
-        this.#actionsCache = undefined;
-        this.#triggersCache = undefined;
+        this.#actionsCache.clear();
+        this.#triggersCache.clear();
         this.#connectionTypesCache = undefined;
         this.#controlFlowsCache = undefined;
     }
