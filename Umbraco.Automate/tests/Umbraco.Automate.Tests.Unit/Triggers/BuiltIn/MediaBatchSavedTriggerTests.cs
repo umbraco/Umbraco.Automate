@@ -41,8 +41,8 @@ public class MediaBatchSavedTriggerTests
     [Fact]
     public void MapEvent_ProducesSingleEventWithAllItems()
     {
-        var media1 = MediaSavedTriggerTests.CreateMedia(Guid.NewGuid(), "Image One", "Image");
-        var media2 = MediaSavedTriggerTests.CreateMedia(Guid.NewGuid(), "Image Two", "Image");
+        var media1 = MediaSavedTriggerTests.CreateMedia(Guid.NewGuid(), "Image One", "Image", isNew: true);
+        var media2 = MediaSavedTriggerTests.CreateMedia(Guid.NewGuid(), "Image Two", "Image", isNew: false);
 
         var notification = new MediaSavedNotification(
             new[] { media1, media2 },
@@ -57,7 +57,9 @@ public class MediaBatchSavedTriggerTests
         batchEvent.Output.Count.ShouldBe(2);
         batchEvent.Output.Items.Count.ShouldBe(2);
         batchEvent.Output.Items[0].MediaName.ShouldBe("Image One");
+        batchEvent.Output.Items[0].IsNew.ShouldBeTrue();
         batchEvent.Output.Items[1].MediaName.ShouldBe("Image Two");
+        batchEvent.Output.Items[1].IsNew.ShouldBeFalse();
     }
 
     [Fact]

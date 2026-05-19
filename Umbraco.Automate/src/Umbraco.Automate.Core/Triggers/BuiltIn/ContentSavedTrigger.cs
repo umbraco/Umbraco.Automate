@@ -3,11 +3,13 @@ using Umbraco.Cms.Core.Notifications;
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
-/// Fires when content is saved in Umbraco CMS.
+/// Fires when content is saved in Umbraco CMS (covers both new content and subsequent
+/// edits — Umbraco raises <see cref="ContentSavedNotification"/> for both, with
+/// <see cref="ContentSavedTriggerOutput.IsNew"/> distinguishing them).
 /// Produces one <see cref="TriggerEvent"/> per saved content item.
 /// </summary>
 [Trigger("umbracoAutomate.contentSaved", "Content Saved",
-    Description = "Fires when content is saved.",
+    Description = "Fires when content is saved (created or updated).",
     Group = "Content",
     Icon = "icon-save")]
 public sealed class ContentSavedTrigger
@@ -38,6 +40,7 @@ public sealed class ContentSavedTrigger
                     ContentName = content.Name,
                     ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
+                    IsNew = content.CreateDate == content.UpdateDate,
                 },
             };
         }

@@ -49,13 +49,14 @@ public class MediaSavedTriggerTests
         properties.Keys.ShouldContain("mediaKey");
         properties.Keys.ShouldContain("mediaName");
         properties.Keys.ShouldContain("mediaTypeAlias");
+        properties.Keys.ShouldContain("isNew");
     }
 
     [Fact]
     public void MapEvent_ProducesEventPerSavedItem()
     {
-        var media1 = CreateMedia(Guid.NewGuid(), "Image One", "Image");
-        var media2 = CreateMedia(Guid.NewGuid(), "Image Two", "Image");
+        var media1 = CreateMedia(Guid.NewGuid(), "Image One", "Image", isNew: true);
+        var media2 = CreateMedia(Guid.NewGuid(), "Image Two", "Image", isNew: false);
 
         var notification = new MediaSavedNotification(
             new[] { media1, media2 },
@@ -69,9 +70,11 @@ public class MediaSavedTriggerTests
         first.TriggerAlias.ShouldBe("umbracoAutomate.mediaSaved");
         first.Output.MediaName.ShouldBe("Image One");
         first.Output.MediaTypeAlias.ShouldBe("Image");
+        first.Output.IsNew.ShouldBeTrue();
 
         var second = events[1].ShouldBeOfType<TriggerEvent<MediaSavedTriggerOutput>>();
         second.Output.MediaName.ShouldBe("Image Two");
+        second.Output.IsNew.ShouldBeFalse();
     }
 
     [Fact]
@@ -135,15 +138,21 @@ public class MediaSavedTriggerTests
         ((ITrigger)_trigger).CanHandle(new { }, new MediaSavedTriggerSettings()).ShouldBeTrue();
     }
 
-    internal static IMedia CreateMedia(Guid key, string name, string mediaTypeAlias)
+    internal static IMedia CreateMedia(Guid key, string name, string mediaTypeAlias, bool isNew = false)
     {
         var contentType = new Mock<ISimpleContentType>();
         contentType.SetupGet(ct => ct.Alias).Returns(mediaTypeAlias);
+
+        // CreateDate == UpdateDate signals a newly-created item; diverged dates signal an edit.
+        var createDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var updateDate = isNew ? createDate : createDate.AddSeconds(1);
 
         var media = new Mock<IMedia>();
         media.SetupGet(m => m.Key).Returns(key);
         media.SetupGet(m => m.Name).Returns(name);
         media.SetupGet(m => m.ContentType).Returns(contentType.Object);
+        media.SetupGet(m => m.CreateDate).Returns(createDate);
+        media.SetupGet(m => m.UpdateDate).Returns(updateDate);
 
         return media.Object;
     }

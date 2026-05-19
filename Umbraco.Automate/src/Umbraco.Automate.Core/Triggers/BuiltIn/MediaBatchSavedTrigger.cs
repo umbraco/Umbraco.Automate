@@ -35,6 +35,7 @@ public sealed class MediaBatchSavedTrigger
             MediaName = media.Name,
             MediaTypeKey = media.ContentType?.Key,
             MediaTypeAlias = media.ContentType?.Alias,
+            IsNew = media.CreateDate == media.UpdateDate,
         }).ToList();
 
         // Media saves reuse the same VersionId per item; UpdateDate is what advances per save,

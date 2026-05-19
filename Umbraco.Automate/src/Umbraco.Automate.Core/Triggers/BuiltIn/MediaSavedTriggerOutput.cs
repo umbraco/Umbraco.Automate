@@ -24,4 +24,12 @@ public sealed class MediaSavedTriggerOutput
     /// Gets the media type alias.
     /// </summary>
     public string? MediaTypeAlias { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether this save represents a newly-created media item.
+    /// True when <c>CreateDate == UpdateDate</c> on the saved entity. Soft signal —
+    /// database date precision may vary, so downstream automations needing a hard
+    /// guarantee should re-fetch.
+    /// </summary>
+    public bool IsNew { get; init; }
 }

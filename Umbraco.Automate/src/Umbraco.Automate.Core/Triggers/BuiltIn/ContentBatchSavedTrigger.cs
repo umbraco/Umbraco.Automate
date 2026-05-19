@@ -35,6 +35,7 @@ public sealed class ContentBatchSavedTrigger
             ContentName = content.Name,
             ContentTypeKey = content.ContentType?.Key,
             ContentTypeAlias = content.ContentType?.Alias,
+            IsNew = content.CreateDate == content.UpdateDate,
         }).ToList();
 
         // Draft saves reuse the same VersionId per item; UpdateDate is what advances per save,
