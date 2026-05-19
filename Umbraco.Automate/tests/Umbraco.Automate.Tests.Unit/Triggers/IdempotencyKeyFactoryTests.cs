@@ -206,4 +206,85 @@ public class IdempotencyKeyFactoryTests
 
         key1.ShouldBe(key2);
     }
+
+    [Fact]
+    public void ForVersionlessEntitySaveEvent_SameUpdateDate_ProducesSameKey()
+    {
+        var entityKey = Guid.NewGuid();
+        var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var a = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, updateDate);
+        var b = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, updateDate);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForVersionlessEntitySaveEvent_DifferentUpdateDates_ProduceDifferentKeys()
+    {
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc));
+        var b = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc));
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void ForVersionlessEntitySaveEvent_KeyFormat_IsStable()
+    {
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var key = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, updateDate);
+        key.ShouldBe($"test.trigger:11111111-1111-1111-1111-111111111111:u{updateDate.Ticks}");
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_SameInputs_ProducesSameKey()
+    {
+        var time = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var a = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", time);
+        var b = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", time);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_DifferentTimes_ProduceDifferentKeys()
+    {
+        var a = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc));
+        var b = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc));
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_NullUserId_ProducesStableKey()
+    {
+        // Failed-login notifications may carry a null AffectedUserId — the key should
+        // still be deterministic and not throw.
+        var time = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var a = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", null, time);
+        var b = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", null, time);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_KeyFormat_IsStable()
+    {
+        var time = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var key = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", time);
+        key.ShouldBe($"test.trigger:user-123:t{time.Ticks}");
+    }
+
+    [Fact]
+    public void ForVersionlessEntityEvent_SameEntity_ProducesSameKey()
+    {
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        var b = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForVersionlessEntityEvent_KeyFormat_IsStable()
+    {
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var key = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        key.ShouldBe("test.trigger:11111111-1111-1111-1111-111111111111");
+    }
 }
