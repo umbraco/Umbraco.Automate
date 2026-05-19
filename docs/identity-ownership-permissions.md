@@ -279,6 +279,107 @@ Connection (unchanged from engineering-spec.md — access controlled at workspac
 | 4 | Service account assignment | **Required on workspace, not per-automation** | Admin assigns a service account when creating a workspace. All automations in the workspace inherit it. Automation creators never choose a service account — eliminates "pick the most powerful one" behaviour. No SYSTEM fallback. |
 | 5 | Ownership model | **No explicit owner — workspace + version history** | `CreatedBy` + version history provide full accountability. The workspace is the collective owner. Eliminates ownership transfer complexity. |
 
+## Step-type Permission Model
+
+Triggers and actions can declare CMS access requirements through metadata on the
+`[Trigger(...)]` / `[Action(...)]` attribute. Three layers are enforced, each at a
+different point in the lifecycle:
+
+| Layer | Declared by | Enforced at |
+|-------|-------------|-------------|
+| **Section access** | `RequiredSections = ["content", ...]` | Catalogue endpoint (picker filter) → publish-time validation → trigger dispatch → per-action runtime middleware |
+| **Node access** | n/a (resolved from the action's target node at runtime) | Inside each content/media action via `IAutomationActionAuthorizer` |
+| **Permission verb** | `RequiredPermissions = [ActionPublish.ActionLetter, ...]` (content actions only) | Same as node access — fed into `IContentPermissionService.AuthorizeAccessAsync` |
+
+### Section access — `RequiredSections`
+
+Declare the Umbraco backoffice section aliases the workspace's service account
+must have access to. Semantics are "any-of": the account passes if its
+`AllowedSections` contains at least one entry from the list. Empty list (the
+default) means the step type is universally available.
+
+```csharp
+[Trigger("umbracoAutomate.userSaved", "User Saved",
+    Group = "Users",
+    RequiredSections = [Constants.Applications.Users])]
+public sealed class UserSavedTrigger : ...
+
+[Action("umbracoAutomate.publishContent", "Publish Content",
+    Group = "Content",
+    RequiredSections = [Constants.Applications.Content],
+    RequiredPermissions = [ActionPublish.ActionLetter])]
+public sealed class PublishContentAction : ...
+```
+
+Enforcement points:
+- **Catalogue (`GET /catalogue/triggers?workspaceId=...`, `GET /catalogue/actions?workspaceId=...`)** — hard-excludes restricted items so the picker never offers a step type the workspace cannot legitimately use. Omitting `workspaceId` returns the full unfiltered catalogue (for admin tooling and binding-suggestion resolvers).
+- **`AutomationService.ValidateForPublishAsync`** — backstops the catalogue filter. Catches import paths, direct API calls, and stale drafts.
+- **`TriggerEventHandler.HandleAsync`** — skips dispatch when a published automation's trigger requires sections the service account has lost since publish. No run record is created.
+- **`BackOfficeIdentityMiddleware`** — fails the step with `StepRunErrorCategory.Authentication` when the action's section is no longer satisfied at runtime.
+
+### Node access and permission verbs — `IAutomationActionAuthorizer`
+
+Section access is necessary but not sufficient. A workspace with the Content
+section can still legitimately be scoped to a subset of nodes via the service
+account's start node and granular permissions. Content and media actions enforce
+this at runtime by calling `IAutomationActionAuthorizer`:
+
+```csharp
+public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+{
+    var settings = context.GetSettings<MyActionSettings>();
+
+    if (!Guid.TryParse(settings.ContentKey, out var contentKey)) { /* validation error */ }
+
+    var auth = await _authorizer.AuthorizeContentAsync(
+        contentKey,
+        RequiredPermissions.ToHashSet(),
+        cancellationToken);
+    if (!auth.Authorized)
+    {
+        return ActionResult.Failed(
+            new UnauthorizedAccessException(auth.FailureReason),
+            StepRunErrorCategory.Authentication);
+    }
+
+    // ...invoke the CMS service...
+}
+```
+
+For search/list actions, use `FilterAuthorizedContentAsync` to drop unauthorised
+results from the output set rather than failing the action:
+
+```csharp
+var authorizedKeys = await _authorizer.FilterAuthorizedContentAsync(
+    matches.Select(m => m.ContentKey),
+    RequiredPermissions.ToHashSet(),
+    cancellationToken);
+matches = matches.Where(m => authorizedKeys.Contains(m.ContentKey)).ToList();
+```
+
+Media actions use `AuthorizeMediaAsync(mediaKey, ct)` — media has no permission
+verbs in CMS, so it is binary (start-node access only).
+
+The authorizer wraps Umbraco's `IContentPermissionService` /
+`IMediaPermissionService`, so behaviour matches the backoffice's own
+access-control enforcement.
+
+### Third-party step types
+
+Unannotated step types (empty `RequiredSections`) are available to every
+workspace by default. Third-party packages may opt in to section gating by
+declaring requirements. The convention is documented but not strictly enforced
+— author discretion governs whether their step type carries CMS data.
+
+### Drift health check
+
+`AutomationPermissionDriftHealthCheck` walks published automations and reports
+any whose workspace service account no longer satisfies the trigger or step
+action section requirements. Surfaces in the Umbraco health-check dashboard
+under the "Umbraco Automate" group with an action-required message listing
+affected automations. Operators republish each automation or grant the missing
+section to the service account.
+
 ## Open Questions
 
 1. Where should the administration UI live — Settings section, Users section, or within the Automations section?

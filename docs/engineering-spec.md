@@ -2076,6 +2076,7 @@ These concerns are baked into the architecture, not bolted on later.
 | Concern | Approach |
 |---------|----------|
 | **Secrets management** | Settings marked `[Field(IsSensitive = true)]` are automatically encrypted at rest using ASP.NET Core Data Protection (already in Umbraco's dependency tree) — mirroring Umbraco.AI's `[AIField(IsSensitive = true)]` pattern. Sensitive values are encrypted in-place on the entity (Connection settings, action settings) via EF Core value converters. No separate secrets table — the Connection entity itself centralises shared credentials. |
+| **Step-type permission gating** | Triggers and actions declare `RequiredSections` (and content actions `RequiredPermissions`, the CMS permission letters) on the `[Trigger(...)]` / `[Action(...)]` attribute. `ISectionAccessChecker` enforces section access at four points: the catalogue picker endpoint filters out items the workspace's service account cannot use; `AutomationService.ValidateForPublishAsync` rejects publishes that would violate them; `TriggerEventHandler` skips dispatch when the trigger requirement is no longer satisfied; `BackOfficeIdentityMiddleware` fails the step at runtime when the action requirement drifts. `IAutomationActionAuthorizer` wraps Umbraco's `IContentPermissionService` / `IMediaPermissionService` to enforce node-level access (start node + granular Browse/Update/Publish) inside each content/media action. `AutomationPermissionDriftHealthCheck` surfaces published automations whose service accounts no longer satisfy the requirements. See [identity-ownership-permissions.md](identity-ownership-permissions.md#step-type-permission-model) for the full model. |
 | **SSRF prevention** | HTTP Request action validates URLs against a configurable allowlist/denylist. Blocks internal IPs (`10.x`, `172.16.x`, `192.168.x`), link-local (`169.254.x`), and localhost by default. |
 | **Step-level timeout enforcement** | `CancellationToken` linked to a `CancellationTokenSource` with the configured timeout. Enforced by the middleware pipeline — actions that ignore cancellation are terminated after a grace period. |
 | **Trigger deduplication** | Optional `IdempotencyKey` on trigger events. `TriggerService` deduplicates within a configurable window (default 5 minutes). Incoming webhooks use `X-Request-Id` header or body hash. |
@@ -2099,6 +2100,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | **Engine Status** | WorkflowCore host is running and processing. Queue provider is reachable. | Error |
 | **Queue Depth** | Work queue depth is below `MaxQueueDepth` threshold. Early warning at 80%. | Warning |
 | **Data Retention** | Purge job has run successfully within the expected interval. | Info |
+| **Automation Service-Account Permissions** | Every published automation's workspace service account still satisfies the trigger/action `RequiredSections`. | Warning |
 
 #### Phase 2
 
