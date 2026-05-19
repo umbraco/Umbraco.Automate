@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.userDeleted", "User Deleted",
     Description = "Fires when a back-office user is deleted.",
     Group = "Users",
-    Icon = "icon-delete")]
+    Icon = "icon-delete",
+    RequiredSections = [UmbracoConstants.Applications.Users])]
 public sealed class UserDeletedTrigger
     : NotificationTriggerBase<UserDeletedTriggerSettings, UserDeletedTriggerOutput, UserDeletedNotification>
 {

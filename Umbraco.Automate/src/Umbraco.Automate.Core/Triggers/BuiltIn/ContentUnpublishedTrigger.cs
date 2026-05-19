@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,10 +10,18 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.contentUnpublished", "Content Unpublished",
     Description = "Fires when content is unpublished.",
     Group = "Content",
-    Icon = "icon-globe")]
+    Icon = "icon-globe",
+    RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentUnpublishedTrigger
-    : NotificationTriggerBase<ContentUnpublishedTriggerSettings, ContentUnpublishedTriggerOutput, ContentUnpublishedNotification>
+    : NotificationTriggerBase<ContentUnpublishedTriggerSettings, ContentUnpublishedTriggerOutput, ContentUnpublishedNotification>,
+      INodeScopedTrigger
 {
+    /// <inheritdoc />
+    public NodeScopedTriggerTarget? GetTargetNode(object output)
+        => output is ContentUnpublishedTriggerOutput typed
+            ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
+            : null;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ContentUnpublishedTrigger"/> class.
     /// </summary>

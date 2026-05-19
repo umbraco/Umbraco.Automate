@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
@@ -14,6 +15,7 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Automations.Transfer;
 
@@ -55,12 +57,14 @@ public class AutomationTransferTests
             Mock.Of<IEntityVersionService>(),
             _workspaceService.Object,
             _connectionService.Object,
+            Mock.Of<IWorkspaceServiceAccountResolver>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
             _actions,
             _triggers,
             _controlFlows,
-            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows, connectionTypes));
+            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows, connectionTypes),
+            new SectionAccessChecker());
     }
 
     #region Export Tests

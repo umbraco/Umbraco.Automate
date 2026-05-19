@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
@@ -18,6 +19,7 @@ public class UpdateContentPropertyActionTests
     private readonly Mock<IUserIdKeyResolver> _userIdKeyResolver = new();
     private readonly Mock<IBackOfficeSecurityAccessor> _securityAccessor = new();
     private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
+    private readonly Mock<IAutomationActionAuthorizer> _authorizer = new();
     private readonly UpdateContentPropertyAction _action;
 
     public UpdateContentPropertyActionTests()
@@ -31,12 +33,17 @@ public class UpdateContentPropertyActionTests
                 isRoot: false,
                 Mock.Of<IUmbracoContextAccessor>()));
 
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
         _action = new UpdateContentPropertyAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _contentService.Object,
             _userIdKeyResolver.Object,
             _securityAccessor.Object,
             _contextFactory.Object,
+            _authorizer.Object,
             Mock.Of<ILogger<UpdateContentPropertyAction>>());
     }
 

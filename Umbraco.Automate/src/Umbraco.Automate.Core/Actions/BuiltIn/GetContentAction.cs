@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
+using Umbraco.Automate.Core.Security;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
@@ -16,7 +19,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.getContent", "Get Content",
     Description = "Fetches a published content item and exposes its properties for use in later steps.",
     Group = "Content",
-    Icon = "icon-document")]
+    Icon = "icon-document",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class GetContentAction : ActionBase<GetContentSettings, GetContentOutput>
 {
     // Not ICmsAction — this is a read, so no audit trail entry is written.
@@ -33,6 +38,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     private readonly IPublishedUrlProvider _urlProvider;
     private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IContentValueNormaliser _normaliser;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<GetContentAction> _logger;
 
     /// <summary>
@@ -45,6 +51,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         IPublishedUrlProvider urlProvider,
         IUserIdKeyResolver userIdKeyResolver,
         IContentValueNormaliser normaliser,
+        IAutomationActionAuthorizer authorizer,
         ILogger<GetContentAction> logger)
         : base(infrastructure)
     {
@@ -53,6 +60,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         _urlProvider = urlProvider;
         _userIdKeyResolver = userIdKeyResolver;
         _normaliser = normaliser;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -67,6 +75,14 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
             return ActionResult.Failed(
                 new ArgumentException($"Invalid or missing content key: '{settings.ContentKey}'."),
                 StepRunErrorCategory.Validation);
+        }
+
+        // Node-level authorisation: section access is checked upstream by the middleware,
+        // but the service account's start node / granular permissions may scope it to a
+        // subset of the Content section. Reject reads outside the account's accessible path.
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        {
+            return failure;
         }
 
         // Required when running from the outbox dispatcher, which has no HTTP request

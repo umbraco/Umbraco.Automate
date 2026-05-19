@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.contentBatchUnpublished", "Content Batch Unpublished",
     Description = "Fires once when one or more content items are unpublished, with all items as a collection.",
     Group = "Content",
-    Icon = "icon-documents")]
+    Icon = "icon-documents",
+    RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentBatchUnpublishedTrigger
     : NotificationTriggerBase<ContentUnpublishedTriggerSettings, BatchTriggerOutput<ContentUnpublishedTriggerOutput>, ContentUnpublishedNotification>
 {

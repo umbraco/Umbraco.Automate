@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -12,7 +13,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.mediaBatchDeleted", "Media Batch Deleted",
     Description = "Fires once when one or more media items are permanently deleted, with all items as a collection.",
     Group = "Media",
-    Icon = "icon-delete")]
+    Icon = "icon-delete",
+    RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class MediaBatchDeletedTrigger
     : NotificationTriggerBase<MediaDeletedTriggerSettings, BatchTriggerOutput<MediaDeletedTriggerOutput>, MediaDeletedNotification>
 {

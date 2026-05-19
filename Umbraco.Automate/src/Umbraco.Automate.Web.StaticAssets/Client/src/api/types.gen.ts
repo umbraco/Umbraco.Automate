@@ -1069,7 +1069,9 @@ export type PostAutomationsImportValidateResponse = PostAutomationsImportValidat
 export type GetCatalogueActionsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        workspaceId?: string;
+    };
     url: '/umbraco/automate/management/api/v1/catalogue/actions';
 };
 
@@ -1078,6 +1080,10 @@ export type GetCatalogueActionsErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
 };
 
 export type GetCatalogueActionsResponses = {
@@ -1219,7 +1225,9 @@ export type PostCatalogueStepTypesByAliasOutputSchemaResponse = PostCatalogueSte
 export type GetCatalogueTriggersData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        workspaceId?: string;
+    };
     url: '/umbraco/automate/management/api/v1/catalogue/triggers';
 };
 
@@ -1228,6 +1236,10 @@ export type GetCatalogueTriggersErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
 };
 
 export type GetCatalogueTriggersResponses = {

@@ -18,6 +18,7 @@ using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
@@ -25,6 +26,8 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -98,6 +101,21 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
 
+        // Service-account resolver + section access checker — required by the dispatch-time
+        // section guard even though this test's manual trigger declares no section requirements.
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
+        services.AddSingleton(serviceAccountResolver.Object);
+        services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
+
+        // Node authoriser — the manual trigger in this smoke test isn't INodeScopedTrigger,
+        // so the authoriser is never consulted. Register a permissive mock to satisfy DI.
+        var nodeAuthorizer = new Mock<IAutomationActionAuthorizer>();
+        nodeAuthorizer.Setup(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+        services.AddSingleton(nodeAuthorizer.Object);
+
         services.AddSingleton(Mock.Of<IConnectionService>());
 
         // Rate limiting — disabled for tests.
@@ -139,6 +157,9 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
             triggers,
+            _provider.GetRequiredService<IWorkspaceServiceAccountResolver>(),
+            _provider.GetRequiredService<ISectionAccessChecker>(),
+            _provider.GetRequiredService<IAutomationActionAuthorizer>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }

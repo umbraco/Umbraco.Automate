@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Services;
 
@@ -10,7 +11,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.userPasswordChanged", "User Password Changed",
     Description = "Fires when a back-office user's password is changed.",
     Group = "Users",
-    Icon = "icon-key")]
+    Icon = "icon-key",
+    RequiredSections = [UmbracoConstants.Applications.Users])]
 public sealed class UserPasswordChangedTrigger
     : NotificationTriggerBase<UserAuthTriggerSettings, UserAuthTriggerOutput, UserPasswordChangedNotification>
 {

@@ -41,6 +41,20 @@ public interface IStepType : IDiscoverable
     string? ConnectionTypeAlias { get; }
 
     /// <summary>
+    /// Gets the backoffice section aliases the workspace's service account must have access to in
+    /// order to use this step type. Empty list means no requirement. See <c>RequiredSections</c> on
+    /// <see cref="StepTypeAttribute"/> for semantics.
+    /// </summary>
+    IReadOnlyList<string> RequiredSections { get; }
+
+    /// <summary>
+    /// Gets the CMS permission letters the service account must hold on the target node when this
+    /// step type's action runs. Empty list means no node-level permission is enforced. See
+    /// <c>RequiredPermissions</c> on <see cref="StepTypeAttribute"/> for semantics.
+    /// </summary>
+    IReadOnlyList<string> RequiredPermissions { get; }
+
+    /// <summary>
     /// Gets the settings POCO type that drives the configuration UI, or null if the step type has no settings.
     /// </summary>
     Type? SettingsType { get; }

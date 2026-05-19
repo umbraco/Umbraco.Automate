@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -11,10 +12,18 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.mediaSaved", "Media Saved",
     Description = "Fires when media is saved (created or updated).",
     Group = "Media",
-    Icon = "icon-picture")]
+    Icon = "icon-picture",
+    RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class MediaSavedTrigger
-    : NotificationTriggerBase<MediaSavedTriggerSettings, MediaSavedTriggerOutput, MediaSavedNotification>
+    : NotificationTriggerBase<MediaSavedTriggerSettings, MediaSavedTriggerOutput, MediaSavedNotification>,
+      INodeScopedTrigger
 {
+    /// <inheritdoc />
+    public NodeScopedTriggerTarget? GetTargetNode(object output)
+        => output is MediaSavedTriggerOutput typed
+            ? new NodeScopedTriggerTarget(typed.MediaKey, NodeScopedTriggerTargetKind.Media)
+            : null;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MediaSavedTrigger"/> class.
     /// </summary>

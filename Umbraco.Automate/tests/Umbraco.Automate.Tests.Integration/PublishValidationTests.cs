@@ -5,12 +5,15 @@ using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Scoping;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Integration;
 
@@ -51,18 +54,24 @@ public class PublishValidationTests
         var controlFlows = new ControlFlowCollection(() => []);
         var connectionTypes = new ConnectionTypeCollection(() => []);
 
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
+
         _service = new AutomationService(
             _repo.Object,
             Mock.Of<IAutomationRunRepository>(),
             Mock.Of<IEntityVersionService>(),
             _workspaceService.Object,
             Mock.Of<IConnectionService>(),
+            serviceAccountResolver.Object,
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
             actions,
             triggers,
             controlFlows,
-            new SensitiveSettingsStripper(actions, triggers, controlFlows, connectionTypes));
+            new SensitiveSettingsStripper(actions, triggers, controlFlows, connectionTypes),
+            new SectionAccessChecker());
     }
 
     [Fact]

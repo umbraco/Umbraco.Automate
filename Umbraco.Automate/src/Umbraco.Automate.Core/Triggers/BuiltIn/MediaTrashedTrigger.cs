@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,10 +10,25 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.mediaTrashed", "Media Trashed",
     Description = "Fires when media is moved to the recycle bin.",
     Group = "Media",
-    Icon = "icon-trash")]
+    Icon = "icon-trash",
+    RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class MediaTrashedTrigger
-    : NotificationTriggerBase<MediaTrashedTriggerSettings, MediaTrashedTriggerOutput, MediaMovedToRecycleBinNotification>
+    : NotificationTriggerBase<MediaTrashedTriggerSettings, MediaTrashedTriggerOutput, MediaMovedToRecycleBinNotification>,
+      INodeScopedTrigger
 {
+    /// <inheritdoc />
+    /// <remarks>
+    /// After trashing, the media lives under the recycle bin (path <c>,-1,-21,...</c>). CMS
+    /// denies any non-root user access to that path, so a workspace with a restricted start
+    /// node will be denied here — matching the backoffice UI, where scoped users do not see
+    /// the recycle bin at all and cannot interact with trashed items even if they originally
+    /// trashed them.
+    /// </remarks>
+    public NodeScopedTriggerTarget? GetTargetNode(object output)
+        => output is MediaTrashedTriggerOutput typed
+            ? new NodeScopedTriggerTarget(typed.MediaKey, NodeScopedTriggerTargetKind.Media)
+            : null;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MediaTrashedTrigger"/> class.
     /// </summary>

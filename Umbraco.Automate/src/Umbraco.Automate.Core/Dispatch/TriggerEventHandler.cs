@@ -5,8 +5,10 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Cms.Core.Models.Membership;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
@@ -20,6 +22,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly IAutomationExecutor _executor;
     private readonly IExecutionNodeEligibility _nodeEligibility;
     private readonly TriggerCollection _triggers;
+    private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
+    private readonly ISectionAccessChecker _sectionAccessChecker;
+    private readonly IAutomationActionAuthorizer _nodeAuthorizer;
     private readonly IOptionsMonitor<ExecutionOptions> _executionOptions;
     private readonly ILogger<TriggerEventHandler> _logger;
 
@@ -29,6 +34,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
         IAutomationExecutor executor,
         IExecutionNodeEligibility nodeEligibility,
         TriggerCollection triggers,
+        IWorkspaceServiceAccountResolver serviceAccountResolver,
+        ISectionAccessChecker sectionAccessChecker,
+        IAutomationActionAuthorizer nodeAuthorizer,
         IOptionsMonitor<ExecutionOptions> executionOptions,
         ILogger<TriggerEventHandler> logger)
     {
@@ -37,6 +45,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
         _executor = executor;
         _nodeEligibility = nodeEligibility;
         _triggers = triggers;
+        _serviceAccountResolver = serviceAccountResolver;
+        _sectionAccessChecker = sectionAccessChecker;
+        _nodeAuthorizer = nodeAuthorizer;
         _executionOptions = executionOptions;
         _logger = logger;
     }
@@ -107,6 +118,11 @@ internal sealed class TriggerEventHandler : IMessageHandler
         // trigger settings. Deserialize lazily to avoid the cost on the common no-filter path.
         object? typedOutput = null;
         var typedOutputAttempted = false;
+
+        // Per-invocation cache of service-account resolution per workspace. Avoids repeating
+        // the IUserService.GetAsync round-trip when several published automations subscribe
+        // to the same trigger from the same workspace.
+        var serviceAccountCache = new Dictionary<Guid, IUser?>();
 
         foreach (var automation in matching)
         {
@@ -186,6 +202,57 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 }
             }
 
+            // Runtime section guard: even if the trigger was permitted at publish time,
+            // the workspace's service account may have been downgraded since. Skip the run
+            // (no run record, no payload exposure) when the account no longer has the
+            // sections the trigger requires.
+            var sectionGated = trigger is not null && trigger.RequiredSections.Count > 0;
+            var nodeGated = trigger is INodeScopedTrigger;
+            if (sectionGated || nodeGated)
+            {
+                var serviceAccount = await ResolveServiceAccountAsync(executionAutomation.WorkspaceId, serviceAccountCache, cancellationToken);
+                if (serviceAccount is null)
+                {
+                    _logger.LogWarning(
+                        "Automation {AutomationId} skipped — workspace service account could not be resolved for trigger {TriggerAlias}.",
+                        executionAutomation.Id, message.TriggerAlias);
+                    continue;
+                }
+
+                if (sectionGated && !_sectionAccessChecker.CanAccess(serviceAccount, trigger!))
+                {
+                    _logger.LogWarning(
+                        "Automation {AutomationId} skipped — workspace service account does not satisfy trigger {TriggerAlias} section requirements ({Sections}). Republish or update the service account.",
+                        executionAutomation.Id, message.TriggerAlias, string.Join(", ", trigger!.RequiredSections));
+                    continue;
+                }
+
+                // Node-level guard: a trigger whose output is bound to a CMS node (content
+                // or media) must also pass the service account's start-node / granular
+                // permission check. Otherwise a workspace scoped to /blog/ would still
+                // receive payloads about /home, etc. Mirrors the per-action node check
+                // done by IAutomationActionAuthorizer at runtime.
+                if (nodeGated)
+                {
+                    var nodeScoped = (INodeScopedTrigger)trigger!;
+                    if (!typedOutputAttempted)
+                    {
+                        typedOutput = DeserializeTypedOutput(message.OutputData, trigger.OutputType);
+                        typedOutputAttempted = true;
+                    }
+
+                    if (typedOutput is not null
+                        && nodeScoped.GetTargetNode(typedOutput) is { } target
+                        && !await AuthorizeNodeAsync(serviceAccount, target, cancellationToken))
+                    {
+                        _logger.LogInformation(
+                            "Automation {AutomationId} skipped — workspace service account is not authorised for {NodeKind} node {NodeKey} (trigger {TriggerAlias}).",
+                            executionAutomation.Id, target.Kind, target.Key, message.TriggerAlias);
+                        continue;
+                    }
+                }
+            }
+
             _logger.LogInformation(
                 "Starting run for automation {AutomationAlias} ({AutomationId}) version {Version} from trigger {TriggerAlias}",
                 executionAutomation.Alias, executionAutomation.Id, executionAutomation.Version, message.TriggerAlias);
@@ -198,6 +265,39 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 cancellationToken,
                 originChain: message.OriginAutomationChain);
         }
+    }
+
+    private async Task<bool> AuthorizeNodeAsync(IUser user, NodeScopedTriggerTarget target, CancellationToken cancellationToken)
+    {
+        // Trigger payload only carries a node identifier — Browse is the natural gate for
+        // "may this account learn that this node was modified?". Verb-specific checks
+        // (publish/update) are still enforced inside each action.
+        var result = target.Kind switch
+        {
+            NodeScopedTriggerTargetKind.Content => await _nodeAuthorizer.AuthorizeContentAsync(
+                user, target.Key, BrowsePermissions, cancellationToken),
+            NodeScopedTriggerTargetKind.Media => await _nodeAuthorizer.AuthorizeMediaAsync(
+                user, target.Key, cancellationToken),
+            _ => AutomationAuthorizationResult.Success,
+        };
+        return result.Authorized;
+    }
+
+    private static readonly IReadOnlySet<string> BrowsePermissions = new HashSet<string> { Umbraco.Cms.Core.Actions.ActionBrowse.ActionLetter };
+
+    private async Task<IUser?> ResolveServiceAccountAsync(
+        Guid workspaceId,
+        Dictionary<Guid, IUser?> cache,
+        CancellationToken cancellationToken)
+    {
+        if (cache.TryGetValue(workspaceId, out var cached))
+        {
+            return cached;
+        }
+
+        var user = await _serviceAccountResolver.GetServiceAccountAsync(workspaceId, cancellationToken);
+        cache[workspaceId] = user;
+        return user;
     }
 
     private object? DeserializeTypedOutput(string? outputData, Type? outputType)

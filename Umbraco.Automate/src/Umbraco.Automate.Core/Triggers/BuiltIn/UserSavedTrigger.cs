@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -11,7 +12,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.userSaved", "User Saved",
     Description = "Fires when a back-office user is saved (created or updated).",
     Group = "Users",
-    Icon = "icon-user")]
+    Icon = "icon-user",
+    RequiredSections = [UmbracoConstants.Applications.Users])]
 public sealed class UserSavedTrigger
     : NotificationTriggerBase<UserSavedTriggerSettings, UserSavedTriggerOutput, UserSavedNotification>
 {
