@@ -341,12 +341,18 @@ public sealed class ContentSavedTrigger
 }
 ```
 
-`MediaDeletedTrigger` and `MediaTrashedTrigger` do **not** implement
-`INodeScopedTrigger`: by the time the dispatcher processes a deletion the node
-is gone (`AuthorizeAccessAsync` returns NotFound for everyone, including
-operators who legitimately had access), and a trashed node is moved under the
-recycle bin so a start-node-scoped service account would lose notifications
-about media it previously had access to. These two events stay section-only.
+`MediaTrashedTrigger` is also node-scoped: after trashing, the media lives
+under the recycle bin (`,-1,-21,...`). CMS denies any non-root user access to
+that path, so scoped service accounts are correctly denied here too —
+matching the backoffice UI, where scoped users do not see the recycle bin at
+all and cannot interact with trashed items even if they originally trashed
+them. Root-scoped service accounts (or unscoped accounts) still receive the
+notification.
+
+`MediaDeletedTrigger` does **not** implement `INodeScopedTrigger`: by the time
+the dispatcher processes a deletion the node is permanently gone, so
+`AuthorizeAccessAsync` returns `NotFound` for everyone — not a meaningful
+authorisation signal. This event stays section-only.
 
 ### Node access at action runtime — `IAutomationActionAuthorizer`
 
