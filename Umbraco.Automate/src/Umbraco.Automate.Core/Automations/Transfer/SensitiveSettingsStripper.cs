@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
@@ -12,15 +13,18 @@ internal sealed class SensitiveSettingsStripper : ISensitiveSettingsStripper
     private readonly ActionCollection _actions;
     private readonly TriggerCollection _triggers;
     private readonly ControlFlowCollection _controlFlows;
+    private readonly ConnectionTypeCollection _connectionTypes;
 
     public SensitiveSettingsStripper(
         ActionCollection actions,
         TriggerCollection triggers,
-        ControlFlowCollection controlFlows)
+        ControlFlowCollection controlFlows,
+        ConnectionTypeCollection connectionTypes)
     {
         _actions = actions;
         _triggers = triggers;
         _controlFlows = controlFlows;
+        _connectionTypes = connectionTypes;
     }
 
     /// <inheritdoc />
@@ -68,6 +72,13 @@ internal sealed class SensitiveSettingsStripper : ISensitiveSettingsStripper
     {
         var stepType = (IStepType?)_actions.GetByAlias(actionAlias) ?? _controlFlows.GetByAlias(actionAlias);
         return StripSensitiveSettings(settings, stepType?.GetSettingsSchema());
+    }
+
+    /// <inheritdoc />
+    public Dictionary<string, object?> StripConnectionSettings(string connectionTypeAlias, Dictionary<string, object?> settings)
+    {
+        var connectionType = _connectionTypes.GetByAlias(connectionTypeAlias);
+        return StripSensitiveSettings(settings, connectionType?.GetSettingsSchema());
     }
 
     private static Dictionary<string, object?> StripSensitiveSettings(

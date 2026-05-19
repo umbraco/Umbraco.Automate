@@ -24,4 +24,11 @@ public interface ISensitiveSettingsStripper
     /// or the original instance when nothing needed to be stripped.
     /// </summary>
     Dictionary<string, object?> StripStepSettings(string actionAlias, Dictionary<string, object?> settings);
+
+    /// <summary>
+    /// Returns a filtered copy of a connection's settings dictionary with sensitive fields
+    /// removed (per the connection type's settings schema), or the original instance when
+    /// nothing needed to be stripped.
+    /// </summary>
+    Dictionary<string, object?> StripConnectionSettings(string connectionTypeAlias, Dictionary<string, object?> settings);
 }

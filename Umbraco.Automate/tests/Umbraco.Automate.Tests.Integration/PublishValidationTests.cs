@@ -52,6 +52,7 @@ public class PublishValidationTests
         var actions = new ActionCollection(() => []);
         var triggers = new TriggerCollection(() => []);
         var controlFlows = new ControlFlowCollection(() => []);
+        var connectionTypes = new ConnectionTypeCollection(() => []);
 
         var userService = new Mock<IUserService>();
         userService.Setup(u => u.GetAsync(It.IsAny<Guid>()))
@@ -69,7 +70,7 @@ public class PublishValidationTests
             actions,
             triggers,
             controlFlows,
-            new SensitiveSettingsStripper(actions, triggers, controlFlows),
+            new SensitiveSettingsStripper(actions, triggers, controlFlows, connectionTypes),
             new SectionAccessChecker());
     }
 

@@ -186,6 +186,7 @@ public class AutomationServicePublishSectionValidationTests
         var actionCollection = new ActionCollection(() => actions);
         var triggerCollection = new TriggerCollection(() => triggers);
         var controlFlowCollection = new ControlFlowCollection(() => []);
+        var connectionTypeCollection = new ConnectionTypeCollection(() => []);
 
         var service = new AutomationService(
             repo.Object,
@@ -199,7 +200,7 @@ public class AutomationServicePublishSectionValidationTests
             actionCollection,
             triggerCollection,
             controlFlowCollection,
-            new SensitiveSettingsStripper(actionCollection, triggerCollection, controlFlowCollection),
+            new SensitiveSettingsStripper(actionCollection, triggerCollection, controlFlowCollection, connectionTypeCollection),
             new SectionAccessChecker());
 
         return (service, repo);
