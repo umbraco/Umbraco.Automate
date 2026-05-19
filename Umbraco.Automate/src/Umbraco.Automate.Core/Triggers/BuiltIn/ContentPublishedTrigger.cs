@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.contentPublished", "Content Published",
     Description = "Fires when content is published.",
     Group = "Content",
-    Icon = "icon-document")]
+    Icon = "icon-document",
+    RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentPublishedTrigger
     : NotificationTriggerBase<ContentPublishedTriggerSettings, ContentPublishedTriggerOutput, ContentPublishedNotification>
 {

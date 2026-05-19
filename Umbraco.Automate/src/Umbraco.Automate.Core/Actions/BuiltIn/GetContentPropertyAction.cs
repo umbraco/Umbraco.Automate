@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Web;
@@ -14,7 +16,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.getContentProperty", "Get Content Property",
     Description = "Fetches a single property value from a published content item.",
     Group = "Content",
-    Icon = "icon-document")]
+    Icon = "icon-document",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySettings, GetContentPropertyOutput>
 {
     /// <summary>

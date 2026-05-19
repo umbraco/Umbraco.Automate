@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
@@ -15,7 +16,8 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.updateMediaProperty", "Update Media Property",
     Description = "Writes a single property value on a media item.",
     Group = "Media",
-    Icon = "icon-edit")]
+    Icon = "icon-edit",
+    RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySettings, UpdateMediaPropertyOutput>, ICmsAction
 {
     /// <summary>

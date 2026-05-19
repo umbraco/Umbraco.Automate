@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.ContentPublishing;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -13,7 +15,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.publishContent", "Publish Content",
     Description = "Publishes a content item in Umbraco CMS.",
     Group = "Content",
-    Icon = "icon-globe")]
+    Icon = "icon-globe",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionPublish.ActionLetter])]
 public sealed class PublishContentAction : ActionBase<PublishContentSettings, PublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;

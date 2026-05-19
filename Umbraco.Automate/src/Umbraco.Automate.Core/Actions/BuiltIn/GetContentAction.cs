@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
@@ -16,7 +18,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.getContent", "Get Content",
     Description = "Fetches a published content item and exposes its properties for use in later steps.",
     Group = "Content",
-    Icon = "icon-document")]
+    Icon = "icon-document",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class GetContentAction : ActionBase<GetContentSettings, GetContentOutput>
 {
     // Not ICmsAction — this is a read, so no audit trail entry is written.

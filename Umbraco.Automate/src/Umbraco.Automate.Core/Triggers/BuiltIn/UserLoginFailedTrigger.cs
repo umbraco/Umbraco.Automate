@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Services;
 
@@ -11,7 +12,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.userLoginFailed", "User Login Failed",
     Description = "Fires when a back-office login attempt fails.",
     Group = "Users",
-    Icon = "icon-lock")]
+    Icon = "icon-lock",
+    RequiredSections = [UmbracoConstants.Applications.Users])]
 public sealed class UserLoginFailedTrigger
     : NotificationTriggerBase<UserAuthTriggerSettings, UserAuthTriggerOutput, UserLoginFailedNotification>
 {

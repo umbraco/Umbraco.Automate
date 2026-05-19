@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -10,7 +11,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.mediaBatchTrashed", "Media Batch Trashed",
     Description = "Fires once when one or more media items are moved to the recycle bin, with all items as a collection.",
     Group = "Media",
-    Icon = "icon-trash")]
+    Icon = "icon-trash",
+    RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class MediaBatchTrashedTrigger
     : NotificationTriggerBase<MediaTrashedTriggerSettings, BatchTriggerOutput<MediaTrashedTriggerOutput>, MediaMovedToRecycleBinNotification>
 {

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Services;
 
@@ -13,7 +14,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.memberSaved", "Member Saved",
     Description = "Fires when a member is saved (created or updated).",
     Group = "Members",
-    Icon = "icon-user")]
+    Icon = "icon-user",
+    RequiredSections = [UmbracoConstants.Applications.Members])]
 public sealed class MemberSavedTrigger
     : NotificationTriggerBase<MemberSavedTriggerSettings, MemberSavedTriggerOutput, MemberSavedNotification>
 {

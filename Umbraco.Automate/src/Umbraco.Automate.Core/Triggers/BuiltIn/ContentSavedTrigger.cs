@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -11,7 +12,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.contentSaved", "Content Saved",
     Description = "Fires when content is saved (created or updated).",
     Group = "Content",
-    Icon = "icon-save")]
+    Icon = "icon-save",
+    RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentSavedTrigger
     : NotificationTriggerBase<ContentSavedTriggerSettings, ContentSavedTriggerOutput, ContentSavedNotification>
 {

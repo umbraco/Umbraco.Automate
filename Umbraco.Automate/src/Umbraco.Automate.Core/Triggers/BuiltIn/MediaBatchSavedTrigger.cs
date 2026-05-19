@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.mediaBatchSaved", "Media Batch Saved",
     Description = "Fires once when one or more media items are saved, with all items as a collection.",
     Group = "Media",
-    Icon = "icon-pictures-alt")]
+    Icon = "icon-pictures-alt",
+    RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class MediaBatchSavedTrigger
     : NotificationTriggerBase<MediaSavedTriggerSettings, BatchTriggerOutput<MediaSavedTriggerOutput>, MediaSavedNotification>
 {

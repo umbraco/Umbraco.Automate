@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
@@ -12,7 +14,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.unpublishContent", "Unpublish Content",
     Description = "Unpublishes a content item in Umbraco CMS.",
     Group = "Content",
-    Icon = "icon-globe")]
+    Icon = "icon-globe",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionPublish.ActionLetter])]
 public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSettings, UnpublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;

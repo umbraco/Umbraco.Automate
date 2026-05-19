@@ -8,6 +8,7 @@ using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Infrastructure.Examine;
 using Umbraco.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
@@ -22,7 +23,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.findContent", "Find Content",
     Description = "Finds content items by name, optionally filtered by content type.",
     Group = "Content",
-    Icon = "icon-search")]
+    Icon = "icon-search",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class FindContentAction : ActionBase<FindContentSettings, FindContentOutput>
 {
     // Not ICmsAction — this is a read, so no audit trail entry is written.

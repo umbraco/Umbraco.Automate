@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -10,7 +11,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.mediaDeleted", "Media Deleted",
     Description = "Fires when media is permanently deleted.",
     Group = "Media",
-    Icon = "icon-delete")]
+    Icon = "icon-delete",
+    RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class MediaDeletedTrigger
     : NotificationTriggerBase<MediaDeletedTriggerSettings, MediaDeletedTriggerOutput, MediaDeletedNotification>
 {

@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -14,7 +16,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.updateContentProperty", "Update Content Property",
     Description = "Writes a single property value on a content item (draft save).",
     Group = "Content",
-    Icon = "icon-edit")]
+    Icon = "icon-edit",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionUpdate.ActionLetter])]
 public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentPropertySettings, UpdateContentPropertyOutput>, ICmsAction
 {
     /// <summary>
