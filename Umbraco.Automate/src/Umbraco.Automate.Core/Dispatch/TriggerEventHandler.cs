@@ -8,9 +8,7 @@ using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
-using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core.Models.Membership;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
@@ -24,8 +22,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly IAutomationExecutor _executor;
     private readonly IExecutionNodeEligibility _nodeEligibility;
     private readonly TriggerCollection _triggers;
-    private readonly IWorkspaceService _workspaceService;
-    private readonly IUserService _userService;
+    private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
     private readonly ISectionAccessChecker _sectionAccessChecker;
     private readonly IOptionsMonitor<ExecutionOptions> _executionOptions;
     private readonly ILogger<TriggerEventHandler> _logger;
@@ -36,8 +33,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
         IAutomationExecutor executor,
         IExecutionNodeEligibility nodeEligibility,
         TriggerCollection triggers,
-        IWorkspaceService workspaceService,
-        IUserService userService,
+        IWorkspaceServiceAccountResolver serviceAccountResolver,
         ISectionAccessChecker sectionAccessChecker,
         IOptionsMonitor<ExecutionOptions> executionOptions,
         ILogger<TriggerEventHandler> logger)
@@ -47,8 +43,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
         _executor = executor;
         _nodeEligibility = nodeEligibility;
         _triggers = triggers;
-        _workspaceService = workspaceService;
-        _userService = userService;
+        _serviceAccountResolver = serviceAccountResolver;
         _sectionAccessChecker = sectionAccessChecker;
         _executionOptions = executionOptions;
         _logger = logger;
@@ -244,14 +239,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
             return cached;
         }
 
-        var workspace = await _workspaceService.GetWorkspaceAsync(workspaceId, cancellationToken);
-        if (workspace is null || workspace.ServiceAccountKey == Guid.Empty)
-        {
-            cache[workspaceId] = null;
-            return null;
-        }
-
-        var user = await _userService.GetAsync(workspace.ServiceAccountKey);
+        var user = await _serviceAccountResolver.GetServiceAccountAsync(workspaceId, cancellationToken);
         cache[workspaceId] = user;
         return user;
     }

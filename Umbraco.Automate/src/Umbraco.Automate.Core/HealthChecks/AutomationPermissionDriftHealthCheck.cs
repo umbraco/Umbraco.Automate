@@ -7,7 +7,6 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core.HealthChecks;
 using Umbraco.Cms.Core.Models.Membership;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.HealthChecks;
 
@@ -27,7 +26,7 @@ public sealed class AutomationPermissionDriftHealthCheck : HealthCheck
 {
     private readonly IAutomationService _automationService;
     private readonly IWorkspaceService _workspaceService;
-    private readonly IUserService _userService;
+    private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
     private readonly TriggerCollection _triggers;
     private readonly ActionCollection _actions;
     private readonly ISectionAccessChecker _sectionAccessChecker;
@@ -39,7 +38,7 @@ public sealed class AutomationPermissionDriftHealthCheck : HealthCheck
     public AutomationPermissionDriftHealthCheck(
         IAutomationService automationService,
         IWorkspaceService workspaceService,
-        IUserService userService,
+        IWorkspaceServiceAccountResolver serviceAccountResolver,
         TriggerCollection triggers,
         ActionCollection actions,
         ISectionAccessChecker sectionAccessChecker,
@@ -47,7 +46,7 @@ public sealed class AutomationPermissionDriftHealthCheck : HealthCheck
     {
         _automationService = automationService;
         _workspaceService = workspaceService;
-        _userService = userService;
+        _serviceAccountResolver = serviceAccountResolver;
         _triggers = triggers;
         _actions = actions;
         _sectionAccessChecker = sectionAccessChecker;
@@ -72,51 +71,48 @@ public sealed class AutomationPermissionDriftHealthCheck : HealthCheck
             }];
         }
 
+        // Cache the (workspace, service account) pair per workspaceId so N automations
+        // sharing one workspace only pay for one workspace + one user lookup.
+        var workspaceCache = new Dictionary<Guid, (Workspace? Workspace, IUser? ServiceAccount)>();
         var violations = new List<string>();
-        // Cache workspace → user resolution within a single invocation: many automations
-        // commonly share a workspace, so memoise the IUserService.GetAsync call.
-        var serviceAccountCache = new Dictionary<Guid, IUser?>();
 
         foreach (var automation in published)
         {
-            var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId);
-            if (workspace is null || workspace.ServiceAccountKey == Guid.Empty)
+            if (!workspaceCache.TryGetValue(automation.WorkspaceId, out var resolved))
             {
-                continue;
+                var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId);
+                var user = workspace is null || workspace.ServiceAccountKey == Guid.Empty
+                    ? null
+                    : await _serviceAccountResolver.GetServiceAccountAsync(workspace.Id);
+                resolved = (workspace, user);
+                workspaceCache[automation.WorkspaceId] = resolved;
             }
 
-            if (!serviceAccountCache.TryGetValue(workspace.Id, out var serviceAccount))
+            var (workspaceResolved, serviceAccount) = resolved;
+            if (workspaceResolved is null || workspaceResolved.ServiceAccountKey == Guid.Empty)
             {
-                serviceAccount = await _userService.GetAsync(workspace.ServiceAccountKey);
-                serviceAccountCache[workspace.Id] = serviceAccount;
+                continue;
             }
 
             if (serviceAccount is null)
             {
-                violations.Add($"'{automation.Name}' (workspace '{workspace.Name}') — service account '{workspace.ServiceAccountKey}' was not found.");
+                violations.Add($"'{automation.Name}' (workspace '{workspaceResolved.Name}') — service account '{workspaceResolved.ServiceAccountKey}' was not found.");
                 continue;
             }
 
-            if (automation.Trigger is not null)
+            if (automation.Trigger is not null
+                && _triggers.GetByAlias(automation.Trigger.TriggerAlias) is { } trigger
+                && !_sectionAccessChecker.CanAccess(serviceAccount, trigger))
             {
-                var trigger = _triggers.GetByAlias(automation.Trigger.TriggerAlias);
-                if (trigger is not null && !_sectionAccessChecker.CanAccess(serviceAccount, trigger))
-                {
-                    violations.Add($"'{automation.Name}' (workspace '{workspace.Name}') — trigger '{trigger.Name}' requires sections {FormatSections(trigger.RequiredSections)}.");
-                }
+                violations.Add($"'{automation.Name}' (workspace '{workspaceResolved.Name}') — trigger '{trigger.Name}' requires sections {FormatSections(trigger.RequiredSections)}.");
             }
 
             foreach (var step in automation.Steps)
             {
-                var action = _actions.GetByAlias(step.ActionAlias);
-                if (action is null)
+                if (_actions.GetByAlias(step.ActionAlias) is { } action
+                    && !_sectionAccessChecker.CanAccess(serviceAccount, action))
                 {
-                    continue;
-                }
-
-                if (!_sectionAccessChecker.CanAccess(serviceAccount, action))
-                {
-                    violations.Add($"'{automation.Name}' (workspace '{workspace.Name}') — step '{step.Name}' uses action '{action.Name}' which requires sections {FormatSections(action.RequiredSections)}.");
+                    violations.Add($"'{automation.Name}' (workspace '{workspaceResolved.Name}') — step '{step.Name}' uses action '{action.Name}' which requires sections {FormatSections(action.RequiredSections)}.");
                 }
             }
         }

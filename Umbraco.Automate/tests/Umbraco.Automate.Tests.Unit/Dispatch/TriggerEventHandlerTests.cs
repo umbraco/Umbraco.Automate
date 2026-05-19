@@ -12,10 +12,8 @@ using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
-using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Models.Membership;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
 
@@ -24,8 +22,7 @@ public class TriggerEventHandlerTests
     private readonly Mock<IAutomationService> _automationService = new();
     private readonly Mock<IAutomationExecutor> _executor = new();
     private readonly Mock<IExecutionNodeEligibility> _nodeEligibility = new();
-    private readonly Mock<IWorkspaceService> _workspaceService = new();
-    private readonly Mock<IUserService> _userService = new();
+    private readonly Mock<IWorkspaceServiceAccountResolver> _serviceAccountResolver = new();
     private readonly TriggerCollection _triggers;
     private readonly TriggerEventHandler _handler;
 
@@ -33,11 +30,9 @@ public class TriggerEventHandlerTests
     {
         _nodeEligibility.Setup(e => e.CanExecuteWorkflows()).Returns(true);
 
-        // Default workspace + service-account mocks so the runtime section guard passes.
-        // Individual tests can override these to exercise the deny path.
-        _workspaceService.Setup(s => s.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Guid id, CancellationToken _) => new WorkspaceBuilder().WithId(id).Build());
-        _userService.Setup(s => s.GetAsync(It.IsAny<Guid>()))
+        // Default service-account resolver so the runtime section guard passes.
+        // Individual tests override to exercise the deny path.
+        _serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
 
         var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
@@ -57,8 +52,7 @@ public class TriggerEventHandlerTests
             _executor.Object,
             _nodeEligibility.Object,
             _triggers,
-            _workspaceService.Object,
-            _userService.Object,
+            _serviceAccountResolver.Object,
             new SectionAccessChecker(),
             CreateExecutionOptionsMonitor(),
             Mock.Of<ILogger<TriggerEventHandler>>());
@@ -336,8 +330,7 @@ public class TriggerEventHandlerTests
             _executor.Object,
             _nodeEligibility.Object,
             _triggers,
-            _workspaceService.Object,
-            _userService.Object,
+            _serviceAccountResolver.Object,
             new SectionAccessChecker(),
             CreateExecutionOptionsMonitor(maxChainDepth: 3),
             Mock.Of<ILogger<TriggerEventHandler>>());
@@ -565,7 +558,7 @@ public class TriggerEventHandlerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        _userService.Setup(s => s.GetAsync(It.IsAny<Guid>()))
+        _serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "media" }));
 
         var body = SerializeMessage(new TriggerEventMessage
@@ -596,7 +589,7 @@ public class TriggerEventHandlerTests
         _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
 
-        _userService.Setup(s => s.GetAsync(It.IsAny<Guid>()))
+        _serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IUser?)null);
 
         var body = SerializeMessage(new TriggerEventMessage

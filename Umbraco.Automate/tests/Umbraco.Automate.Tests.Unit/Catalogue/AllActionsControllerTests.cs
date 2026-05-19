@@ -11,7 +11,6 @@ using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Scoping;
-using Umbraco.Cms.Core.Services;
 using ActionContext = Umbraco.Automate.Core.Actions.ActionContext;
 using ActionResult = Umbraco.Automate.Core.Actions.ActionResult;
 
@@ -78,27 +77,18 @@ public class AllActionsControllerTests
         var actionCollection = new ActionCollection(() => actions ?? []);
         var mapper = BuildMapper();
 
-        var workspaceService = new Mock<IWorkspaceService>();
-        if (workspace is not null)
-        {
-            workspaceService
-                .Setup(s => s.GetWorkspaceAsync(workspace.Id, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(workspace);
-        }
-
-        var userService = new Mock<IUserService>();
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
         if (workspace is not null && workspace.ServiceAccountKey != Guid.Empty)
         {
-            userService
-                .Setup(s => s.GetAsync(workspace.ServiceAccountKey))
+            serviceAccountResolver
+                .Setup(r => r.GetServiceAccountAsync(workspace.Id, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(user);
         }
 
         return new AllActionsController(
             actionCollection,
             mapper,
-            workspaceService.Object,
-            userService.Object,
+            serviceAccountResolver.Object,
             new SectionAccessChecker());
     }
 

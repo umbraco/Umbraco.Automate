@@ -1,5 +1,6 @@
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Extensions;
 
 namespace Umbraco.Automate.Core.Security;
 
@@ -13,22 +14,17 @@ internal sealed class SectionAccessChecker : ISectionAccessChecker
         ArgumentNullException.ThrowIfNull(stepType);
 
         var required = stepType.RequiredSections;
-        if (required is null || required.Count == 0)
+        if (required.Count == 0)
         {
             return true;
         }
 
-        var allowed = user.AllowedSections;
-        if (allowed is null)
-        {
-            return false;
-        }
-
-        var allowedSet = allowed as ISet<string> ?? new HashSet<string>(allowed, StringComparer.Ordinal);
-
+        // Defer to the CMS extension so we match Umbraco's case-insensitive comparison
+        // semantics for section aliases (configured sections may be cased differently to
+        // the constants).
         foreach (var section in required)
         {
-            if (allowedSet.Contains(section))
+            if (user.HasSectionAccess(section))
             {
                 return true;
             }

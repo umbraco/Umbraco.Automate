@@ -15,7 +15,6 @@ using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Scoping;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Automations;
 
@@ -46,11 +45,10 @@ public class AutomationServiceTests
         _workspaceService.Setup(w => w.GetWorkspaceAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceBuilder().Build());
 
-        // Default user service mock — returns a service-account stub for any key so the
-        // publish-time section validator can resolve an IUser. Tests in this class do not
-        // exercise section-specific scenarios.
-        var userService = new Mock<IUserService>();
-        userService.Setup(u => u.GetAsync(It.IsAny<Guid>()))
+        // Default service-account stub for any workspace so the publish-time section validator
+        // can resolve an IUser. Tests in this class do not exercise section-specific scenarios.
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
 
         var actions = new ActionCollection(() => []);
@@ -64,7 +62,7 @@ public class AutomationServiceTests
             Mock.Of<IEntityVersionService>(),
             _workspaceService.Object,
             Mock.Of<IConnectionService>(),
-            userService.Object,
+            serviceAccountResolver.Object,
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
             actions,

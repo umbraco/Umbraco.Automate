@@ -57,15 +57,9 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
                 StepRunErrorCategory.Validation);
         }
 
-        var auth = await _authorizer.AuthorizeContentAsync(
-            contentKey,
-            RequiredPermissions.ToHashSet(),
-            cancellationToken);
-        if (!auth.Authorized)
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
         {
-            return ActionResult.Failed(
-                new UnauthorizedAccessException(auth.FailureReason),
-                StepRunErrorCategory.Authentication);
+            return failure;
         }
 
         var cultures = ParseCultures(settings.Cultures);

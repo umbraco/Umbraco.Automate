@@ -177,13 +177,14 @@ public class AutomationPermissionDriftHealthCheckTests
                 .ReturnsAsync(workspace);
         }
 
-        var userService = new Mock<IUserService>();
-        userService.Setup(u => u.GetAsync(It.IsAny<Guid>())).ReturnsAsync(user);
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         return new AutomationPermissionDriftHealthCheck(
             automationService.Object,
             workspaceService.Object,
-            userService.Object,
+            serviceAccountResolver.Object,
             new TriggerCollection(() => triggers),
             new ActionCollection(() => actions),
             new SectionAccessChecker(),

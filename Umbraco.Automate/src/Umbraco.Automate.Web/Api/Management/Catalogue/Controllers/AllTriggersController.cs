@@ -2,12 +2,9 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Security;
-using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
-using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
 using Umbraco.Cms.Core.Mapping;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Web.Api.Management.Catalogue.Controllers;
 
@@ -19,8 +16,7 @@ public sealed class AllTriggersController : CatalogueControllerBase
 {
     private readonly TriggerCollection _triggers;
     private readonly IUmbracoMapper _mapper;
-    private readonly IWorkspaceService _workspaceService;
-    private readonly IUserService _userService;
+    private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
     private readonly ISectionAccessChecker _sectionAccessChecker;
 
     /// <summary>
@@ -29,14 +25,12 @@ public sealed class AllTriggersController : CatalogueControllerBase
     public AllTriggersController(
         TriggerCollection triggers,
         IUmbracoMapper mapper,
-        IWorkspaceService workspaceService,
-        IUserService userService,
+        IWorkspaceServiceAccountResolver serviceAccountResolver,
         ISectionAccessChecker sectionAccessChecker)
     {
         _triggers = triggers;
         _mapper = mapper;
-        _workspaceService = workspaceService;
-        _userService = userService;
+        _serviceAccountResolver = serviceAccountResolver;
         _sectionAccessChecker = sectionAccessChecker;
     }
 
@@ -57,16 +51,7 @@ public sealed class AllTriggersController : CatalogueControllerBase
 
         if (workspaceId.HasValue)
         {
-            var workspace = await _workspaceService.GetWorkspaceAsync(workspaceId.Value, cancellationToken);
-            if (workspace is null)
-            {
-                return NotFound();
-            }
-
-            var serviceAccount = workspace.ServiceAccountKey == Guid.Empty
-                ? null
-                : await _userService.GetAsync(workspace.ServiceAccountKey);
-
+            var serviceAccount = await _serviceAccountResolver.GetServiceAccountAsync(workspaceId.Value, cancellationToken);
             if (serviceAccount is null)
             {
                 return NotFound();

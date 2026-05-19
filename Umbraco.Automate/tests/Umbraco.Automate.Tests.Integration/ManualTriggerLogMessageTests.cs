@@ -101,12 +101,12 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
 
-        // User service + section access checker — required by the dispatch-time section guard
-        // even though this test's manual trigger declares no section requirements.
-        var userService = new Mock<IUserService>();
-        userService.Setup(u => u.GetAsync(It.IsAny<Guid>()))
+        // Service-account resolver + section access checker — required by the dispatch-time
+        // section guard even though this test's manual trigger declares no section requirements.
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
-        services.AddSingleton(userService.Object);
+        services.AddSingleton(serviceAccountResolver.Object);
         services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
 
         services.AddSingleton(Mock.Of<IConnectionService>());
@@ -150,8 +150,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
             triggers,
-            _provider.GetRequiredService<IWorkspaceService>(),
-            _provider.GetRequiredService<IUserService>(),
+            _provider.GetRequiredService<IWorkspaceServiceAccountResolver>(),
             _provider.GetRequiredService<ISectionAccessChecker>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());

@@ -78,12 +78,9 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
                 StepRunErrorCategory.Validation);
         }
 
-        var auth = await _authorizer.AuthorizeMediaAsync(mediaKey, cancellationToken);
-        if (!auth.Authorized)
+        if (await _authorizer.AuthorizeMediaOrFailAsync(mediaKey, cancellationToken) is { } failure)
         {
-            return ActionResult.Failed(
-                new UnauthorizedAccessException(auth.FailureReason),
-                StepRunErrorCategory.Authentication);
+            return failure;
         }
 
         var media = _mediaService.GetById(mediaKey);

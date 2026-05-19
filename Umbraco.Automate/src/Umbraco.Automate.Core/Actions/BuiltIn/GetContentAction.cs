@@ -80,15 +80,9 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         // Node-level authorisation: section access is checked upstream by the middleware,
         // but the service account's start node / granular permissions may scope it to a
         // subset of the Content section. Reject reads outside the account's accessible path.
-        var auth = await _authorizer.AuthorizeContentAsync(
-            contentKey,
-            RequiredPermissions.ToHashSet(),
-            cancellationToken);
-        if (!auth.Authorized)
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
         {
-            return ActionResult.Failed(
-                new UnauthorizedAccessException(auth.FailureReason),
-                StepRunErrorCategory.Authentication);
+            return failure;
         }
 
         // Required when running from the outbox dispatcher, which has no HTTP request

@@ -120,6 +120,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.DecorateBackOfficeSecurityAccessor();
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
         builder.Services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
+        builder.Services.AddSingleton<IWorkspaceServiceAccountResolver, WorkspaceServiceAccountResolver>();
         builder.Services.AddSingleton<IAutomationActionAuthorizer, AutomationActionAuthorizer>();
 
         // Settings infrastructure

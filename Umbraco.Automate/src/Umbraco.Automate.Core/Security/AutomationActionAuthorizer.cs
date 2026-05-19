@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.AuthorizationStatus;
@@ -38,24 +39,18 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
                 "No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
         }
 
-        // CMS expects ISet<string>; copy into a HashSet so callers can pass any IReadOnlySet variant.
-        var permissionSet = permissions as ISet<string> ?? new HashSet<string>(permissions, StringComparer.Ordinal);
-
-        var status = permissionSet.Count > 0
-            ? await _contentPermissionService.AuthorizeAccessAsync(user, [contentKey], permissionSet)
-            : await _contentPermissionService.AuthorizeAccessAsync(user, [contentKey], new HashSet<string>());
+        var status = await AuthorizeContentKeyAsync(user, contentKey, permissions);
 
         if (status == ContentAuthorizationStatus.Success)
         {
             return AutomationAuthorizationResult.Success;
         }
 
-        var reason = MapContentReason(status, contentKey, permissionSet);
         _logger.LogDebug(
             "Content authorisation denied for service account {UserKey} on node {ContentKey} (permissions [{Permissions}]): {Status}",
-            user.Key, contentKey, string.Join(", ", permissionSet), status);
+            user.Key, contentKey, string.Join(", ", permissions), status);
 
-        return AutomationAuthorizationResult.Fail(reason);
+        return AutomationAuthorizationResult.Fail(MapContentReason(status, contentKey, permissions));
     }
 
     /// <inheritdoc />
@@ -104,7 +99,6 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             return new HashSet<Guid>();
         }
 
-        var permissionSet = permissions as ISet<string> ?? new HashSet<string>(permissions, StringComparer.Ordinal);
         var authorized = new HashSet<Guid>();
 
         // CMS's permission service authorises a *batch* of keys atomically — a single failure
@@ -112,10 +106,7 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
         // acceptable; result sets are bounded by the calling action's Limit (default ~50).
         foreach (var key in keys)
         {
-            var status = permissionSet.Count > 0
-                ? await _contentPermissionService.AuthorizeAccessAsync(user, [key], permissionSet)
-                : await _contentPermissionService.AuthorizeAccessAsync(user, [key], new HashSet<string>());
-
+            var status = await AuthorizeContentKeyAsync(user, key, permissions);
             if (status == ContentAuthorizationStatus.Success)
             {
                 authorized.Add(key);
@@ -125,7 +116,18 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
         return authorized;
     }
 
-    private static string MapContentReason(ContentAuthorizationStatus status, Guid contentKey, ISet<string> permissions)
+    private Task<ContentAuthorizationStatus> AuthorizeContentKeyAsync(
+        IUser user,
+        Guid contentKey,
+        IReadOnlySet<string> permissions)
+    {
+        // CMS expects ISet<string>. The IReadOnlySet → ISet copy is unavoidable but cheap
+        // (permission lists hold 0-1 entries in practice).
+        var permissionSet = new HashSet<string>(permissions, StringComparer.Ordinal);
+        return _contentPermissionService.AuthorizeAccessAsync(user, [contentKey], permissionSet);
+    }
+
+    private static string MapContentReason(ContentAuthorizationStatus status, Guid contentKey, IReadOnlySet<string> permissions)
         => status switch
         {
             ContentAuthorizationStatus.NotFound =>

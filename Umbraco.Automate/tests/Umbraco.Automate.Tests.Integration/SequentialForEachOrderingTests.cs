@@ -112,10 +112,10 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
             .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
 
-        var userService = new Mock<IUserService>();
-        userService.Setup(u => u.GetAsync(It.IsAny<Guid>()))
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
-        services.AddSingleton(userService.Object);
+        services.AddSingleton(serviceAccountResolver.Object);
         services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
 
         services.AddSingleton(Mock.Of<IConnectionService>());
@@ -199,8 +199,7 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
             triggers,
-            _provider.GetRequiredService<IWorkspaceService>(),
-            _provider.GetRequiredService<IUserService>(),
+            _provider.GetRequiredService<IWorkspaceServiceAccountResolver>(),
             _provider.GetRequiredService<ISectionAccessChecker>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());

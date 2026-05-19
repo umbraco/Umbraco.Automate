@@ -54,8 +54,8 @@ public class PublishValidationTests
         var controlFlows = new ControlFlowCollection(() => []);
         var connectionTypes = new ConnectionTypeCollection(() => []);
 
-        var userService = new Mock<IUserService>();
-        userService.Setup(u => u.GetAsync(It.IsAny<Guid>()))
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
 
         _service = new AutomationService(
@@ -64,7 +64,7 @@ public class PublishValidationTests
             Mock.Of<IEntityVersionService>(),
             _workspaceService.Object,
             Mock.Of<IConnectionService>(),
-            userService.Object,
+            serviceAccountResolver.Object,
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
             actions,

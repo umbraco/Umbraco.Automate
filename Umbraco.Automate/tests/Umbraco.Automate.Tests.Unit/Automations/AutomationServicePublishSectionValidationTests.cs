@@ -152,7 +152,7 @@ public class AutomationServicePublishSectionValidationTests
     {
         var repo = new Mock<IAutomationRepository>();
         var workspaceService = new Mock<IWorkspaceService>();
-        var userService = new Mock<IUserService>();
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
         var scopeProvider = new Mock<ICoreScopeProvider>();
         var scope = new Mock<ICoreScope>();
         var notifications = new Mock<IScopedNotificationPublisher>();
@@ -181,7 +181,8 @@ public class AutomationServicePublishSectionValidationTests
         {
             resolvedUser = Mock.Of<IUser>(u => u.AllowedSections == allowedSections);
         }
-        userService.Setup(u => u.GetAsync(key)).ReturnsAsync(resolvedUser);
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(workspace.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(resolvedUser);
 
         var actionCollection = new ActionCollection(() => actions);
         var triggerCollection = new TriggerCollection(() => triggers);
@@ -194,7 +195,7 @@ public class AutomationServicePublishSectionValidationTests
             Mock.Of<IEntityVersionService>(),
             workspaceService.Object,
             Mock.Of<IConnectionService>(),
-            userService.Object,
+            serviceAccountResolver.Object,
             scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
             actionCollection,

@@ -57,7 +57,7 @@ public class AutomationTransferTests
             Mock.Of<IEntityVersionService>(),
             _workspaceService.Object,
             _connectionService.Object,
-            Mock.Of<IUserService>(),
+            Mock.Of<IWorkspaceServiceAccountResolver>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
             _actions,

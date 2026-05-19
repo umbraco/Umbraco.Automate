@@ -41,7 +41,7 @@ internal sealed class AutomationService : IAutomationService
     private readonly IEntityVersionService _versionService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IConnectionService _connectionService;
-    private readonly IUserService _userService;
+    private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
     private readonly ActionCollection _actions;
@@ -56,7 +56,7 @@ internal sealed class AutomationService : IAutomationService
         IEntityVersionService versionService,
         IWorkspaceService workspaceService,
         IConnectionService connectionService,
-        IUserService userService,
+        IWorkspaceServiceAccountResolver serviceAccountResolver,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory,
         ActionCollection actions,
@@ -70,7 +70,7 @@ internal sealed class AutomationService : IAutomationService
         _versionService = versionService;
         _workspaceService = workspaceService;
         _connectionService = connectionService;
-        _userService = userService;
+        _serviceAccountResolver = serviceAccountResolver;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
         _actions = actions;
@@ -187,82 +187,83 @@ internal sealed class AutomationService : IAutomationService
     {
         var errors = new List<string>();
 
-        // 1. Trigger must be configured.
         if (automation.Trigger is null)
         {
             errors.Add("A trigger must be configured before publishing.");
         }
 
-        // 2. Workspace must exist and have a valid service account.
         var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken);
         if (workspace is null)
         {
             errors.Add($"Workspace '{automation.WorkspaceId}' not found.");
+            ThrowIfErrors(automation, errors);
+            return;
         }
-        else
+
+        if (workspace.ServiceAccountKey == Guid.Empty)
         {
-            if (workspace.ServiceAccountKey == Guid.Empty)
-            {
-                errors.Add("The workspace's service account is not configured.");
-            }
-
-            // 3. All step connections must be allowed by the workspace.
-            var stepConnectionIds = automation.Steps
-                .Where(s => s.ConnectionId.HasValue)
-                .Select(s => s.ConnectionId!.Value)
-                .Distinct()
-                .ToList();
-
-            if (stepConnectionIds.Count > 0)
-            {
-                var allowedSet = workspace.AllowedConnections.ToHashSet();
-                var disallowed = stepConnectionIds.Where(id => !allowedSet.Contains(id)).ToList();
-
-                foreach (var connectionId in disallowed)
-                {
-                    errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
-                }
-            }
-
-            // 4. The workspace's service account must satisfy the section requirements of
-            //    the trigger and every step's action. Catches publish paths that bypassed the
-            //    catalogue filter (direct API call, import, stale draft after account downgrade).
-            if (workspace.ServiceAccountKey != Guid.Empty)
-            {
-                var serviceAccount = await _userService.GetAsync(workspace.ServiceAccountKey);
-                if (serviceAccount is null)
-                {
-                    errors.Add($"Service account '{workspace.ServiceAccountKey}' for workspace '{workspace.Name}' not found.");
-                }
-                else
-                {
-                    if (automation.Trigger is not null)
-                    {
-                        var trigger = _triggers.GetByAlias(automation.Trigger.TriggerAlias);
-                        if (trigger is not null && !_sectionAccessChecker.CanAccess(serviceAccount, trigger))
-                        {
-                            errors.Add(FormatSectionError("Trigger", trigger.Name, trigger.RequiredSections));
-                        }
-                    }
-
-                    foreach (var step in automation.Steps)
-                    {
-                        var action = _actions.GetByAlias(step.ActionAlias);
-                        if (action is null)
-                        {
-                            // Control-flow step types are not actions; they have no section requirements.
-                            continue;
-                        }
-
-                        if (!_sectionAccessChecker.CanAccess(serviceAccount, action))
-                        {
-                            errors.Add(FormatStepSectionError(step.Name, action.Name, action.RequiredSections));
-                        }
-                    }
-                }
-            }
+            errors.Add("The workspace's service account is not configured.");
         }
 
+        AddDisallowedConnectionErrors(automation, workspace, errors);
+
+        if (workspace.ServiceAccountKey != Guid.Empty)
+        {
+            await AddSectionAccessErrorsAsync(automation, workspace, errors, cancellationToken);
+        }
+
+        ThrowIfErrors(automation, errors);
+    }
+
+    private static void AddDisallowedConnectionErrors(Automation automation, Workspace workspace, List<string> errors)
+    {
+        var allowed = workspace.AllowedConnections.ToHashSet();
+        var disallowed = automation.Steps
+            .Where(s => s.ConnectionId.HasValue && !allowed.Contains(s.ConnectionId!.Value))
+            .Select(s => s.ConnectionId!.Value)
+            .Distinct();
+
+        foreach (var connectionId in disallowed)
+        {
+            errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
+        }
+    }
+
+    private async Task AddSectionAccessErrorsAsync(
+        Automation automation,
+        Workspace workspace,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        // Catches publish paths that bypassed the catalogue filter (direct API call,
+        // import, stale draft after account downgrade).
+        var serviceAccount = await _serviceAccountResolver.GetServiceAccountAsync(workspace.Id, cancellationToken);
+        if (serviceAccount is null)
+        {
+            errors.Add($"Service account '{workspace.ServiceAccountKey}' for workspace '{workspace.Name}' not found.");
+            return;
+        }
+
+        if (automation.Trigger is not null
+            && _triggers.GetByAlias(automation.Trigger.TriggerAlias) is { } trigger
+            && !_sectionAccessChecker.CanAccess(serviceAccount, trigger))
+        {
+            errors.Add($"Trigger '{trigger.Name}' requires section access ({string.Join(", ", trigger.RequiredSections)}) the workspace's service account does not have.");
+        }
+
+        foreach (var step in automation.Steps)
+        {
+            // Control-flow step types are not in _actions; their section requirements are unenforced.
+            if (_actions.GetByAlias(step.ActionAlias) is { } action
+                && !_sectionAccessChecker.CanAccess(serviceAccount, action))
+            {
+                errors.Add($"Step '{step.Name}' uses action '{action.Name}' which requires section access ({string.Join(", ", action.RequiredSections)}) the workspace's service account does not have.");
+            }
+        }
+    }
+
+    private static void ThrowIfErrors(Automation automation, List<string> errors)
+    {
         if (errors.Count > 0)
         {
             throw new AutomationValidationException(
@@ -270,12 +271,6 @@ internal sealed class AutomationService : IAutomationService
                 errors);
         }
     }
-
-    private static string FormatSectionError(string kind, string name, IReadOnlyList<string> sections)
-        => $"{kind} '{name}' requires section access ({string.Join(", ", sections)}) the workspace's service account does not have.";
-
-    private static string FormatStepSectionError(string stepName, string actionName, IReadOnlyList<string> sections)
-        => $"Step '{stepName}' uses action '{actionName}' which requires section access ({string.Join(", ", sections)}) the workspace's service account does not have.";
 
     public async Task<Automation> UnpublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default)
     {
