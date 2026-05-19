@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
@@ -13,6 +14,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Automations;
 
@@ -39,12 +41,14 @@ internal sealed class AutomationService : IAutomationService
     private readonly IEntityVersionService _versionService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IConnectionService _connectionService;
+    private readonly IUserService _userService;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
     private readonly ActionCollection _actions;
     private readonly TriggerCollection _triggers;
     private readonly ControlFlowCollection _controlFlows;
     private readonly ISensitiveSettingsStripper _sensitiveStripper;
+    private readonly ISectionAccessChecker _sectionAccessChecker;
 
     public AutomationService(
         IAutomationRepository automationRepository,
@@ -52,24 +56,28 @@ internal sealed class AutomationService : IAutomationService
         IEntityVersionService versionService,
         IWorkspaceService workspaceService,
         IConnectionService connectionService,
+        IUserService userService,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory,
         ActionCollection actions,
         TriggerCollection triggers,
         ControlFlowCollection controlFlows,
-        ISensitiveSettingsStripper sensitiveStripper)
+        ISensitiveSettingsStripper sensitiveStripper,
+        ISectionAccessChecker sectionAccessChecker)
     {
         _automationRepository = automationRepository;
         _runRepository = runRepository;
         _versionService = versionService;
         _workspaceService = workspaceService;
         _connectionService = connectionService;
+        _userService = userService;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
         _actions = actions;
         _triggers = triggers;
         _controlFlows = controlFlows;
         _sensitiveStripper = sensitiveStripper;
+        _sectionAccessChecker = sectionAccessChecker;
     }
 
     public Task<Automation?> GetAutomationAsync(Guid id, CancellationToken cancellationToken = default)
@@ -215,6 +223,44 @@ internal sealed class AutomationService : IAutomationService
                     errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
                 }
             }
+
+            // 4. The workspace's service account must satisfy the section requirements of
+            //    the trigger and every step's action. Catches publish paths that bypassed the
+            //    catalogue filter (direct API call, import, stale draft after account downgrade).
+            if (workspace.ServiceAccountKey != Guid.Empty)
+            {
+                var serviceAccount = await _userService.GetAsync(workspace.ServiceAccountKey);
+                if (serviceAccount is null)
+                {
+                    errors.Add($"Service account '{workspace.ServiceAccountKey}' for workspace '{workspace.Name}' not found.");
+                }
+                else
+                {
+                    if (automation.Trigger is not null)
+                    {
+                        var trigger = _triggers.GetByAlias(automation.Trigger.TriggerAlias);
+                        if (trigger is not null && !_sectionAccessChecker.CanAccess(serviceAccount, trigger))
+                        {
+                            errors.Add(FormatSectionError("Trigger", trigger.Name, trigger.RequiredSections));
+                        }
+                    }
+
+                    foreach (var step in automation.Steps)
+                    {
+                        var action = _actions.GetByAlias(step.ActionAlias);
+                        if (action is null)
+                        {
+                            // Control-flow step types are not actions; they have no section requirements.
+                            continue;
+                        }
+
+                        if (!_sectionAccessChecker.CanAccess(serviceAccount, action))
+                        {
+                            errors.Add(FormatStepSectionError(step.Name, action.Name, action.RequiredSections));
+                        }
+                    }
+                }
+            }
         }
 
         if (errors.Count > 0)
@@ -224,6 +270,12 @@ internal sealed class AutomationService : IAutomationService
                 errors);
         }
     }
+
+    private static string FormatSectionError(string kind, string name, IReadOnlyList<string> sections)
+        => $"{kind} '{name}' requires section access ({string.Join(", ", sections)}) the workspace's service account does not have.";
+
+    private static string FormatStepSectionError(string stepName, string actionName, IReadOnlyList<string> sections)
+        => $"Step '{stepName}' uses action '{actionName}' which requires section access ({string.Join(", ", sections)}) the workspace's service account does not have.";
 
     public async Task<Automation> UnpublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default)
     {
