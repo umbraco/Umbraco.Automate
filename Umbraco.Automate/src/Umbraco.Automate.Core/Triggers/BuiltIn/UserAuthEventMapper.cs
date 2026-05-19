@@ -9,7 +9,10 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 /// </summary>
 internal static class UserAuthEventMapper
 {
-    public static IEnumerable<TriggerEvent> Map(string triggerAlias, UserNotification notification)
+    public static IEnumerable<TriggerEvent> Map(
+        string triggerAlias,
+        UserNotification notification,
+        IReadOnlyList<Guid> userGroupKeys)
     {
         yield return new TriggerEvent<UserAuthTriggerOutput>
         {
@@ -22,6 +25,7 @@ internal static class UserAuthEventMapper
                 PerformingUserId = notification.PerformingUserId,
                 IpAddress = notification.IpAddress,
                 DateTimeUtc = notification.DateTimeUtc,
+                UserGroupKeys = userGroupKeys,
             },
         };
     }

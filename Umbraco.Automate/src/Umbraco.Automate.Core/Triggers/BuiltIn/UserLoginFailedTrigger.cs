@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -13,14 +15,28 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class UserLoginFailedTrigger
     : NotificationTriggerBase<UserAuthTriggerSettings, UserAuthTriggerOutput, UserLoginFailedNotification>
 {
+    private readonly IUserService _userService;
+    private readonly ILogger<UserLoginFailedTrigger> _logger;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="UserLoginFailedTrigger"/> class.
     /// </summary>
-    public UserLoginFailedTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
+    public UserLoginFailedTrigger(
+        TriggerInfrastructure infrastructure,
+        IUserService userService,
+        ILogger<UserLoginFailedTrigger> logger)
+        : base(infrastructure)
     {
+        _userService = userService;
+        _logger = logger;
     }
 
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(UserLoginFailedNotification notification)
-        => UserAuthEventMapper.Map(Alias, notification);
+        => UserAuthEventMapper.Map(Alias, notification,
+            UserGroupResolver.Resolve(_userService, notification.AffectedUserId, _logger));
+
+    /// <inheritdoc />
+    protected override bool CanHandle(UserAuthTriggerOutput output, UserAuthTriggerSettings? settings)
+        => GroupKeysFilter.Matches(output.UserGroupKeys, settings?.UserGroups);
 }

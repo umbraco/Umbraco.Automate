@@ -28,4 +28,11 @@ public sealed class UserAuthTriggerOutput
     /// Gets the UTC timestamp at which the event was raised by the CMS.
     /// </summary>
     public DateTime DateTimeUtc { get; init; }
+
+    /// <summary>
+    /// Gets the keys of the user groups the affected user belongs to. Resolved at
+    /// notification time by looking up the user via <c>IUserService</c>; empty when the
+    /// id is missing, unparseable (legacy int identities), or the user can't be found.
+    /// </summary>
+    public IReadOnlyList<Guid> UserGroupKeys { get; init; } = Array.Empty<Guid>();
 }

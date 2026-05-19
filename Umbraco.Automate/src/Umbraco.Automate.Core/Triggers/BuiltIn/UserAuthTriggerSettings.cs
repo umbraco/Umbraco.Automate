@@ -11,6 +11,16 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class UserAuthTriggerSettings : IAutomationOriginatedEventBehavior
 {
     /// <summary>
+    /// Gets or sets the user group unique IDs to filter on (comma-separated). If null,
+    /// fires regardless of the affected user's group membership. Match-if-any semantics.
+    /// </summary>
+    [Field(
+        Label = "User Groups",
+        Description = "Only fire for users in these groups. Leave blank to match all.",
+        EditorUiAlias = "Umb.Automate.UserGroupPicker")]
+    public string? UserGroups { get; set; }
+
+    /// <summary>
     /// Gets or sets how the trigger should react to events caused by another automation.
     /// </summary>
     [Field(

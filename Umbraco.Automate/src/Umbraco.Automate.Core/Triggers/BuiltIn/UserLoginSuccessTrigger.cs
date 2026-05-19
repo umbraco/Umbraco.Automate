@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -12,14 +14,28 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class UserLoginSuccessTrigger
     : NotificationTriggerBase<UserAuthTriggerSettings, UserAuthTriggerOutput, UserLoginSuccessNotification>
 {
+    private readonly IUserService _userService;
+    private readonly ILogger<UserLoginSuccessTrigger> _logger;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="UserLoginSuccessTrigger"/> class.
     /// </summary>
-    public UserLoginSuccessTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
+    public UserLoginSuccessTrigger(
+        TriggerInfrastructure infrastructure,
+        IUserService userService,
+        ILogger<UserLoginSuccessTrigger> logger)
+        : base(infrastructure)
     {
+        _userService = userService;
+        _logger = logger;
     }
 
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(UserLoginSuccessNotification notification)
-        => UserAuthEventMapper.Map(Alias, notification);
+        => UserAuthEventMapper.Map(Alias, notification,
+            UserGroupResolver.Resolve(_userService, notification.AffectedUserId, _logger));
+
+    /// <inheritdoc />
+    protected override bool CanHandle(UserAuthTriggerOutput output, UserAuthTriggerSettings? settings)
+        => GroupKeysFilter.Matches(output.UserGroupKeys, settings?.UserGroups);
 }
