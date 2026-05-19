@@ -7,6 +7,7 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Triggers.Scheduling;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Runtime;
@@ -244,6 +245,133 @@ public class ScheduledTriggerBackgroundJobTests
         _dispatcher.Verify(
             d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_FirstFire_LookbackCoversJitterWindow()
+    {
+        // Regression for the first-fire lookback bug: run many automations (different ids,
+        // hence different jitter offsets) and confirm at least one dispatches. With the
+        // pre-fix 1-minute lookback, a Flexible automation with a hashed offset > the time
+        // since the cron tick would be permanently stuck waiting for tomorrow.
+        var ids = Enumerable.Range(0, 20).Select(_ => Guid.NewGuid()).ToList();
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ids.Select(id => (id, 1)).ToList());
+
+        foreach (var id in ids)
+        {
+            var automation = new Automation
+            {
+                Alias = "test",
+                Name = "Test",
+                Status = AutomationStatus.Published,
+                Trigger = new TriggerConfiguration { TriggerAlias = ScheduledTriggerAlias, Settings = [] },
+            };
+            _automationService.Setup(s => s.GetAutomationAsync(id, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(automation);
+            _stateStore.Setup(s => s.GetLastFiredAsync(id, It.IsAny<CancellationToken>()))
+                .ReturnsAsync((DateTime?)null);
+        }
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        await _job.PerformExecuteAsync(null);
+
+        // At least some automations must dispatch on the first poll. Before the lookback
+        // fix, a freshly-created Flexible automation could be stuck waiting until the next
+        // poll, by which point the lookback had moved past the cron tick.
+        _dispatcher.Verify(
+            d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_PreciseTiming_DispatchesOnTick()
+    {
+        // With Timing = Precise, jitter must be zero — automation must fire as soon as the
+        // cron tick is in the past, regardless of MaxJitter.
+        var automationId = Guid.NewGuid();
+
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
+
+        var automation = new Automation
+        {
+            Alias = "test",
+            Name = "Test",
+            Status = AutomationStatus.Published,
+            Trigger = new TriggerConfiguration
+            {
+                TriggerAlias = ScheduledTriggerAlias,
+                Settings = new Dictionary<string, object?> { ["Timing"] = "Precise" },
+            },
+        };
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns(typeof(ScheduledTriggerSettings));
+        _mockTrigger.Setup(t => t.ResolveSettings(It.IsAny<Dictionary<string, object?>>()))
+            .Returns(new ScheduledTriggerSettings { Timing = nameof(ScheduleTiming.Precise) });
+
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTime.UtcNow.AddSeconds(-90));
+
+        await _job.PerformExecuteAsync(null);
+
+        _dispatcher.Verify(
+            d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_FlexibleTiming_IdempotencyKeyUsesCronTick()
+    {
+        // Regression: the idempotency key must stay on the raw cron tick (not the jittered
+        // dueAt), so a restart during the jitter window doesn't double-dispatch via a
+        // different key. For `* * * * *` the next-occurrence is always a whole minute,
+        // so the key timestamp must end at the minute boundary.
+        var automationId = Guid.NewGuid();
+
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
+
+        var automation = new Automation
+        {
+            Alias = "test",
+            Name = "Test",
+            Status = AutomationStatus.Published,
+            Trigger = new TriggerConfiguration { TriggerAlias = ScheduledTriggerAlias, Settings = [] },
+        };
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        // Last fired well in the past so the cron tick is definitely behind us even after jitter.
+        _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTime.UtcNow.AddMinutes(-10));
+
+        TriggerEvent? captured = null;
+        _dispatcher.Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _job.PerformExecuteAsync(null);
+
+        captured.ShouldNotBeNull();
+        captured!.IdempotencyKey.ShouldStartWith($"scheduled:{automationId}:");
+        // The timestamp portion ends with :00.0000000Z because the cron tick is a whole minute.
+        captured.IdempotencyKey.ShouldContain(":00.0000000");
     }
 
     [Fact]

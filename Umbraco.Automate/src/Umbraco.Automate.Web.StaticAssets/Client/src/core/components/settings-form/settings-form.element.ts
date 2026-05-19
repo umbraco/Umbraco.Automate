@@ -170,7 +170,7 @@ export class UaSettingsFormElement extends UmbLitElement {
         return html`
             <umb-property
                 label=${this.localize.string(field.label)}
-                description=${field.description ?? ""}
+                description=${this.localize.string(field.description ?? "")}
                 alias=${field.key}
                 property-editor-ui-alias=${this.#resolveEditorAlias(field)}
                 .appearance=${{ labelOnTop: this.labelOnTop }}
