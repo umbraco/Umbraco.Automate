@@ -8,6 +8,16 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class UserDeletedTriggerSettings : IAutomationOriginatedEventBehavior
 {
     /// <summary>
+    /// Gets or sets the user group unique IDs to filter on (comma-separated). If null,
+    /// fires regardless of group membership.
+    /// </summary>
+    [Field(
+        Label = "User Groups",
+        Description = "Only fire for users in these groups. Leave blank to match all.",
+        EditorUiAlias = "Umb.Automate.UserGroupPicker")]
+    public string? UserGroups { get; set; }
+
+    /// <summary>
     /// Gets or sets how the trigger should react to deletes performed by another automation.
     /// </summary>
     [Field(

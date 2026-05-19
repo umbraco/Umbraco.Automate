@@ -26,6 +26,12 @@ public sealed class UserSavedTriggerOutput
     public string? Email { get; init; }
 
     /// <summary>
+    /// Gets the keys of the user groups this user belongs to. Read directly from
+    /// <c>IUser.Groups</c> at notification time — no extra service lookup needed.
+    /// </summary>
+    public IReadOnlyList<Guid> UserGroupKeys { get; init; } = Array.Empty<Guid>();
+
+    /// <summary>
     /// Gets a value indicating whether this save represents a newly-created user.
     /// True when <c>CreateDate == UpdateDate</c> on the saved entity. Soft signal —
     /// database date precision may vary, so downstream automations needing a hard

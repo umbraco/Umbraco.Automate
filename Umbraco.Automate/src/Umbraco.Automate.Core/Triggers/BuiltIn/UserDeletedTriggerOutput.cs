@@ -24,4 +24,9 @@ public sealed class UserDeletedTriggerOutput
     /// Gets the user's email address.
     /// </summary>
     public string? Email { get; init; }
+
+    /// <summary>
+    /// Gets the keys of the user groups this user belonged to at delete time.
+    /// </summary>
+    public IReadOnlyList<Guid> UserGroupKeys { get; init; } = Array.Empty<Guid>();
 }

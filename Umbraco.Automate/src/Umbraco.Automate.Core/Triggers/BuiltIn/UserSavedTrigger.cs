@@ -41,9 +41,14 @@ public sealed class UserSavedTrigger
                     UserName = user.Name,
                     Username = user.Username,
                     Email = user.Email,
+                    UserGroupKeys = user.Groups?.Select(g => g.Key).ToArray() ?? Array.Empty<Guid>(),
                     IsNew = user.CreateDate == user.UpdateDate,
                 },
             };
         }
     }
+
+    /// <inheritdoc />
+    protected override bool CanHandle(UserSavedTriggerOutput output, UserSavedTriggerSettings? settings)
+        => GroupKeysFilter.Matches(output.UserGroupKeys, settings?.UserGroups);
 }

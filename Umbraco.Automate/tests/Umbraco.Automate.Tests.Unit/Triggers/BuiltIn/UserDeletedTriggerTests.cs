@@ -61,10 +61,23 @@ public class UserDeletedTriggerTests
     }
 
     [Fact]
-    public void CanHandle_AlwaysReturnsTrue()
+    public void CanHandle_NoSettings_ReturnsTrue()
     {
         var output = new UserDeletedTriggerOutput { UserKey = Guid.NewGuid() };
         ((ITrigger)_trigger).CanHandle(output, null).ShouldBeTrue();
         ((ITrigger)_trigger).CanHandle(output, new UserDeletedTriggerSettings()).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CanHandle_NonMatchingUserGroup_ReturnsFalse()
+    {
+        var output = new UserDeletedTriggerOutput
+        {
+            UserKey = Guid.NewGuid(),
+            UserGroupKeys = new[] { Guid.NewGuid() },
+        };
+        var settings = new UserDeletedTriggerSettings { UserGroups = Guid.NewGuid().ToString() };
+
+        ((ITrigger)_trigger).CanHandle(output, settings).ShouldBeFalse();
     }
 }

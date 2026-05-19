@@ -87,17 +87,65 @@ public class UserSavedTriggerTests
     }
 
     [Fact]
-    public void CanHandle_AlwaysReturnsTrue()
+    public void CanHandle_NoSettings_ReturnsTrue()
     {
         var output = new UserSavedTriggerOutput { UserKey = Guid.NewGuid() };
         ((ITrigger)_trigger).CanHandle(output, null).ShouldBeTrue();
         ((ITrigger)_trigger).CanHandle(output, new UserSavedTriggerSettings()).ShouldBeTrue();
     }
 
-    internal static IUser CreateUser(Guid key, string name, string username, string email, bool isNew = false)
+    [Fact]
+    public void CanHandle_MatchingUserGroup_ReturnsTrue()
+    {
+        var groupKey = Guid.NewGuid();
+        var output = new UserSavedTriggerOutput
+        {
+            UserKey = Guid.NewGuid(),
+            UserGroupKeys = new[] { groupKey },
+        };
+        var settings = new UserSavedTriggerSettings { UserGroups = groupKey.ToString() };
+
+        ((ITrigger)_trigger).CanHandle(output, settings).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CanHandle_NonMatchingUserGroup_ReturnsFalse()
+    {
+        var output = new UserSavedTriggerOutput
+        {
+            UserKey = Guid.NewGuid(),
+            UserGroupKeys = new[] { Guid.NewGuid() },
+        };
+        var settings = new UserSavedTriggerSettings { UserGroups = Guid.NewGuid().ToString() };
+
+        ((ITrigger)_trigger).CanHandle(output, settings).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void MapEvent_PopulatesUserGroupKeys()
+    {
+        var groupKey1 = Guid.NewGuid();
+        var groupKey2 = Guid.NewGuid();
+        var user = CreateUser(Guid.NewGuid(), "Alice", "alice", "alice@example.com", groupKeys: [groupKey1, groupKey2]);
+
+        var notification = new UserSavedNotification(new[] { user }, new EventMessages());
+        var events = _trigger.MapEvent(notification).ToList();
+
+        events[0].ShouldBeOfType<TriggerEvent<UserSavedTriggerOutput>>()
+            .Output.UserGroupKeys.ShouldBe(new[] { groupKey1, groupKey2 }, ignoreOrder: true);
+    }
+
+    internal static IUser CreateUser(Guid key, string name, string username, string email, bool isNew = false, Guid[]? groupKeys = null)
     {
         var createDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
         var updateDate = isNew ? createDate : createDate.AddSeconds(1);
+
+        var groups = (groupKeys ?? Array.Empty<Guid>()).Select(k =>
+        {
+            var g = new Mock<IReadOnlyUserGroup>();
+            g.SetupGet(x => x.Key).Returns(k);
+            return g.Object;
+        }).ToArray();
 
         var user = new Mock<IUser>();
         user.SetupGet(u => u.Key).Returns(key);
@@ -106,6 +154,7 @@ public class UserSavedTriggerTests
         user.SetupGet(u => u.Email).Returns(email);
         user.SetupGet(u => u.CreateDate).Returns(createDate);
         user.SetupGet(u => u.UpdateDate).Returns(updateDate);
+        user.SetupGet(u => u.Groups).Returns(groups);
 
         return user.Object;
     }

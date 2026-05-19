@@ -38,8 +38,13 @@ public sealed class UserDeletedTrigger
                     UserName = user.Name,
                     Username = user.Username,
                     Email = user.Email,
+                    UserGroupKeys = user.Groups?.Select(g => g.Key).ToArray() ?? Array.Empty<Guid>(),
                 },
             };
         }
     }
+
+    /// <inheritdoc />
+    protected override bool CanHandle(UserDeletedTriggerOutput output, UserDeletedTriggerSettings? settings)
+        => GroupKeysFilter.Matches(output.UserGroupKeys, settings?.UserGroups);
 }
