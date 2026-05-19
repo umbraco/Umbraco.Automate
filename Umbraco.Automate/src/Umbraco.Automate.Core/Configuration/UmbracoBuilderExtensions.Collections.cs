@@ -119,6 +119,8 @@ public static partial class UmbracoBuilderExtensions
         // while outside of runs the original accessor is used unchanged.
         builder.Services.DecorateBackOfficeSecurityAccessor();
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
+        builder.Services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
+        builder.Services.AddSingleton<IAutomationActionAuthorizer, AutomationActionAuthorizer>();
 
         // Settings infrastructure
         builder.Services.AddSingleton<IEditableModelSerializer, EditableModelSerializer>();

@@ -51,4 +51,21 @@ public abstract class StepTypeAttribute : Attribute
     /// When set, the UI will prompt the user to select a connection of this type.
     /// </summary>
     public string? ConnectionTypeAlias { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Umbraco backoffice section aliases this step type requires the workspace's
+    /// service account to have access to (e.g. <c>Constants.Applications.Content</c>). Empty means
+    /// no requirement and the step type is available everywhere. Non-empty enforces any-of semantics:
+    /// the service account must have at least one of the listed sections in <c>AllowedSections</c>.
+    /// Enforced at the catalogue endpoint, at publish time, at trigger dispatch, and per action at runtime.
+    /// </summary>
+    public string[] RequiredSections { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the CMS permission letters this step type's action requires the service account
+    /// to hold on the target node (e.g. <c>ActionPublish.ActionLetter</c>). Empty means no requirement.
+    /// Only meaningful for content actions; ignored for triggers and media actions. Enforced at runtime
+    /// by content actions calling <c>IAutomationActionAuthorizer</c>.
+    /// </summary>
+    public string[] RequiredPermissions { get; set; } = [];
 }

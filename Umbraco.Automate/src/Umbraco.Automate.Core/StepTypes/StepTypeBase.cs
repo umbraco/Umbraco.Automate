@@ -57,6 +57,12 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
     public virtual string? ConnectionTypeAlias => _attribute.ConnectionTypeAlias;
 
     /// <inheritdoc />
+    public virtual IReadOnlyList<string> RequiredSections => _attribute.RequiredSections;
+
+    /// <inheritdoc />
+    public virtual IReadOnlyList<string> RequiredPermissions => _attribute.RequiredPermissions;
+
+    /// <inheritdoc />
     public Type? SettingsType => typeof(TSettings) == typeof(object) ? null : typeof(TSettings);
 
     /// <inheritdoc />
