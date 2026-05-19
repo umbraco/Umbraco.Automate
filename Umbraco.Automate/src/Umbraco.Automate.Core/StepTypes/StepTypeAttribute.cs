@@ -55,8 +55,9 @@ public abstract class StepTypeAttribute : Attribute
     /// <summary>
     /// Gets or sets the Umbraco backoffice section aliases this step type requires the workspace's
     /// service account to have access to (e.g. <c>Constants.Applications.Content</c>). Empty means
-    /// no requirement and the step type is available everywhere. Non-empty enforces any-of semantics:
-    /// the service account must have at least one of the listed sections in <c>AllowedSections</c>.
+    /// no requirement and the step type is available everywhere. Non-empty enforces all-of semantics:
+    /// the service account must have every listed section in <c>AllowedSections</c> — a step type
+    /// that lists multiple sections genuinely touches all of them.
     /// Enforced at the catalogue endpoint, at publish time, at trigger dispatch, and per action at runtime.
     /// </summary>
     public string[] RequiredSections { get; set; } = [];

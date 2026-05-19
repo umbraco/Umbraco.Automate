@@ -109,10 +109,18 @@ public sealed class AutomationPermissionDriftHealthCheck : HealthCheck
 
             foreach (var step in automation.Steps)
             {
-                if (_actions.GetByAlias(step.ActionAlias) is { } action
-                    && !_sectionAccessChecker.CanAccess(serviceAccount, action))
+                if (_actions.GetByAlias(step.ActionAlias) is not { } action)
+                {
+                    continue;
+                }
+
+                if (!_sectionAccessChecker.CanAccess(serviceAccount, action))
                 {
                     violations.Add($"'{automation.Name}' (workspace '{workspaceResolved.Name}') — step '{step.Name}' uses action '{action.Name}' which requires sections {FormatSections(action.RequiredSections)}.");
+                }
+                else if (!_sectionAccessChecker.HasRequiredPermissions(serviceAccount, action))
+                {
+                    violations.Add($"'{automation.Name}' (workspace '{workspaceResolved.Name}') — step '{step.Name}' uses action '{action.Name}' which requires permissions {FormatSections(action.RequiredPermissions)} the service account does not have on any node.");
                 }
             }
         }

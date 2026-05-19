@@ -295,9 +295,13 @@ different point in the lifecycle:
 ### Section access — `RequiredSections`
 
 Declare the Umbraco backoffice section aliases the workspace's service account
-must have access to. Semantics are "any-of": the account passes if its
-`AllowedSections` contains at least one entry from the list. Empty list (the
-default) means the step type is universally available.
+must have access to. Semantics are "all-of": the account must have every
+listed section in its `AllowedSections`. A step type that lists multiple
+sections genuinely touches all of them — partial access is denial. Empty list
+(the default) means the step type is universally available.
+
+`RequiredPermissions` uses the same all-of semantics: the union of the user's
+group permission letters must cover every required letter.
 
 ```csharp
 [Trigger("umbracoAutomate.userSaved", "User Saved",

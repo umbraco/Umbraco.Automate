@@ -254,10 +254,20 @@ internal sealed class AutomationService : IAutomationService
         foreach (var step in automation.Steps)
         {
             // Control-flow step types are not in _actions; their section requirements are unenforced.
-            if (_actions.GetByAlias(step.ActionAlias) is { } action
-                && !_sectionAccessChecker.CanAccess(serviceAccount, action))
+            if (_actions.GetByAlias(step.ActionAlias) is not { } action)
+            {
+                continue;
+            }
+
+            if (!_sectionAccessChecker.CanAccess(serviceAccount, action))
             {
                 errors.Add($"Step '{step.Name}' uses action '{action.Name}' which requires section access ({string.Join(", ", action.RequiredSections)}) the workspace's service account does not have.");
+                continue;
+            }
+
+            if (!_sectionAccessChecker.HasRequiredPermissions(serviceAccount, action))
+            {
+                errors.Add($"Step '{step.Name}' uses action '{action.Name}' which requires permissions ({string.Join(", ", action.RequiredPermissions)}) the workspace's service account does not have on any node.");
             }
         }
     }

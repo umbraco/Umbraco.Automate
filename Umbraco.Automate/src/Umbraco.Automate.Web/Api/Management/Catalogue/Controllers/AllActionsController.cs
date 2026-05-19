@@ -57,7 +57,9 @@ public sealed class AllActionsController : CatalogueControllerBase
                 return NotFound();
             }
 
-            actions = actions.Where(a => _sectionAccessChecker.CanAccess(serviceAccount, a));
+            actions = actions.Where(a =>
+                _sectionAccessChecker.CanAccess(serviceAccount, a)
+                && _sectionAccessChecker.HasRequiredPermissions(serviceAccount, a));
         }
 
         return Ok(_mapper.MapEnumerable<IAction, ActionItemResponseModel>(actions));
