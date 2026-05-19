@@ -69,12 +69,13 @@ export function flowToConnections(edges: Edge[]): StepConnectionModel[] {
 export function flowToCanvasState(
     nodes: Node[],
     viewport: { x: number; y: number; zoom: number },
+    fallbackTriggerPosition?: { x: number; y: number },
 ): CanvasState {
     const triggerNode = nodes.find((n) => n.id === TRIGGER_NODE_ID);
     return {
         viewport,
         triggerPosition: triggerNode
             ? { x: triggerNode.position.x, y: triggerNode.position.y }
-            : undefined,
+            : fallbackTriggerPosition,
     };
 }

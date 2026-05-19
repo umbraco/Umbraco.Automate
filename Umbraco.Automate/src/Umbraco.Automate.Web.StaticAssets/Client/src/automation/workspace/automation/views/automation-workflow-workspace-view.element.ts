@@ -128,11 +128,25 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const steps = flowToSteps(nodes, this._model.steps);
         const connections = flowToConnections(edges);
         const trigger = flowToTrigger(nodes, this._model.trigger);
-        const canvasState = JSON.stringify(flowToCanvasState(nodes, viewport));
+        // Preserve the trigger's last position so the placeholder reappears in the same spot
+        // when the trigger is removed (otherwise it jumps to the default position).
+        const previousCanvasState = this.#parseCanvasState(this._model.canvasState);
+        const canvasState = JSON.stringify(
+            flowToCanvasState(nodes, viewport, previousCanvasState?.triggerPosition),
+        );
+
+        const triggerWasRemoved = this._model.trigger !== null && trigger === null;
 
         this.#isCanvasUpdate = true;
         this.#workspaceContext?.updateProperties({ steps, connections, trigger, canvasState });
         this.#isCanvasUpdate = false;
+
+        // When the trigger is removed via the canvas (Delete key or trash button), the model
+        // observer is suppressed by #isCanvasUpdate and the trigger-placeholder is never added
+        // back. Force a re-sync so the placeholder reappears and the user can add a replacement.
+        if (triggerWasRemoved && this._model) {
+            this.#syncFromModel(this._model);
+        }
     }
 
     async #onNodeSettingsOpen(event: CustomEvent<NodeSettingsOpenDetail>) {
