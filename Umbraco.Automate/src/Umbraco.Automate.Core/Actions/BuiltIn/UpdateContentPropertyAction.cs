@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Security;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
@@ -35,6 +36,7 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
     private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<UpdateContentPropertyAction> _logger;
 
     /// <summary>
@@ -46,6 +48,7 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
         IUserIdKeyResolver userIdKeyResolver,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoContextFactory umbracoContextFactory,
+        IAutomationActionAuthorizer authorizer,
         ILogger<UpdateContentPropertyAction> logger)
         : base(infrastructure)
     {
@@ -53,6 +56,7 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
         _userIdKeyResolver = userIdKeyResolver;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _umbracoContextFactory = umbracoContextFactory;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -73,6 +77,17 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
             return ActionResult.Failed(
                 new ArgumentException("Property alias is required."),
                 StepRunErrorCategory.Validation);
+        }
+
+        var auth = await _authorizer.AuthorizeContentAsync(
+            contentKey,
+            RequiredPermissions.ToHashSet(),
+            cancellationToken);
+        if (!auth.Authorized)
+        {
+            return ActionResult.Failed(
+                new UnauthorizedAccessException(auth.FailureReason),
+                StepRunErrorCategory.Authentication);
         }
 
         var content = _contentService.GetById(contentKey);

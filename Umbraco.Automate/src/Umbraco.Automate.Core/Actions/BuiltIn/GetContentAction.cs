@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
+using Umbraco.Automate.Core.Security;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -37,6 +38,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     private readonly IPublishedUrlProvider _urlProvider;
     private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IContentValueNormaliser _normaliser;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<GetContentAction> _logger;
 
     /// <summary>
@@ -49,6 +51,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         IPublishedUrlProvider urlProvider,
         IUserIdKeyResolver userIdKeyResolver,
         IContentValueNormaliser normaliser,
+        IAutomationActionAuthorizer authorizer,
         ILogger<GetContentAction> logger)
         : base(infrastructure)
     {
@@ -57,6 +60,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         _urlProvider = urlProvider;
         _userIdKeyResolver = userIdKeyResolver;
         _normaliser = normaliser;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -71,6 +75,20 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
             return ActionResult.Failed(
                 new ArgumentException($"Invalid or missing content key: '{settings.ContentKey}'."),
                 StepRunErrorCategory.Validation);
+        }
+
+        // Node-level authorisation: section access is checked upstream by the middleware,
+        // but the service account's start node / granular permissions may scope it to a
+        // subset of the Content section. Reject reads outside the account's accessible path.
+        var auth = await _authorizer.AuthorizeContentAsync(
+            contentKey,
+            RequiredPermissions.ToHashSet(),
+            cancellationToken);
+        if (!auth.Authorized)
+        {
+            return ActionResult.Failed(
+                new UnauthorizedAccessException(auth.FailureReason),
+                StepRunErrorCategory.Authentication);
         }
 
         // Required when running from the outbox dispatcher, which has no HTTP request

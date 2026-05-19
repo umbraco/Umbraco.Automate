@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Security;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
@@ -34,6 +35,7 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
     private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<UpdateMediaPropertyAction> _logger;
 
     /// <summary>
@@ -45,6 +47,7 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
         IUserIdKeyResolver userIdKeyResolver,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoContextFactory umbracoContextFactory,
+        IAutomationActionAuthorizer authorizer,
         ILogger<UpdateMediaPropertyAction> logger)
         : base(infrastructure)
     {
@@ -52,6 +55,7 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
         _userIdKeyResolver = userIdKeyResolver;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _umbracoContextFactory = umbracoContextFactory;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -72,6 +76,14 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
             return ActionResult.Failed(
                 new ArgumentException("Property alias is required."),
                 StepRunErrorCategory.Validation);
+        }
+
+        var auth = await _authorizer.AuthorizeMediaAsync(mediaKey, cancellationToken);
+        if (!auth.Authorized)
+        {
+            return ActionResult.Failed(
+                new UnauthorizedAccessException(auth.FailureReason),
+                StepRunErrorCategory.Authentication);
         }
 
         var media = _mediaService.GetById(mediaKey);

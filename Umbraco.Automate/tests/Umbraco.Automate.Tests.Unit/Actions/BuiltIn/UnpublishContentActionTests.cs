@@ -4,6 +4,7 @@ using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Security;
@@ -17,6 +18,7 @@ public class UnpublishContentActionTests
 {
     private readonly Mock<IContentPublishingService> _publishingService = new();
     private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
+    private readonly Mock<IAutomationActionAuthorizer> _authorizer = new();
     private readonly UnpublishContentAction _action;
 
     public UnpublishContentActionTests()
@@ -28,11 +30,16 @@ public class UnpublishContentActionTests
                 isRoot: false,
                 Mock.Of<IUmbracoContextAccessor>()));
 
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
         _action = new UnpublishContentAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _publishingService.Object,
             Mock.Of<IBackOfficeSecurityAccessor>(),
             _contextFactory.Object,
+            _authorizer.Object,
             Mock.Of<ILogger<UnpublishContentAction>>());
     }
 

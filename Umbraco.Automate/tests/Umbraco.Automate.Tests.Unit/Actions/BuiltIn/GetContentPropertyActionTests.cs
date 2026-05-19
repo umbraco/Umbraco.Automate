@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Models;
@@ -17,6 +18,7 @@ public class GetContentPropertyActionTests
     private readonly Mock<IPublishedContentCache> _cache = new();
     private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
     private readonly Mock<IContentValueNormaliser> _normaliser = new();
+    private readonly Mock<IAutomationActionAuthorizer> _authorizer = new();
     private readonly GetContentPropertyAction _action;
 
     public GetContentPropertyActionTests()
@@ -28,11 +30,16 @@ public class GetContentPropertyActionTests
                 isRoot: false,
                 Mock.Of<IUmbracoContextAccessor>()));
 
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
         _action = new GetContentPropertyAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _cache.Object,
             _contextFactory.Object,
             _normaliser.Object,
+            _authorizer.Object,
             Mock.Of<ILogger<GetContentPropertyAction>>());
     }
 

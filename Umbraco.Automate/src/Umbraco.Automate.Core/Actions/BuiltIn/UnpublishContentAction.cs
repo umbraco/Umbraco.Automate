@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Security;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Security;
@@ -22,6 +23,7 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
     private readonly IContentPublishingService _contentPublishingService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<UnpublishContentAction> _logger;
 
     /// <summary>
@@ -32,12 +34,14 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
         IContentPublishingService contentPublishingService,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoContextFactory umbracoContextFactory,
+        IAutomationActionAuthorizer authorizer,
         ILogger<UnpublishContentAction> logger)
         : base(infrastructure)
     {
         _contentPublishingService = contentPublishingService;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _umbracoContextFactory = umbracoContextFactory;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -51,6 +55,17 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
             return ActionResult.Failed(
                 new ArgumentException($"Invalid or missing content key: '{settings.ContentKey}'."),
                 StepRunErrorCategory.Validation);
+        }
+
+        var auth = await _authorizer.AuthorizeContentAsync(
+            contentKey,
+            RequiredPermissions.ToHashSet(),
+            cancellationToken);
+        if (!auth.Authorized)
+        {
+            return ActionResult.Failed(
+                new UnauthorizedAccessException(auth.FailureReason),
+                StepRunErrorCategory.Authentication);
         }
 
         var cultures = ParseCultures(settings.Cultures);

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
+using Umbraco.Automate.Core.Security;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -36,6 +37,7 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
     private readonly IPublishedContentCache _publishedContentCache;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly IContentValueNormaliser _normaliser;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<GetContentPropertyAction> _logger;
 
     /// <summary>
@@ -46,12 +48,14 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
         IPublishedContentCache publishedContentCache,
         IUmbracoContextFactory umbracoContextFactory,
         IContentValueNormaliser normaliser,
+        IAutomationActionAuthorizer authorizer,
         ILogger<GetContentPropertyAction> logger)
         : base(infrastructure)
     {
         _publishedContentCache = publishedContentCache;
         _umbracoContextFactory = umbracoContextFactory;
         _normaliser = normaliser;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -73,6 +77,17 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
             return ActionResult.Failed(
                 new ArgumentException("Property alias is required."),
                 StepRunErrorCategory.Validation);
+        }
+
+        var auth = await _authorizer.AuthorizeContentAsync(
+            contentKey,
+            RequiredPermissions.ToHashSet(),
+            cancellationToken);
+        if (!auth.Authorized)
+        {
+            return ActionResult.Failed(
+                new UnauthorizedAccessException(auth.FailureReason),
+                StepRunErrorCategory.Authentication);
         }
 
         using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();

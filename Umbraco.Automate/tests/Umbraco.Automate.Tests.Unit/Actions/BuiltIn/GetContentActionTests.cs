@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Models;
@@ -21,6 +22,7 @@ public class GetContentActionTests
     private readonly Mock<IPublishedUrlProvider> _urlProvider = new();
     private readonly Mock<IUserIdKeyResolver> _userIdKeyResolver = new();
     private readonly Mock<IContentValueNormaliser> _normaliser = new();
+    private readonly Mock<IAutomationActionAuthorizer> _authorizer = new();
     private readonly GetContentAction _action;
 
     public GetContentActionTests()
@@ -38,6 +40,12 @@ public class GetContentActionTests
             .Setup(x => x.TryGetAsync(It.IsAny<int>()))
             .ReturnsAsync(Attempt<Guid>.Fail());
 
+        // Default: node-level authorisation passes. Tests that exercise the deny path
+        // override this on a per-test basis.
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
         _action = new GetContentAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _cache.Object,
@@ -45,6 +53,7 @@ public class GetContentActionTests
             _urlProvider.Object,
             _userIdKeyResolver.Object,
             _normaliser.Object,
+            _authorizer.Object,
             Mock.Of<ILogger<GetContentAction>>());
     }
 
@@ -76,6 +85,23 @@ public class GetContentActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Failed);
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NodeAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var contentKey = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(contentKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var context = CreateContext(new GetContentSettings { ContentKey = contentKey.ToString() });
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+        _cache.Verify(c => c.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<bool?>()), Times.Never);
     }
 
     [Fact]
