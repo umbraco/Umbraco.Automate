@@ -70,6 +70,16 @@ public class EditableModelSchemaBuilderTests
     }
 
     [Fact]
+    public void Build_CachesByType_ReturningSameInstance()
+    {
+        // Use a type that no other test caches, to keep this test independent.
+        var first = EditableModelSchemaBuilder.Build(typeof(CacheProbeSettings));
+        var second = EditableModelSchemaBuilder.Build(typeof(CacheProbeSettings));
+
+        first.ShouldBeSameAs(second);
+    }
+
+    [Fact]
     public void HumanizePropertyName_ConvertsCorrectly()
     {
         EditableModelSchemaBuilder.HumanizePropertyName("ContentName").ShouldBe("Content Name");
@@ -100,5 +110,10 @@ public class EditableModelSchemaBuilderTests
         public string Unmarked { get; set; } = string.Empty;
 
         public string NoAttribute { get; set; } = string.Empty;
+    }
+
+    private class CacheProbeSettings
+    {
+        public string Anything { get; set; } = string.Empty;
     }
 }
