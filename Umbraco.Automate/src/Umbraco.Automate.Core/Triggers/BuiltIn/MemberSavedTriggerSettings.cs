@@ -14,7 +14,8 @@ public sealed class MemberSavedTriggerSettings : IAutomationOriginatedEventBehav
     [Field(
         Label = "Member Types",
         Description = "Only fire for these member types. Leave blank to match all.",
-        EditorUiAlias = "Umb.Automate.MemberTypePicker")]
+        EditorUiAlias = "Umb.Automate.MemberTypePicker",
+        SortOrder = 1)]
     public string? MemberTypes { get; set; }
 
     /// <summary>
@@ -25,7 +26,8 @@ public sealed class MemberSavedTriggerSettings : IAutomationOriginatedEventBehav
     [Field(
         Label = "Member Groups",
         Description = "Only fire for members in these groups. Leave blank to match all.",
-        EditorUiAlias = "Umb.PropertyEditorUi.MemberGroupPicker")]
+        EditorUiAlias = "Umb.PropertyEditorUi.MemberGroupPicker",
+        SortOrder = 2)]
     public string? MemberGroups { get; set; }
 
     /// <summary>
@@ -44,7 +46,8 @@ public sealed class MemberSavedTriggerSettings : IAutomationOriginatedEventBehav
                 { "name": "Skip entirely", "value": "SkipAlways" }
             ] }]
             """,
-        Group = "Advanced")]
+        Group = "Advanced",
+        SortOrder = 100)]
     public string OnAutomationOriginatedEvent { get; set; } = nameof(AutomationOriginatedEventBehavior.SkipOnCycle);
 
     /// <inheritdoc />

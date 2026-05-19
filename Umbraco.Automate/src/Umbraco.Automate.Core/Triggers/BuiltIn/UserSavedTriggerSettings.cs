@@ -15,7 +15,8 @@ public sealed class UserSavedTriggerSettings : IAutomationOriginatedEventBehavio
     [Field(
         Label = "User Groups",
         Description = "Only fire for users in these groups. Leave blank to match all.",
-        EditorUiAlias = "Umb.Automate.UserGroupPicker")]
+        EditorUiAlias = "Umb.Automate.UserGroupPicker",
+        SortOrder = 1)]
     public string? UserGroups { get; set; }
 
     /// <summary>
@@ -32,7 +33,8 @@ public sealed class UserSavedTriggerSettings : IAutomationOriginatedEventBehavio
                 { "name": "Skip entirely", "value": "SkipAlways" }
             ] }]
             """,
-        Group = "Advanced")]
+        Group = "Advanced",
+        SortOrder = 100)]
     public string OnAutomationOriginatedEvent { get; set; } = nameof(AutomationOriginatedEventBehavior.SkipOnCycle);
 
     /// <inheritdoc />
