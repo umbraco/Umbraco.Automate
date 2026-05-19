@@ -8,7 +8,7 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.userLoginSuccess", "User Login Success",
     Description = "Fires when a back-office user successfully logs in.",
     Group = "Users",
-    Icon = "icon-lock-open")]
+    Icon = "icon-unlocked")]
 public sealed class UserLoginSuccessTrigger
     : NotificationTriggerBase<UserAuthTriggerSettings, UserAuthTriggerOutput, UserLoginSuccessNotification>
 {
