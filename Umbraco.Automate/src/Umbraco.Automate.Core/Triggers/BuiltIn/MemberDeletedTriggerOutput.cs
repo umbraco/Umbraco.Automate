@@ -34,4 +34,9 @@ public sealed class MemberDeletedTriggerOutput
     /// Gets the member type alias.
     /// </summary>
     public string? MemberTypeAlias { get; init; }
+
+    /// <summary>
+    /// Gets the keys of the member groups this member belonged to at delete time.
+    /// </summary>
+    public IReadOnlyList<Guid> MemberGroupKeys { get; init; } = Array.Empty<Guid>();
 }

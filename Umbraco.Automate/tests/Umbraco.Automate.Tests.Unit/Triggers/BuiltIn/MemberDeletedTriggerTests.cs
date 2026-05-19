@@ -1,17 +1,33 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 
 public class MemberDeletedTriggerTests
 {
-    private readonly MemberDeletedTrigger _trigger = new(
-        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
+    private readonly Mock<IMemberService> _memberService = new();
+    private readonly Mock<IMemberGroupService> _memberGroupService = new();
+    private readonly MemberDeletedTrigger _trigger;
+
+    public MemberDeletedTriggerTests()
+    {
+        _memberService.Setup(s => s.GetAllRolesIds(It.IsAny<int>())).Returns(Array.Empty<int>());
+        _memberGroupService.Setup(s => s.GetByIdsAsync(It.IsAny<IEnumerable<int>>())).ReturnsAsync(Array.Empty<IMemberGroup>());
+
+        _trigger = new MemberDeletedTrigger(
+            new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()),
+            _memberService.Object,
+            _memberGroupService.Object,
+            NullLogger<MemberDeletedTrigger>.Instance);
+    }
 
     [Fact]
     public void HasCorrectAlias()
@@ -28,6 +44,15 @@ public class MemberDeletedTriggerTests
     [Fact]
     public void HasOutputType()
         => _trigger.OutputType.ShouldBe(typeof(MemberDeletedTriggerOutput));
+
+    [Fact]
+    public void HasSettingsSchema()
+    {
+        var schema = _trigger.GetSettingsSchema();
+        schema.ShouldNotBeNull();
+        schema.Fields.ShouldContain(f => f.PropertyName == "MemberTypes");
+        schema.Fields.ShouldContain(f => f.PropertyName == "MemberGroups");
+    }
 
     [Fact]
     public void MapEvent_ProducesEventForDeletedMember()
@@ -62,10 +87,29 @@ public class MemberDeletedTriggerTests
     }
 
     [Fact]
-    public void CanHandle_AlwaysReturnsTrue()
+    public void CanHandle_NoSettings_ReturnsTrue()
     {
         var output = new MemberDeletedTriggerOutput { MemberKey = Guid.NewGuid() };
         ((ITrigger)_trigger).CanHandle(output, null).ShouldBeTrue();
-        ((ITrigger)_trigger).CanHandle(output, new MemberDeletedTriggerSettings()).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CanHandle_BothFiltersMustPass()
+    {
+        var typeKey = Guid.NewGuid();
+        var groupKey = Guid.NewGuid();
+        var output = new MemberDeletedTriggerOutput
+        {
+            MemberKey = Guid.NewGuid(),
+            MemberTypeKey = typeKey,
+            MemberGroupKeys = new[] { groupKey },
+        };
+        var settings = new MemberDeletedTriggerSettings
+        {
+            MemberTypes = typeKey.ToString(),
+            MemberGroups = groupKey.ToString(),
+        };
+
+        ((ITrigger)_trigger).CanHandle(output, settings).ShouldBeTrue();
     }
 }

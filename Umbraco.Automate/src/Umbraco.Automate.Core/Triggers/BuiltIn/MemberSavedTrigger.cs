@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -15,11 +17,23 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class MemberSavedTrigger
     : NotificationTriggerBase<MemberSavedTriggerSettings, MemberSavedTriggerOutput, MemberSavedNotification>
 {
+    private readonly IMemberService _memberService;
+    private readonly IMemberGroupService _memberGroupService;
+    private readonly ILogger<MemberSavedTrigger> _logger;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MemberSavedTrigger"/> class.
     /// </summary>
-    public MemberSavedTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
+    public MemberSavedTrigger(
+        TriggerInfrastructure infrastructure,
+        IMemberService memberService,
+        IMemberGroupService memberGroupService,
+        ILogger<MemberSavedTrigger> logger)
+        : base(infrastructure)
     {
+        _memberService = memberService;
+        _memberGroupService = memberGroupService;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -42,9 +56,15 @@ public sealed class MemberSavedTrigger
                     Email = member.Email,
                     MemberTypeKey = member.ContentType?.Key,
                     MemberTypeAlias = member.ContentType?.Alias,
+                    MemberGroupKeys = MemberGroupResolver.Resolve(_memberService, _memberGroupService, member, _logger),
                     IsNew = member.CreateDate == member.UpdateDate,
                 },
             };
         }
     }
+
+    /// <inheritdoc />
+    protected override bool CanHandle(MemberSavedTriggerOutput output, MemberSavedTriggerSettings? settings)
+        => EntityTypesFilter.Matches(output.MemberTypeKey, settings?.MemberTypes)
+           && GroupKeysFilter.Matches(output.MemberGroupKeys, settings?.MemberGroups);
 }

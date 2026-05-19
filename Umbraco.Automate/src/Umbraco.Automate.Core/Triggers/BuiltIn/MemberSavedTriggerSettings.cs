@@ -8,6 +8,27 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class MemberSavedTriggerSettings : IAutomationOriginatedEventBehavior
 {
     /// <summary>
+    /// Gets or sets the member type unique IDs to filter on (comma-separated). If null,
+    /// all member types match.
+    /// </summary>
+    [Field(
+        Label = "Member Types",
+        Description = "Only fire for these member types. Leave blank to match all.",
+        EditorUiAlias = "Umb.Automate.MemberTypePicker")]
+    public string? MemberTypes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the member group unique IDs to filter on (comma-separated). If null,
+    /// fires regardless of group membership. Match-if-any semantics: a member that
+    /// belongs to at least one configured group fires the trigger.
+    /// </summary>
+    [Field(
+        Label = "Member Groups",
+        Description = "Only fire for members in these groups. Leave blank to match all.",
+        EditorUiAlias = "Umb.PropertyEditorUi.MemberGroupPicker")]
+    public string? MemberGroups { get; set; }
+
+    /// <summary>
     /// Gets or sets how the trigger should react to saves performed by another automation.
     /// Stored as a string so the dropdown picker round-trips cleanly — parsed via the
     /// <see cref="IAutomationOriginatedEventBehavior"/> implementation below.

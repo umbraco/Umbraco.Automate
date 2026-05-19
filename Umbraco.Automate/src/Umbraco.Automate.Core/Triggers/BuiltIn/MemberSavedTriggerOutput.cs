@@ -36,6 +36,13 @@ public sealed class MemberSavedTriggerOutput
     public string? MemberTypeAlias { get; init; }
 
     /// <summary>
+    /// Gets the keys of the member groups this member belongs to. Resolved by the trigger
+    /// at dispatch time so the group filter can run synchronously in <c>CanHandle</c> and
+    /// downstream automations can branch on group membership without an extra lookup.
+    /// </summary>
+    public IReadOnlyList<Guid> MemberGroupKeys { get; init; } = Array.Empty<Guid>();
+
+    /// <summary>
     /// Gets a value indicating whether this save represents a newly-created member.
     /// True when <c>CreateDate == UpdateDate</c> on the saved entity. Soft signal —
     /// database date precision may vary, so downstream automations needing a hard

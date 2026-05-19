@@ -8,6 +8,26 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class MemberDeletedTriggerSettings : IAutomationOriginatedEventBehavior
 {
     /// <summary>
+    /// Gets or sets the member type unique IDs to filter on (comma-separated). If null,
+    /// all member types match.
+    /// </summary>
+    [Field(
+        Label = "Member Types",
+        Description = "Only fire for these member types. Leave blank to match all.",
+        EditorUiAlias = "Umb.Automate.MemberTypePicker")]
+    public string? MemberTypes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the member group unique IDs to filter on (comma-separated). If null,
+    /// fires regardless of group membership.
+    /// </summary>
+    [Field(
+        Label = "Member Groups",
+        Description = "Only fire for members in these groups. Leave blank to match all.",
+        EditorUiAlias = "Umb.PropertyEditorUi.MemberGroupPicker")]
+    public string? MemberGroups { get; set; }
+
+    /// <summary>
     /// Gets or sets how the trigger should react to deletes performed by another automation.
     /// </summary>
     [Field(
