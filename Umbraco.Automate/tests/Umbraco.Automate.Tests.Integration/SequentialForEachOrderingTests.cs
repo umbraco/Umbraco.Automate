@@ -118,6 +118,11 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
         services.AddSingleton(serviceAccountResolver.Object);
         services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
 
+        var nodeAuthorizer = new Mock<IAutomationActionAuthorizer>();
+        nodeAuthorizer.Setup(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+        services.AddSingleton(nodeAuthorizer.Object);
+
         services.AddSingleton(Mock.Of<IConnectionService>());
 
         services.Configure<RateLimitingOptions>(o => o.Enabled = false);
@@ -201,6 +206,7 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
             triggers,
             _provider.GetRequiredService<IWorkspaceServiceAccountResolver>(),
             _provider.GetRequiredService<ISectionAccessChecker>(),
+            _provider.GetRequiredService<IAutomationActionAuthorizer>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }

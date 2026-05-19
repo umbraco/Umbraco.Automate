@@ -288,7 +288,8 @@ different point in the lifecycle:
 | Layer | Declared by | Enforced at |
 |-------|-------------|-------------|
 | **Section access** | `RequiredSections = ["content", ...]` | Catalogue endpoint (picker filter) → publish-time validation → trigger dispatch → per-action runtime middleware |
-| **Node access** | n/a (resolved from the action's target node at runtime) | Inside each content/media action via `IAutomationActionAuthorizer` |
+| **Node access (trigger)** | `INodeScopedTrigger.GetTargetNode(output)` on the trigger | Trigger dispatch — authorises the workspace service account against the node identified in the event output before starting the run |
+| **Node access (action)** | n/a (resolved from the action's target node at runtime) | Inside each content/media action via `IAutomationActionAuthorizer` |
 | **Permission verb** | `RequiredPermissions = [ActionPublish.ActionLetter, ...]` (content actions only) | Same as node access — fed into `IContentPermissionService.AuthorizeAccessAsync` |
 
 ### Section access — `RequiredSections`
@@ -317,7 +318,37 @@ Enforcement points:
 - **`TriggerEventHandler.HandleAsync`** — skips dispatch when a published automation's trigger requires sections the service account has lost since publish. No run record is created.
 - **`BackOfficeIdentityMiddleware`** — fails the step with `StepRunErrorCategory.Authentication` when the action's section is no longer satisfied at runtime.
 
-### Node access and permission verbs — `IAutomationActionAuthorizer`
+### Node access at trigger dispatch — `INodeScopedTrigger`
+
+Content and media triggers whose output is bound to a specific node implement
+`INodeScopedTrigger` and expose the target node key. The dispatcher resolves
+the workspace service account, runs the section check, then authorises the
+target node via `IContentPermissionService` / `IMediaPermissionService` with
+the `Umb.Document.Read` (Browse) permission. Failure skips the automation
+silently (logged at Information): no run is created and no payload is exposed.
+
+```csharp
+public sealed class ContentSavedTrigger
+    : NotificationTriggerBase<ContentSavedTriggerSettings, ContentSavedTriggerOutput, ContentSavedNotification>,
+      INodeScopedTrigger
+{
+    public NodeScopedTriggerTarget? GetTargetNode(object output)
+        => output is ContentSavedTriggerOutput typed
+            ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
+            : null;
+
+    // ...
+}
+```
+
+`MediaDeletedTrigger` and `MediaTrashedTrigger` do **not** implement
+`INodeScopedTrigger`: by the time the dispatcher processes a deletion the node
+is gone (`AuthorizeAccessAsync` returns NotFound for everyone, including
+operators who legitimately had access), and a trashed node is moved under the
+recycle bin so a start-node-scoped service account would lose notifications
+about media it previously had access to. These two events stay section-only.
+
+### Node access at action runtime — `IAutomationActionAuthorizer`
 
 Section access is necessary but not sufficient. A workspace with the Content
 section can still legitimately be scoped to a subset of nodes via the service

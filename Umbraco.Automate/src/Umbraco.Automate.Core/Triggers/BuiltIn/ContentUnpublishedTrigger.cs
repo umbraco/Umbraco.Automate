@@ -13,8 +13,15 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
     Icon = "icon-globe",
     RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentUnpublishedTrigger
-    : NotificationTriggerBase<ContentUnpublishedTriggerSettings, ContentUnpublishedTriggerOutput, ContentUnpublishedNotification>
+    : NotificationTriggerBase<ContentUnpublishedTriggerSettings, ContentUnpublishedTriggerOutput, ContentUnpublishedNotification>,
+      INodeScopedTrigger
 {
+    /// <inheritdoc />
+    public NodeScopedTriggerTarget? GetTargetNode(object output)
+        => output is ContentUnpublishedTriggerOutput typed
+            ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
+            : null;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ContentUnpublishedTrigger"/> class.
     /// </summary>

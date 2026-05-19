@@ -15,8 +15,15 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
     Icon = "icon-picture",
     RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class MediaSavedTrigger
-    : NotificationTriggerBase<MediaSavedTriggerSettings, MediaSavedTriggerOutput, MediaSavedNotification>
+    : NotificationTriggerBase<MediaSavedTriggerSettings, MediaSavedTriggerOutput, MediaSavedNotification>,
+      INodeScopedTrigger
 {
+    /// <inheritdoc />
+    public NodeScopedTriggerTarget? GetTargetNode(object output)
+        => output is MediaSavedTriggerOutput typed
+            ? new NodeScopedTriggerTarget(typed.MediaKey, NodeScopedTriggerTargetKind.Media)
+            : null;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MediaSavedTrigger"/> class.
     /// </summary>

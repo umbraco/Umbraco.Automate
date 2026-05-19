@@ -9,6 +9,9 @@ namespace Umbraco.Automate.Core.Security;
 /// <inheritdoc />
 internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
 {
+    private const string NoBackofficeIdentityMessage =
+        "No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.";
+
     private readonly IContentPermissionService _contentPermissionService;
     private readonly IMediaPermissionService _mediaPermissionService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
@@ -27,7 +30,7 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
     }
 
     /// <inheritdoc />
-    public async Task<AutomationAuthorizationResult> AuthorizeContentAsync(
+    public Task<AutomationAuthorizationResult> AuthorizeContentAsync(
         Guid contentKey,
         IReadOnlySet<string> permissions,
         CancellationToken cancellationToken)
@@ -35,10 +38,19 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
         var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
         if (user is null)
         {
-            return AutomationAuthorizationResult.Fail(
-                "No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
+            return Task.FromResult(AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage));
         }
 
+        return AuthorizeContentAsync(user, contentKey, permissions, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeContentAsync(
+        IUser user,
+        Guid contentKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+    {
         var status = await AuthorizeContentKeyAsync(user, contentKey, permissions);
 
         if (status == ContentAuthorizationStatus.Success)
@@ -54,17 +66,25 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
     }
 
     /// <inheritdoc />
-    public async Task<AutomationAuthorizationResult> AuthorizeMediaAsync(
+    public Task<AutomationAuthorizationResult> AuthorizeMediaAsync(
         Guid mediaKey,
         CancellationToken cancellationToken)
     {
         var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
         if (user is null)
         {
-            return AutomationAuthorizationResult.Fail(
-                "No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
+            return Task.FromResult(AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage));
         }
 
+        return AuthorizeMediaAsync(user, mediaKey, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeMediaAsync(
+        IUser user,
+        Guid mediaKey,
+        CancellationToken cancellationToken)
+    {
         var status = await _mediaPermissionService.AuthorizeAccessAsync(user, [mediaKey]);
 
         if (status == MediaAuthorizationStatus.Success)
@@ -72,12 +92,11 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             return AutomationAuthorizationResult.Success;
         }
 
-        var reason = MapMediaReason(status, mediaKey);
         _logger.LogDebug(
             "Media authorisation denied for service account {UserKey} on node {MediaKey}: {Status}",
             user.Key, mediaKey, status);
 
-        return AutomationAuthorizationResult.Fail(reason);
+        return AutomationAuthorizationResult.Fail(MapMediaReason(status, mediaKey));
     }
 
     /// <inheritdoc />

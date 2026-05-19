@@ -109,6 +109,13 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(serviceAccountResolver.Object);
         services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
 
+        // Node authoriser — the manual trigger in this smoke test isn't INodeScopedTrigger,
+        // so the authoriser is never consulted. Register a permissive mock to satisfy DI.
+        var nodeAuthorizer = new Mock<IAutomationActionAuthorizer>();
+        nodeAuthorizer.Setup(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+        services.AddSingleton(nodeAuthorizer.Object);
+
         services.AddSingleton(Mock.Of<IConnectionService>());
 
         // Rate limiting — disabled for tests.
@@ -152,6 +159,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             triggers,
             _provider.GetRequiredService<IWorkspaceServiceAccountResolver>(),
             _provider.GetRequiredService<ISectionAccessChecker>(),
+            _provider.GetRequiredService<IAutomationActionAuthorizer>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }
