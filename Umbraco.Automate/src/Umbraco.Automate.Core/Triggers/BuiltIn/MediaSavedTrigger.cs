@@ -4,7 +4,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
 /// Fires when media is saved in Umbraco CMS (covers both new uploads and subsequent edits —
-/// Umbraco raises <see cref="MediaSavedNotification"/> for both).
+/// Umbraco raises <see cref="MediaSavedNotification"/> for both, with
+/// <see cref="MediaSavedTriggerOutput.IsNew"/> distinguishing them).
 /// Produces one <see cref="TriggerEvent"/> per saved media item.
 /// </summary>
 [Trigger("umbracoAutomate.mediaSaved", "Media Saved",
@@ -39,6 +40,7 @@ public sealed class MediaSavedTrigger
                     MediaName = media.Name,
                     MediaTypeKey = media.ContentType?.Key,
                     MediaTypeAlias = media.ContentType?.Alias,
+                    IsNew = media.CreateDate == media.UpdateDate,
                 },
             };
         }
