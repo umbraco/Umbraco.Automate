@@ -18,8 +18,7 @@ public sealed class MediaSavedTrigger
     : NotificationTriggerBase<MediaSavedTriggerSettings, MediaSavedTriggerOutput, MediaSavedNotification>,
       INodeScopedTrigger
 {
-    /// <inheritdoc />
-    public NodeScopedTriggerTarget? GetTargetNode(object output)
+    NodeScopedTriggerTarget? INodeScopedTrigger.GetTargetNode(object output)
         => output is MediaSavedTriggerOutput typed
             ? new NodeScopedTriggerTarget(typed.MediaKey, NodeScopedTriggerTargetKind.Media)
             : null;

@@ -16,8 +16,7 @@ public sealed class ContentUnpublishedTrigger
     : NotificationTriggerBase<ContentUnpublishedTriggerSettings, ContentUnpublishedTriggerOutput, ContentUnpublishedNotification>,
       INodeScopedTrigger
 {
-    /// <inheritdoc />
-    public NodeScopedTriggerTarget? GetTargetNode(object output)
+    NodeScopedTriggerTarget? INodeScopedTrigger.GetTargetNode(object output)
         => output is ContentUnpublishedTriggerOutput typed
             ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
             : null;

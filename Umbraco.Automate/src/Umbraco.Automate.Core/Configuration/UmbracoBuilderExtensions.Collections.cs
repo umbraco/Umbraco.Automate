@@ -8,6 +8,7 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.HealthChecks;
 using Umbraco.Automate.Core.Bindings;
@@ -75,6 +76,8 @@ public static partial class UmbracoBuilderExtensions
         builder.AutomateWebhookAuthenticators()
             .Add<PlainSecretWebhookAuthenticator>()
             .Add<HmacSha256WebhookAuthenticator>();
+        builder.AutomateTriggerDispatchAuthorizers()
+            .Add<NodeScopedTriggerDispatchAuthorizer>();
         builder.AutomateBindingFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>()
@@ -251,6 +254,15 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static WebhookAuthenticatorCollectionBuilder AutomateWebhookAuthenticators(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<WebhookAuthenticatorCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the trigger dispatch authoriser collection builder. Register additional
+    /// <see cref="ITriggerDispatchAuthorizer"/> implementations to gate trigger dispatch
+    /// against provider-specific resource models (e.g. per-store membership in Umbraco
+    /// Commerce). The built-in node-scoped authoriser is registered by default.
+    /// </summary>
+    public static TriggerDispatchAuthorizerCollectionBuilder AutomateTriggerDispatchAuthorizers(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<TriggerDispatchAuthorizerCollectionBuilder>();
 
     /// <summary>
     /// Gets the versionable entity adapter collection builder.

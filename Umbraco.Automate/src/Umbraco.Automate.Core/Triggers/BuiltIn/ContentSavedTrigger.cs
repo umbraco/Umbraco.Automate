@@ -18,8 +18,7 @@ public sealed class ContentSavedTrigger
     : NotificationTriggerBase<ContentSavedTriggerSettings, ContentSavedTriggerOutput, ContentSavedNotification>,
       INodeScopedTrigger
 {
-    /// <inheritdoc />
-    public NodeScopedTriggerTarget? GetTargetNode(object output)
+    NodeScopedTriggerTarget? INodeScopedTrigger.GetTargetNode(object output)
         => output is ContentSavedTriggerOutput typed
             ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
             : null;

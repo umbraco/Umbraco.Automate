@@ -288,7 +288,7 @@ different point in the lifecycle:
 | Layer | Declared by | Enforced at |
 |-------|-------------|-------------|
 | **Section access** | `RequiredSections = ["content", ...]` | Catalogue endpoint (picker filter) → publish-time validation → trigger dispatch → per-action runtime middleware |
-| **Node access (trigger)** | `INodeScopedTrigger.GetTargetNode(output)` on the trigger | Trigger dispatch — authorises the workspace service account against the node identified in the event output before starting the run |
+| **Dispatch authorisation** | `ITriggerDispatchAuthorizer` implementations | Trigger dispatch — runs after the section guard, before the run is started. Built-in handles CMS content/media nodes; provider packages plug in their own (e.g. Umbraco Commerce store membership) |
 | **Node access (action)** | n/a (resolved from the action's target node at runtime) | Inside each content/media action via `IAutomationActionAuthorizer` |
 | **Permission verb** | `RequiredPermissions = [ActionPublish.ActionLetter, ...]` (content actions only) | Same as node access — fed into `IContentPermissionService.AuthorizeAccessAsync` |
 
@@ -322,41 +322,55 @@ Enforcement points:
 - **`TriggerEventHandler.HandleAsync`** — skips dispatch when a published automation's trigger requires sections the service account has lost since publish. No run record is created.
 - **`BackOfficeIdentityMiddleware`** — fails the step with `StepRunErrorCategory.Authentication` when the action's section is no longer satisfied at runtime.
 
-### Node access at trigger dispatch — `INodeScopedTrigger`
+### Dispatch authorisation — `ITriggerDispatchAuthorizer`
 
-Content and media triggers whose output is bound to a specific node implement
-`INodeScopedTrigger` and expose the target node key. The dispatcher resolves
-the workspace service account, runs the section check, then authorises the
-target node via `IContentPermissionService` / `IMediaPermissionService` with
-the `Umb.Document.Read` (Browse) permission. Failure skips the automation
-silently (logged at Information): no run is created and no payload is exposed.
+After the section guard passes, the dispatcher iterates registered
+`ITriggerDispatchAuthorizer` implementations. Each one gets the trigger, the
+deserialised output, the resolved service account, and the automation; the
+first denial short-circuits dispatch for that automation. Failure is logged at
+Information level — no run is created and no payload is exposed.
 
 ```csharp
-public sealed class ContentSavedTrigger
-    : NotificationTriggerBase<ContentSavedTriggerSettings, ContentSavedTriggerOutput, ContentSavedNotification>,
-      INodeScopedTrigger
+public interface ITriggerDispatchAuthorizer
 {
-    public NodeScopedTriggerTarget? GetTargetNode(object output)
-        => output is ContentSavedTriggerOutput typed
-            ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
-            : null;
-
-    // ...
+    Task<AutomationAuthorizationResult> AuthorizeAsync(
+        TriggerDispatchAuthorizationContext context,
+        CancellationToken cancellationToken);
 }
 ```
 
-`MediaTrashedTrigger` is also node-scoped: after trashing, the media lives
-under the recycle bin (`,-1,-21,...`). CMS denies any non-root user access to
-that path, so scoped service accounts are correctly denied here too —
-matching the backoffice UI, where scoped users do not see the recycle bin at
-all and cannot interact with trashed items even if they originally trashed
-them. Root-scoped service accounts (or unscoped accounts) still receive the
-notification.
+Authorisers that don't apply to the current event should return
+`AutomationAuthorizationResult.Success` — Success means "not blocking", not
+"explicitly approved". Register one via the collection builder:
 
-`MediaDeletedTrigger` does **not** implement `INodeScopedTrigger`: by the time
-the dispatcher processes a deletion the node is permanently gone, so
-`AuthorizeAccessAsync` returns `NotFound` for everyone — not a meaningful
-authorisation signal. This event stays section-only.
+```csharp
+builder.AutomateTriggerDispatchAuthorizers()
+    .Add<MyDispatchAuthorizer>();
+```
+
+#### Built-in CMS node-scoped authorisation
+
+The built-in `NodeScopedTriggerDispatchAuthorizer` handles content and media
+triggers whose output identifies a single CMS node. It authorises the target
+node via `IContentPermissionService` / `IMediaPermissionService` with the
+`Umb.Document.Read` (Browse) permission. The built-in triggers
+(`ContentSaved/Published/Unpublished`, `MediaSaved`, `MediaTrashed`) opt in via
+the internal `INodeScopedTrigger` marker; the implementation detail isn't
+exposed because third-party providers with non-CMS resource models should
+write their own `ITriggerDispatchAuthorizer` rather than reuse the marker.
+
+`MediaTrashedTrigger` is also gated by this authoriser: after trashing, the
+media lives under the recycle bin (`,-1,-21,...`). CMS denies any non-root
+user access to that path, so scoped service accounts are correctly denied
+here too — matching the backoffice UI, where scoped users do not see the
+recycle bin at all and cannot interact with trashed items even if they
+originally trashed them. Root-scoped service accounts (or unscoped accounts)
+still receive the notification.
+
+`MediaDeletedTrigger` is not node-scoped: by the time the dispatcher processes
+a deletion the node is permanently gone, so `AuthorizeAccessAsync` returns
+`NotFound` for everyone — not a meaningful authorisation signal. This event
+stays section-only.
 
 ### Node access at action runtime — `IAutomationActionAuthorizer`
 

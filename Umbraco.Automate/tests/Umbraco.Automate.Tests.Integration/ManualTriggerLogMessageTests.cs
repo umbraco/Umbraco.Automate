@@ -13,6 +13,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Messaging;
@@ -109,12 +110,9 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(serviceAccountResolver.Object);
         services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
 
-        // Node authoriser — the manual trigger in this smoke test isn't INodeScopedTrigger,
-        // so the authoriser is never consulted. Register a permissive mock to satisfy DI.
-        var nodeAuthorizer = new Mock<IAutomationActionAuthorizer>();
-        nodeAuthorizer.Setup(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AutomationAuthorizationResult.Success);
-        services.AddSingleton(nodeAuthorizer.Object);
+        // Dispatch authorisers — the manual trigger in this smoke test has no payload an
+        // authoriser would inspect, so an empty collection is sufficient.
+        services.AddSingleton(new TriggerDispatchAuthorizerCollection(Array.Empty<ITriggerDispatchAuthorizer>));
 
         services.AddSingleton(Mock.Of<IConnectionService>());
 
@@ -159,7 +157,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             triggers,
             _provider.GetRequiredService<IWorkspaceServiceAccountResolver>(),
             _provider.GetRequiredService<ISectionAccessChecker>(),
-            _provider.GetRequiredService<IAutomationActionAuthorizer>(),
+            _provider.GetRequiredService<TriggerDispatchAuthorizerCollection>(),
             _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }

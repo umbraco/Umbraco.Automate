@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Security;
@@ -24,7 +25,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly TriggerCollection _triggers;
     private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
     private readonly ISectionAccessChecker _sectionAccessChecker;
-    private readonly IAutomationActionAuthorizer _nodeAuthorizer;
+    private readonly TriggerDispatchAuthorizerCollection _dispatchAuthorizers;
     private readonly IOptionsMonitor<ExecutionOptions> _executionOptions;
     private readonly ILogger<TriggerEventHandler> _logger;
 
@@ -36,7 +37,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
         TriggerCollection triggers,
         IWorkspaceServiceAccountResolver serviceAccountResolver,
         ISectionAccessChecker sectionAccessChecker,
-        IAutomationActionAuthorizer nodeAuthorizer,
+        TriggerDispatchAuthorizerCollection dispatchAuthorizers,
         IOptionsMonitor<ExecutionOptions> executionOptions,
         ILogger<TriggerEventHandler> logger)
     {
@@ -47,7 +48,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
         _triggers = triggers;
         _serviceAccountResolver = serviceAccountResolver;
         _sectionAccessChecker = sectionAccessChecker;
-        _nodeAuthorizer = nodeAuthorizer;
+        _dispatchAuthorizers = dispatchAuthorizers;
         _executionOptions = executionOptions;
         _logger = logger;
     }
@@ -115,7 +116,8 @@ internal sealed class TriggerEventHandler : IMessageHandler
         var trigger = _triggers.GetByAlias(message.TriggerAlias);
 
         // Typed output is only needed when at least one automation has configured
-        // trigger settings. Deserialize lazily to avoid the cost on the common no-filter path.
+        // trigger settings, or when a dispatch authoriser needs to inspect the payload.
+        // Deserialize lazily so the common no-filter / no-authoriser path stays cheap.
         object? typedOutput = null;
         var typedOutputAttempted = false;
 
@@ -205,10 +207,12 @@ internal sealed class TriggerEventHandler : IMessageHandler
             // Runtime section guard: even if the trigger was permitted at publish time,
             // the workspace's service account may have been downgraded since. Skip the run
             // (no run record, no payload exposure) when the account no longer has the
-            // sections the trigger requires.
+            // sections the trigger requires. After that, run any registered dispatch
+            // authorisers — built-in NodeScopedTriggerDispatchAuthorizer plus any provider
+            // packages have registered (e.g. Commerce store-scoped).
             var sectionGated = trigger is not null && trigger.RequiredSections.Count > 0;
-            var nodeGated = trigger is INodeScopedTrigger;
-            if (sectionGated || nodeGated)
+            var hasDispatchAuthorizers = _dispatchAuthorizers.Count > 0;
+            if (sectionGated || hasDispatchAuthorizers)
             {
                 var serviceAccount = await ResolveServiceAccountAsync(executionAutomation.WorkspaceId, serviceAccountCache, cancellationToken);
                 if (serviceAccount is null)
@@ -227,27 +231,28 @@ internal sealed class TriggerEventHandler : IMessageHandler
                     continue;
                 }
 
-                // Node-level guard: a trigger whose output is bound to a CMS node (content
-                // or media) must also pass the service account's start-node / granular
-                // permission check. Otherwise a workspace scoped to /blog/ would still
-                // receive payloads about /home, etc. Mirrors the per-action node check
-                // done by IAutomationActionAuthorizer at runtime.
-                if (nodeGated)
+                if (hasDispatchAuthorizers && trigger is not null)
                 {
-                    var nodeScoped = (INodeScopedTrigger)trigger!;
                     if (!typedOutputAttempted)
                     {
                         typedOutput = DeserializeTypedOutput(message.OutputData, trigger.OutputType);
                         typedOutputAttempted = true;
                     }
 
-                    if (typedOutput is not null
-                        && nodeScoped.GetTargetNode(typedOutput) is { } target
-                        && !await AuthorizeNodeAsync(serviceAccount, target, cancellationToken))
+                    var authContext = new TriggerDispatchAuthorizationContext
+                    {
+                        Trigger = trigger,
+                        TypedOutput = typedOutput,
+                        ServiceAccount = serviceAccount,
+                        Automation = executionAutomation,
+                    };
+
+                    var deny = await EvaluateAuthorizersAsync(authContext, cancellationToken);
+                    if (deny is not null)
                     {
                         _logger.LogInformation(
-                            "Automation {AutomationId} skipped — workspace service account is not authorised for {NodeKind} node {NodeKey} (trigger {TriggerAlias}).",
-                            executionAutomation.Id, target.Kind, target.Key, message.TriggerAlias);
+                            "Automation {AutomationId} skipped by dispatch authoriser {Authoriser} (trigger {TriggerAlias}): {Reason}",
+                            executionAutomation.Id, deny.Value.AuthorizerName, message.TriggerAlias, deny.Value.Result.FailureReason);
                         continue;
                     }
                 }
@@ -267,23 +272,21 @@ internal sealed class TriggerEventHandler : IMessageHandler
         }
     }
 
-    private async Task<bool> AuthorizeNodeAsync(IUser user, NodeScopedTriggerTarget target, CancellationToken cancellationToken)
+    private async Task<(AutomationAuthorizationResult Result, string AuthorizerName)?> EvaluateAuthorizersAsync(
+        TriggerDispatchAuthorizationContext context,
+        CancellationToken cancellationToken)
     {
-        // Trigger payload only carries a node identifier — Browse is the natural gate for
-        // "may this account learn that this node was modified?". Verb-specific checks
-        // (publish/update) are still enforced inside each action.
-        var result = target.Kind switch
+        foreach (var authorizer in _dispatchAuthorizers)
         {
-            NodeScopedTriggerTargetKind.Content => await _nodeAuthorizer.AuthorizeContentAsync(
-                user, target.Key, BrowsePermissions, cancellationToken),
-            NodeScopedTriggerTargetKind.Media => await _nodeAuthorizer.AuthorizeMediaAsync(
-                user, target.Key, cancellationToken),
-            _ => AutomationAuthorizationResult.Success,
-        };
-        return result.Authorized;
-    }
+            var result = await authorizer.AuthorizeAsync(context, cancellationToken);
+            if (!result.Authorized)
+            {
+                return (result, authorizer.GetType().Name);
+            }
+        }
 
-    private static readonly IReadOnlySet<string> BrowsePermissions = new HashSet<string> { Umbraco.Cms.Core.Actions.ActionBrowse.ActionLetter };
+        return null;
+    }
 
     private async Task<IUser?> ResolveServiceAccountAsync(
         Guid workspaceId,
