@@ -1,9 +1,11 @@
+using Umbraco.Automate.Core.Dispatch.Authorization;
+
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
 /// Output produced by the <see cref="ContentPublishedTrigger"/> for each published content item.
 /// </summary>
-public sealed class ContentPublishedTriggerOutput
+public sealed class ContentPublishedTriggerOutput : IContentScopedTriggerOutput
 {
     /// <summary>
     /// Gets the content item's unique key.
@@ -29,4 +31,6 @@ public sealed class ContentPublishedTriggerOutput
     /// Gets the culture that was published, or null for invariant content.
     /// </summary>
     public string? Culture { get; init; }
+
+    Guid? IContentScopedTriggerOutput.GetContentKey() => ContentKey;
 }

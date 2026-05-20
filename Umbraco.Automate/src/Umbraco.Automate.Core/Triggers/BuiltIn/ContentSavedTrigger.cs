@@ -15,14 +15,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
     Icon = "icon-save",
     RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentSavedTrigger
-    : NotificationTriggerBase<ContentSavedTriggerSettings, ContentSavedTriggerOutput, ContentSavedNotification>,
-      INodeScopedTrigger
+    : NotificationTriggerBase<ContentSavedTriggerSettings, ContentSavedTriggerOutput, ContentSavedNotification>
 {
-    NodeScopedTriggerTarget? INodeScopedTrigger.GetTargetNode(object output)
-        => output is ContentSavedTriggerOutput typed
-            ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
-            : null;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="ContentSavedTrigger"/> class.
     /// </summary>
