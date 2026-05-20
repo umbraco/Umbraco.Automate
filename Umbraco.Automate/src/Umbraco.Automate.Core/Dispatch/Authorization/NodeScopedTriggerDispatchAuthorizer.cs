@@ -1,19 +1,19 @@
 using Umbraco.Automate.Core.Security;
-using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Core.Actions;
 
 namespace Umbraco.Automate.Core.Dispatch.Authorization;
 
 /// <summary>
 /// Built-in authoriser for triggers whose output is bound to a CMS content or media node.
-/// Triggers opt in by implementing <see cref="INodeScopedTrigger"/>; the authoriser checks
-/// the workspace service account's start-node / Browse permission via
+/// Outputs opt in by implementing <see cref="IContentScopedTriggerOutput"/> or
+/// <see cref="IMediaScopedTriggerOutput"/>; the authoriser then checks the workspace
+/// service account's start-node / Browse permission via
 /// <see cref="IAutomationActionAuthorizer"/>, matching the per-action node guard.
 /// </summary>
 /// <remarks>
-/// Returns <see cref="AutomationAuthorizationResult.Success"/> when the trigger isn't node
-/// scoped, when typed output isn't available, or when the trigger doesn't extract a target
-/// node from this event (a config-level event the trigger considers unrestricted).
+/// Returns <see cref="AutomationAuthorizationResult.Success"/> when the typed output is
+/// absent, when neither marker is present, or when the marker reports no target key (a
+/// config-level event the output considers unrestricted).
 /// </remarks>
 internal sealed class NodeScopedTriggerDispatchAuthorizer : ITriggerDispatchAuthorizer
 {
@@ -30,26 +30,21 @@ internal sealed class NodeScopedTriggerDispatchAuthorizer : ITriggerDispatchAuth
         TriggerDispatchAuthorizationContext context,
         CancellationToken cancellationToken)
     {
-        if (context.Trigger is not INodeScopedTrigger nodeScoped || context.TypedOutput is null)
-        {
-            return AutomationAuthorizationResult.Success;
-        }
-
-        if (nodeScoped.GetTargetNode(context.TypedOutput) is not { } target)
-        {
-            return AutomationAuthorizationResult.Success;
-        }
-
         // Trigger payload only carries a node identifier — Browse is the natural gate for
         // "may this account learn that this node was modified?". Verb-specific checks
         // (publish/update) are still enforced inside each action.
-        return target.Kind switch
+        switch (context.TypedOutput)
         {
-            NodeScopedTriggerTargetKind.Content => await _nodeAuthorizer.AuthorizeContentAsync(
-                context.ServiceAccount, target.Key, BrowsePermissions, cancellationToken),
-            NodeScopedTriggerTargetKind.Media => await _nodeAuthorizer.AuthorizeMediaAsync(
-                context.ServiceAccount, target.Key, cancellationToken),
-            _ => AutomationAuthorizationResult.Success,
-        };
+            case IContentScopedTriggerOutput content when content.GetContentKey() is { } contentKey:
+                return await _nodeAuthorizer.AuthorizeContentAsync(
+                    context.ServiceAccount, contentKey, BrowsePermissions, cancellationToken);
+
+            case IMediaScopedTriggerOutput media when media.GetMediaKey() is { } mediaKey:
+                return await _nodeAuthorizer.AuthorizeMediaAsync(
+                    context.ServiceAccount, mediaKey, cancellationToken);
+
+            default:
+                return AutomationAuthorizationResult.Success;
+        }
     }
 }

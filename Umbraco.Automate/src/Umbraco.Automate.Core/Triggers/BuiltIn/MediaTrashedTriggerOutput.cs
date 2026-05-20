@@ -1,9 +1,11 @@
+using Umbraco.Automate.Core.Dispatch.Authorization;
+
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
 /// Output produced by the <see cref="MediaTrashedTrigger"/> for each trashed media item.
 /// </summary>
-public sealed class MediaTrashedTriggerOutput
+public sealed class MediaTrashedTriggerOutput : IMediaScopedTriggerOutput
 {
     /// <summary>
     /// Gets the media item's unique key.
@@ -30,4 +32,6 @@ public sealed class MediaTrashedTriggerOutput
     /// useful for cleanup automations that need to know the original location.
     /// </summary>
     public string? OriginalPath { get; init; }
+
+    Guid? IMediaScopedTriggerOutput.GetMediaKey() => MediaKey;
 }

@@ -1,9 +1,11 @@
+using Umbraco.Automate.Core.Dispatch.Authorization;
+
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
 /// Output produced by the <see cref="MediaSavedTrigger"/> for each saved media item.
 /// </summary>
-public sealed class MediaSavedTriggerOutput
+public sealed class MediaSavedTriggerOutput : IMediaScopedTriggerOutput
 {
     /// <summary>
     /// Gets the media item's unique key.
@@ -32,4 +34,6 @@ public sealed class MediaSavedTriggerOutput
     /// guarantee should re-fetch.
     /// </summary>
     public bool IsNew { get; init; }
+
+    Guid? IMediaScopedTriggerOutput.GetMediaKey() => MediaKey;
 }

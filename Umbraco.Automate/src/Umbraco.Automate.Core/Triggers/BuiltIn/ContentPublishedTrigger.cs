@@ -13,14 +13,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
     Icon = "icon-document",
     RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentPublishedTrigger
-    : NotificationTriggerBase<ContentPublishedTriggerSettings, ContentPublishedTriggerOutput, ContentPublishedNotification>,
-      INodeScopedTrigger
+    : NotificationTriggerBase<ContentPublishedTriggerSettings, ContentPublishedTriggerOutput, ContentPublishedNotification>
 {
-    NodeScopedTriggerTarget? INodeScopedTrigger.GetTargetNode(object output)
-        => output is ContentPublishedTriggerOutput typed
-            ? new NodeScopedTriggerTarget(typed.ContentKey, NodeScopedTriggerTargetKind.Content)
-            : null;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="ContentPublishedTrigger"/> class.
     /// </summary>

@@ -1,9 +1,11 @@
+using Umbraco.Automate.Core.Dispatch.Authorization;
+
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
 /// Output produced by the <see cref="ContentSavedTrigger"/> for each saved content item.
 /// </summary>
-public sealed class ContentSavedTriggerOutput
+public sealed class ContentSavedTriggerOutput : IContentScopedTriggerOutput
 {
     /// <summary>
     /// Gets the content item's unique key.
@@ -32,4 +34,6 @@ public sealed class ContentSavedTriggerOutput
     /// guarantee should re-fetch.
     /// </summary>
     public bool IsNew { get; init; }
+
+    Guid? IContentScopedTriggerOutput.GetContentKey() => ContentKey;
 }
