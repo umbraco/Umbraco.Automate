@@ -1,12 +1,17 @@
 namespace Umbraco.Automate.Core.Triggers;
 
 /// <summary>
-/// A trigger whose output is bound to a CMS content or media node. Enables the dispatcher
-/// to authorise the event against the workspace service account's start node and granular
-/// permissions, so a workspace with section access but a restricted start node does not
-/// receive payloads for nodes outside its accessible path.
+/// Marker for built-in CMS content / media triggers. Recognised by the built-in
+/// <c>NodeScopedTriggerDispatchAuthorizer</c>, which authorises the workspace service
+/// account against the target node's start-node path and Browse permission.
 /// </summary>
-public interface INodeScopedTrigger : ITrigger
+/// <remarks>
+/// Internal because the public extensibility point for dispatch-time authorisation is
+/// <c>ITriggerDispatchAuthorizer</c>. Provider packages with non-CMS resource models
+/// (e.g. Umbraco Commerce stores) register their own authoriser rather than reuse this
+/// marker.
+/// </remarks>
+internal interface INodeScopedTrigger : ITrigger
 {
     /// <summary>
     /// Returns the CMS node this event refers to, or <c>null</c> when the output is not

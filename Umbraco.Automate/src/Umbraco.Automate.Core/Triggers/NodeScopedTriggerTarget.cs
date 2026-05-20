@@ -1,16 +1,15 @@
 namespace Umbraco.Automate.Core.Triggers;
 
 /// <summary>
-/// Identifies the CMS node a node-scoped trigger event refers to. The dispatcher uses
-/// this to authorise the workspace service account against the node before starting a run.
+/// Identifies the CMS node a node-scoped trigger event refers to.
 /// </summary>
-public readonly record struct NodeScopedTriggerTarget(Guid Key, NodeScopedTriggerTargetKind Kind);
+internal readonly record struct NodeScopedTriggerTarget(Guid Key, NodeScopedTriggerTargetKind Kind);
 
 /// <summary>
 /// The kind of CMS resource a <see cref="NodeScopedTriggerTarget"/> refers to. Selects which
-/// Umbraco permission service the dispatcher consults.
+/// Umbraco permission service the built-in authoriser consults.
 /// </summary>
-public enum NodeScopedTriggerTargetKind
+internal enum NodeScopedTriggerTargetKind
 {
     /// <summary>The target is a content node — authorised via <c>IContentPermissionService</c>.</summary>
     Content,

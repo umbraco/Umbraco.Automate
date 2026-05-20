@@ -16,15 +16,12 @@ public sealed class MediaTrashedTrigger
     : NotificationTriggerBase<MediaTrashedTriggerSettings, MediaTrashedTriggerOutput, MediaMovedToRecycleBinNotification>,
       INodeScopedTrigger
 {
-    /// <inheritdoc />
-    /// <remarks>
-    /// After trashing, the media lives under the recycle bin (path <c>,-1,-21,...</c>). CMS
-    /// denies any non-root user access to that path, so a workspace with a restricted start
-    /// node will be denied here — matching the backoffice UI, where scoped users do not see
-    /// the recycle bin at all and cannot interact with trashed items even if they originally
-    /// trashed them.
-    /// </remarks>
-    public NodeScopedTriggerTarget? GetTargetNode(object output)
+    // After trashing, the media lives under the recycle bin (path ,-1,-21,...). CMS
+    // denies any non-root user access to that path, so a workspace with a restricted start
+    // node will be denied here — matching the backoffice UI, where scoped users do not see
+    // the recycle bin at all and cannot interact with trashed items even if they originally
+    // trashed them.
+    NodeScopedTriggerTarget? INodeScopedTrigger.GetTargetNode(object output)
         => output is MediaTrashedTriggerOutput typed
             ? new NodeScopedTriggerTarget(typed.MediaKey, NodeScopedTriggerTargetKind.Media)
             : null;

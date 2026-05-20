@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Security;
@@ -25,6 +26,7 @@ public class TriggerEventHandlerTests
     private readonly Mock<IWorkspaceServiceAccountResolver> _serviceAccountResolver = new();
     private readonly Mock<IAutomationActionAuthorizer> _nodeAuthorizer = new();
     private readonly TriggerCollection _triggers;
+    private readonly TriggerDispatchAuthorizerCollection _dispatchAuthorizers;
     private readonly TriggerEventHandler _handler;
 
     public TriggerEventHandlerTests()
@@ -54,6 +56,14 @@ public class TriggerEventHandlerTests
             };
         });
 
+        // Production DI registers NodeScopedTriggerDispatchAuthorizer plus any provider
+        // package additions. Tests use only the built-in — it's what the unit suite was
+        // already exercising via the (now-internal) inline node guard.
+        _dispatchAuthorizers = new TriggerDispatchAuthorizerCollection(() => new ITriggerDispatchAuthorizer[]
+        {
+            new NodeScopedTriggerDispatchAuthorizer(_nodeAuthorizer.Object),
+        });
+
         _handler = new TriggerEventHandler(
             _automationService.Object,
             Mock.Of<IEntityVersionService>(),
@@ -62,7 +72,7 @@ public class TriggerEventHandlerTests
             _triggers,
             _serviceAccountResolver.Object,
             new SectionAccessChecker(),
-            _nodeAuthorizer.Object,
+            _dispatchAuthorizers,
             CreateExecutionOptionsMonitor(),
             Mock.Of<ILogger<TriggerEventHandler>>());
     }
@@ -341,7 +351,7 @@ public class TriggerEventHandlerTests
             _triggers,
             _serviceAccountResolver.Object,
             new SectionAccessChecker(),
-            _nodeAuthorizer.Object,
+            _dispatchAuthorizers,
             CreateExecutionOptionsMonitor(maxChainDepth: 3),
             Mock.Of<ILogger<TriggerEventHandler>>());
 
@@ -656,6 +666,126 @@ public class TriggerEventHandlerTests
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(),
             It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_FirstAuthorizerDenial_ShortCircuitsRemainingAuthorizers()
+    {
+        // Two authorisers, both would deny — but only the first should be consulted. Proves
+        // the collection iteration short-circuits on first failure rather than running the
+        // whole chain.
+        var first = new RecordingAuthorizer(deny: true, reason: "first");
+        var second = new RecordingAuthorizer(deny: true, reason: "second");
+
+        var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
+        var triggers = new TriggerCollection(() => new ITrigger[]
+        {
+            new ContentSavedTrigger(new TriggerInfrastructure(modelResolver)),
+        });
+
+        var authorisers = new TriggerDispatchAuthorizerCollection(
+            () => new ITriggerDispatchAuthorizer[] { first, second });
+
+        var handler = new TriggerEventHandler(
+            _automationService.Object,
+            Mock.Of<IEntityVersionService>(),
+            _executor.Object,
+            _nodeEligibility.Object,
+            triggers,
+            _serviceAccountResolver.Object,
+            new SectionAccessChecker(),
+            authorisers,
+            CreateExecutionOptionsMonitor(),
+            Mock.Of<ILogger<TriggerEventHandler>>());
+
+        var automation = new AutomationBuilder().WithTrigger("umbracoAutomate.contentSaved").Build();
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automation });
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
+        });
+
+        await handler.HandleAsync(body, CancellationToken.None);
+
+        first.Calls.ShouldBe(1);
+        second.Calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_EmptyAuthorizerCollection_AllowsDispatch()
+    {
+        // Section gate is enough on its own: with no authorisers registered, a trigger that
+        // passes section access (or has no section requirements) should dispatch normally.
+        // Matches the manual / scheduled trigger code path where no node-scoping applies.
+        var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
+        var triggers = new TriggerCollection(() => new ITrigger[]
+        {
+            new ContentSavedTrigger(new TriggerInfrastructure(modelResolver)),
+        });
+
+        var authorisers = new TriggerDispatchAuthorizerCollection(
+            () => Array.Empty<ITriggerDispatchAuthorizer>());
+
+        var handler = new TriggerEventHandler(
+            _automationService.Object,
+            Mock.Of<IEntityVersionService>(),
+            _executor.Object,
+            _nodeEligibility.Object,
+            triggers,
+            _serviceAccountResolver.Object,
+            new SectionAccessChecker(),
+            authorisers,
+            CreateExecutionOptionsMonitor(),
+            Mock.Of<ILogger<TriggerEventHandler>>());
+
+        var automation = new AutomationBuilder().WithTrigger("umbracoAutomate.contentSaved").Build();
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { automation });
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentSaved",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(BuildContentSavedOutput(), JsonOptions.Default),
+        });
+
+        await handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            automation,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
+    }
+
+    private sealed class RecordingAuthorizer : ITriggerDispatchAuthorizer
+    {
+        private readonly bool _deny;
+        private readonly string _reason;
+
+        public RecordingAuthorizer(bool deny, string reason)
+        {
+            _deny = deny;
+            _reason = reason;
+        }
+
+        public int Calls { get; private set; }
+
+        public Task<AutomationAuthorizationResult> AuthorizeAsync(
+            TriggerDispatchAuthorizationContext context,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(_deny
+                ? AutomationAuthorizationResult.Fail(_reason)
+                : AutomationAuthorizationResult.Success);
+        }
     }
 
     private static Automation BuildContentSavedAutomation(Guid id, AutomationOriginatedEventBehavior behavior)
