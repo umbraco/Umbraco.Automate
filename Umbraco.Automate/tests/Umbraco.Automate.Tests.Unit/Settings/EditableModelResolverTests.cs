@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Tests.Unit.Settings;
@@ -288,6 +289,25 @@ public class EditableModelResolverTests
         result.ShouldNotBeNull();
         result!.ApiToken.ShouldBe("json-elem-token");
         result.MaxRetries.ShouldBe(3);
+    }
+
+    [Fact]
+    public void ResolveModel_WithDictionaryContainingSingleElementArray_UnwrapsToScalar()
+    {
+        // Reproduces the FindContentSettings.matchMode bug (issue #52): the Umbraco Dropdown
+        // editor persists single selections as ["StartsWith"], but settings POCOs declare
+        // scalar strings. The exact runtime shape is a step Settings Dictionary whose values
+        // are JsonElements after the DB round-trip — must flow through the array converter.
+        var json = """{"name":"Homepage","matchMode":["StartsWith"]}""";
+        var deserialized = JsonSerializer.Deserialize<Dictionary<string, object?>>(json,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var resolver = CreateResolver();
+
+        var result = resolver.ResolveModel<FindContentSettings>("findContent", deserialized);
+
+        result.ShouldNotBeNull();
+        result!.Name.ShouldBe("Homepage");
+        result.MatchMode.ShouldBe("StartsWith");
     }
 
     #endregion
