@@ -79,6 +79,42 @@ public class EditableModelSchemaBuilderTests
         first.ShouldBeSameAs(second);
     }
 
+    [Theory]
+    [InlineData(nameof(EditorInferenceSettings.StringField), "Umb.PropertyEditorUi.TextBox")]
+    [InlineData(nameof(EditorInferenceSettings.NullableStringField), "Umb.PropertyEditorUi.TextBox")]
+    [InlineData(nameof(EditorInferenceSettings.IntField), "Umb.PropertyEditorUi.Integer")]
+    [InlineData(nameof(EditorInferenceSettings.NullableIntField), "Umb.PropertyEditorUi.Integer")]
+    [InlineData(nameof(EditorInferenceSettings.LongField), "Umb.PropertyEditorUi.Integer")]
+    [InlineData(nameof(EditorInferenceSettings.NullableLongField), "Umb.PropertyEditorUi.Integer")]
+    [InlineData(nameof(EditorInferenceSettings.BoolField), "Umb.PropertyEditorUi.Toggle")]
+    [InlineData(nameof(EditorInferenceSettings.NullableBoolField), "Umb.PropertyEditorUi.Toggle")]
+    [InlineData(nameof(EditorInferenceSettings.DecimalField), "Umb.PropertyEditorUi.Decimal")]
+    [InlineData(nameof(EditorInferenceSettings.NullableDecimalField), "Umb.PropertyEditorUi.Decimal")]
+    [InlineData(nameof(EditorInferenceSettings.DoubleField), "Umb.PropertyEditorUi.Decimal")]
+    [InlineData(nameof(EditorInferenceSettings.FloatField), "Umb.PropertyEditorUi.Decimal")]
+    [InlineData(nameof(EditorInferenceSettings.DateTimeField), "Umb.PropertyEditorUi.DatePicker")]
+    [InlineData(nameof(EditorInferenceSettings.NullableDateTimeField), "Umb.PropertyEditorUi.DatePicker")]
+    [InlineData(nameof(EditorInferenceSettings.DateTimeOffsetField), "Umb.PropertyEditorUi.DatePicker")]
+    [InlineData(nameof(EditorInferenceSettings.NullableDateTimeOffsetField), "Umb.PropertyEditorUi.DatePicker")]
+    public void Build_InfersEditorUiAlias_FromPropertyType(string propertyName, string expectedAlias)
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(EditorInferenceSettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == propertyName);
+
+        field.EditorUiAlias.ShouldBe(expectedAlias);
+    }
+
+    [Fact]
+    public void Build_AttributeEditorUiAlias_WinsOverInference()
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(EditorInferenceSettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == "Explicit");
+
+        field.EditorUiAlias.ShouldBe("Umb.PropertyEditorUi.TextArea");
+    }
+
     [Fact]
     public void HumanizePropertyName_ConvertsCorrectly()
     {
@@ -115,5 +151,43 @@ public class EditableModelSchemaBuilderTests
     private class CacheProbeSettings
     {
         public string Anything { get; set; } = string.Empty;
+    }
+
+    private class EditorInferenceSettings
+    {
+        public string StringField { get; set; } = string.Empty;
+
+        public string? NullableStringField { get; set; }
+
+        public int IntField { get; set; }
+
+        public int? NullableIntField { get; set; }
+
+        public long LongField { get; set; }
+
+        public long? NullableLongField { get; set; }
+
+        public bool BoolField { get; set; }
+
+        public bool? NullableBoolField { get; set; }
+
+        public decimal DecimalField { get; set; }
+
+        public decimal? NullableDecimalField { get; set; }
+
+        public double DoubleField { get; set; }
+
+        public float FloatField { get; set; }
+
+        public DateTime DateTimeField { get; set; }
+
+        public DateTime? NullableDateTimeField { get; set; }
+
+        public DateTimeOffset DateTimeOffsetField { get; set; }
+
+        public DateTimeOffset? NullableDateTimeOffsetField { get; set; }
+
+        [Field(EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
+        public string Explicit { get; set; } = string.Empty;
     }
 }
