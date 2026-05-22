@@ -77,9 +77,25 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Failed to resolve model '{modelId}' to type {modelType.Name}",
+                BuildResolveFailureMessage(modelId, modelType, ex),
                 ex);
         }
+    }
+
+    /// <summary>
+    /// Builds a diagnostic message naming the model, the inner failure type and message,
+    /// and (for JSON failures) the JSON path of the offending property — without this,
+    /// callers see only "Failed to resolve model ..." with no hint at the broken field.
+    /// </summary>
+    private static string BuildResolveFailureMessage(string modelId, Type modelType, Exception ex)
+    {
+        var path = (ex as JsonException)?.Path;
+
+        var details = string.IsNullOrEmpty(path)
+            ? $"{ex.GetType().Name}: {ex.Message}"
+            : $"{ex.GetType().Name} at '{path}': {ex.Message}";
+
+        return $"Failed to resolve model '{modelId}' to type {modelType.Name}. {details}";
     }
 
     private void ResolveConfigurationVariablesInObject(object obj)
