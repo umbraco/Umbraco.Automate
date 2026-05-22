@@ -2,11 +2,14 @@ import { UmbPropertyActionBase } from "@umbraco-cms/backoffice/property-action";
 import { UMB_PROPERTY_CONTEXT } from "@umbraco-cms/backoffice/property";
 import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import { UA_BINDING_PICKER_MODAL } from "./binding-picker-modal.token.js";
+import { isBindingInsertable } from "./binding-editor.types.js";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
 
 /**
  * Property action that opens the binding picker modal and inserts the
- * selected `${ }` expression into the property value.
+ * selected `${ }` expression into the property value at the current caret
+ * position. Falls back to appending if the editor element doesn't expose
+ * `insertAtCaret`.
  */
 export class UaInsertBindingPropertyAction extends UmbPropertyActionBase {
     override async execute() {
@@ -29,6 +32,15 @@ export class UaInsertBindingPropertyAction extends UmbPropertyActionBase {
 
         try {
             const { expression } = await modal.onSubmit();
+
+            const editor = propertyContext.getEditor();
+            if (isBindingInsertable(editor)) {
+                editor.insertAtCaret(expression);
+                return;
+            }
+
+            // Fallback: append. Reached only if the property action is wired up
+            // to an editor UI that doesn't implement UaBindingInsertable.
             const currentValue = (propertyContext.getValue() as string) ?? "";
             propertyContext.setValue(currentValue + expression);
         } catch {
