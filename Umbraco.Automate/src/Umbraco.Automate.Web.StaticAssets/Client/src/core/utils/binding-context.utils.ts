@@ -133,8 +133,15 @@ export async function buildBindingSources(
         const loopLeaves: BindingLeaf[] = [{ path: "index", label: "index", type: "integer" }];
 
         if (itemSchema) {
-            const itemLeaves = flattenJsonSchema(itemSchema);
-            for (const leaf of itemLeaves) {
+            // Always expose the bare `item` so primitive-typed arrays (e.g. string[])
+            // and whole-object pass-through both work from the picker.
+            loopLeaves.push({
+                path: "item",
+                label: "item",
+                type: (itemSchema.type as string) ?? "unknown",
+            });
+
+            for (const leaf of flattenJsonSchema(itemSchema)) {
                 loopLeaves.push({ ...leaf, path: `item.${leaf.path}`, label: leaf.label });
             }
         }
