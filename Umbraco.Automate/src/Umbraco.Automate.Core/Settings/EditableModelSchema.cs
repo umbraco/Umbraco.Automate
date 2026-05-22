@@ -55,7 +55,8 @@ public sealed class EditableModelFieldDescriptor
     public Type PropertyType { get; init; } = null!;
 
     /// <summary>
-    /// Gets the Umbraco editor UI alias, or null to infer from the property type.
+    /// Gets the Umbraco editor UI alias. Set from <see cref="EditableModelFieldAttribute.EditorUiAlias"/>
+    /// when provided, otherwise inferred from the CLR property type by the schema builder.
     /// </summary>
     public string? EditorUiAlias { get; init; }
 

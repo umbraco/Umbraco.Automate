@@ -310,6 +310,83 @@ public class EditableModelResolverTests
         result.MatchMode.ShouldBe("StartsWith");
     }
 
+    [Fact]
+    public void ResolveModel_WithDictionaryStringEncodedNumber_DeserializesToInt()
+    {
+        // Reproduces issue #34: an int? field rendered through the default TextBox editor
+        // persists "24" (string) instead of 24 (number). NumberHandling.AllowReadingFromString
+        // on JsonOptions.Settings should let it round-trip.
+        var dict = new Dictionary<string, object?>
+        {
+            ["apiToken"] = "irrelevant",
+            ["maxRetries"] = "7",
+        };
+        var resolver = CreateResolver();
+
+        var result = resolver.ResolveModel<FakeSettings>("test", dict);
+
+        result.ShouldNotBeNull();
+        result!.MaxRetries.ShouldBe(7);
+    }
+
+    [Fact]
+    public void ResolveModel_WithDictionaryStringEncodedNumber_FromJsonElements_DeserializesToInt()
+    {
+        // Same scenario but after a JSON round-trip — values are JsonElement(String), which
+        // is what actually arrives at runtime from the persisted automation definition.
+        var json = """{"apiToken":"irrelevant","maxRetries":"7"}""";
+        var deserialized = JsonSerializer.Deserialize<Dictionary<string, object?>>(json,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var resolver = CreateResolver();
+
+        var result = resolver.ResolveModel<FakeSettings>("test", deserialized);
+
+        result.ShouldNotBeNull();
+        result!.MaxRetries.ShouldBe(7);
+    }
+
+    [Fact]
+    public void ResolveModel_RequestApprovalSettings_WithStringEncodedTimeoutHours_DeserializesCorrectly()
+    {
+        // Issue #34: an int? field rendered as a TextBox (because the schema builder didn't
+        // infer a default EditorUiAlias) persists "24" as a string. AllowReadingFromString
+        // lets it round-trip even for legacy automations saved before the schema-builder fix.
+        var json = """{"prompt":"Please approve","timeoutHours":"24"}""";
+        var deserialized = JsonSerializer.Deserialize<Dictionary<string, object?>>(json,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var resolver = CreateResolver();
+
+        var result = resolver.ResolveModel<RequestApprovalSettings>(
+            RequestApprovalAction.ApprovalActionAlias, deserialized);
+
+        result.ShouldNotBeNull();
+        result!.Prompt.ShouldBe("Please approve");
+        result.TimeoutHours.ShouldBe(24);
+    }
+
+    [Fact]
+    public void ResolveModel_WithIncompatibleValue_IncludesInnerExceptionDetailsInMessage()
+    {
+        // Non-numeric string still can't be coerced to int even with AllowReadingFromString —
+        // verify the wrapping exception names the inner failure type, includes a JSON path
+        // marker, and preserves the original exception so diagnostics aren't lost.
+        var dict = new Dictionary<string, object?>
+        {
+            ["maxRetries"] = "not-a-number",
+        };
+        var resolver = CreateResolver();
+
+        var act = () => resolver.ResolveModel<FakeSettings>("requestApproval", dict);
+
+        var exception = Should.Throw<InvalidOperationException>(act);
+        exception.Message.ShouldContain("requestApproval");
+        exception.Message.ShouldContain(nameof(FakeSettings));
+        exception.Message.ShouldContain("JsonException");
+        exception.Message.ShouldContain("at '$");
+        exception.InnerException.ShouldNotBeNull();
+        exception.InnerException.ShouldBeOfType<JsonException>();
+    }
+
     #endregion
 
     #region Test models
