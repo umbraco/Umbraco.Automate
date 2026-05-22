@@ -94,9 +94,7 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
 
         return Success(new NotifyEditorOutput
         {
-            ContentKey = contentKey,
-            ContentName = content.Name ?? string.Empty,
-            Title = title,
+            ContentKey = contentKey
         });
     }
 }
