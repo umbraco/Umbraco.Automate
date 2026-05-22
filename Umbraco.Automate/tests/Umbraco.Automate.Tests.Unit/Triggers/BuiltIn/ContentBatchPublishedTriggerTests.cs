@@ -118,16 +118,49 @@ public class ContentBatchPublishedTriggerTests
         item.ContentTypeKey.ShouldBe(contentTypeKey);
     }
 
-    private static IContent CreateContent(Guid key, string name, string contentTypeAlias, Guid? contentTypeKey = null)
+    [Fact]
+    public void MapEvent_PropagatesCulturesPerItem()
+    {
+        var invariant = CreateContent(Guid.NewGuid(), "Invariant", "blogPost");
+        var variantPublishCultureInfos = ContentPublishedTriggerTests.BuildCultureInfos(
+            dirty: new[] { "en-US" },
+            clean: new[] { "fr-FR" });
+        var variant = CreateContent(
+            Guid.NewGuid(),
+            "Variant",
+            "article",
+            variations: ContentVariation.Culture,
+            publishCultureInfos: variantPublishCultureInfos);
+
+        var notification = new ContentPublishedNotification(new[] { invariant, variant }, new EventMessages());
+
+        var batch = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<BatchTriggerOutput<ContentPublishedTriggerOutput>>>()
+            .Output;
+
+        batch.Items[0].Cultures.ShouldBeNull();
+        batch.Items[1].Cultures.ShouldBe(new[] { "en-US" });
+    }
+
+    private static IContent CreateContent(
+        Guid key,
+        string name,
+        string contentTypeAlias,
+        Guid? contentTypeKey = null,
+        ContentVariation variations = ContentVariation.Nothing,
+        ContentCultureInfosCollection? publishCultureInfos = null)
     {
         var contentType = new Mock<ISimpleContentType>();
         contentType.SetupGet(ct => ct.Alias).Returns(contentTypeAlias);
         contentType.SetupGet(ct => ct.Key).Returns(contentTypeKey ?? Guid.NewGuid());
+        contentType.SetupGet(ct => ct.Variations).Returns(variations);
 
         var content = new Mock<IContent>();
         content.SetupGet(c => c.Key).Returns(key);
         content.SetupGet(c => c.Name).Returns(name);
         content.SetupGet(c => c.ContentType).Returns(contentType.Object);
+        content.SetupGet(c => c.PublishCultureInfos).Returns(publishCultureInfos);
 
         return content.Object;
     }

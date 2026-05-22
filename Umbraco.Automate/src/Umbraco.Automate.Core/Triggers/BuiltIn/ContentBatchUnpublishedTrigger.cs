@@ -37,6 +37,7 @@ public sealed class ContentBatchUnpublishedTrigger
             ContentName = content.Name,
             ContentTypeKey = content.ContentType?.Key,
             ContentTypeAlias = content.ContentType?.Alias,
+            Cultures = ContentCultureHelpers.GetUnpublishedCultures(content),
         }).ToList();
 
         // Use PublishedVersionId to identify what was unpublished — same logic as the
