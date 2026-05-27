@@ -1167,7 +1167,7 @@ Automation
 ├── Name: string
 ├── Description: string
 ├── IsEnabled: bool
-├── Status: Draft | Published | Inactive
+├── Status: Draft | Published | Unpublished
 ├── PublishedVersion: int? (the version currently active for trigger evaluation)
 ├── GroupId: Guid? (for organizing)
 ├── CreatedUtc: DateTime
@@ -1353,7 +1353,7 @@ Automations follow a **draft → publish** lifecycle, similar to most automation
 |--------|---------------|-------------|
 | **Draft** | No | Newly created or never published. Editable but does not trigger. |
 | **Published** | Yes (if enabled) | Has a published version. Triggers evaluate against the published definition. |
-| **Inactive** | No | Previously published, explicitly deactivated. Published version is retained for reference/rollback. |
+| **Unpublished** | No | Previously published, explicitly unpublished. Published version is retained for reference/rollback. |
 
 `IsEnabled` is separate from `Status` — a published automation can be disabled (kill switch) without losing its published state. Re-enabling resumes trigger evaluation immediately.
 
@@ -1853,7 +1853,7 @@ Follows the Umbraco.AI two-column layout (`<umb-automate-workspace-editor-layout
 - **Right column** (aside): Info box
   - **Id** — automation unique ID (or "Unsaved" tag for new)
   - **Alias** — URL-safe alias
-  - **Status** — Draft / Published / Inactive badge
+  - **Status** — Draft / Published / Unpublished badge
   - **Published version** — version number currently live
   - **Date Created** — formatted timestamp
   - **Date Modified** — formatted timestamp
