@@ -123,6 +123,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         // Execution.
         services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
+        services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();

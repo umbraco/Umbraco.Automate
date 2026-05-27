@@ -128,6 +128,7 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
 
         services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
+        services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();
