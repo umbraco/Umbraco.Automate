@@ -223,6 +223,23 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         return status.HasValue ? (AutomationRunStatus?)status.Value : null;
     }
 
+    public async Task<IReadOnlyList<AutomationRunStatus>> GetRecentTerminalStatusesAsync(
+        Guid automationId,
+        int windowSize,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var statuses = await db.AutomationRuns
+            .Where(r => r.AutomationId == automationId && TerminalStatuses.Contains(r.Status))
+            .OrderByDescending(r => r.StartedUtc)
+            .Take(windowSize)
+            .Select(r => r.Status)
+            .ToListAsync(cancellationToken);
+
+        return statuses.Select(s => (AutomationRunStatus)s).ToList();
+    }
+
     public async Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByActionAndStatusAsync(
         string actionAlias,
         StepRunStatus status,

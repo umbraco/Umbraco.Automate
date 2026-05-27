@@ -30,6 +30,16 @@ public interface IAutomationRunService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the most recent terminal run statuses for an automation, newest first, capped at
+    /// <paramref name="windowSize"/>. Used by the circuit breaker to derive consecutive-failure
+    /// count and error rate.
+    /// </summary>
+    Task<IReadOnlyList<AutomationRunStatus>> GetRecentTerminalStatusesAsync(
+        Guid automationId,
+        int windowSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets step runs with a specific action alias and status, along with their parent runs.
     /// Used to find pending approval steps across all automations.
     /// </summary>

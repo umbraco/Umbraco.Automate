@@ -58,6 +58,12 @@ public enum NotifyOn
     /// <summary>Notify when a run succeeds after the previous run failed or was suspended.</summary>
     Recovered = 8,
 
+    /// <summary>Notify when the automation is auto-disabled by the circuit breaker.</summary>
+    Disabled = 16,
+
+    /// <summary>Notify when the circuit breaker issues a degradation warning.</summary>
+    Warning = 32,
+
     /// <summary>Notify on both failure and suspension.</summary>
     FailedOrSuspended = Failed | Suspended,
 }

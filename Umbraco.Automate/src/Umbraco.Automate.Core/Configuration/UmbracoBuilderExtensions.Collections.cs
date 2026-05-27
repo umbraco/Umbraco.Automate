@@ -61,6 +61,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
         builder.Services.Configure<RateLimitingOptions>(
             builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
+        builder.Services.Configure<CircuitBreakerOptions>(
+            builder.Config.GetSection("Umbraco:Automate:CircuitBreaker"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -97,8 +99,17 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<AutomationUnpublishedNotification, TriggerSubscriptionInvalidator>();
         builder.AddNotificationAsyncHandler<AutomationDeletedNotification, TriggerSubscriptionInvalidator>();
 
+        // Shared channel dispatch helper used by the run-completed and health-changed dispatchers.
+        builder.Services.AddSingleton<ChannelNotifier>();
+
         // Wire run-completed notification → notification channel dispatcher
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
+
+        // Circuit breaker: evaluate health after every terminal run, reset on re-publish, and
+        // dispatch health-changed (degraded/disabled) notifications to configured channels.
+        builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, CircuitBreakerEvaluator>();
+        builder.AddNotificationAsyncHandler<AutomationPublishedNotification, CircuitBreakerResetHandler>();
+        builder.AddNotificationAsyncHandler<AutomationHealthChangedNotification, CircuitBreakerHealthNotificationDispatcher>();
 
         // Action middleware — ordered pipeline:
         //   1. ErrorHandling — catches exceptions from everything inside
@@ -158,6 +169,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
+        builder.Services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<BindingEvaluator>();
         builder.Services.AddSingleton<SettingsBindingResolver>();

@@ -44,5 +44,10 @@ internal sealed class UmbracoAutomateSchema
         /// Scheduled trigger background job configuration.
         /// </summary>
         public required ScheduledTriggerOptions ScheduledTrigger { get; set; }
+
+        /// <summary>
+        /// Circuit breaker (auto-disable) configuration.
+        /// </summary>
+        public required CircuitBreakerOptions CircuitBreaker { get; set; }
     }
 }

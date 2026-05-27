@@ -38,6 +38,12 @@ internal sealed class AutomationRunService : IAutomationRunService
         CancellationToken cancellationToken = default)
         => _runRepository.GetPreviousTerminalRunStatusAsync(automationId, currentRunId, cancellationToken);
 
+    public Task<IReadOnlyList<AutomationRunStatus>> GetRecentTerminalStatusesAsync(
+        Guid automationId,
+        int windowSize,
+        CancellationToken cancellationToken = default)
+        => _runRepository.GetRecentTerminalStatusesAsync(automationId, windowSize, cancellationToken);
+
     public Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByStatusAsync(
         string actionAlias,
         StepRunStatus status,

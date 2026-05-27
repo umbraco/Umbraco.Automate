@@ -19,6 +19,8 @@ public class UmbracoAutomateDbContext : DbContext
 {
     internal DbSet<AutomationEntity> Automations { get; set; } = null!;
 
+    internal DbSet<AutomationHealthEntity> AutomationHealth { get; set; } = null!;
+
     internal DbSet<AutomationRunEntity> AutomationRuns { get; set; } = null!;
 
     internal DbSet<StepRunEntity> StepRuns { get; set; } = null!;
@@ -123,6 +125,16 @@ public class UmbracoAutomateDbContext : DbContext
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.GroupId);
             entity.HasIndex(e => e.WorkspaceId);
+        });
+
+        modelBuilder.Entity<AutomationHealthEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateAutomationHealth");
+            entity.HasKey(e => e.AutomationId);
+
+            entity.Property(e => e.Health).IsRequired();
+
+            entity.HasIndex(e => e.Health);
         });
 
         modelBuilder.Entity<AutomationRunEntity>(entity =>
