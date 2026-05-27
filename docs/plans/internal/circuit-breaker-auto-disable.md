@@ -23,7 +23,7 @@ Zapier handles this with a two-phase approach: warn the owner when the error rat
 - **Single run chokepoint**: `IAutomationExecutor.ExecuteAsync` is the only place a run record is created and a WorkflowCore workflow started — so every run passes through it regardless of caller. It has **three direct callers**: `TriggerEventHandler.cs:265` (all automatic triggers — event/scheduled/webhook, via the outbox; **ignores** the return value), `TriggerAutomationController.cs:77` (manual "run now", `InitiatorType = User`), and `ReplayRunController.cs:91` (replay). The latter two bypass `TriggerEventHandler` and call `ExecuteAsync` directly. It already gates on `IRateLimitService.CheckRateLimitAsync` before creating the run, which **throws** `RateLimitExceededException` on rejection (`AutomationExecutor.cs:50-59`, `RateLimitService.cs:43`). It receives `initiatorType` / `initiatorId`. Defined `TriggerInitiatorType` constants are `System` / `User` / `Webhook` / `Scheduled`; **replay passes a bare `"replay"` string** (`ReplayRunController.cs:93`) that is not currently a defined constant.
 - **Terminal-state hook**: `RunFinalizer` publishes `AutomationRunCompletedNotification` for every terminal outcome (Complete, Terminated → Failed, failed-step → Failed) and for Suspended, after the run is persisted (`RunFinalizer.cs:75`). `RunCompletedNotificationDispatcher` already consumes it.
 - Run history: `IAutomationRunService.GetRunsByAutomationPagedAsync()`, `GetRunSummaryAsync()`, `GetPreviousTerminalRunStatusAsync()`
-- Automation lifecycle: `AutomationStatus` is **Draft / Published / Inactive**. Triggers fire only for `Published` (`TriggerEventHandler.cs:92`, `TriggerSubscriptionRegistry.cs:82`). `PublishAutomationAsync` / `UnpublishAutomationAsync` raise `AutomationPublishedNotification` / `AutomationUnpublishedNotification`.
+- Automation lifecycle: `AutomationStatus` is **Draft / Published / Unpublished**. Triggers fire only for `Published` (`TriggerEventHandler.cs:92`, `TriggerSubscriptionRegistry.cs:82`). `PublishAutomationAsync` / `UnpublishAutomationAsync` raise `AutomationPublishedNotification` / `AutomationUnpublishedNotification`.
 - `GovernanceOptions` holds audit/governance configuration, including `DefaultNotifyOn`.
 
 > **Note:** the old per-automation `IsEnabled` flag was **removed** (migration `UmbracoAutomate_RemoveAutomationIsEnabled`). There is no longer a boolean enable/disable separate from publish state — the only surviving `IsEnabled` is per notification channel (`ChannelConfiguration`).
@@ -44,7 +44,7 @@ The breaker introduces a **second axis** kept deliberately separate from the pub
 
 | Axis | Type | Owned by | Values |
 | --- | --- | --- | --- |
-| **Publish intent** | `AutomationStatus` | the user | Draft / Published / Inactive |
+| **Publish intent** | `AutomationStatus` | the user | Draft / Published / Unpublished |
 | **System health** | `AutomationHealth` | the circuit breaker | Healthy / Degraded / Disabled |
 
 An automation runs only when **both** allow it: `Status == Published` **AND** the circuit is closed. The breaker never touches `Status`. This keeps user intent distinct from system health, so:

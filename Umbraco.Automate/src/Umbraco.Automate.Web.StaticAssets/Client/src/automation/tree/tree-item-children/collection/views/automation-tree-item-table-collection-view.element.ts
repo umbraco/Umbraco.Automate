@@ -52,7 +52,7 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
         switch (status) {
             case "Published": return "positive";
             case "Draft": return "warning";
-            case "Inactive": return "danger";
+            case "Unpublished": return "danger";
             default: return "default";
         }
     }

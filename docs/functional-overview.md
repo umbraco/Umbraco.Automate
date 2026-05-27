@@ -99,7 +99,7 @@ Automations follow a **draft → publish** lifecycle, consistent with Umbraco's 
 |--------|---------------|-------------|
 | **Draft** | No | Being edited. Does not respond to triggers. |
 | **Published** | Yes (if enabled) | Live version responds to triggers. |
-| **Inactive** | No | Explicitly deactivated. Published version retained for rollback. |
+| **Unpublished** | No | Explicitly unpublished. Published version retained for rollback. |
 
 - **Editing a published automation** saves draft versions without affecting the live version
 - **"Unpublished changes"** indicator shows when the draft is ahead of the published version

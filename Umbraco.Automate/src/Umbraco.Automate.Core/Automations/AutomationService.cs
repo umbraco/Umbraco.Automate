@@ -304,7 +304,7 @@ internal sealed class AutomationService : IAutomationService
             throw new OperationCanceledException("Automation unpublish was cancelled by a notification handler.");
         }
 
-        automation.Status = AutomationStatus.Inactive;
+        automation.Status = AutomationStatus.Unpublished;
 
         var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
 

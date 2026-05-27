@@ -492,7 +492,7 @@ src/automation/workspace/automation/views/
 ### Steps
 
 1. ✅ **Update existing section dashboard** — kept as `type: "dashboard"` conditioned on `Ua.Section.Automate`, with pathname `welcome`
-2. ✅ **Build dashboard with status cards**: Published, Draft, Inactive, Failed Runs, In Progress counts
+2. ✅ **Build dashboard with status cards**: Published, Draft, Unpublished, Failed Runs, In Progress counts
 3. ✅ **Build activity list**: Recent runs with status badge, automation name, timestamp, links to run workspace
 4. ✅ **Wire up links**: activity items link to run workspace detail view
 

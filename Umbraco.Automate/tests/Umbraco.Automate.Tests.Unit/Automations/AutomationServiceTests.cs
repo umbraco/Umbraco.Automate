@@ -95,7 +95,7 @@ public class AutomationServiceTests
     }
 
     [Fact]
-    public async Task UnpublishAutomationAsync_SetsInactive()
+    public async Task UnpublishAutomationAsync_SetsUnpublished()
     {
         var id = Guid.NewGuid();
         Automation automation = new AutomationBuilder().WithId(id);
@@ -108,7 +108,7 @@ public class AutomationServiceTests
 
         var result = await _service.UnpublishAutomationAsync(id);
 
-        result.Status.ShouldBe(AutomationStatus.Inactive);
+        result.Status.ShouldBe(AutomationStatus.Unpublished);
     }
 
     [Fact]
@@ -150,10 +150,10 @@ public class AutomationServiceTests
     }
 
     [Fact]
-    public async Task UnpublishAutomationAsync_InactiveAutomation_ThrowsValidationException()
+    public async Task UnpublishAutomationAsync_UnpublishedAutomation_ThrowsValidationException()
     {
         var id = Guid.NewGuid();
-        var automation = new AutomationBuilder().WithId(id).AsInactive().Build();
+        var automation = new AutomationBuilder().WithId(id).AsUnpublished().Build();
 
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
@@ -161,7 +161,7 @@ public class AutomationServiceTests
         var ex = await Should.ThrowAsync<AutomationValidationException>(
             () => _service.UnpublishAutomationAsync(id));
 
-        ex.Errors.ShouldContain(e => e.Contains("Inactive"));
+        ex.Errors.ShouldContain(e => e.Contains("Unpublished"));
         _repo.Verify(
             r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
             Times.Never);
