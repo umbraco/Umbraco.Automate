@@ -149,11 +149,11 @@ public class AutomationBuilder
     }
 
     /// <summary>
-    /// Configures the automation as inactive (unpublished after being published).
+    /// Configures the automation as unpublished (after having been published).
     /// </summary>
-    public AutomationBuilder AsInactive()
+    public AutomationBuilder AsUnpublished()
     {
-        _status = AutomationStatus.Inactive;
+        _status = AutomationStatus.Unpublished;
         return this;
     }
 

@@ -81,9 +81,9 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_AutomationInactive_Returns409()
+    public async Task ReceiveWebhook_AutomationUnpublished_Returns409()
     {
-        var automation = CreateAutomation(AutomationStatus.Inactive);
+        var automation = CreateAutomation(AutomationStatus.Unpublished);
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
