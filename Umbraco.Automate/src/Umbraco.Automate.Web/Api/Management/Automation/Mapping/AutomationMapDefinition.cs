@@ -61,7 +61,9 @@ public class AutomationMapDefinition : IMapDefinition
         target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll
+    // Umbraco.Code.MapAll -Health -WarningIssuedUtc -DisabledUtc
+    // Health properties are populated by the controller from ICircuitBreakerService (a separate
+    // axis not present on the Automation definition).
     private static void MapToResponse(Core.Automations.Automation source, AutomationResponseModel target, MapperContext context)
     {
         target.Id = source.Id;
@@ -82,7 +84,7 @@ public class AutomationMapDefinition : IMapDefinition
         target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll -NotificationSettings
+    // Umbraco.Code.MapAll -NotificationSettings -Health
     private static void MapToItemResponse(Core.Automations.Automation source, AutomationItemResponseModel target, MapperContext context)
     {
         target.Id = source.Id;

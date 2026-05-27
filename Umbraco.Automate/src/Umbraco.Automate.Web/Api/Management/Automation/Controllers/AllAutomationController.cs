@@ -21,6 +21,7 @@ public sealed class AllAutomationController : AutomationControllerBase
     private readonly IAutomationService _automationService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IAuthorizationHelper _authorizationHelper;
+    private readonly ICircuitBreakerService _circuitBreaker;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
@@ -30,11 +31,13 @@ public sealed class AllAutomationController : AutomationControllerBase
         IAutomationService automationService,
         IWorkspaceService workspaceService,
         IAuthorizationHelper authorizationHelper,
+        ICircuitBreakerService circuitBreaker,
         IUmbracoMapper mapper)
     {
         _automationService = automationService;
         _workspaceService = workspaceService;
         _authorizationHelper = authorizationHelper;
+        _circuitBreaker = circuitBreaker;
         _mapper = mapper;
     }
 
@@ -73,10 +76,19 @@ public sealed class AllAutomationController : AutomationControllerBase
 
         var (items, total) = await _automationService.GetAutomationsPagedAsync(filter, workspaceIds, groupId, skip, take, cancellationToken);
 
+        var itemList = items.ToList();
+        var models = _mapper.MapEnumerable<Core.Automations.Automation, AutomationItemResponseModel>(itemList);
+
+        var healthMap = await _circuitBreaker.GetHealthAsync(itemList.Select(a => a.Id).ToList(), cancellationToken);
+        foreach (var model in models)
+        {
+            model.Health = healthMap[model.Id].Health;
+        }
+
         return Ok(new PagedViewModel<AutomationItemResponseModel>
         {
             Total = total,
-            Items = _mapper.MapEnumerable<Core.Automations.Automation, AutomationItemResponseModel>(items),
+            Items = models,
         });
     }
 }

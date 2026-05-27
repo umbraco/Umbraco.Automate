@@ -48,4 +48,8 @@ public sealed class AutomationItemResponseModel
 
     /// <summary>When the automation was last modified.</summary>
     public DateTime DateModified { get; set; }
+
+    /// <summary>The circuit-breaker health, a separate axis from <see cref="Status"/>.</summary>
+    [Required]
+    public AutomationHealth Health { get; set; }
 }

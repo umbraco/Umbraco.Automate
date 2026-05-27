@@ -19,6 +19,7 @@ public sealed class TriggerAutomationController : AutomationControllerBase
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
     private readonly IAutomationExecutor _executor;
+    private readonly ICircuitBreakerService _circuitBreaker;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
 
     /// <summary>
@@ -28,11 +29,13 @@ public sealed class TriggerAutomationController : AutomationControllerBase
         IAutomationService automationService,
         IAuthorizationService authorizationService,
         IAutomationExecutor executor,
+        ICircuitBreakerService circuitBreaker,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
         _executor = executor;
+        _circuitBreaker = circuitBreaker;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
     }
 
@@ -65,6 +68,14 @@ public sealed class TriggerAutomationController : AutomationControllerBase
             return Conflict(new ProblemDetailsBuilder()
                 .WithTitle("Automation not active")
                 .WithDetail("The automation must be published to be triggered.")
+                .Build());
+        }
+
+        if (!await _circuitBreaker.IsRunAllowedAsync(id, TriggerInitiatorType.User, cancellationToken))
+        {
+            return Conflict(new ProblemDetailsBuilder()
+                .WithTitle("Automation auto-disabled")
+                .WithDetail("This automation has been auto-disabled by the circuit breaker. Re-enable it to run.")
                 .Build());
         }
 
