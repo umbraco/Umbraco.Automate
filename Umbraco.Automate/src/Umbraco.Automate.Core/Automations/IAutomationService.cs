@@ -59,7 +59,7 @@ public interface IAutomationService
     Task<Automation> PublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Unpublishes an automation, setting it to inactive.
+    /// Unpublishes an automation, setting it to unpublished.
     /// </summary>
     Task<Automation> UnpublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default);
 
