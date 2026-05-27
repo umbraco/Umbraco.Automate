@@ -16,4 +16,7 @@ public static class TriggerInitiatorType
 
     /// <summary>Triggered by a CRON schedule.</summary>
     public const string Scheduled = "scheduled";
+
+    /// <summary>Triggered by replaying a previous run via the management API.</summary>
+    public const string Replay = "replay";
 }
