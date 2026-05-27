@@ -146,6 +146,10 @@ Outstanding WorkflowCore capabilities not yet surfaced in Umbraco.Automate. Item
 
 **Complexity:** Low — WorkflowCore supports registration via DI. Needs integration with existing middleware and workspace configuration.
 
+**Caveat — `PostWorkflow` only fires on success:** WorkflowCore's `PostWorkflow` middleware runs **only when a workflow reaches `Complete`** — it does *not* fire on `Terminated`, errored, or `Suspended` (verified against the 3.9.0 source: the post-middleware runner is gated behind `workflow.Status = WorkflowStatus.Complete` in `WorkflowExecutor`). So any *failure-aware* cross-cutting concern (e.g. run-level audit that must capture failed runs) cannot use `PostWorkflow` middleware — hook `AutomationRunCompletedNotification` (published by `RunFinalizer` for **all** terminal outcomes) instead. `PreWorkflow` middleware is unaffected and remains the right tool for pre-run setup (shared-context injection, global timeout arming).
+
+> **The circuit breaker no longer depends on this item.** It was originally scoped as a `PostWorkflow` middleware (and as a forcing function to land #11), but that hits the caveat above — a misconfigured automation that fails every run would never reach the middleware. It now hooks `AutomationRunCompletedNotification` directly. See [circuit-breaker-auto-disable.md](plans/internal/circuit-breaker-auto-disable.md) §1.5.
+
 ---
 
 ## Suggested Implementation Order
@@ -156,7 +160,7 @@ A pragmatic ordering based on user value vs complexity:
 |-------|---------|-----------|
 | **1** | Suspend/Resume/Terminate (#10) | Low effort, high operational value, pure WorkflowCore wiring |
 | **1** | Suspend error mode (#7) | Low effort, completes existing error handling |
-| **1** | Workflow-level middleware (#11) | Low effort, unblocks governance features |
+| **1** | Workflow-level middleware (#11) | Low effort; good for `PreWorkflow` setup. Narrower than first thought — `PostWorkflow` only fires on success, so it's not a fit for failure-driven governance (the circuit breaker no longer needs it; see #11 caveat) |
 | **2** | CancelCondition (#8) | Medium effort, important for production robustness |
 | **2** | ForEach (#2) | High effort but highest user demand — iteration is a core automation pattern |
 | **3** | Parallel execution (#1) | High effort, high value, but many automations work without it |
