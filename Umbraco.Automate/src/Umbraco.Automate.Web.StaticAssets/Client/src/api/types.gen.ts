@@ -125,7 +125,7 @@ export type AutomationRunResponseModel = {
 
 export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Suspended' | 'Cancelled';
 
-export type AutomationStatusModel = 'Draft' | 'Published' | 'Inactive';
+export type AutomationStatusModel = 'Draft' | 'Published' | 'Unpublished';
 
 export type ChannelConfigurationModel = {
     channelAlias: string;

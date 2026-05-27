@@ -123,7 +123,7 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                 return "positive";
             case "Draft":
                 return "warning";
-            case "Inactive":
+            case "Unpublished":
                 return "danger";
             default:
                 return "default";

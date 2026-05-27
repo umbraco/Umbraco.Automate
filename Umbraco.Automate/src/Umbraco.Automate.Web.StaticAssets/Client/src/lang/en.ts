@@ -27,7 +27,7 @@ export default {
         disabled: "Disabled",
         draft: "Draft",
         published: "Published",
-        inactive: "Inactive",
+        unpublished: "Unpublished",
         unpublishedChanges: "Unpublished changes",
         requestedAt: "Requested At",
         id: "Id",
