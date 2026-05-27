@@ -34,6 +34,7 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
     private _columns: UmbTableColumn[] = [
         { name: "Name", alias: "name" },
         { name: "Status", alias: "status" },
+        { name: "Health", alias: "health" },
         { name: "Modified", alias: "dateModified" },
     ];
 
@@ -77,6 +78,17 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
         }
     }
 
+    #healthColor(health: string): string {
+        switch (health) {
+            case "Degraded":
+                return "warning";
+            case "Disabled":
+                return "danger";
+            default:
+                return "positive";
+        }
+    }
+
     #createTableItems(items: UaAutomationItemModel[]) {
         this._items = items.map((item) => ({
             id: item.unique,
@@ -94,6 +106,16 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
                     value: html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">
                         ${item.status}
                     </uui-tag>`,
+                },
+                {
+                    columnAlias: "health",
+                    // Only flag unhealthy automations; healthy ones show nothing to avoid noise.
+                    value:
+                        item.health && item.health !== "Healthy"
+                            ? html`<uui-tag color=${this.#healthColor(item.health)} look="secondary">
+                                  ${item.health}
+                              </uui-tag>`
+                            : html`<span>-</span>`,
                 },
                 {
                     columnAlias: "dateModified",

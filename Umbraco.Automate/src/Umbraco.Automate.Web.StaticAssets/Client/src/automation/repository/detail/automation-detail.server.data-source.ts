@@ -34,6 +34,9 @@ export class UaAutomationDetailServerDataSource implements UmbDetailDataSource<U
             version: 0,
             dateCreated: new Date().toISOString(),
             dateModified: new Date().toISOString(),
+            health: "Healthy",
+            warningIssuedUtc: null,
+            disabledUtc: null,
             ...preset,
         };
 

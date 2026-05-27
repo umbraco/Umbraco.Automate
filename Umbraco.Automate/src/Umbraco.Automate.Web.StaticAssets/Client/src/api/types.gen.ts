@@ -77,6 +77,7 @@ export type AutomationItemResponseModel = {
     publishedVersion?: number | null;
     dateCreated: string;
     dateModified: string;
+    health: AutomationHealthModel;
 };
 
 export type AutomationNotificationSettingsModel = {
@@ -100,6 +101,9 @@ export type AutomationResponseModel = {
     dateCreated: string;
     dateModified: string;
     notificationSettings?: AutomationNotificationSettingsModel | null;
+    health: AutomationHealthModel;
+    warningIssuedUtc?: string | null;
+    disabledUtc?: string | null;
 };
 
 export type AutomationRunCountModel = {
@@ -126,6 +130,8 @@ export type AutomationRunResponseModel = {
 export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Suspended' | 'Cancelled';
 
 export type AutomationStatusModel = 'Draft' | 'Published' | 'Unpublished';
+
+export type AutomationHealthModel = 'Healthy' | 'Degraded' | 'Disabled';
 
 export type ChannelConfigurationModel = {
     channelAlias: string;
@@ -971,6 +977,35 @@ export type PostAutomationsByIdUnpublishErrors = {
 export type PostAutomationsByIdUnpublishError = PostAutomationsByIdUnpublishErrors[keyof PostAutomationsByIdUnpublishErrors];
 
 export type PostAutomationsByIdUnpublishResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PostAutomationsByIdReEnableData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/re-enable';
+};
+
+export type PostAutomationsByIdReEnableErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostAutomationsByIdReEnableError = PostAutomationsByIdReEnableErrors[keyof PostAutomationsByIdReEnableErrors];
+
+export type PostAutomationsByIdReEnableResponses = {
     /**
      * OK
      */
