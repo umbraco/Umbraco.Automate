@@ -58,7 +58,7 @@ public class TriggerSubscriptionRegistryTests
     }
 
     [Fact]
-    public async Task HasSubscribers_UnpublishedAutomation_ReturnsFalse()
+    public async Task HasSubscribers_DraftAutomation_ReturnsFalse()
     {
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentPublished")
