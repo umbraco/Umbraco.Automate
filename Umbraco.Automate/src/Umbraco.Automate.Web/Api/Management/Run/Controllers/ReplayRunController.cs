@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Api.Common.Builders;
 
 namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
@@ -90,7 +91,7 @@ public sealed class ReplayRunController : RunControllerBase
 
         await _executor.ExecuteAsync(
             automation,
-            "replay",
+            TriggerInitiatorType.Replay,
             run.Id.ToString(),
             triggerData,
             cancellationToken);
