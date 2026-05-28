@@ -81,7 +81,7 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
         forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
         forEntityFlags: [UA_AUTOMATION_HEALTH_DEGRADED_FLAG],
         weight: 900,
-        meta: { iconName: "icon-alert", iconColorAlias: "warning", label: "#uaAutomation_degradedBanner" },
+        meta: { iconName: "icon-alert", iconColorAlias: "orange", label: "#uaAutomation_degradedBanner" },
     },
     {
         type: "entitySign",
@@ -91,7 +91,7 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
         forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
         forEntityFlags: [UA_AUTOMATION_HEALTH_DISABLED_FLAG],
         weight: 1000,
-        meta: { iconName: "icon-block", iconColorAlias: "danger", label: "#uaAutomation_disabledBanner" },
+        meta: { iconName: "icon-block", iconColorAlias: "red", label: "#uaAutomation_disabledBanner" },
     },
     {
         type: "treeItem",
