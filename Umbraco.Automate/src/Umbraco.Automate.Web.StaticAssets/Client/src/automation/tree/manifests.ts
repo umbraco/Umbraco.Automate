@@ -1,4 +1,6 @@
 import {
+    UA_AUTOMATION_HEALTH_DEGRADED_FLAG,
+    UA_AUTOMATION_HEALTH_DISABLED_FLAG,
     UA_AUTOMATION_PENDING_CHANGES_FLAG,
     UA_AUTOMATION_TREE_ALIAS,
     UA_AUTOMATION_TREE_REPOSITORY_ALIAS,
@@ -70,6 +72,26 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
         forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
         forEntityFlags: [UA_AUTOMATION_PENDING_CHANGES_FLAG],
         meta: { iconName: "icon-edit", label: "#uaLabels_unpublishedChanges" },
+    },
+    {
+        type: "entitySign",
+        kind: "icon",
+        alias: "UmbracoAutomate.EntitySign.Automation.HealthDegraded",
+        name: "Automation Health Degraded Entity Sign",
+        forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
+        forEntityFlags: [UA_AUTOMATION_HEALTH_DEGRADED_FLAG],
+        weight: 900,
+        meta: { iconName: "icon-alert", iconColorAlias: "warning", label: "#uaAutomation_degradedBanner" },
+    },
+    {
+        type: "entitySign",
+        kind: "icon",
+        alias: "UmbracoAutomate.EntitySign.Automation.HealthDisabled",
+        name: "Automation Health Disabled Entity Sign",
+        forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
+        forEntityFlags: [UA_AUTOMATION_HEALTH_DISABLED_FLAG],
+        weight: 1000,
+        meta: { iconName: "icon-block", iconColorAlias: "danger", label: "#uaAutomation_disabledBanner" },
     },
     {
         type: "treeItem",
