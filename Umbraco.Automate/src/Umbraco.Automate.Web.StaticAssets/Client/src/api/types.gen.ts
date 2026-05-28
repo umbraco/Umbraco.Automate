@@ -56,6 +56,8 @@ export type AutomationExportModel = {
     connectionReferences: Array<ConnectionReferenceModel>;
 };
 
+export type AutomationHealthModel = 'Healthy' | 'Degraded' | 'Disabled';
+
 export type AutomationImportResultModel = {
     success: boolean;
     automationId?: string | null;
@@ -130,8 +132,6 @@ export type AutomationRunResponseModel = {
 export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Suspended' | 'Cancelled';
 
 export type AutomationStatusModel = 'Draft' | 'Published' | 'Unpublished';
-
-export type AutomationHealthModel = 'Healthy' | 'Degraded' | 'Disabled';
 
 export type ChannelConfigurationModel = {
     channelAlias: string;
@@ -331,20 +331,7 @@ export type NotificationChannelItemResponseModel = {
     settingsSchema?: EditableModelSchemaModel | null;
 };
 
-/**
- * Atomic notification flag. The wire format ({@link NotifyOnModel}) is a comma-separated
- * combination of these (e.g. `"Failed, Disabled"`).
- */
-export type NotifyOnFlag = 'Failed' | 'Suspended' | 'Resumed' | 'Completed' | 'Recovered' | 'Warning' | 'Disabled' | 'ReEnabled';
-
-/**
- * Wire format for the per-channel notify-on selection. Server-side this maps to a [Flags] enum,
- * so the JSON value is either a single named member (atomic, `"Never"`, or a legacy composite
- * like `"FailedOrSuspended"`) or a comma-separated combination (`"Failed, Disabled"`). Use the
- * `parseNotifyOn` / `serializeNotifyOn` helpers in the notification-channel modal to convert
- * between this and a `Set<NotifyOnFlag>`.
- */
-export type NotifyOnModel = string;
+export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered' | 'Disabled' | 'Warning' | 'ReEnabled' | 'Resumed';
 
 export type PagedAutomationItemResponseModel = {
     total: number;
@@ -381,7 +368,7 @@ export type ProblemDetails = {
     status?: number | null;
     detail?: string | null;
     instance?: string | null;
-    [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
+    [key: string]: unknown;
 };
 
 export type ResolveOutputSchemaRequestModel = {
@@ -900,6 +887,35 @@ export type PostAutomationsByIdPublishResponses = {
     200: unknown;
 };
 
+export type PostAutomationsByIdReEnableData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/re-enable';
+};
+
+export type PostAutomationsByIdReEnableErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostAutomationsByIdReEnableError = PostAutomationsByIdReEnableErrors[keyof PostAutomationsByIdReEnableErrors];
+
+export type PostAutomationsByIdReEnableResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetAutomationsByIdRunsData = {
     body?: never;
     path: {
@@ -985,40 +1001,15 @@ export type PostAutomationsByIdUnpublishErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsByIdUnpublishError = PostAutomationsByIdUnpublishErrors[keyof PostAutomationsByIdUnpublishErrors];
 
 export type PostAutomationsByIdUnpublishResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type PostAutomationsByIdReEnableData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/umbraco/automate/management/api/v1/automations/{id}/re-enable';
-};
-
-export type PostAutomationsByIdReEnableErrors = {
-    /**
-     * The resource is protected and requires an authentication token
-     */
-    401: unknown;
-    /**
-     * Not Found
-     */
-    404: ProblemDetails;
-};
-
-export type PostAutomationsByIdReEnableError = PostAutomationsByIdReEnableErrors[keyof PostAutomationsByIdReEnableErrors];
-
-export type PostAutomationsByIdReEnableResponses = {
     /**
      * OK
      */

@@ -1,10 +1,10 @@
 import { html, customElement, state, nothing, css } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
-import type { ChannelConfigurationModel, NotifyOnFlag } from "../../../api/types.gen.js";
+import type { ChannelConfigurationModel, NotifyOnModel } from "../../../api/types.gen.js";
 import type { SettingsChangeDetail } from "../../../core/components/settings-form/settings-form.element.js";
 import "../../../core/components/settings-form/settings-form.element.js";
 import type { UaNotificationChannelModalData, UaNotificationChannelModalValue } from "./types.js";
-import { NOTIFY_ON_FLAGS, parseNotifyOn, serializeNotifyOn } from "./notify-on.helpers.js";
+import { NOTIFY_ON_FLAGS, parseNotifyOn, serializeNotifyOn, type NotifyOnFlag } from "./notify-on.helpers.js";
 
 @customElement("ua-notification-channel-modal")
 export class UaNotificationChannelModalElement extends UmbModalBaseElement<
@@ -37,7 +37,10 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
         }
 
         this._notifyOnFlags = next;
-        this._channel = { ...this._channel, notifyOn: serializeNotifyOn(next) };
+        // The wire format may be a comma-separated combination of NotifyOnFlag values,
+        // which the strict NotifyOnModel union can't express — the backend's [Flags] enum
+        // accepts it at runtime.
+        this._channel = { ...this._channel, notifyOn: serializeNotifyOn(next) as NotifyOnModel };
     }
 
     #onEnabledChange(e: Event) {

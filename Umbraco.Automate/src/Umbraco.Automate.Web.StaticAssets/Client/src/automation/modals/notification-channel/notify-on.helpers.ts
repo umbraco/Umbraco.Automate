@@ -1,4 +1,11 @@
-import type { NotifyOnFlag } from "../../../api/types.gen.js";
+/**
+ * Atomic notification flag, derived from the [Flags] backend enum. Defined here rather than in
+ * `types.gen.ts` because the OpenAPI generator surfaces only the named enum members (atomic +
+ * composites) — it has no concept of multi-flag combinations. The channel modal uses a
+ * `Set<NotifyOnFlag>` for its toggle state and serialises back to the wire format
+ * (`NotifyOnModel`, which may be a single name or a comma-separated combination).
+ */
+export type NotifyOnFlag = 'Failed' | 'Suspended' | 'Resumed' | 'Completed' | 'Recovered' | 'Warning' | 'Disabled' | 'ReEnabled';
 
 /**
  * Atomic notification flags shown as toggles in the channel modal, in render order.

@@ -4,7 +4,7 @@ import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
 import type { DeleteAutomationsByIdData, DeleteAutomationsByIdErrors, DeleteAutomationsByIdResponses, DeleteConnectionsByIdData, DeleteConnectionsByIdErrors, DeleteConnectionsByIdResponses, DeleteWorkspacesByIdData, DeleteWorkspacesByIdErrors, DeleteWorkspacesByIdGroupsByGroupIdData, DeleteWorkspacesByIdGroupsByGroupIdErrors, DeleteWorkspacesByIdGroupsByGroupIdResponses, DeleteWorkspacesByIdResponses, GetApprovalsPendingData, GetApprovalsPendingErrors, GetApprovalsPendingResponses, GetAutomationsByIdAncestorsData, GetAutomationsByIdAncestorsErrors, GetAutomationsByIdAncestorsResponses, GetAutomationsByIdData, GetAutomationsByIdErrors, GetAutomationsByIdExportData, GetAutomationsByIdExportErrors, GetAutomationsByIdExportResponses, GetAutomationsByIdResponses, GetAutomationsByIdRunsData, GetAutomationsByIdRunsErrors, GetAutomationsByIdRunsResponses, GetAutomationsData, GetAutomationsErrors, GetAutomationsGroupsByGroupIdData, GetAutomationsGroupsByGroupIdErrors, GetAutomationsGroupsByGroupIdResponses, GetAutomationsResponses, GetCatalogueActionsData, GetCatalogueActionsErrors, GetCatalogueActionsResponses, GetCatalogueConnectionTypesData, GetCatalogueConnectionTypesErrors, GetCatalogueConnectionTypesResponses, GetCatalogueControlFlowsData, GetCatalogueControlFlowsErrors, GetCatalogueControlFlowsResponses, GetCatalogueNotificationChannelsData, GetCatalogueNotificationChannelsErrors, GetCatalogueNotificationChannelsResponses, GetCatalogueStepTypesData, GetCatalogueStepTypesErrors, GetCatalogueStepTypesResponses, GetCatalogueTriggersData, GetCatalogueTriggersErrors, GetCatalogueTriggersResponses, GetCatalogueWebhookAuthenticatorsData, GetCatalogueWebhookAuthenticatorsErrors, GetCatalogueWebhookAuthenticatorsResponses, GetConnectionsByIdData, GetConnectionsByIdErrors, GetConnectionsByIdResponses, GetConnectionsData, GetConnectionsErrors, GetConnectionsResponses, GetMetricsByAutomationData, GetMetricsByAutomationErrors, GetMetricsByAutomationResponses, GetMetricsData, GetMetricsErrors, GetMetricsResponses, GetRunsByIdData, GetRunsByIdErrors, GetRunsByIdResponses, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionData, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdData, GetVersionHistoryByEntityTypeByEntityIdErrors, GetVersionHistoryByEntityTypeByEntityIdResponses, GetVersionHistorySupportedTypesData, GetVersionHistorySupportedTypesErrors, GetVersionHistorySupportedTypesResponses, GetWorkspacesByIdData, GetWorkspacesByIdErrors, GetWorkspacesByIdGroupsByGroupIdData, GetWorkspacesByIdGroupsByGroupIdErrors, GetWorkspacesByIdGroupsByGroupIdResponses, GetWorkspacesByIdGroupsData, GetWorkspacesByIdGroupsErrors, GetWorkspacesByIdGroupsResponses, GetWorkspacesByIdResponses, GetWorkspacesData, GetWorkspacesErrors, GetWorkspacesResponses, PostApprovalsByRunIdStepsByStepIdDecisionData, PostApprovalsByRunIdStepsByStepIdDecisionErrors, PostApprovalsByRunIdStepsByStepIdDecisionResponses, PostAutomationsByIdPublishData, PostAutomationsByIdPublishErrors, PostAutomationsByIdPublishResponses, PostAutomationsByIdReEnableData, PostAutomationsByIdReEnableErrors, PostAutomationsByIdReEnableResponses, PostAutomationsByIdTriggerData, PostAutomationsByIdTriggerErrors, PostAutomationsByIdTriggerResponses, PostAutomationsByIdUnpublishData, PostAutomationsByIdUnpublishErrors, PostAutomationsByIdUnpublishResponses, PostAutomationsData, PostAutomationsErrors, PostAutomationsImportData, PostAutomationsImportErrors, PostAutomationsImportResponses, PostAutomationsImportValidateData, PostAutomationsImportValidateErrors, PostAutomationsImportValidateResponses, PostAutomationsResponses, PostCatalogueStepTypesByAliasOutputSchemaData, PostCatalogueStepTypesByAliasOutputSchemaErrors, PostCatalogueStepTypesByAliasOutputSchemaResponses, PostConnectionsByIdTestData, PostConnectionsByIdTestErrors, PostConnectionsByIdTestResponses, PostConnectionsData, PostConnectionsErrors, PostConnectionsResponses, PostRunsByIdReplayData, PostRunsByIdReplayErrors, PostRunsByIdReplayResponses, PostRunsByIdResumeData, PostRunsByIdResumeErrors, PostRunsByIdResumeResponses, PostRunsByIdSuspendData, PostRunsByIdSuspendErrors, PostRunsByIdSuspendResponses, PostRunsByIdTerminateData, PostRunsByIdTerminateErrors, PostRunsByIdTerminateResponses, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackData, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses, PostWorkspacesByIdGroupsData, PostWorkspacesByIdGroupsErrors, PostWorkspacesByIdGroupsResponses, PostWorkspacesData, PostWorkspacesErrors, PostWorkspacesResponses, PutAutomationsByIdData, PutAutomationsByIdErrors, PutAutomationsByIdImportData, PutAutomationsByIdImportErrors, PutAutomationsByIdImportResponses, PutAutomationsByIdResponses, PutConnectionsByIdData, PutConnectionsByIdErrors, PutConnectionsByIdResponses, PutWorkspacesByIdData, PutWorkspacesByIdErrors, PutWorkspacesByIdGroupsByGroupIdData, PutWorkspacesByIdGroupsByGroupIdErrors, PutWorkspacesByIdGroupsByGroupIdResponses, PutWorkspacesByIdResponses } from './types.gen';
 
-export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
+export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
      * You can provide a client instance returned by `createClient()` instead of
      * individual options. This might be also useful if you want to implement a
@@ -21,12 +21,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 export class ApprovalsService {
     public static postApprovalsByRunIdStepsByStepIdDecision<ThrowOnError extends boolean = false>(options: Options<PostApprovalsByRunIdStepsByStepIdDecisionData, ThrowOnError>) {
         return (options.client ?? client).post<PostApprovalsByRunIdStepsByStepIdDecisionResponses, PostApprovalsByRunIdStepsByStepIdDecisionErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/approvals/{runId}/steps/{stepId}/decision',
             ...options,
             headers: {
@@ -38,12 +33,7 @@ export class ApprovalsService {
     
     public static getApprovalsPending<ThrowOnError extends boolean = false>(options?: Options<GetApprovalsPendingData, ThrowOnError>) {
         return (options?.client ?? client).get<GetApprovalsPendingResponses, GetApprovalsPendingErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/approvals/pending',
             ...options
         });
@@ -53,12 +43,7 @@ export class ApprovalsService {
 export class AutomationsService {
     public static getAutomations<ThrowOnError extends boolean = false>(options?: Options<GetAutomationsData, ThrowOnError>) {
         return (options?.client ?? client).get<GetAutomationsResponses, GetAutomationsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations',
             ...options
         });
@@ -66,12 +51,7 @@ export class AutomationsService {
     
     public static postAutomations<ThrowOnError extends boolean = false>(options?: Options<PostAutomationsData, ThrowOnError>) {
         return (options?.client ?? client).post<PostAutomationsResponses, PostAutomationsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations',
             ...options,
             headers: {
@@ -83,12 +63,7 @@ export class AutomationsService {
     
     public static deleteAutomationsById<ThrowOnError extends boolean = false>(options: Options<DeleteAutomationsByIdData, ThrowOnError>) {
         return (options.client ?? client).delete<DeleteAutomationsByIdResponses, DeleteAutomationsByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}',
             ...options
         });
@@ -96,12 +71,7 @@ export class AutomationsService {
     
     public static getAutomationsById<ThrowOnError extends boolean = false>(options: Options<GetAutomationsByIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetAutomationsByIdResponses, GetAutomationsByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}',
             ...options
         });
@@ -109,12 +79,7 @@ export class AutomationsService {
     
     public static putAutomationsById<ThrowOnError extends boolean = false>(options: Options<PutAutomationsByIdData, ThrowOnError>) {
         return (options.client ?? client).put<PutAutomationsByIdResponses, PutAutomationsByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}',
             ...options,
             headers: {
@@ -126,12 +91,7 @@ export class AutomationsService {
     
     public static getAutomationsByIdAncestors<ThrowOnError extends boolean = false>(options: Options<GetAutomationsByIdAncestorsData, ThrowOnError>) {
         return (options.client ?? client).get<GetAutomationsByIdAncestorsResponses, GetAutomationsByIdAncestorsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/ancestors',
             ...options
         });
@@ -139,12 +99,7 @@ export class AutomationsService {
     
     public static getAutomationsByIdExport<ThrowOnError extends boolean = false>(options: Options<GetAutomationsByIdExportData, ThrowOnError>) {
         return (options.client ?? client).get<GetAutomationsByIdExportResponses, GetAutomationsByIdExportErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/export',
             ...options
         });
@@ -152,12 +107,7 @@ export class AutomationsService {
     
     public static putAutomationsByIdImport<ThrowOnError extends boolean = false>(options: Options<PutAutomationsByIdImportData, ThrowOnError>) {
         return (options.client ?? client).put<PutAutomationsByIdImportResponses, PutAutomationsByIdImportErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/import',
             ...options,
             headers: {
@@ -169,25 +119,23 @@ export class AutomationsService {
     
     public static postAutomationsByIdPublish<ThrowOnError extends boolean = false>(options: Options<PostAutomationsByIdPublishData, ThrowOnError>) {
         return (options.client ?? client).post<PostAutomationsByIdPublishResponses, PostAutomationsByIdPublishErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/publish',
+            ...options
+        });
+    }
+    
+    public static postAutomationsByIdReEnable<ThrowOnError extends boolean = false>(options: Options<PostAutomationsByIdReEnableData, ThrowOnError>) {
+        return (options.client ?? client).post<PostAutomationsByIdReEnableResponses, PostAutomationsByIdReEnableErrors, ThrowOnError>({
+            security: [{ scheme: 'bearer', type: 'http' }],
+            url: '/umbraco/automate/management/api/v1/automations/{id}/re-enable',
             ...options
         });
     }
     
     public static getAutomationsByIdRuns<ThrowOnError extends boolean = false>(options: Options<GetAutomationsByIdRunsData, ThrowOnError>) {
         return (options.client ?? client).get<GetAutomationsByIdRunsResponses, GetAutomationsByIdRunsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/runs',
             ...options
         });
@@ -195,12 +143,7 @@ export class AutomationsService {
     
     public static postAutomationsByIdTrigger<ThrowOnError extends boolean = false>(options: Options<PostAutomationsByIdTriggerData, ThrowOnError>) {
         return (options.client ?? client).post<PostAutomationsByIdTriggerResponses, PostAutomationsByIdTriggerErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/trigger',
             ...options
         });
@@ -208,38 +151,15 @@ export class AutomationsService {
     
     public static postAutomationsByIdUnpublish<ThrowOnError extends boolean = false>(options: Options<PostAutomationsByIdUnpublishData, ThrowOnError>) {
         return (options.client ?? client).post<PostAutomationsByIdUnpublishResponses, PostAutomationsByIdUnpublishErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/unpublish',
             ...options
         });
     }
-
-    public static postAutomationsByIdReEnable<ThrowOnError extends boolean = false>(options: Options<PostAutomationsByIdReEnableData, ThrowOnError>) {
-        return (options.client ?? client).post<PostAutomationsByIdReEnableResponses, PostAutomationsByIdReEnableErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
-            url: '/umbraco/automate/management/api/v1/automations/{id}/re-enable',
-            ...options
-        });
-    }
-
+    
     public static getAutomationsGroupsByGroupId<ThrowOnError extends boolean = false>(options: Options<GetAutomationsGroupsByGroupIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetAutomationsGroupsByGroupIdResponses, GetAutomationsGroupsByGroupIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/groups/{groupId}',
             ...options
         });
@@ -247,12 +167,7 @@ export class AutomationsService {
     
     public static postAutomationsImport<ThrowOnError extends boolean = false>(options?: Options<PostAutomationsImportData, ThrowOnError>) {
         return (options?.client ?? client).post<PostAutomationsImportResponses, PostAutomationsImportErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/import',
             ...options,
             headers: {
@@ -264,12 +179,7 @@ export class AutomationsService {
     
     public static postAutomationsImportValidate<ThrowOnError extends boolean = false>(options?: Options<PostAutomationsImportValidateData, ThrowOnError>) {
         return (options?.client ?? client).post<PostAutomationsImportValidateResponses, PostAutomationsImportValidateErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/import/validate',
             ...options,
             headers: {
@@ -283,12 +193,7 @@ export class AutomationsService {
 export class CatalogueService {
     public static getCatalogueActions<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueActionsData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueActionsResponses, GetCatalogueActionsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/actions',
             ...options
         });
@@ -296,12 +201,7 @@ export class CatalogueService {
     
     public static getCatalogueConnectionTypes<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueConnectionTypesData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueConnectionTypesResponses, GetCatalogueConnectionTypesErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/connection-types',
             ...options
         });
@@ -309,12 +209,7 @@ export class CatalogueService {
     
     public static getCatalogueControlFlows<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueControlFlowsData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueControlFlowsResponses, GetCatalogueControlFlowsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/control-flows',
             ...options
         });
@@ -322,12 +217,7 @@ export class CatalogueService {
     
     public static getCatalogueNotificationChannels<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueNotificationChannelsData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueNotificationChannelsResponses, GetCatalogueNotificationChannelsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/notification-channels',
             ...options
         });
@@ -335,12 +225,7 @@ export class CatalogueService {
     
     public static getCatalogueStepTypes<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueStepTypesData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueStepTypesResponses, GetCatalogueStepTypesErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/step-types',
             ...options
         });
@@ -348,12 +233,7 @@ export class CatalogueService {
     
     public static postCatalogueStepTypesByAliasOutputSchema<ThrowOnError extends boolean = false>(options: Options<PostCatalogueStepTypesByAliasOutputSchemaData, ThrowOnError>) {
         return (options.client ?? client).post<PostCatalogueStepTypesByAliasOutputSchemaResponses, PostCatalogueStepTypesByAliasOutputSchemaErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/step-types/{alias}/output-schema',
             ...options,
             headers: {
@@ -365,12 +245,7 @@ export class CatalogueService {
     
     public static getCatalogueTriggers<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueTriggersData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueTriggersResponses, GetCatalogueTriggersErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/triggers',
             ...options
         });
@@ -378,12 +253,7 @@ export class CatalogueService {
     
     public static getCatalogueWebhookAuthenticators<ThrowOnError extends boolean = false>(options?: Options<GetCatalogueWebhookAuthenticatorsData, ThrowOnError>) {
         return (options?.client ?? client).get<GetCatalogueWebhookAuthenticatorsResponses, GetCatalogueWebhookAuthenticatorsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/catalogue/webhook-authenticators',
             ...options
         });
@@ -393,12 +263,7 @@ export class CatalogueService {
 export class ConnectionsService {
     public static getConnections<ThrowOnError extends boolean = false>(options?: Options<GetConnectionsData, ThrowOnError>) {
         return (options?.client ?? client).get<GetConnectionsResponses, GetConnectionsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/connections',
             ...options
         });
@@ -406,12 +271,7 @@ export class ConnectionsService {
     
     public static postConnections<ThrowOnError extends boolean = false>(options?: Options<PostConnectionsData, ThrowOnError>) {
         return (options?.client ?? client).post<PostConnectionsResponses, PostConnectionsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/connections',
             ...options,
             headers: {
@@ -423,12 +283,7 @@ export class ConnectionsService {
     
     public static deleteConnectionsById<ThrowOnError extends boolean = false>(options: Options<DeleteConnectionsByIdData, ThrowOnError>) {
         return (options.client ?? client).delete<DeleteConnectionsByIdResponses, DeleteConnectionsByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/connections/{id}',
             ...options
         });
@@ -436,12 +291,7 @@ export class ConnectionsService {
     
     public static getConnectionsById<ThrowOnError extends boolean = false>(options: Options<GetConnectionsByIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetConnectionsByIdResponses, GetConnectionsByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/connections/{id}',
             ...options
         });
@@ -449,12 +299,7 @@ export class ConnectionsService {
     
     public static putConnectionsById<ThrowOnError extends boolean = false>(options: Options<PutConnectionsByIdData, ThrowOnError>) {
         return (options.client ?? client).put<PutConnectionsByIdResponses, PutConnectionsByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/connections/{id}',
             ...options,
             headers: {
@@ -466,12 +311,7 @@ export class ConnectionsService {
     
     public static postConnectionsByIdTest<ThrowOnError extends boolean = false>(options: Options<PostConnectionsByIdTestData, ThrowOnError>) {
         return (options.client ?? client).post<PostConnectionsByIdTestResponses, PostConnectionsByIdTestErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/connections/{id}/test',
             ...options
         });
@@ -481,12 +321,7 @@ export class ConnectionsService {
 export class MetricsService {
     public static getMetrics<ThrowOnError extends boolean = false>(options?: Options<GetMetricsData, ThrowOnError>) {
         return (options?.client ?? client).get<GetMetricsResponses, GetMetricsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/metrics',
             ...options
         });
@@ -494,12 +329,7 @@ export class MetricsService {
     
     public static getMetricsByAutomation<ThrowOnError extends boolean = false>(options?: Options<GetMetricsByAutomationData, ThrowOnError>) {
         return (options?.client ?? client).get<GetMetricsByAutomationResponses, GetMetricsByAutomationErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/metrics/by-automation',
             ...options
         });
@@ -509,12 +339,7 @@ export class MetricsService {
 export class RunsService {
     public static getRunsById<ThrowOnError extends boolean = false>(options: Options<GetRunsByIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetRunsByIdResponses, GetRunsByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/runs/{id}',
             ...options
         });
@@ -522,12 +347,7 @@ export class RunsService {
     
     public static postRunsByIdReplay<ThrowOnError extends boolean = false>(options: Options<PostRunsByIdReplayData, ThrowOnError>) {
         return (options.client ?? client).post<PostRunsByIdReplayResponses, PostRunsByIdReplayErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/runs/{id}/replay',
             ...options
         });
@@ -535,12 +355,7 @@ export class RunsService {
     
     public static postRunsByIdResume<ThrowOnError extends boolean = false>(options: Options<PostRunsByIdResumeData, ThrowOnError>) {
         return (options.client ?? client).post<PostRunsByIdResumeResponses, PostRunsByIdResumeErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/runs/{id}/resume',
             ...options
         });
@@ -548,12 +363,7 @@ export class RunsService {
     
     public static postRunsByIdSuspend<ThrowOnError extends boolean = false>(options: Options<PostRunsByIdSuspendData, ThrowOnError>) {
         return (options.client ?? client).post<PostRunsByIdSuspendResponses, PostRunsByIdSuspendErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/runs/{id}/suspend',
             ...options
         });
@@ -561,12 +371,7 @@ export class RunsService {
     
     public static postRunsByIdTerminate<ThrowOnError extends boolean = false>(options: Options<PostRunsByIdTerminateData, ThrowOnError>) {
         return (options.client ?? client).post<PostRunsByIdTerminateResponses, PostRunsByIdTerminateErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/runs/{id}/terminate',
             ...options
         });
@@ -576,12 +381,7 @@ export class RunsService {
 export class VersionHistoryService {
     public static getVersionHistoryByEntityTypeByEntityId<ThrowOnError extends boolean = false>(options: Options<GetVersionHistoryByEntityTypeByEntityIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetVersionHistoryByEntityTypeByEntityIdResponses, GetVersionHistoryByEntityTypeByEntityIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}',
             ...options
         });
@@ -589,12 +389,7 @@ export class VersionHistoryService {
     
     public static getVersionHistoryByEntityTypeByEntityIdByEntityVersion<ThrowOnError extends boolean = false>(options: Options<GetVersionHistoryByEntityTypeByEntityIdByEntityVersionData, ThrowOnError>) {
         return (options.client ?? client).get<GetVersionHistoryByEntityTypeByEntityIdByEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByEntityVersionErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{entityVersion}',
             ...options
         });
@@ -602,12 +397,7 @@ export class VersionHistoryService {
     
     public static postVersionHistoryByEntityTypeByEntityIdByEntityVersionRollback<ThrowOnError extends boolean = false>(options: Options<PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackData, ThrowOnError>) {
         return (options.client ?? client).post<PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackResponses, PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{entityVersion}/rollback',
             ...options
         });
@@ -615,12 +405,7 @@ export class VersionHistoryService {
     
     public static getVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersion<ThrowOnError extends boolean = false>(options: Options<GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionData, ThrowOnError>) {
         return (options.client ?? client).get<GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionResponses, GetVersionHistoryByEntityTypeByEntityIdByFromEntityVersionCompareByToEntityVersionErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/version-history/{entityType}/{entityId}/{fromEntityVersion}/compare/{toEntityVersion}',
             ...options
         });
@@ -628,12 +413,7 @@ export class VersionHistoryService {
     
     public static getVersionHistorySupportedTypes<ThrowOnError extends boolean = false>(options?: Options<GetVersionHistorySupportedTypesData, ThrowOnError>) {
         return (options?.client ?? client).get<GetVersionHistorySupportedTypesResponses, GetVersionHistorySupportedTypesErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/version-history/supported-types',
             ...options
         });
@@ -643,12 +423,7 @@ export class VersionHistoryService {
 export class WorkspacesService {
     public static getWorkspaces<ThrowOnError extends boolean = false>(options?: Options<GetWorkspacesData, ThrowOnError>) {
         return (options?.client ?? client).get<GetWorkspacesResponses, GetWorkspacesErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces',
             ...options
         });
@@ -656,12 +431,7 @@ export class WorkspacesService {
     
     public static postWorkspaces<ThrowOnError extends boolean = false>(options?: Options<PostWorkspacesData, ThrowOnError>) {
         return (options?.client ?? client).post<PostWorkspacesResponses, PostWorkspacesErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces',
             ...options,
             headers: {
@@ -673,12 +443,7 @@ export class WorkspacesService {
     
     public static deleteWorkspacesById<ThrowOnError extends boolean = false>(options: Options<DeleteWorkspacesByIdData, ThrowOnError>) {
         return (options.client ?? client).delete<DeleteWorkspacesByIdResponses, DeleteWorkspacesByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}',
             ...options
         });
@@ -686,12 +451,7 @@ export class WorkspacesService {
     
     public static getWorkspacesById<ThrowOnError extends boolean = false>(options: Options<GetWorkspacesByIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetWorkspacesByIdResponses, GetWorkspacesByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}',
             ...options
         });
@@ -699,12 +459,7 @@ export class WorkspacesService {
     
     public static putWorkspacesById<ThrowOnError extends boolean = false>(options: Options<PutWorkspacesByIdData, ThrowOnError>) {
         return (options.client ?? client).put<PutWorkspacesByIdResponses, PutWorkspacesByIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}',
             ...options,
             headers: {
@@ -716,12 +471,7 @@ export class WorkspacesService {
     
     public static getWorkspacesByIdGroups<ThrowOnError extends boolean = false>(options: Options<GetWorkspacesByIdGroupsData, ThrowOnError>) {
         return (options.client ?? client).get<GetWorkspacesByIdGroupsResponses, GetWorkspacesByIdGroupsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups',
             ...options
         });
@@ -729,12 +479,7 @@ export class WorkspacesService {
     
     public static postWorkspacesByIdGroups<ThrowOnError extends boolean = false>(options: Options<PostWorkspacesByIdGroupsData, ThrowOnError>) {
         return (options.client ?? client).post<PostWorkspacesByIdGroupsResponses, PostWorkspacesByIdGroupsErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups',
             ...options,
             headers: {
@@ -746,12 +491,7 @@ export class WorkspacesService {
     
     public static deleteWorkspacesByIdGroupsByGroupId<ThrowOnError extends boolean = false>(options: Options<DeleteWorkspacesByIdGroupsByGroupIdData, ThrowOnError>) {
         return (options.client ?? client).delete<DeleteWorkspacesByIdGroupsByGroupIdResponses, DeleteWorkspacesByIdGroupsByGroupIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}',
             ...options
         });
@@ -759,12 +499,7 @@ export class WorkspacesService {
     
     public static getWorkspacesByIdGroupsByGroupId<ThrowOnError extends boolean = false>(options: Options<GetWorkspacesByIdGroupsByGroupIdData, ThrowOnError>) {
         return (options.client ?? client).get<GetWorkspacesByIdGroupsByGroupIdResponses, GetWorkspacesByIdGroupsByGroupIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}',
             ...options
         });
@@ -772,12 +507,7 @@ export class WorkspacesService {
     
     public static putWorkspacesByIdGroupsByGroupId<ThrowOnError extends boolean = false>(options: Options<PutWorkspacesByIdGroupsByGroupIdData, ThrowOnError>) {
         return (options.client ?? client).put<PutWorkspacesByIdGroupsByGroupIdResponses, PutWorkspacesByIdGroupsByGroupIdErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
+            security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces/{id}/groups/{groupId}',
             ...options,
             headers: {
