@@ -9,7 +9,6 @@ import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice/entity-action";
-import { UmbHintController } from "@umbraco-cms/backoffice/hint";
 import {
     UA_AUTOMATION_WORKSPACE_ALIAS,
     UA_AUTOMATION_ENTITY_TYPE,
@@ -32,9 +31,9 @@ export class UaAutomationWorkspaceContext
 
     #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
 
-    // Hint controller for badging workspace view tabs (e.g. the Info tab when the breaker
-    // has tripped). Provided at this context so the workspace-editor's view contexts inherit it.
-    #hintController = new UmbHintController(this);
+    // Workspace view tabs (UmbWorkspaceViewContext) inherit hints from the parent UmbViewContext
+    // — i.e. this workspace's `this.view`. Adding a hint to that controller with the child view's
+    // alias as path[0] makes the workspace-editor badge that tab.
     static readonly #HEALTH_HINT_UNIQUE = "ua-automation-health-hint";
     static readonly #INFO_VIEW_ALIAS = "UmbracoAutomate.Workspace.Automation.View.Info";
 
@@ -52,7 +51,6 @@ export class UaAutomationWorkspaceContext
         this.observe(this.name, (name) => this.view.setTitle(name), null);
 
         // Badge the Info tab whenever circuit-breaker health is unhealthy.
-        this.#hintController.provideAt(this);
         this.observe(
             this._data.createObservablePartOfCurrent((d) => d?.health),
             (health) => this.#updateHealthHint(health),
@@ -162,19 +160,21 @@ export class UaAutomationWorkspaceContext
 
     #updateHealthHint(health: string | undefined) {
         const unique = UaAutomationWorkspaceContext.#HEALTH_HINT_UNIQUE;
-        if (this.#hintController.has(unique)) {
-            this.#hintController.removeOne(unique);
+        const hints = this.view.hints;
+
+        if (hints.has(unique)) {
+            hints.removeOne(unique);
         }
 
         if (health === "Disabled") {
-            this.#hintController.addOne({
+            hints.addOne({
                 unique,
                 path: [UaAutomationWorkspaceContext.#INFO_VIEW_ALIAS],
                 text: "!",
                 color: "danger",
             });
         } else if (health === "Degraded") {
-            this.#hintController.addOne({
+            hints.addOne({
                 unique,
                 path: [UaAutomationWorkspaceContext.#INFO_VIEW_ALIAS],
                 text: "!",
