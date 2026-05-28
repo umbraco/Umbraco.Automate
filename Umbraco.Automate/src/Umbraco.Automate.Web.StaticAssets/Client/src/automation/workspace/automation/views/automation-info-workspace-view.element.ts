@@ -249,12 +249,12 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
             }
 
             .health-banner.danger {
-                background-color: var(--uui-color-danger-standalone, #f9e9e9);
+                background-color: color-mix(in srgb, var(--uui-color-danger) 10%, transparent);
                 border-color: var(--uui-color-danger);
             }
 
             .health-banner.warning {
-                background-color: var(--uui-color-warning-standalone, #fdf6e3);
+                background-color: color-mix(in srgb, var(--uui-color-warning) 12%, transparent);
                 border-color: var(--uui-color-warning);
             }
         `,
