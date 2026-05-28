@@ -109,13 +109,11 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
                 },
                 {
                     columnAlias: "health",
-                    // Only flag unhealthy automations; healthy ones show nothing to avoid noise.
-                    value:
-                        item.health && item.health !== "Healthy"
-                            ? html`<uui-tag color=${this.#healthColor(item.health)} look="secondary">
-                                  ${item.health}
-                              </uui-tag>`
-                            : html`<span>-</span>`,
+                    value: item.health
+                        ? html`<uui-tag color=${this.#healthColor(item.health)} look="secondary">
+                              ${item.health}
+                          </uui-tag>`
+                        : html`<span>-</span>`,
                 },
                 {
                     columnAlias: "dateModified",

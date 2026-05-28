@@ -88,8 +88,7 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
                 },
                 {
                     columnAlias: "health",
-                    // Only flag unhealthy automations to keep the row tidy.
-                    value: isAutomation && item.health && item.health !== "Healthy"
+                    value: isAutomation && item.health
                         ? html`<uui-tag color=${this.#healthColor(item.health)} look="secondary">${item.health}</uui-tag>`
                         : "",
                 },
