@@ -145,6 +145,9 @@ export default {
             "A run finished with an error. Fires once per failed run — can be noisy on flaky automations.",
         notifyOnSuspended: "Suspended",
         notifyOnSuspendedDesc: "A run is paused, waiting for input or approval.",
+        notifyOnResumed: "Resumed",
+        notifyOnResumedDesc:
+            "A paused run resumed — e.g. after an approval was granted or a wait-for-event completed.",
         notifyOnCompleted: "Completed",
         notifyOnCompletedDesc: "Every successful run. Verbose; usually only useful for auditing.",
         notifyOnRecovered: "Recovered",
@@ -156,6 +159,9 @@ export default {
         notifyOnDisabled: "Disabled",
         notifyOnDisabledDesc:
             "The circuit breaker has auto-disabled this automation after repeated failures.",
+        notifyOnReEnabled: "Re-enabled",
+        notifyOnReEnabledDesc:
+            "An auto-disabled automation has been re-enabled by an operator.",
     },
     uaWorkspace: {
         deleteConfirm: "Are you sure you want to delete this workspace?",

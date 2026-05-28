@@ -104,6 +104,7 @@ public static partial class UmbracoBuilderExtensions
 
         // Wire run-completed notification → notification channel dispatcher
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
+        builder.AddNotificationAsyncHandler<AutomationRunResumedNotification, RunResumedNotificationDispatcher>();
 
         // Circuit breaker: evaluate health after every terminal run, reset on re-publish, and
         // dispatch health-changed (degraded/disabled) notifications to configured channels.

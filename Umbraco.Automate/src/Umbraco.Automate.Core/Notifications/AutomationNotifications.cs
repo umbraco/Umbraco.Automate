@@ -90,6 +90,20 @@ public sealed class AutomationRunCompletedNotification(AutomationRun target, Eve
 }
 
 /// <summary>
+/// Notification fired when a suspended run resumes (Suspended → Running). Fires from both the
+/// explicit lifecycle API (<c>IAutomationRunService.ResumeRunAsync</c>) and the implicit
+/// approval/wait-for-event continuation in <c>ActionStepBody.HandleResumeAsync</c>.
+/// </summary>
+public sealed class AutomationRunResumedNotification(AutomationRun target, EventMessages messages)
+    : ObjectNotification<AutomationRun>(target, messages)
+{
+    /// <summary>
+    /// Gets the resumed automation run.
+    /// </summary>
+    public AutomationRun Run { get; } = target;
+}
+
+/// <summary>
 /// Notification fired after a step run has completed (any status).
 /// </summary>
 public sealed class StepRunCompletedNotification(StepRun target, EventMessages messages)

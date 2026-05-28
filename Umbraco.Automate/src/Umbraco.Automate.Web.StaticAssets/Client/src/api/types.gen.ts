@@ -335,7 +335,7 @@ export type NotificationChannelItemResponseModel = {
  * Atomic notification flag. The wire format ({@link NotifyOnModel}) is a comma-separated
  * combination of these (e.g. `"Failed, Disabled"`).
  */
-export type NotifyOnFlag = 'Failed' | 'Suspended' | 'Completed' | 'Recovered' | 'Warning' | 'Disabled';
+export type NotifyOnFlag = 'Failed' | 'Suspended' | 'Resumed' | 'Completed' | 'Recovered' | 'Warning' | 'Disabled' | 'ReEnabled';
 
 /**
  * Wire format for the per-channel notify-on selection. Server-side this maps to a [Flags] enum,

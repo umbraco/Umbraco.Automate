@@ -36,8 +36,13 @@ internal sealed class CircuitBreakerHealthNotificationDispatcher
             case AutomationHealth.Degraded:
                 requiredFlag = NotifyOn.Warning;
                 break;
+            case AutomationHealth.Healthy when notification.PreviousHealth == AutomationHealth.Disabled:
+                // Strict scope: only the Disabled → Healthy round-trip (operator re-enabled).
+                // Degraded → Healthy is run-driven and intentionally quiet.
+                requiredFlag = NotifyOn.ReEnabled;
+                break;
             default:
-                return; // Healthy (reset / recovery) is not dispatched to channels.
+                return;
         }
 
         var automation = await _automationService.GetAutomationAsync(notification.State.AutomationId, cancellationToken);

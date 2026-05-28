@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Notifications;
+using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Core.Runs;
@@ -10,15 +12,18 @@ internal sealed class AutomationRunService : IAutomationRunService
 {
     private readonly IAutomationRunRepository _runRepository;
     private readonly IWorkflowHost _workflowHost;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutomationRunService> _logger;
 
     public AutomationRunService(
         IAutomationRunRepository runRepository,
         IWorkflowHost workflowHost,
+        IEventAggregator eventAggregator,
         ILogger<AutomationRunService> logger)
     {
         _runRepository = runRepository;
         _workflowHost = workflowHost;
+        _eventAggregator = eventAggregator;
         _logger = logger;
     }
 
@@ -135,6 +140,10 @@ internal sealed class AutomationRunService : IAutomationRunService
 
         run.Status = AutomationRunStatus.Running;
         await _runRepository.SaveAsync(run, cancellationToken);
+
+        await _eventAggregator.PublishAsync(
+            new AutomationRunResumedNotification(run, new EventMessages()),
+            cancellationToken);
 
         _logger.LogInformation("Run {RunId} resumed via lifecycle API", runId);
         return RunLifecycleResult.Success;

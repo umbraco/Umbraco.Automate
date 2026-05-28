@@ -10,7 +10,9 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -32,6 +34,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly IStepErrorClassifier _errorClassifier;
     private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly AutomateMetrics _metrics;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<ActionStepBody> _logger;
 
     public ActionStepBody(
@@ -45,6 +48,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         IStepErrorClassifier errorClassifier,
         IOptions<ExecutionOptions> executionOptions,
         AutomateMetrics metrics,
+        IEventAggregator eventAggregator,
         ILogger<ActionStepBody> logger)
     {
         _stepConfig = stepConfig;
@@ -57,6 +61,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _errorClassifier = errorClassifier;
         _executionOptions = executionOptions;
         _metrics = metrics;
+        _eventAggregator = eventAggregator;
         _logger = logger;
     }
 
@@ -395,6 +400,10 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             run.Status = AutomationRunStatus.Running;
             await _runRepository.SaveAsync(run, cancellationToken);
+
+            await _eventAggregator.PublishAsync(
+                new AutomationRunResumedNotification(run, new EventMessages()),
+                cancellationToken);
         }
 
         stepRun.CompletedUtc = DateTime.UtcNow;

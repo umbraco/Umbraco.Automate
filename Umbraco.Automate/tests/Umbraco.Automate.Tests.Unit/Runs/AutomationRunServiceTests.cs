@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Tests.Unit.Runs;
@@ -8,13 +9,19 @@ public class AutomationRunServiceTests
 {
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
     private readonly Mock<IWorkflowHost> _workflowHost = new();
+    private readonly Mock<IEventAggregator> _eventAggregator = new();
     private readonly AutomationRunService _service;
 
     public AutomationRunServiceTests()
     {
+        _eventAggregator
+            .Setup(e => e.PublishAsync(It.IsAny<Umbraco.Automate.Core.Notifications.AutomationRunResumedNotification>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
         _service = new AutomationRunService(
             _runRepo.Object,
             _workflowHost.Object,
+            _eventAggregator.Object,
             NullLogger<AutomationRunService>.Instance);
     }
 

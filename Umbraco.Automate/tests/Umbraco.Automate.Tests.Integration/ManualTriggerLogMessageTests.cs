@@ -27,6 +27,7 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
+using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Services;
 using WorkflowCore.Interface;
@@ -124,6 +125,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
+        services.AddSingleton<IEventAggregator>(Mock.Of<IEventAggregator>());
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();

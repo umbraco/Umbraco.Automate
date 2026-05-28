@@ -64,6 +64,12 @@ public enum NotifyOn
     /// <summary>Notify when the circuit breaker issues a degradation warning.</summary>
     Warning = 32,
 
+    /// <summary>Notify when an auto-disabled automation is re-enabled (Disabled → Healthy).</summary>
+    ReEnabled = 64,
+
+    /// <summary>Notify when a suspended run resumes (Suspended → Running).</summary>
+    Resumed = 128,
+
     /// <summary>Notify on both failure and suspension.</summary>
     FailedOrSuspended = Failed | Suspended,
 }

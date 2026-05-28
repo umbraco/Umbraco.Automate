@@ -8,10 +8,12 @@ import type { NotifyOnFlag } from "../../../api/types.gen.js";
 export const NOTIFY_ON_FLAGS: ReadonlyArray<NotifyOnFlag> = [
     "Failed",
     "Suspended",
+    "Resumed",
     "Completed",
     "Recovered",
     "Warning",
     "Disabled",
+    "ReEnabled",
 ];
 
 const LEGACY_COMPOSITES: Readonly<Record<string, ReadonlyArray<NotifyOnFlag>>> = {
