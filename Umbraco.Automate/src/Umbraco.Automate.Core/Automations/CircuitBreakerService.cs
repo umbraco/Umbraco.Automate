@@ -91,6 +91,8 @@ internal sealed class CircuitBreakerService : ICircuitBreakerService
         state.Health = AutomationHealth.Healthy;
         state.WarningIssuedUtc = null;
         state.DisabledUtc = null;
+        // Advance the window floor so future evaluations ignore the failures that tripped it.
+        state.WindowResetUtc = DateTime.UtcNow;
         await _healthRepository.SaveAsync(state, cancellationToken);
 
         Publish(state, previous, "Re-enabled.");
@@ -136,6 +138,9 @@ internal sealed class CircuitBreakerService : ICircuitBreakerService
         Publish(state, previous, "Recovered after a successful run.");
     }
 
+    // Note: in-place Degraded → Healthy (above) does NOT advance the window floor — the recovery
+    // is run-driven; the window naturally rolls forward as more runs accumulate.
+
     private async Task HandleFailureAsync(Guid automationId, CircuitBreakerOptions options, CancellationToken cancellationToken)
     {
         var state = await _healthRepository.GetAsync(automationId, cancellationToken)
@@ -148,8 +153,11 @@ internal sealed class CircuitBreakerService : ICircuitBreakerService
             return;
         }
 
+        // Only consider runs that started after the last reset, so a re-enable / re-publish
+        // doesn't re-trip on stale failures the operator just acknowledged.
+        var since = state.WindowResetUtc ?? DateTime.MinValue;
         var window = await _runService.GetRecentTerminalStatusesAsync(
-            automationId, options.EvaluationWindowSize, cancellationToken);
+            automationId, options.EvaluationWindowSize, since, cancellationToken);
 
         var consecutiveFailures = 0;
         foreach (var status in window)

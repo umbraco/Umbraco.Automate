@@ -62,7 +62,11 @@ public class CircuitBreakerServiceTests
 
     private void SetupWindow(Guid automationId, params AutomationRunStatus[] newestFirst)
         => _runService
-            .Setup(r => r.GetRecentTerminalStatusesAsync(automationId, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetRecentTerminalStatusesAsync(
+                automationId,
+                It.IsAny<int>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(newestFirst);
 
     private static AutomationRun Run(AutomationRunStatus status, Guid automationId) => new()
@@ -111,7 +115,7 @@ public class CircuitBreakerServiceTests
 
         _saved.ShouldBeNull();
         _runService.Verify(
-            r => r.GetRecentTerminalStatusesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            r => r.GetRecentTerminalStatusesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -218,7 +222,7 @@ public class CircuitBreakerServiceTests
 
         _saved.ShouldBeNull();
         _runService.Verify(
-            r => r.GetRecentTerminalStatusesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            r => r.GetRecentTerminalStatusesAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -275,15 +279,16 @@ public class CircuitBreakerServiceTests
     }
 
     [Fact]
-    public async Task ResetAsync_Disabled_ClearsToHealthy()
+    public async Task ResetAsync_Disabled_ClearsToHealthy_AndAdvancesWindowFloor()
     {
         var id = Guid.NewGuid();
+        var before = DateTime.UtcNow;
         SetupHealth(id, new AutomationHealthState
         {
             AutomationId = id,
             Health = AutomationHealth.Disabled,
-            WarningIssuedUtc = DateTime.UtcNow,
-            DisabledUtc = DateTime.UtcNow,
+            WarningIssuedUtc = DateTime.UtcNow.AddHours(-3),
+            DisabledUtc = DateTime.UtcNow.AddHours(-1),
         });
         var service = CreateService();
 
@@ -293,6 +298,33 @@ public class CircuitBreakerServiceTests
         _saved!.Health.ShouldBe(AutomationHealth.Healthy);
         _saved.WarningIssuedUtc.ShouldBeNull();
         _saved.DisabledUtc.ShouldBeNull();
+        _saved.WindowResetUtc.ShouldNotBeNull();
+        _saved.WindowResetUtc!.Value.ShouldBeGreaterThanOrEqualTo(before);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_FailedRun_QueriesWindowSinceLastResetFloor()
+    {
+        var id = Guid.NewGuid();
+        var resetAt = DateTime.UtcNow.AddMinutes(-5);
+        _options = new CircuitBreakerOptions { ConsecutiveFailureThreshold = 10 };
+        SetupHealth(id, new AutomationHealthState
+        {
+            AutomationId = id,
+            Health = AutomationHealth.Healthy,
+            WindowResetUtc = resetAt,
+        });
+        // Only one Failed run since reset → consecutive 1 < threshold → no disable, even though
+        // historic runs (pre-reset) had many failures.
+        SetupWindow(id, AutomationRunStatus.Failed);
+        var service = CreateService();
+
+        await service.EvaluateAsync(Run(AutomationRunStatus.Failed, id), CancellationToken.None);
+
+        _saved.ShouldBeNull();
+        _runService.Verify(
+            r => r.GetRecentTerminalStatusesAsync(id, It.IsAny<int>(), resetAt, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

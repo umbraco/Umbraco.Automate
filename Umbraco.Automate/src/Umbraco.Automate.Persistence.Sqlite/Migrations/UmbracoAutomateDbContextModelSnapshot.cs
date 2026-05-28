@@ -99,6 +99,9 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.Property<DateTime?>("WarningIssuedUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("WindowResetUtc")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("AutomationId");
 
                     b.HasIndex("Health");

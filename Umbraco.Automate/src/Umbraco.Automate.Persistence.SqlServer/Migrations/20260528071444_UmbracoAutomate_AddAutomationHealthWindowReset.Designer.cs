@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Persistence;
 
@@ -11,9 +12,11 @@ using Umbraco.Automate.Persistence;
 namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 {
     [DbContext(typeof(UmbracoAutomateDbContext))]
-    partial class UmbracoAutomateDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260528071444_UmbracoAutomate_AddAutomationHealthWindowReset")]
+    partial class UmbracoAutomate_AddAutomationHealthWindowReset
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

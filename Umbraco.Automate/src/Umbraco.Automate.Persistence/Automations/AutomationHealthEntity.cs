@@ -13,4 +13,6 @@ internal sealed class AutomationHealthEntity
     public DateTime? WarningIssuedUtc { get; set; }
 
     public DateTime? DisabledUtc { get; set; }
+
+    public DateTime? WindowResetUtc { get; set; }
 }

@@ -68,12 +68,15 @@ internal interface IAutomationRunRepository
 
     /// <summary>
     /// Gets the most recent terminal run statuses for an automation, newest first, capped at
-    /// <paramref name="windowSize"/>. Used by the circuit breaker to derive consecutive-failure
-    /// count and error rate without a persisted counter.
+    /// <paramref name="windowSize"/> and only including runs that started after <paramref name="since"/>.
+    /// Used by the circuit breaker to derive consecutive-failure count and error rate without a
+    /// persisted counter; <paramref name="since"/> is the per-automation window floor that
+    /// advances on re-enable / re-publish so stale failures don't re-trip the breaker.
     /// </summary>
     Task<IReadOnlyList<AutomationRunStatus>> GetRecentTerminalStatusesAsync(
         Guid automationId,
         int windowSize,
+        DateTime since,
         CancellationToken cancellationToken = default);
 
     /// <summary>

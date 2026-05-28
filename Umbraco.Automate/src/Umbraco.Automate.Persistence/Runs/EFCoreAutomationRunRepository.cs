@@ -226,12 +226,15 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     public async Task<IReadOnlyList<AutomationRunStatus>> GetRecentTerminalStatusesAsync(
         Guid automationId,
         int windowSize,
+        DateTime since,
         CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var statuses = await db.AutomationRuns
-            .Where(r => r.AutomationId == automationId && TerminalStatuses.Contains(r.Status))
+            .Where(r => r.AutomationId == automationId
+                && TerminalStatuses.Contains(r.Status)
+                && r.StartedUtc > since)
             .OrderByDescending(r => r.StartedUtc)
             .Take(windowSize)
             .Select(r => r.Status)

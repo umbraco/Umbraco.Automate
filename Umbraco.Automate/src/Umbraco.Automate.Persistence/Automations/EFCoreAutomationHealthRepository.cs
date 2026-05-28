@@ -40,6 +40,7 @@ internal sealed class EFCoreAutomationHealthRepository : IAutomationHealthReposi
                 Health = (int)state.Health,
                 WarningIssuedUtc = state.WarningIssuedUtc,
                 DisabledUtc = state.DisabledUtc,
+                WindowResetUtc = state.WindowResetUtc,
             });
         }
         else
@@ -47,6 +48,7 @@ internal sealed class EFCoreAutomationHealthRepository : IAutomationHealthReposi
             entity.Health = (int)state.Health;
             entity.WarningIssuedUtc = state.WarningIssuedUtc;
             entity.DisabledUtc = state.DisabledUtc;
+            entity.WindowResetUtc = state.WindowResetUtc;
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -76,5 +78,6 @@ internal sealed class EFCoreAutomationHealthRepository : IAutomationHealthReposi
         Health = (AutomationHealth)entity.Health,
         WarningIssuedUtc = entity.WarningIssuedUtc,
         DisabledUtc = entity.DisabledUtc,
+        WindowResetUtc = entity.WindowResetUtc,
     };
 }
