@@ -331,7 +331,20 @@ export type NotificationChannelItemResponseModel = {
     settingsSchema?: EditableModelSchemaModel | null;
 };
 
-export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered';
+/**
+ * Atomic notification flag. The wire format ({@link NotifyOnModel}) is a comma-separated
+ * combination of these (e.g. `"Failed, Disabled"`).
+ */
+export type NotifyOnFlag = 'Failed' | 'Suspended' | 'Completed' | 'Recovered' | 'Warning' | 'Disabled';
+
+/**
+ * Wire format for the per-channel notify-on selection. Server-side this maps to a [Flags] enum,
+ * so the JSON value is either a single named member (atomic, `"Never"`, or a legacy composite
+ * like `"FailedOrSuspended"`) or a comma-separated combination (`"Failed, Disabled"`). Use the
+ * `parseNotifyOn` / `serializeNotifyOn` helpers in the notification-channel modal to convert
+ * between this and a `Set<NotifyOnFlag>`.
+ */
+export type NotifyOnModel = string;
 
 export type PagedAutomationItemResponseModel = {
     total: number;

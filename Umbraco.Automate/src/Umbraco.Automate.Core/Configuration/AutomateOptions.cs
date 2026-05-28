@@ -159,10 +159,9 @@ public sealed class GovernanceOptions
     public bool SensitiveDataMasking { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets the default notification policy for new automations. Includes
-    /// <see cref="NotifyOn.Disabled"/> so owners are always told when an automation is auto-disabled.
+    /// Gets or sets the default notification policy for new automations.
     /// </summary>
-    public NotifyOn DefaultNotifyOn { get; set; } = NotifyOn.Failed | NotifyOn.Disabled;
+    public NotifyOn DefaultNotifyOn { get; set; } = NotifyOn.Failed;
 }
 
 /// <summary>

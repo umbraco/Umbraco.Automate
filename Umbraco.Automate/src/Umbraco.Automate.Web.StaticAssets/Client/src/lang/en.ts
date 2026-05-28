@@ -140,6 +140,22 @@ export default {
         channel: "Channel",
         notifyOn: "Notify on",
         addChannel: "Add notification channel",
+        notifyOnFailed: "Failed",
+        notifyOnFailedDesc:
+            "A run finished with an error. Fires once per failed run — can be noisy on flaky automations.",
+        notifyOnSuspended: "Suspended",
+        notifyOnSuspendedDesc: "A run is paused, waiting for input or approval.",
+        notifyOnCompleted: "Completed",
+        notifyOnCompletedDesc: "Every successful run. Verbose; usually only useful for auditing.",
+        notifyOnRecovered: "Recovered",
+        notifyOnRecoveredDesc:
+            "A successful run after a previous failure. Quieter than Completed.",
+        notifyOnWarning: "Warning",
+        notifyOnWarningDesc:
+            "The circuit breaker has issued a degradation warning — error rate is climbing.",
+        notifyOnDisabled: "Disabled",
+        notifyOnDisabledDesc:
+            "The circuit breaker has auto-disabled this automation after repeated failures.",
     },
     uaWorkspace: {
         deleteConfirm: "Are you sure you want to delete this workspace?",

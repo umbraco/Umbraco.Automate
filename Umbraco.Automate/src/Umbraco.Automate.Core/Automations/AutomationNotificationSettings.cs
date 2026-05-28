@@ -55,7 +55,7 @@ public enum NotifyOn
     /// <summary>Notify on successful completion.</summary>
     Completed = 4,
 
-    /// <summary>Notify when a run succeeds after the previous run failed or was suspended.</summary>
+    /// <summary>Notify when a run succeeds after the previous terminal run was a failure.</summary>
     Recovered = 8,
 
     /// <summary>Notify when the automation is auto-disabled by the circuit breaker.</summary>

@@ -97,11 +97,13 @@ internal sealed class RunCompletedNotificationDispatcher
             return false;
         }
 
-        // Check if the previous terminal run was a failure or suspension.
+        // Recovery is a success that follows a failure. Suspended runs are intentional pauses,
+        // not failures, so a success after a Suspended run isn't a "recovery" — and in any case
+        // Suspended is not in TerminalStatuses, so this query would never return it.
         var previousStatus = await _runService.GetPreviousTerminalRunStatusAsync(
             run.AutomationId, run.Id, cancellationToken);
 
-        return previousStatus is AutomationRunStatus.Failed or AutomationRunStatus.Suspended;
+        return previousStatus is AutomationRunStatus.Failed;
     }
 
     private static string BuildSubject(string automationName, AutomationRunStatus status)
