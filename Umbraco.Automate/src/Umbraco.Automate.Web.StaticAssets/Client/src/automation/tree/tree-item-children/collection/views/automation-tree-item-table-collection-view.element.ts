@@ -21,6 +21,7 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
     private _tableColumns: Array<UmbTableColumn> = [
         { name: "Name", alias: "name" },
         { name: "Status", alias: "status" },
+        { name: "Health", alias: "health" },
         { name: "", alias: "entityActions", align: "right", width: "1%" },
     ];
 
@@ -57,6 +58,14 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
         }
     }
 
+    #healthColor(health: string): string {
+        switch (health) {
+            case "Degraded": return "warning";
+            case "Disabled": return "danger";
+            default: return "positive";
+        }
+    }
+
     #buildTableItem(item: UaWorkspaceTreeItemModel): UmbTableItem {
         const isAutomation = item.entityType === UA_AUTOMATION_ENTITY_TYPE;
         const href = isAutomation
@@ -75,6 +84,13 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
                     columnAlias: "status",
                     value: isAutomation && item.status
                         ? html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">${item.status}</uui-tag>`
+                        : "",
+                },
+                {
+                    columnAlias: "health",
+                    // Only flag unhealthy automations to keep the row tidy.
+                    value: isAutomation && item.health && item.health !== "Healthy"
+                        ? html`<uui-tag color=${this.#healthColor(item.health)} look="secondary">${item.health}</uui-tag>`
                         : "",
                 },
                 {

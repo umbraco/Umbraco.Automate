@@ -136,6 +136,33 @@ public class CircuitBreakerServiceTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_ConsecutiveFailures_ReachWarningThreshold_IssuesWarning()
+    {
+        var id = Guid.NewGuid();
+        _options = new CircuitBreakerOptions
+        {
+            ConsecutiveWarningThreshold = 5,
+            ConsecutiveFailureThreshold = 10,
+        };
+        SetupHealth(id, null);
+        // 5 consecutive Failed (window not full — rate path wouldn't fire), so consecutive-warning
+        // is the one that should issue the warning before consecutive-disable trips at 10.
+        SetupWindow(id,
+            AutomationRunStatus.Failed,
+            AutomationRunStatus.Failed,
+            AutomationRunStatus.Failed,
+            AutomationRunStatus.Failed,
+            AutomationRunStatus.Failed);
+        var service = CreateService();
+
+        await service.EvaluateAsync(Run(AutomationRunStatus.Failed, id), CancellationToken.None);
+
+        _saved.ShouldNotBeNull();
+        _saved!.Health.ShouldBe(AutomationHealth.Degraded);
+        _saved.WarningIssuedUtc.ShouldNotBeNull();
+    }
+
+    [Fact]
     public async Task EvaluateAsync_ErrorRateAboveWarning_IssuesWarning()
     {
         var id = Guid.NewGuid();

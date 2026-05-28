@@ -197,6 +197,20 @@ internal sealed class CircuitBreakerService : ICircuitBreakerService
             return;
         }
 
+        if (consecutiveFailures >= options.ConsecutiveWarningThreshold && state.Health == AutomationHealth.Healthy)
+        {
+            var previous = state.Health;
+            state.Health = AutomationHealth.Degraded;
+            state.WarningIssuedUtc = DateTime.UtcNow;
+            await _healthRepository.SaveAsync(state, cancellationToken);
+
+            Publish(
+                state,
+                previous,
+                $"{consecutiveFailures} consecutive failures (warning at {options.ConsecutiveWarningThreshold}, disable at {options.ConsecutiveFailureThreshold}).");
+            return;
+        }
+
         if (windowFull && errorRate >= options.WarningErrorRate && state.Health == AutomationHealth.Healthy)
         {
             var previous = state.Health;

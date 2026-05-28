@@ -323,6 +323,7 @@ export class UaWorkspaceTreeServerDataSource
             isFolder: false,
             icon: "icon-mindmap",
             status: item.status,
+            health: item.health,
             triggerAlias: item.triggerAlias ?? null,
             flags,
         };

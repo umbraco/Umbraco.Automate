@@ -203,6 +203,14 @@ public sealed class CircuitBreakerOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets the number of consecutive failures that issues a degradation warning
+    /// (transitions to <see cref="AutomationHealth.Degraded"/>). Set lower than
+    /// <see cref="ConsecutiveFailureThreshold"/> so the warning is reachable in the common
+    /// "keeps failing" path before the disable threshold trips.
+    /// </summary>
+    public int ConsecutiveWarningThreshold { get; set; } = 5;
+
+    /// <summary>
     /// Gets or sets the number of consecutive failures before an automation is disabled.
     /// </summary>
     public int ConsecutiveFailureThreshold { get; set; } = 10;
