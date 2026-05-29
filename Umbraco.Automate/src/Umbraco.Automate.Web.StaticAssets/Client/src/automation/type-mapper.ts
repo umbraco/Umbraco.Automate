@@ -26,6 +26,9 @@ export const UaAutomationTypeMapper = {
             version: response.version,
             dateCreated: response.dateCreated,
             dateModified: response.dateModified,
+            health: response.health,
+            warningIssuedUtc: response.warningIssuedUtc ?? null,
+            disabledUtc: response.disabledUtc ?? null,
         };
     },
 
@@ -40,6 +43,7 @@ export const UaAutomationTypeMapper = {
             version: response.version,
             dateCreated: response.dateCreated,
             dateModified: response.dateModified,
+            health: response.health,
         };
     },
 

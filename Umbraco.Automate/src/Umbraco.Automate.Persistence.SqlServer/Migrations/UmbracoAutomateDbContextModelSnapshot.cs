@@ -89,6 +89,31 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.ToTable("umbracoAutomateAutomation", (string)null);
                 });
 
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Automations.AutomationHealthEntity", b =>
+                {
+                    b.Property<Guid>("AutomationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("DisabledUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Health")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("WarningIssuedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("WindowResetUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("AutomationId");
+
+                    b.HasIndex("Health");
+
+                    b.ToTable("umbracoAutomateAutomationHealth", (string)null);
+                });
+
             modelBuilder.Entity("Umbraco.Automate.Persistence.Connections.ConnectionEntity", b =>
                 {
                     b.Property<Guid>("Id")

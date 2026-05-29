@@ -16,6 +16,7 @@ public sealed class ByIdAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly ICircuitBreakerService _circuitBreaker;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
@@ -24,10 +25,12 @@ public sealed class ByIdAutomationController : AutomationControllerBase
     public ByIdAutomationController(
         IAutomationService automationService,
         IAuthorizationService authorizationService,
+        ICircuitBreakerService circuitBreaker,
         IUmbracoMapper mapper)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
+        _circuitBreaker = circuitBreaker;
         _mapper = mapper;
     }
 
@@ -54,6 +57,13 @@ public sealed class ByIdAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        return Ok(_mapper.Map<AutomationResponseModel>(automation));
+        var model = _mapper.Map<AutomationResponseModel>(automation)!;
+
+        var health = await _circuitBreaker.GetHealthAsync(id, cancellationToken);
+        model.Health = health.Health;
+        model.WarningIssuedUtc = health.WarningIssuedUtc;
+        model.DisabledUtc = health.DisabledUtc;
+
+        return Ok(model);
     }
 }

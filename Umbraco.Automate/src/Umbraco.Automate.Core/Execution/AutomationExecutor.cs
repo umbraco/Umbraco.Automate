@@ -21,6 +21,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IAutomationRunRepository _runRepository;
     private readonly IWorkspaceService _workspaceService;
     private readonly IRateLimitService _rateLimitService;
+    private readonly ICircuitBreakerService _circuitBreaker;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<AutomationExecutor> _logger;
@@ -32,6 +33,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IAutomationRunRepository runRepository,
         IWorkspaceService workspaceService,
         IRateLimitService rateLimitService,
+        ICircuitBreakerService circuitBreaker,
         ConditionEvaluator conditionEvaluator,
         AutomateMetrics metrics,
         ILogger<AutomationExecutor> logger)
@@ -42,6 +44,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _runRepository = runRepository;
         _workspaceService = workspaceService;
         _rateLimitService = rateLimitService;
+        _circuitBreaker = circuitBreaker;
         _conditionEvaluator = conditionEvaluator;
         _metrics = metrics;
         _logger = logger;
@@ -57,6 +60,17 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     {
         // Check rate limits before creating the run record.
         await _rateLimitService.CheckRateLimitAsync(automation.Id, cancellationToken);
+
+        // Circuit breaker gate: an auto-disabled automation does not run, except for permitted
+        // interactive test runs. Quiet skip (no run record, no workflow) — the trigger dispatch
+        // path ignores the return value; interactive Web controllers gate earlier and return 409.
+        if (!await _circuitBreaker.IsRunAllowedAsync(automation.Id, initiatorType, cancellationToken))
+        {
+            _logger.LogDebug(
+                "Run skipped — circuit open for automation {AutomationId} ({AutomationAlias}), initiator {Initiator}",
+                automation.Id, automation.Alias, initiatorType);
+            return Guid.Empty;
+        }
 
         // Resolve workspace and service account.
         var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken)

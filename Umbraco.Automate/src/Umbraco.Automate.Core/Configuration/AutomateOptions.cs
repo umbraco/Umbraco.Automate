@@ -188,3 +188,58 @@ public sealed class ScheduledTriggerOptions
     /// </summary>
     public TimeSpan MaxJitter { get; set; } = TimeSpan.FromMinutes(5);
 }
+
+/// <summary>
+/// Configuration options for the circuit breaker that auto-disables a "sick" automation
+/// (one failing on every trigger due to misconfiguration).
+/// Bound to <c>Umbraco:Automate:CircuitBreaker</c> in appsettings.json.
+/// </summary>
+public sealed class CircuitBreakerOptions
+{
+    /// <summary>
+    /// Gets or sets whether the circuit breaker is enabled globally.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the number of consecutive failures that issues a degradation warning
+    /// (transitions to <see cref="AutomationHealth.Degraded"/>). Set lower than
+    /// <see cref="ConsecutiveFailureThreshold"/> so the warning is reachable in the common
+    /// "keeps failing" path before the disable threshold trips.
+    /// </summary>
+    public int ConsecutiveWarningThreshold { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets the number of consecutive failures before an automation is disabled.
+    /// </summary>
+    public int ConsecutiveFailureThreshold { get; set; } = 10;
+
+    /// <summary>
+    /// Gets or sets the error rate (0.0–1.0) over the evaluation window that triggers a warning.
+    /// </summary>
+    public double WarningErrorRate { get; set; } = 0.5;
+
+    /// <summary>
+    /// Gets or sets the error rate (0.0–1.0) over the evaluation window that triggers auto-disable.
+    /// </summary>
+    public double DisableErrorRate { get; set; } = 0.7;
+
+    /// <summary>
+    /// Gets or sets the number of recent terminal runs evaluated for the error-rate calculation.
+    /// Error-rate thresholds only apply once at least this many terminal runs exist.
+    /// </summary>
+    public int EvaluationWindowSize { get; set; } = 20;
+
+    /// <summary>
+    /// Gets or sets the grace period after a warning before auto-disable can trigger,
+    /// giving the owner time to investigate and fix.
+    /// </summary>
+    public TimeSpan GracePeriodAfterWarning { get; set; } = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// Gets or sets whether a manual "run now" / replay is allowed while the circuit is open,
+    /// so the owner can test a fix. The run is a pure test — success does NOT auto re-enable;
+    /// the owner must re-enable explicitly.
+    /// </summary>
+    public bool AllowManualRunWhileDisabled { get; set; } = true;
+}

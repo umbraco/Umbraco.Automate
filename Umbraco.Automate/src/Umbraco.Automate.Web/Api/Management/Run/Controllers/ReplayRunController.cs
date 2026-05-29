@@ -20,6 +20,7 @@ public sealed class ReplayRunController : RunControllerBase
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
     private readonly IAutomationExecutor _executor;
+    private readonly ICircuitBreakerService _circuitBreaker;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ReplayRunController"/> class.
@@ -28,12 +29,14 @@ public sealed class ReplayRunController : RunControllerBase
         IAutomationRunService runService,
         IAutomationService automationService,
         IAuthorizationService authorizationService,
-        IAutomationExecutor executor)
+        IAutomationExecutor executor,
+        ICircuitBreakerService circuitBreaker)
     {
         _runService = runService;
         _automationService = automationService;
         _authorizationService = authorizationService;
         _executor = executor;
+        _circuitBreaker = circuitBreaker;
     }
 
     /// <summary>
@@ -80,6 +83,14 @@ public sealed class ReplayRunController : RunControllerBase
             return Conflict(new ProblemDetailsBuilder()
                 .WithTitle("Run still in progress")
                 .WithDetail("Only completed, failed, or cancelled runs can be replayed.")
+                .Build());
+        }
+
+        if (!await _circuitBreaker.IsRunAllowedAsync(automation.Id, TriggerInitiatorType.Replay, cancellationToken))
+        {
+            return Conflict(new ProblemDetailsBuilder()
+                .WithTitle("Automation auto-disabled")
+                .WithDetail("This automation has been auto-disabled by the circuit breaker. Re-enable it to replay runs.")
                 .Build());
         }
 

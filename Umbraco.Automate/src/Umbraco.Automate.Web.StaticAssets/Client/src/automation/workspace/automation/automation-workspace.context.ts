@@ -31,6 +31,12 @@ export class UaAutomationWorkspaceContext
 
     #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
 
+    // Workspace view tabs (UmbWorkspaceViewContext) inherit hints from the parent UmbViewContext
+    // — i.e. this workspace's `this.view`. Adding a hint to that controller with the child view's
+    // alias as path[0] makes the workspace-editor badge that tab.
+    static readonly #HEALTH_HINT_UNIQUE = "ua-automation-health-hint";
+    static readonly #INFO_VIEW_ALIAS = "UmbracoAutomate.Workspace.Automation.View.Info";
+
     constructor(host: UmbControllerHost) {
         super(host, {
             workspaceAlias: UA_AUTOMATION_WORKSPACE_ALIAS,
@@ -43,6 +49,13 @@ export class UaAutomationWorkspaceContext
         });
 
         this.observe(this.name, (name) => this.view.setTitle(name), null);
+
+        // Badge the Info tab whenever circuit-breaker health is unhealthy.
+        this.observe(
+            this._data.createObservablePartOfCurrent((d) => d?.health),
+            (health) => this.#updateHealthHint(health),
+            null,
+        );
 
         this.routes.setRoutes([
             {
@@ -143,6 +156,31 @@ export class UaAutomationWorkspaceContext
             unique,
         });
         this.#eventContext?.dispatchEvent(event);
+    }
+
+    #updateHealthHint(health: string | undefined) {
+        const unique = UaAutomationWorkspaceContext.#HEALTH_HINT_UNIQUE;
+        const hints = this.view.hints;
+
+        if (hints.has(unique)) {
+            hints.removeOne(unique);
+        }
+
+        if (health === "Disabled") {
+            hints.addOne({
+                unique,
+                path: [UaAutomationWorkspaceContext.#INFO_VIEW_ALIAS],
+                text: "!",
+                color: "danger",
+            });
+        } else if (health === "Degraded") {
+            hints.addOne({
+                unique,
+                path: [UaAutomationWorkspaceContext.#INFO_VIEW_ALIAS],
+                text: "!",
+                color: "warning",
+            });
+        }
     }
 }
 

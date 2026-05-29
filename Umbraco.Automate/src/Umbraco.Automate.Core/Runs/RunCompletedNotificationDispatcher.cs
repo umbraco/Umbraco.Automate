@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Notifications.Channels;
@@ -15,21 +14,18 @@ namespace Umbraco.Automate.Core.Runs;
 internal sealed class RunCompletedNotificationDispatcher
     : INotificationAsyncHandler<AutomationRunCompletedNotification>
 {
-    private readonly NotificationChannelCollection _channels;
+    private readonly ChannelNotifier _channelNotifier;
     private readonly IAutomationService _automationService;
     private readonly IAutomationRunService _runService;
-    private readonly ILogger<RunCompletedNotificationDispatcher> _logger;
 
     public RunCompletedNotificationDispatcher(
-        NotificationChannelCollection channels,
+        ChannelNotifier channelNotifier,
         IAutomationService automationService,
-        IAutomationRunService runService,
-        ILogger<RunCompletedNotificationDispatcher> logger)
+        IAutomationRunService runService)
     {
-        _channels = channels;
+        _channelNotifier = channelNotifier;
         _automationService = automationService;
         _runService = runService;
-        _logger = logger;
     }
 
     public async Task HandleAsync(AutomationRunCompletedNotification notification, CancellationToken cancellationToken)
@@ -38,12 +34,6 @@ internal sealed class RunCompletedNotificationDispatcher
 
         var automation = await _automationService.GetAutomationAsync(run.AutomationId, cancellationToken);
         if (automation is null)
-        {
-            return;
-        }
-
-        var settings = automation.NotificationSettings;
-        if (settings is null || settings.Channels.Count == 0)
         {
             return;
         }
@@ -66,43 +56,11 @@ internal sealed class RunCompletedNotificationDispatcher
             Data = runData,
         };
 
-        foreach (var channelConfig in settings.Channels)
-        {
-            if (!channelConfig.IsEnabled)
-            {
-                continue;
-            }
-
-            if (!await ShouldNotifyAsync(run, channelConfig.NotifyOn, cancellationToken))
-            {
-                continue;
-            }
-
-            var channel = _channels.GetByAlias(channelConfig.ChannelAlias);
-            if (channel is null)
-            {
-                _logger.LogWarning(
-                    "Notification channel '{ChannelAlias}' not found for automation {AutomationId}",
-                    channelConfig.ChannelAlias, automation.Id);
-                continue;
-            }
-
-            try
-            {
-                var resolvedSettings = channelConfig.Settings.Count > 0
-                    ? channel.ResolveSettings(channelConfig.Settings)
-                    : null;
-
-                await channel.NotifyAsync(message, resolvedSettings, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Failed to send notification via channel '{ChannelAlias}' for run {RunId}",
-                    channelConfig.ChannelAlias, run.Id);
-            }
-        }
+        await _channelNotifier.DispatchAsync(
+            automation,
+            message,
+            notifyOn => ShouldNotifyAsync(run, notifyOn, cancellationToken),
+            cancellationToken);
     }
 
     private async Task<bool> ShouldNotifyAsync(
@@ -139,11 +97,13 @@ internal sealed class RunCompletedNotificationDispatcher
             return false;
         }
 
-        // Check if the previous terminal run was a failure or suspension.
+        // Recovery is a success that follows a failure. Suspended runs are intentional pauses,
+        // not failures, so a success after a Suspended run isn't a "recovery" — and in any case
+        // Suspended is not in TerminalStatuses, so this query would never return it.
         var previousStatus = await _runService.GetPreviousTerminalRunStatusAsync(
             run.AutomationId, run.Id, cancellationToken);
 
-        return previousStatus is AutomationRunStatus.Failed or AutomationRunStatus.Suspended;
+        return previousStatus is AutomationRunStatus.Failed;
     }
 
     private static string BuildSubject(string automationName, AutomationRunStatus status)

@@ -14,7 +14,11 @@ import {
     UA_AUTOMATION_GROUP_ENTITY_TYPE,
     UA_AUTOMATION_ROOT_ENTITY_TYPE,
 } from "../entity.js";
-import { UA_AUTOMATION_PENDING_CHANGES_FLAG } from "./constants.js";
+import {
+    UA_AUTOMATION_HEALTH_DEGRADED_FLAG,
+    UA_AUTOMATION_HEALTH_DISABLED_FLAG,
+    UA_AUTOMATION_PENDING_CHANGES_FLAG,
+} from "./constants.js";
 import type { UaAutomationTreeItemModel } from "./types.js";
 
 export class UaAutomationTreeServerDataSource
@@ -118,6 +122,7 @@ export class UaAutomationTreeServerDataSource
             isFolder: false,
             icon: "icon-mindmap",
             status: item.status,
+            health: item.health,
             triggerAlias: item.triggerAlias ?? null,
             flags: buildFlags(item),
         };
@@ -127,6 +132,8 @@ export class UaAutomationTreeServerDataSource
 function buildFlags(item: AutomationItemResponseModel): Array<{ alias: string }> {
     const flags: Array<{ alias: string }> = [];
     if (hasPendingChanges(item)) flags.push({ alias: UA_AUTOMATION_PENDING_CHANGES_FLAG });
+    if (item.health === "Degraded") flags.push({ alias: UA_AUTOMATION_HEALTH_DEGRADED_FLAG });
+    if (item.health === "Disabled") flags.push({ alias: UA_AUTOMATION_HEALTH_DISABLED_FLAG });
     return flags;
 }
 
