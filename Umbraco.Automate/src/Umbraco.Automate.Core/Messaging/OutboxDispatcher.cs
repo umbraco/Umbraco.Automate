@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Diagnostics;
+using Umbraco.Automate.Core.Execution;
 
 namespace Umbraco.Automate.Core.Messaging;
 
@@ -16,6 +17,7 @@ internal sealed class OutboxDispatcher : BackgroundService
     private readonly AutomateReadinessSignal _readinessSignal;
     private readonly IOptions<OutboxOptions> _options;
     private readonly AutomateMetrics _metrics;
+    private readonly IExecutionNodeEligibility _eligibility;
     private readonly ILogger<OutboxDispatcher> _logger;
     private readonly string _instanceId = Guid.NewGuid().ToString("N")[..12];
 
@@ -26,7 +28,19 @@ internal sealed class OutboxDispatcher : BackgroundService
     private Task? _activeDispatch;
 
     private DateTime _lastDepthUpdate = DateTime.MinValue;
+    private int _lastKnownPending;
     private static readonly TimeSpan DepthUpdateInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// When the current "messages pending but nothing eligible to claim them" condition
+    /// first began, and whether we have already warned about it. Used to warn exactly once
+    /// per stall (edge-triggered), and only after the stall has persisted past
+    /// <see cref="StallWarningThreshold"/> so we don't false-alarm during the brief startup
+    /// window where the server role is legitimately still settling.
+    /// </summary>
+    private DateTime? _stallSince;
+    private bool _stallWarned;
+    private static readonly TimeSpan StallWarningThreshold = TimeSpan.FromSeconds(60);
 
     public OutboxDispatcher(
         IOutboxStore store,
@@ -34,6 +48,7 @@ internal sealed class OutboxDispatcher : BackgroundService
         AutomateReadinessSignal readinessSignal,
         IOptions<OutboxOptions> options,
         AutomateMetrics metrics,
+        IExecutionNodeEligibility eligibility,
         ILogger<OutboxDispatcher> logger)
     {
         _store = store;
@@ -41,6 +56,7 @@ internal sealed class OutboxDispatcher : BackgroundService
         _readinessSignal = readinessSignal;
         _options = options;
         _metrics = metrics;
+        _eligibility = eligibility;
         _logger = logger;
     }
 
@@ -107,6 +123,7 @@ internal sealed class OutboxDispatcher : BackgroundService
                     .ToList();
 
                 LogEligibilityTransitions(lastEligibleTopics, eligibleTopics, handlersByTopic.Keys);
+                WarnIfStalled(eligibleTopics.Count, _lastKnownPending);
 
                 if (eligibleTopics.Count == 0)
                 {
@@ -256,11 +273,53 @@ internal sealed class OutboxDispatcher : BackgroundService
         {
             var stats = await _store.GetStatsAsync(cancellationToken);
             _metrics.UpdateOutboxDepth(stats.Pending, stats.Processing);
+            _lastKnownPending = stats.Pending;
             _lastDepthUpdate = now;
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Failed to update outbox depth metrics");
         }
+    }
+
+    /// <summary>
+    /// Warns (once, edge-triggered) when there are messages waiting but no topic is eligible
+    /// for processing on this node — a silent dead-end where work accumulates and nothing
+    /// consumes it. The most common cause is a misconfigured single-server install whose
+    /// <c>ServerRole</c> never leaves <c>Unknown</c>; the explanation comes from
+    /// <see cref="IExecutionNodeEligibility.CanExecuteWorkflows(out string?)"/> so the message
+    /// stays in sync with the actual eligibility rule. A <see cref="StallWarningThreshold"/>
+    /// grace window avoids false alarms while the role is still settling at startup.
+    /// </summary>
+    private void WarnIfStalled(int eligibleTopicCount, int pendingDepth)
+    {
+        var stalled = eligibleTopicCount == 0 && pendingDepth > 0;
+
+        if (!stalled)
+        {
+            if (_stallWarned)
+            {
+                _logger.LogInformation(
+                    "Outbox processing resumed — this node is eligible to consume messages again");
+            }
+
+            _stallSince = null;
+            _stallWarned = false;
+            return;
+        }
+
+        _stallSince ??= DateTime.UtcNow;
+
+        if (_stallWarned || DateTime.UtcNow - _stallSince < StallWarningThreshold)
+        {
+            return;
+        }
+
+        _stallWarned = true;
+        _eligibility.CanExecuteWorkflows(out var reason);
+        _logger.LogWarning(
+            "Outbox has {Pending} pending message(s) but no topics are eligible for processing on this node, " +
+            "so nothing will be consumed. {Reason}",
+            pendingDepth, reason);
     }
 }
