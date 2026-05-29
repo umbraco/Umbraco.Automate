@@ -33,6 +33,41 @@ public class ExecutionNodeEligibilityTests
         sut.CanExecuteWorkflows().ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData(ServerRole.Single, ExecutionMode.SchedulerOnly)]
+    [InlineData(ServerRole.SchedulingPublisher, ExecutionMode.SchedulerOnly)]
+    [InlineData(ServerRole.Unknown, ExecutionMode.Distributed)]
+    public void WhenEligible_ReasonIsNull(ServerRole role, ExecutionMode mode)
+    {
+        var sut = Build(role, mode);
+        sut.CanExecuteWorkflows(out var reason).ShouldBeTrue();
+        reason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void WhenUnknown_ReasonExplainsElectionAndRemediation()
+    {
+        var sut = Build(ServerRole.Unknown, ExecutionMode.SchedulerOnly);
+
+        sut.CanExecuteWorkflows(out var reason).ShouldBeFalse();
+        reason.ShouldNotBeNull();
+        reason.ShouldContain("Unknown");
+        // Surfaces an actionable remediation rather than just stating the role.
+        reason.ShouldContain("DisableElectionForSingleServer");
+    }
+
+    [Fact]
+    public void WhenSubscriber_ReasonIsExpectedNotAlarming()
+    {
+        var sut = Build(ServerRole.Subscriber, ExecutionMode.SchedulerOnly);
+
+        sut.CanExecuteWorkflows(out var reason).ShouldBeFalse();
+        reason.ShouldNotBeNull();
+        reason.ShouldContain("Subscriber");
+        // Subscriber is a legitimate state in a multi-node setup, so the wording is reassuring.
+        reason.ShouldContain("expected");
+    }
+
     private static ExecutionNodeEligibility Build(ServerRole role, ExecutionMode mode)
     {
         var serverRole = new Mock<IServerRoleAccessor>();
