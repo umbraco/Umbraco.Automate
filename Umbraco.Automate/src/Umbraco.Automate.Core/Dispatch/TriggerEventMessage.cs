@@ -21,6 +21,13 @@ internal sealed class TriggerEventMessage
     public string? InitiatorId { get; set; }
 
     /// <summary>
+    /// Gets or sets an optional target automation. When set, only that automation runs rather
+    /// than every published automation subscribed to <see cref="TriggerAlias"/>. <c>null</c>
+    /// for pub/sub triggers that dispatch to all subscribers.
+    /// </summary>
+    public Guid? TargetAutomationId { get; set; }
+
+    /// <summary>
     /// Gets or sets the JSON-serialized trigger output data.
     /// </summary>
     public string? OutputData { get; set; }

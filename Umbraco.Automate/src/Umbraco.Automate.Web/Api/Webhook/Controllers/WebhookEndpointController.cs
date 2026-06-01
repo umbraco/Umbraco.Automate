@@ -229,10 +229,13 @@ public sealed class WebhookEndpointController : ControllerBase
             "Webhook received for automation {AutomationId} ({AutomationAlias})",
             automationId, automation.Alias);
 
+        // Target this exact automation. The endpoint is addressed by automation ID, so the
+        // dispatch must not fan out to every published automation sharing the webhook alias.
         await _dispatcher.DispatchAsync(
             new TriggerEvent<WebhookTriggerOutput>
             {
                 TriggerAlias = triggerAlias,
+                TargetAutomationId = automationId,
                 InitiatorType = TriggerInitiatorType.Webhook,
                 Output = output,
             },

@@ -222,6 +222,31 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
+    public async Task ReceiveWebhook_TargetsTheAddressedAutomation()
+    {
+        // The endpoint is addressed by automation ID, so the dispatched event must target that
+        // automation — otherwise the handler fans out to every published automation sharing the
+        // webhook alias and runs them all.
+        var automation = CreateAutomation(
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "tok" });
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
+
+        TriggerEvent? captured = null;
+        _dispatcher.Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        captured.ShouldNotBeNull();
+        captured.TargetAutomationId.ShouldBe(automation.Id);
+    }
+
+    [Fact]
     public async Task ReceiveWebhook_ValidHmacSignature_Returns202()
     {
         var key = "hmac-secret-key";
