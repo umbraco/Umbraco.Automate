@@ -63,6 +63,34 @@ public class HttpRequestActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Post_SendsBodyFromSettings()
+    {
+        string? sentBody = null;
+        string? sentContentType = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req =>
+        {
+            sentBody = req.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            sentContentType = req.Content?.Headers.ContentType?.ToString();
+        });
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            Body = "{\"hello\":\"world\"}",
+            ContentType = "application/json",
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sentBody.ShouldBe("{\"hello\":\"world\"}");
+
+        // Content-Type must be sent verbatim, without a "; charset=utf-8" suffix that
+        // strict webhook receivers reject.
+        sentContentType.ShouldBe("application/json");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_MissingUrl_ReturnsValidationFailure()
     {
         var action = CreateAction();
@@ -84,7 +112,10 @@ public class HttpRequestActionTests
         Settings = settings,
     };
 
-    private static HttpRequestAction CreateAction(HttpStatusCode statusCode = HttpStatusCode.OK, string body = "")
+    private static HttpRequestAction CreateAction(
+        HttpStatusCode statusCode = HttpStatusCode.OK,
+        string body = "",
+        Action<HttpRequestMessage>? onRequest = null)
     {
         var handler = new Mock<HttpMessageHandler>();
         handler
@@ -93,6 +124,7 @@ public class HttpRequestActionTests
                 "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => onRequest?.Invoke(req))
             .ReturnsAsync(new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(body),
