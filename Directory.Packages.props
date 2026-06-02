@@ -14,13 +14,13 @@
 
   <!-- Umbraco CMS -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Cms.Core" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Core" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[17.4.0, 17.999.999)" />
   </ItemGroup>
 
   <!-- WorkflowCore (automation engine) -->
@@ -46,9 +46,9 @@
 
 <!-- Shared dependencies -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.0, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.0, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.0, 10.999.999)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.6, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.6, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.6, 10.999.999)" />
   </ItemGroup>
 
   <!-- Test dependencies -->
