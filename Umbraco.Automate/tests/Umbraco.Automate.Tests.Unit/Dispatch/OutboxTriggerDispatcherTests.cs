@@ -155,6 +155,62 @@ public class OutboxTriggerDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchAsync_TargetAutomationId_IsPassedThrough()
+    {
+        object? captured = null;
+        _outbox
+            .Setup(p => p.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
+            .Returns(Task.CompletedTask);
+
+        var automationId = Guid.NewGuid();
+        var triggerEvent = new TriggerEvent
+        {
+            TriggerAlias = "umbracoAutomate.webhook",
+            InitiatorType = "webhook",
+            TargetAutomationId = automationId,
+        };
+
+        await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
+
+        captured.ShouldNotBeNull();
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.TargetAutomationId.ShouldBe(automationId);
+    }
+
+    [Fact]
+    public async Task DispatchAsync_NoTargetAutomationId_LeavesItNull()
+    {
+        object? captured = null;
+        _outbox
+            .Setup(p => p.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
+            .Returns(Task.CompletedTask);
+
+        var triggerEvent = new TriggerEvent
+        {
+            TriggerAlias = "contentPublished",
+            InitiatorType = "system",
+        };
+
+        await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
+
+        captured.ShouldNotBeNull();
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.TargetAutomationId.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task DispatchAsync_IdempotencyKey_IsPassedToOutbox()
     {
         string? capturedDedup = null;

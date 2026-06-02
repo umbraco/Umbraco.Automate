@@ -182,6 +182,68 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_TargetAutomationId_RunsOnlyTargetedAutomation()
+    {
+        // Two published automations share the alias (the webhook fan-out scenario). The event
+        // targets exactly one — only that automation should run, never the sibling.
+        var target = new AutomationBuilder().WithId(Guid.NewGuid()).WithTrigger("myTrigger").Build();
+        var sibling = new AutomationBuilder().WithId(Guid.NewGuid()).WithTrigger("myTrigger").Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { target, sibling });
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "myTrigger",
+            InitiatorType = "webhook",
+            TargetAutomationId = target.Id,
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            target,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            sibling,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TargetAutomationId_NoMatch_DoesNotExecute()
+    {
+        // The targeted automation isn't among the published set (deleted/unpublished since the
+        // event was queued) — drop rather than fall back to firing the alias siblings.
+        var sibling = CreatePublishedAutomation("myTrigger");
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { sibling });
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "myTrigger",
+            InitiatorType = "webhook",
+            TargetAutomationId = Guid.NewGuid(),
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            It.IsAny<Automation>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+    }
+
+    [Fact]
     public async Task HandleAsync_WithOutputData_DeserializesAndPassesToExecutor()
     {
         var automation = CreatePublishedAutomation("myTrigger");
