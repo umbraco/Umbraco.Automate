@@ -50,6 +50,7 @@ fetch(swaggerUrl)
                     name: "@hey-api/sdk",
                     operations: {
                         strategy: "byTags",
+                        container: "class",
                         containerName: "{{name}}Service",
                     },
                 },
