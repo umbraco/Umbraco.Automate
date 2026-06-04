@@ -12,6 +12,7 @@ export const UaCatalogueTypeMapper = {
             settingsSchema: response.settingsSchema ?? null,
             connectionTypeAlias: response.connectionTypeAlias ?? null,
             outputSchema: response.outputSchema ?? null,
+            hasDynamicOutputSchema: response.hasDynamicOutputSchema,
         };
     },
 
@@ -24,6 +25,7 @@ export const UaCatalogueTypeMapper = {
             icon: response.icon ?? null,
             settingsSchema: response.settingsSchema ?? null,
             outputSchema: response.outputSchema ?? null,
+            hasDynamicOutputSchema: response.hasDynamicOutputSchema,
         };
     },
 
@@ -47,6 +49,7 @@ export const UaCatalogueTypeMapper = {
             icon: response.icon ?? null,
             settingsSchema: response.settingsSchema ?? null,
             outputSchema: response.outputSchema ?? null,
+            hasDynamicOutputSchema: response.hasDynamicOutputSchema,
         };
     },
 };

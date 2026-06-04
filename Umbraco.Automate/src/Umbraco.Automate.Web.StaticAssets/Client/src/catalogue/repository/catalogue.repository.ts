@@ -16,6 +16,9 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
     #triggersCache = new Map<string, UaTriggerCatalogueItemModel[]>();
     #connectionTypesCache: UaConnectionTypeCatalogueItemModel[] | undefined;
     #controlFlowsCache: UaControlFlowCatalogueItemModel[] | undefined;
+    // Resolved dynamic output schemas, keyed by alias + serialized settings. The binding picker
+    // resolves the same predecessor schemas repeatedly as it rebuilds, so cache per settings snapshot.
+    #outputSchemaCache = new Map<string, Record<string, unknown> | null>();
 
     constructor(host: UmbControllerHost) {
         super(host);
@@ -74,6 +77,27 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
         return result;
     }
 
+    /**
+     * Resolves the settings-dependent output schema for a step type that declares `hasDynamicOutputSchema`.
+     * Cached per (alias, settings) so repeated picker rebuilds don't re-hit the server. Returns a null
+     * schema when settings are insufficient to determine the output shape.
+     */
+    async resolveOutputSchema(
+        alias: string,
+        settings: Record<string, unknown>,
+    ): Promise<{ data?: Record<string, unknown> | null; error?: unknown }> {
+        const key = `${alias}::${JSON.stringify(settings ?? {})}`;
+        if (this.#outputSchemaCache.has(key)) {
+            return { data: this.#outputSchemaCache.get(key) ?? null };
+        }
+
+        const result = await this.#dataSource.resolveOutputSchema(alias, settings ?? {});
+        if (!result.error) {
+            this.#outputSchemaCache.set(key, result.data ?? null);
+        }
+        return result;
+    }
+
     async requestNotificationChannels(): Promise<{ data?: NotificationChannelItemResponseModel[]; error?: unknown }> {
         const { data, error } = await tryExecute(
             this,
@@ -87,6 +111,7 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
         this.#triggersCache.clear();
         this.#connectionTypesCache = undefined;
         this.#controlFlowsCache = undefined;
+        this.#outputSchemaCache.clear();
     }
 }
 
