@@ -34,6 +34,72 @@ public class AutomateOptions
     /// be copied into <c>umbracoAutomateDbDSN</c>.
     /// </remarks>
     public string UseNamedConnectionString { get; set; } = "umbracoAutomateDbDSN";
+
+    /// <summary>
+    /// Gets or sets the <see cref="Microsoft.Extensions.Configuration.IConfiguration"/> key
+    /// prefixes that automation settings may dereference via the <c>$Key:Path</c> syntax.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Settings fields support a <c>$Key:Path</c> syntax that resolves to a configuration
+    /// value at run time (e.g. <c>$Umbraco:Automate:Secrets:SlackToken</c>), letting admins
+    /// keep credentials and per-environment values in app settings / environment variables
+    /// rather than the database.
+    /// </para>
+    /// <para>
+    /// Automations execute under an elevated service-account identity, so configuration
+    /// resolution follows least-privilege: it is <strong>default-deny</strong>, and a key is
+    /// only resolvable when it falls under one of these prefixes. This keeps automation
+    /// settings scoped to configuration explicitly intended for them rather than the whole
+    /// configuration tree. The allow-list lives here (app settings) by design, so only someone
+    /// who already has access to the configuration decides which subset automations may read.
+    /// </para>
+    /// <para>
+    /// Defaults to two dedicated sections, mirroring the GitHub Actions split:
+    /// <c>Umbraco:Automate:Secrets</c> for sensitive values and
+    /// <c>Umbraco:Automate:Variables</c> for non-sensitive per-environment values. Admins
+    /// place automation-facing values under these. Add further prefixes to expose existing
+    /// configuration sections without copying them, accepting that everything under an added
+    /// prefix becomes readable by automation authors. Matching is segment-aware and
+    /// case-insensitive: the prefix <c>Umbraco:Automate:Secrets</c> permits
+    /// <c>Umbraco:Automate:Secrets:SlackToken</c> but not <c>Umbraco:Automate:SecretsBackup:X</c>.
+    /// </para>
+    /// <para>
+    /// Keys under a <see cref="SecretConfigurationKeyPrefixes"/> prefix carry the extra
+    /// restriction that they may only be referenced from sensitive fields — see that property.
+    /// </para>
+    /// </remarks>
+    public IList<string> AllowedConfigurationKeyPrefixes { get; set; } = new List<string>
+    {
+        "Umbraco:Automate:Secrets",
+        "Umbraco:Automate:Variables",
+    };
+
+    /// <summary>
+    /// Gets or sets the subset of <see cref="AllowedConfigurationKeyPrefixes"/> whose values
+    /// are treated as secret, and which may therefore only be referenced from settings fields
+    /// marked <c>[Field(IsSensitive = true)]</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The allow-list scopes which sections are reachable; this adds a further constraint so a
+    /// resolved secret only flows into fields the system already treats as credential-bearing
+    /// (encrypted at rest, stripped on export), the same places a directly-entered credential
+    /// belongs — rather than into fields whose values may later be surfaced in clear.
+    /// </para>
+    /// <para>
+    /// Mirrors the GitHub Actions split: <c>Umbraco:Automate:Secrets</c> (the default here)
+    /// is sensitive and field-restricted; <c>Umbraco:Automate:Variables</c> is left off this
+    /// list so non-secret per-environment values (base URLs, IDs, flags) can be referenced
+    /// from any field. Entries should be a subset of <see cref="AllowedConfigurationKeyPrefixes"/>;
+    /// a secret prefix that is not also allowed is simply never resolvable. Matching is
+    /// segment-aware and case-insensitive, as for the allow-list.
+    /// </para>
+    /// </remarks>
+    public IList<string> SecretConfigurationKeyPrefixes { get; set; } = new List<string>
+    {
+        "Umbraco:Automate:Secrets",
+    };
 }
 
 /// <summary>
