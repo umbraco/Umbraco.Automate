@@ -86,11 +86,15 @@ internal sealed class TriggerEventHandler : IMessageHandler
             return;
         }
 
-        // Find all published automations that use this trigger.
+        // Find all published automations that use this trigger. When the event targets a
+        // specific automation (imperative entry points like the webhook endpoint, addressed by
+        // automation ID), narrow to that one — otherwise this fans out to every published
+        // automation subscribed to the alias, running them all.
         var automations = await _automationService.GetAllAutomationsAsync(cancellationToken);
         var matching = automations
             .Where(a => a.Status == AutomationStatus.Published
-                        && a.Trigger?.TriggerAlias == message.TriggerAlias)
+                        && a.Trigger?.TriggerAlias == message.TriggerAlias
+                        && (message.TargetAutomationId is null || a.Id == message.TargetAutomationId))
             .ToList();
 
         if (matching.Count == 0)
