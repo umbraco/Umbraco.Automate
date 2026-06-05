@@ -1,5 +1,9 @@
 <p align="center">
-  <img alt="Umbraco Automate" src="./assets/logo-128.png" width="128">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo_white.png">
+    <source media="(prefers-color-scheme: light)" srcset="./assets/logo_dark.png">
+    <img alt="Umbraco Automate" src="./assets/logo_dark.png" width="600">
+  </picture>
   <br />
   Provider-driven automation for Umbraco CMS.
 </p>
