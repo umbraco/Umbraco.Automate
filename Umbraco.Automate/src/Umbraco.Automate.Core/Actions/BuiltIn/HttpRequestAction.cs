@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -40,7 +41,16 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
 
         if (!string.IsNullOrWhiteSpace(settings.Body) && HasBody(settings.Method))
         {
-            request.Content = new StringContent(settings.Body, Encoding.UTF8, settings.ContentType);
+            // Encode the body as UTF-8, but set the Content-Type header from the configured
+            // value verbatim rather than letting StringContent append "; charset=utf-8".
+            // Some webhook receivers (e.g. Slack, Discord) reject the charset parameter and
+            // treat the request as if it had no body.
+            request.Content = new StringContent(settings.Body, Encoding.UTF8);
+            if (!string.IsNullOrWhiteSpace(settings.ContentType)
+                && MediaTypeHeaderValue.TryParse(settings.ContentType, out var contentType))
+            {
+                request.Content.Headers.ContentType = contentType;
+            }
         }
 
         ApplyHeaders(request, settings.Headers);

@@ -51,13 +51,14 @@ public class ContentSavedTriggerTests
         properties.Keys.ShouldContain("contentKey");
         properties.Keys.ShouldContain("contentName");
         properties.Keys.ShouldContain("contentTypeAlias");
+        properties.Keys.ShouldContain("isNew");
     }
 
     [Fact]
     public void MapEvent_ProducesEventPerSavedItem()
     {
-        var content1 = CreateContent(Guid.NewGuid(), "Page One", "blogPost");
-        var content2 = CreateContent(Guid.NewGuid(), "Page Two", "article");
+        var content1 = CreateContent(Guid.NewGuid(), "Page One", "blogPost", isNew: true);
+        var content2 = CreateContent(Guid.NewGuid(), "Page Two", "article", isNew: false);
 
         var notification = new ContentSavedNotification(
             new[] { content1, content2 },
@@ -71,9 +72,11 @@ public class ContentSavedTriggerTests
         first.TriggerAlias.ShouldBe("umbracoAutomate.contentSaved");
         first.Output.ContentName.ShouldBe("Page One");
         first.Output.ContentTypeAlias.ShouldBe("blogPost");
+        first.Output.IsNew.ShouldBeTrue();
 
         var second = events[1].ShouldBeOfType<TriggerEvent<ContentSavedTriggerOutput>>();
         second.Output.ContentName.ShouldBe("Page Two");
+        second.Output.IsNew.ShouldBeFalse();
     }
 
     [Fact]
@@ -137,15 +140,68 @@ public class ContentSavedTriggerTests
         ((ITrigger)_trigger).CanHandle(new { }, new ContentSavedTriggerSettings()).ShouldBeTrue();
     }
 
-    private static IContent CreateContent(Guid key, string name, string contentTypeAlias)
+    [Fact]
+    public void MapEvent_InvariantContent_CulturesIsNull()
+    {
+        var content = CreateContent(Guid.NewGuid(), "Page", "blogPost");
+
+        var notification = new ContentSavedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentSavedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBeNull();
+    }
+
+    [Fact]
+    public void MapEvent_VariantContent_CulturesContainsDirtyCultureInfos()
+    {
+        // Only "en-US" was edited in this save; "fr-FR" already existed unchanged.
+        var cultureInfos = ContentPublishedTriggerTests.BuildCultureInfos(
+            dirty: new[] { "en-US" },
+            clean: new[] { "fr-FR" });
+        var content = CreateContent(
+            Guid.NewGuid(),
+            "Page",
+            "blogPost",
+            variations: ContentVariation.Culture,
+            cultureInfos: cultureInfos);
+
+        var notification = new ContentSavedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentSavedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBe(new[] { "en-US" });
+    }
+
+    internal static IContent CreateContent(
+        Guid key,
+        string name,
+        string contentTypeAlias,
+        bool isNew = false,
+        ContentVariation variations = ContentVariation.Nothing,
+        ContentCultureInfosCollection? cultureInfos = null)
     {
         var contentType = new Mock<ISimpleContentType>();
         contentType.SetupGet(ct => ct.Alias).Returns(contentTypeAlias);
+        contentType.SetupGet(ct => ct.Variations).Returns(variations);
+
+        // CreateDate == UpdateDate signals a newly-created item; diverged dates signal an edit.
+        var createDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var updateDate = isNew ? createDate : createDate.AddSeconds(1);
 
         var content = new Mock<IContent>();
         content.SetupGet(c => c.Key).Returns(key);
         content.SetupGet(c => c.Name).Returns(name);
         content.SetupGet(c => c.ContentType).Returns(contentType.Object);
+        content.SetupGet(c => c.CreateDate).Returns(createDate);
+        content.SetupGet(c => c.UpdateDate).Returns(updateDate);
+        content.SetupGet(c => c.CultureInfos).Returns(cultureInfos);
 
         return content.Object;
     }

@@ -1,9 +1,11 @@
+using Umbraco.Automate.Core.Dispatch.Authorization;
+
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
 /// Output produced by the <see cref="ContentUnpublishedTrigger"/> for each unpublished content item.
 /// </summary>
-public sealed class ContentUnpublishedTriggerOutput
+public sealed class ContentUnpublishedTriggerOutput : IContentScopedTriggerOutput
 {
     /// <summary>
     /// Gets the content item's unique key.
@@ -24,4 +26,13 @@ public sealed class ContentUnpublishedTriggerOutput
     /// Gets the content type alias.
     /// </summary>
     public string? ContentTypeAlias { get; init; }
+
+    /// <summary>
+    /// Gets the cultures that were unpublished in this event.
+    /// Null for invariant content (the whole item was unpublished); an empty array
+    /// indicates a variant content unpublish where no cultures were removed (rare).
+    /// </summary>
+    public string[]? Cultures { get; init; }
+
+    Guid? IContentScopedTriggerOutput.GetContentKey() => ContentKey;
 }

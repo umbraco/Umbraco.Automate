@@ -11,17 +11,23 @@ export interface UaCatalogueItemModel {
 
 export interface UaTriggerCatalogueItemModel extends UaCatalogueItemModel {
     outputSchema: { [key: string]: unknown } | null;
+    /** When true, the output schema depends on the step's settings and must be resolved via the catalogue resolve endpoint. */
+    hasDynamicOutputSchema: boolean;
 }
 
 export interface UaActionCatalogueItemModel extends UaCatalogueItemModel {
     connectionTypeAlias: string | null;
     outputSchema: { [key: string]: unknown } | null;
+    /** When true, the output schema depends on the step's settings and must be resolved via the catalogue resolve endpoint. */
+    hasDynamicOutputSchema: boolean;
 }
 
 export interface UaConnectionTypeCatalogueItemModel extends UaCatalogueItemModel {}
 
 export interface UaControlFlowCatalogueItemModel extends UaCatalogueItemModel {
     outputSchema: { [key: string]: unknown } | null;
+    /** When true, the output schema depends on the step's settings and must be resolved via the catalogue resolve endpoint. */
+    hasDynamicOutputSchema: boolean;
 }
 
 export type UaCatalogueMode = "trigger" | "action";

@@ -8,6 +8,7 @@ using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.HealthChecks;
 using Umbraco.Automate.Core.Bindings;
@@ -60,6 +61,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
         builder.Services.Configure<RateLimitingOptions>(
             builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
+        builder.Services.Configure<CircuitBreakerOptions>(
+            builder.Config.GetSection("Umbraco:Automate:CircuitBreaker"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -75,6 +78,8 @@ public static partial class UmbracoBuilderExtensions
         builder.AutomateWebhookAuthenticators()
             .Add<PlainSecretWebhookAuthenticator>()
             .Add<HmacSha256WebhookAuthenticator>();
+        builder.AutomateTriggerDispatchAuthorizers()
+            .Add<NodeScopedTriggerDispatchAuthorizer>();
         builder.AutomateBindingFilters();
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>()
@@ -94,8 +99,18 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<AutomationUnpublishedNotification, TriggerSubscriptionInvalidator>();
         builder.AddNotificationAsyncHandler<AutomationDeletedNotification, TriggerSubscriptionInvalidator>();
 
+        // Shared channel dispatch helper used by the run-completed and health-changed dispatchers.
+        builder.Services.AddSingleton<ChannelNotifier>();
+
         // Wire run-completed notification → notification channel dispatcher
         builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, RunCompletedNotificationDispatcher>();
+        builder.AddNotificationAsyncHandler<AutomationRunResumedNotification, RunResumedNotificationDispatcher>();
+
+        // Circuit breaker: evaluate health after every terminal run, reset on re-publish, and
+        // dispatch health-changed (degraded/disabled) notifications to configured channels.
+        builder.AddNotificationAsyncHandler<AutomationRunCompletedNotification, CircuitBreakerEvaluator>();
+        builder.AddNotificationAsyncHandler<AutomationPublishedNotification, CircuitBreakerResetHandler>();
+        builder.AddNotificationAsyncHandler<AutomationHealthChangedNotification, CircuitBreakerHealthNotificationDispatcher>();
 
         // Bridge run lifecycle notifications onto the backoffice server-events SignalR channel
         builder.AddNotificationAsyncHandler<AutomationRunStartedNotification, RunServerEventBridge>();
@@ -103,13 +118,16 @@ public static partial class UmbracoBuilderExtensions
 
         // Action middleware — ordered pipeline:
         //   1. ErrorHandling — catches exceptions from everything inside
-        //   2. BackOfficeIdentity — resolves the workspace service principal so all
+        //   2. AutomationOrigin — publishes the running run's identity to AsyncLocal so
+        //      side-effect notifications (e.g. content saves) can be stamped with it
+        //   3. BackOfficeIdentity — resolves the workspace service principal so all
         //      subsequent middleware and the action itself execute as that identity
-        //   3. StepRunLogging — logs execution timing (excludes identity resolution overhead)
-        //   4. SettingsValidation — validates before audit so invalid configs aren't trailed
-        //   5. AuditTrail — writes CMS audit entry on success
+        //   4. StepRunLogging — logs execution timing (excludes identity resolution overhead)
+        //   5. SettingsValidation — validates before audit so invalid configs aren't trailed
+        //   6. AuditTrail — writes CMS audit entry on success
         builder.AutomateActionMiddleware()
             .Append<ErrorHandlingMiddleware>()
+            .Append<AutomationOriginMiddleware>()
             .Append<BackOfficeIdentityMiddleware>()
             .Append<StepRunLoggingMiddleware>()
             .Append<SettingsValidationMiddleware>()
@@ -120,6 +138,9 @@ public static partial class UmbracoBuilderExtensions
         // while outside of runs the original accessor is used unchanged.
         builder.Services.DecorateBackOfficeSecurityAccessor();
         builder.Services.AddSingleton<ISensitiveFieldProtector, SensitiveFieldProtector>();
+        builder.Services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
+        builder.Services.AddSingleton<IWorkspaceServiceAccountResolver, WorkspaceServiceAccountResolver>();
+        builder.Services.AddSingleton<IAutomationActionAuthorizer, AutomationActionAuthorizer>();
 
         // Settings infrastructure
         builder.Services.AddSingleton<IEditableModelSerializer, EditableModelSerializer>();
@@ -153,6 +174,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
+        builder.Services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<BindingEvaluator>();
         builder.Services.AddSingleton<SettingsBindingResolver>();
@@ -178,6 +200,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IRateLimitService, RateLimitService>();
 
         // Automation execution
+        builder.Services.AddSingleton<IAutomationOriginAccessor, AutomationOriginAccessor>();
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IExecutionNodeEligibility, ExecutionNodeEligibility>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
@@ -248,6 +271,15 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static WebhookAuthenticatorCollectionBuilder AutomateWebhookAuthenticators(this IUmbracoBuilder builder)
         => builder.WithCollectionBuilder<WebhookAuthenticatorCollectionBuilder>();
+
+    /// <summary>
+    /// Gets the trigger dispatch authoriser collection builder. Register additional
+    /// <see cref="ITriggerDispatchAuthorizer"/> implementations to gate trigger dispatch
+    /// against provider-specific resource models (e.g. per-store membership in Umbraco
+    /// Commerce). The built-in node-scoped authoriser is registered by default.
+    /// </summary>
+    public static TriggerDispatchAuthorizerCollectionBuilder AutomateTriggerDispatchAuthorizers(this IUmbracoBuilder builder)
+        => builder.WithCollectionBuilder<TriggerDispatchAuthorizerCollectionBuilder>();
 
     /// <summary>
     /// Gets the versionable entity adapter collection builder.

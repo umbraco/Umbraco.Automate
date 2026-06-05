@@ -5,6 +5,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -20,6 +21,7 @@ public class BackOfficeIdentityMiddlewareTests
     {
         _middleware = new BackOfficeIdentityMiddleware(
             _userService.Object,
+            new SectionAccessChecker(),
             Mock.Of<ILogger<BackOfficeIdentityMiddleware>>());
     }
 
@@ -149,6 +151,55 @@ public class BackOfficeIdentityMiddlewareTests
         capturedContext.ShouldBeSameAs(context);
     }
 
+    [Fact]
+    public async Task ApplyAsync_ActionRequiresSection_AccountLacksIt_FailsWithAuthentication()
+    {
+        var serviceAccountKey = Guid.NewGuid();
+        var action = new Mock<IAction>();
+        action.Setup(a => a.Name).Returns("Publish Content");
+        action.Setup(a => a.RequiredSections).Returns(new[] { "content" });
+
+        var context = CreateContext(CreateExecutionContext(serviceAccountKey), action.Object);
+
+        _userService.Setup(s => s.GetAsync(serviceAccountKey))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "media" }));
+
+        var nextCalled = false;
+        var result = await _middleware.ApplyAsync(
+            context,
+            (_, _) => { nextCalled = true; return Task.FromResult(ActionResult.Success()); },
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+        nextCalled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ActionRequiresSection_AccountHasIt_DelegatesToNext()
+    {
+        var serviceAccountKey = Guid.NewGuid();
+        var action = new Mock<IAction>();
+        action.Setup(a => a.Name).Returns("Publish Content");
+        action.Setup(a => a.RequiredSections).Returns(new[] { "content" });
+
+        var context = CreateContext(CreateExecutionContext(serviceAccountKey), action.Object);
+
+        var user = new Mock<IUser>();
+        user.Setup(u => u.Key).Returns(serviceAccountKey);
+        user.Setup(u => u.AllowedSections).Returns(new[] { "content" });
+        _userService.Setup(s => s.GetAsync(serviceAccountKey)).ReturnsAsync(user.Object);
+
+        var nextCalled = false;
+        var result = await _middleware.ApplyAsync(
+            context,
+            (_, _) => { nextCalled = true; return Task.FromResult(ActionResult.Success()); },
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        nextCalled.ShouldBeTrue();
+    }
+
     private static AutomationExecutionContext CreateExecutionContext(Guid serviceAccountKey) => new()
     {
         ServiceAccountKey = serviceAccountKey,
@@ -161,12 +212,13 @@ public class BackOfficeIdentityMiddlewareTests
         AllowedConnections = [],
     };
 
-    private static ActionContext CreateContext(AutomationExecutionContext? executionContext = null) => new()
+    private static ActionContext CreateContext(AutomationExecutionContext? executionContext = null, IAction? action = null) => new()
     {
         AutomationId = Guid.NewGuid(),
         RunId = Guid.NewGuid(),
         StepId = Guid.NewGuid(),
         ActionAlias = "umbracoAutomate.publishContent",
         ExecutionContext = executionContext,
+        Action = action,
     };
 }

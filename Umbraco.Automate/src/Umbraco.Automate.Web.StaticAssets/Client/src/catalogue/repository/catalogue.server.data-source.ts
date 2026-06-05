@@ -11,10 +11,10 @@ export class UaCatalogueServerDataSource {
         this.#host = host;
     }
 
-    async getActions(): Promise<{ data?: UaActionCatalogueItemModel[]; error?: unknown }> {
+    async getActions(workspaceId?: string): Promise<{ data?: UaActionCatalogueItemModel[]; error?: unknown }> {
         const { data, error } = await tryExecute(
             this.#host,
-            CatalogueService.getCatalogueActions(),
+            CatalogueService.getCatalogueActions({ query: workspaceId ? { workspaceId } : undefined }),
         );
 
         if (error || !data) {
@@ -24,10 +24,10 @@ export class UaCatalogueServerDataSource {
         return { data: data.map(UaCatalogueTypeMapper.toActionModel) };
     }
 
-    async getTriggers(): Promise<{ data?: UaTriggerCatalogueItemModel[]; error?: unknown }> {
+    async getTriggers(workspaceId?: string): Promise<{ data?: UaTriggerCatalogueItemModel[]; error?: unknown }> {
         const { data, error } = await tryExecute(
             this.#host,
-            CatalogueService.getCatalogueTriggers(),
+            CatalogueService.getCatalogueTriggers({ query: workspaceId ? { workspaceId } : undefined }),
         );
 
         if (error || !data) {
@@ -61,5 +61,29 @@ export class UaCatalogueServerDataSource {
         }
 
         return { data: data.map(UaCatalogueTypeMapper.toControlFlowModel) };
+    }
+
+    /**
+     * Resolves the output schema for a step type using its configured settings. Used for step types
+     * that declare `hasDynamicOutputSchema` (e.g. Run AI Agent), whose output shape depends on settings.
+     * Returns a null schema when the settings are insufficient to determine the shape (e.g. no agent selected).
+     */
+    async resolveOutputSchema(
+        alias: string,
+        settings: Record<string, unknown>,
+    ): Promise<{ data?: Record<string, unknown> | null; error?: unknown }> {
+        const { data, error } = await tryExecute(
+            this.#host,
+            CatalogueService.postCatalogueStepTypesByAliasOutputSchema({
+                path: { alias },
+                body: { settings },
+            }),
+        );
+
+        if (error) {
+            return { error };
+        }
+
+        return { data: (data as Record<string, unknown> | null) ?? null };
     }
 }

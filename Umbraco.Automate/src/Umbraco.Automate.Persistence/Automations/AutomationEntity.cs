@@ -13,8 +13,6 @@ internal sealed class AutomationEntity
 
     public string? Description { get; set; }
 
-    public bool IsEnabled { get; set; }
-
     public int Status { get; set; }
 
     public int? PublishedVersion { get; set; }

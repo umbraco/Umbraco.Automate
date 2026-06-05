@@ -57,7 +57,7 @@ export class UaAutomateDashboardElement extends UmbLitElement {
 
         const published = automationsData.items.filter((a) => a.status === "Published").length;
         const draft = automationsData.items.filter((a) => a.status === "Draft").length;
-        const inactive = automationsData.items.filter((a) => a.status === "Inactive").length;
+        const unpublished = automationsData.items.filter((a) => a.status === "Unpublished").length;
 
         // Load recent runs from all automations
         const allRuns: (UaRunItemModel & { automationName: string })[] = [];
@@ -90,7 +90,7 @@ export class UaAutomateDashboardElement extends UmbLitElement {
         this._cards = [
             { label: "Published", count: published, color: "positive", icon: "icon-check" },
             { label: "Draft", count: draft, color: "warning", icon: "icon-edit" },
-            { label: "Inactive", count: inactive, color: "danger", icon: "icon-block" },
+            { label: "Unpublished", count: unpublished, color: "danger", icon: "icon-block" },
             { label: "Failed Runs", count: failedRuns, color: "danger", icon: "icon-alert" },
             { label: "In Progress", count: runningRuns, color: "warning", icon: "icon-nodes" },
         ];

@@ -32,7 +32,10 @@ internal sealed class OutboxTriggerDispatcher : ITriggerDispatcher
             TriggerAlias = triggerEvent.TriggerAlias,
             InitiatorType = triggerEvent.InitiatorType,
             InitiatorId = triggerEvent.InitiatorId,
+            TargetAutomationId = triggerEvent.TargetAutomationId,
             IdempotencyKey = triggerEvent.IdempotencyKey,
+            OriginRunId = triggerEvent.OriginRunId,
+            OriginAutomationChain = [.. triggerEvent.OriginAutomationChain],
         };
 
         // Extract output data from typed trigger events.

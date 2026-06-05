@@ -1,5 +1,6 @@
 import type { UmbEntityModel } from "@umbraco-cms/backoffice/entity";
 import type {
+    AutomationHealthModel,
     AutomationNotificationSettingsModel,
     AutomationStatusModel,
     TriggerConfigurationModel,
@@ -13,7 +14,6 @@ export interface UaAutomationDetailModel extends UmbEntityModel {
     alias: string;
     name: string;
     description: string | null;
-    isEnabled: boolean;
     workspaceId: string;
     groupId: string | null;
     status: AutomationStatusModel;
@@ -27,6 +27,9 @@ export interface UaAutomationDetailModel extends UmbEntityModel {
     version: number;
     dateCreated: string;
     dateModified: string;
+    health: AutomationHealthModel;
+    warningIssuedUtc: string | null;
+    disabledUtc: string | null;
 }
 
 export interface UaAutomationItemModel extends UmbEntityModel {
@@ -35,9 +38,9 @@ export interface UaAutomationItemModel extends UmbEntityModel {
     alias: string;
     name: string;
     description: string | null;
-    isEnabled: boolean;
     status: AutomationStatusModel;
     version: number;
     dateCreated: string;
     dateModified: string;
+    health: AutomationHealthModel;
 }

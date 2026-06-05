@@ -21,12 +21,12 @@ public class RunCompletedNotificationDispatcherTests
         _channel.Setup(c => c.Alias).Returns("umbracoAutomate.webhook");
 
         var channelCollection = new NotificationChannelCollection(() => [_channel.Object]);
+        var channelNotifier = new ChannelNotifier(channelCollection, Mock.Of<ILogger<ChannelNotifier>>());
 
         _dispatcher = new RunCompletedNotificationDispatcher(
-            channelCollection,
+            channelNotifier,
             _automationService.Object,
-            _runService.Object,
-            Mock.Of<ILogger<RunCompletedNotificationDispatcher>>());
+            _runService.Object);
     }
 
     private static AutomationRun CreateRun(
@@ -285,10 +285,9 @@ public class RunCompletedNotificationDispatcherTests
 
         var channelCollection = new NotificationChannelCollection(() => [_channel.Object, emailChannel.Object]);
         var dispatcher = new RunCompletedNotificationDispatcher(
-            channelCollection,
+            new ChannelNotifier(channelCollection, Mock.Of<ILogger<ChannelNotifier>>()),
             _automationService.Object,
-            _runService.Object,
-            Mock.Of<ILogger<RunCompletedNotificationDispatcher>>());
+            _runService.Object);
 
         var automation = new Automation
         {

@@ -99,7 +99,7 @@ Automations follow a **draft → publish** lifecycle, consistent with Umbraco's 
 |--------|---------------|-------------|
 | **Draft** | No | Being edited. Does not respond to triggers. |
 | **Published** | Yes (if enabled) | Live version responds to triggers. |
-| **Inactive** | No | Explicitly deactivated. Published version retained for rollback. |
+| **Unpublished** | No | Explicitly unpublished. Published version retained for rollback. |
 
 - **Editing a published automation** saves draft versions without affecting the live version
 - **"Unpublished changes"** indicator shows when the draft is ahead of the published version
@@ -270,8 +270,8 @@ A new backoffice section with:
 ## Database & Infrastructure
 
 - **SQL Server and SQLite** supported (same as Umbraco CMS)
-- **Shared database by default** — tables coexist with Umbraco, prefixed with `UmbracoAutomate_`
-- **Separate database optional** — configure `umbracoAutomateDbDSN` connection string (follows Umbraco Commerce convention)
+- **Explicit database configuration** — by default Automate resolves a dedicated `umbracoAutomateDbDSN` connection string (recommended). Point `Umbraco:Automate:UseNamedConnectionString` at another entry (e.g. `umbracoDbDSN`) to share an existing connection. Reuse is opt-in because the additional traffic can affect the target database's performance.
+- **Tables coexist cleanly** when sharing — prefixed with `umbracoAutomate*` and tracked in a separate migrations history table
 - **Distributed deployment** — swap in Redis, Azure, RabbitMQ, or AWS queue/lock providers via NuGet packages
 - **Health checks** — engine status, queue depth, and data retention registered with Umbraco's health check system
 - **OpenTelemetry** — metrics for runs, failures, and step duration (Prometheus, Application Insights, etc.)

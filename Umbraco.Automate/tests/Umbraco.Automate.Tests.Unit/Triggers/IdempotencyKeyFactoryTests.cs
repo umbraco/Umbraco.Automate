@@ -6,119 +6,119 @@ namespace Umbraco.Automate.Tests.Unit.Triggers;
 public class IdempotencyKeyFactoryTests
 {
     [Fact]
-    public void SameContentAndVersion_ProducesSameKey()
+    public void SameEntityAndVersion_ProducesSameKey()
     {
         // A duplicate notification for the exact same publish produces an identical key
         // — the outbox uses this to collapse the duplicate into a single message.
-        var contentKey = Guid.NewGuid();
-        var a = IdempotencyKeyFactory.ForContentEvent("test.trigger", contentKey, versionId: 42);
-        var b = IdempotencyKeyFactory.ForContentEvent("test.trigger", contentKey, versionId: 42);
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForEntityEvent("test.trigger", entityKey, versionId: 42);
+        var b = IdempotencyKeyFactory.ForEntityEvent("test.trigger", entityKey, versionId: 42);
         a.ShouldBe(b);
     }
 
     [Fact]
     public void DifferentVersions_ProduceDifferentKeys()
     {
-        // Two separate publishes of the same content increment the version id, so each
+        // Two separate publishes of the same entity increment the version id, so each
         // one gets its own key and neither is dedup'd away.
-        var contentKey = Guid.NewGuid();
-        var a = IdempotencyKeyFactory.ForContentEvent("test.trigger", contentKey, versionId: 1);
-        var b = IdempotencyKeyFactory.ForContentEvent("test.trigger", contentKey, versionId: 2);
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForEntityEvent("test.trigger", entityKey, versionId: 1);
+        var b = IdempotencyKeyFactory.ForEntityEvent("test.trigger", entityKey, versionId: 2);
         a.ShouldNotBe(b);
     }
 
     [Fact]
     public void DifferentAliases_ProduceDifferentKeys()
     {
-        var contentKey = Guid.NewGuid();
-        var a = IdempotencyKeyFactory.ForContentEvent("a.trigger", contentKey, 1);
-        var b = IdempotencyKeyFactory.ForContentEvent("b.trigger", contentKey, 1);
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForEntityEvent("a.trigger", entityKey, 1);
+        var b = IdempotencyKeyFactory.ForEntityEvent("b.trigger", entityKey, 1);
         a.ShouldNotBe(b);
     }
 
     [Fact]
-    public void DifferentContentKeys_ProduceDifferentKeys()
+    public void DifferentEntityKeys_ProduceDifferentKeys()
     {
-        var a = IdempotencyKeyFactory.ForContentEvent("test.trigger", Guid.NewGuid(), 1);
-        var b = IdempotencyKeyFactory.ForContentEvent("test.trigger", Guid.NewGuid(), 1);
+        var a = IdempotencyKeyFactory.ForEntityEvent("test.trigger", Guid.NewGuid(), 1);
+        var b = IdempotencyKeyFactory.ForEntityEvent("test.trigger", Guid.NewGuid(), 1);
         a.ShouldNotBe(b);
     }
 
     [Fact]
     public void KeyFormat_IsStable()
     {
-        var contentKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var key = IdempotencyKeyFactory.ForContentEvent("test.trigger", contentKey, 42);
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var key = IdempotencyKeyFactory.ForEntityEvent("test.trigger", entityKey, 42);
         key.ShouldBe("test.trigger:11111111-1111-1111-1111-111111111111:v42");
     }
 
     [Fact]
-    public void ForContentBatch_EmptyBatch_ReturnsNull()
-        => IdempotencyKeyFactory.ForContentBatch("test.batch", []).ShouldBeNull();
+    public void ForEntityBatch_EmptyBatch_ReturnsNull()
+        => IdempotencyKeyFactory.ForEntityBatch("test.batch", []).ShouldBeNull();
 
     [Fact]
-    public void ForContentBatch_SameItems_ProducesSameKey()
+    public void ForEntityBatch_SameItems_ProducesSameKey()
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
 
-        var key1 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(a, 1), (b, 2)]);
-        var key2 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(a, 1), (b, 2)]);
+        var key1 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(a, 1), (b, 2)]);
+        var key2 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(a, 1), (b, 2)]);
 
         key1.ShouldBe(key2);
     }
 
     [Fact]
-    public void ForContentBatch_OrderInsensitive()
+    public void ForEntityBatch_OrderInsensitive()
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
 
-        var key1 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(a, 1), (b, 2)]);
-        var key2 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(b, 2), (a, 1)]);
+        var key1 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(a, 1), (b, 2)]);
+        var key2 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(b, 2), (a, 1)]);
 
         key1.ShouldBe(key2);
     }
 
     [Fact]
-    public void ForContentBatch_DifferentVersions_ProduceDifferentKeys()
+    public void ForEntityBatch_DifferentVersions_ProduceDifferentKeys()
     {
         var a = Guid.NewGuid();
 
-        var key1 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(a, 1)]);
-        var key2 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(a, 2)]);
+        var key1 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(a, 1)]);
+        var key2 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(a, 2)]);
 
         key1.ShouldNotBe(key2);
     }
 
     [Fact]
-    public void ForContentBatch_DifferentMembership_ProducesDifferentKeys()
+    public void ForEntityBatch_DifferentMembership_ProducesDifferentKeys()
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
 
-        var key1 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(a, 1)]);
-        var key2 = IdempotencyKeyFactory.ForContentBatch("test.batch", [(a, 1), (b, 1)]);
+        var key1 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(a, 1)]);
+        var key2 = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(a, 1), (b, 1)]);
 
         key1.ShouldNotBe(key2);
     }
 
     [Fact]
-    public void ForContentBatch_DifferentAliases_ProduceDifferentKeys()
+    public void ForEntityBatch_DifferentAliases_ProduceDifferentKeys()
     {
         var a = Guid.NewGuid();
 
-        var key1 = IdempotencyKeyFactory.ForContentBatch("a.batch", [(a, 1)]);
-        var key2 = IdempotencyKeyFactory.ForContentBatch("b.batch", [(a, 1)]);
+        var key1 = IdempotencyKeyFactory.ForEntityBatch("a.batch", [(a, 1)]);
+        var key2 = IdempotencyKeyFactory.ForEntityBatch("b.batch", [(a, 1)]);
 
         key1.ShouldNotBe(key2);
     }
 
     [Fact]
-    public void ForContentBatch_KeyFormatHasExpectedShape()
+    public void ForEntityBatch_KeyFormatHasExpectedShape()
     {
-        var contentKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var key = IdempotencyKeyFactory.ForContentBatch("test.batch", [(contentKey, 42)]);
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var key = IdempotencyKeyFactory.ForEntityBatch("test.batch", [(entityKey, 42)]);
 
         // Format: {alias}:batch:{base64url-sha256-no-padding} → 17 prefix + 43 hash chars.
         key.ShouldNotBeNull();
@@ -131,79 +131,160 @@ public class IdempotencyKeyFactoryTests
     }
 
     [Fact]
-    public void ForContentSaveEvent_SameVersionAndUpdateDate_ProducesSameKey()
+    public void ForEntitySaveEvent_SameVersionAndUpdateDate_ProducesSameKey()
     {
         // A duplicate save notification carries the same VersionId and UpdateDate,
         // so the keys match and the outbox collapses the duplicate.
-        var contentKey = Guid.NewGuid();
+        var entityKey = Guid.NewGuid();
         var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
-        var a = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, versionId: 5, updateDate);
-        var b = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, versionId: 5, updateDate);
+        var a = IdempotencyKeyFactory.ForEntitySaveEvent("test.trigger", entityKey, versionId: 5, updateDate);
+        var b = IdempotencyKeyFactory.ForEntitySaveEvent("test.trigger", entityKey, versionId: 5, updateDate);
         a.ShouldBe(b);
     }
 
     [Fact]
-    public void ForContentSaveEvent_SameVersionDifferentUpdateDate_ProducesDifferentKeys()
+    public void ForEntitySaveEvent_SameVersionDifferentUpdateDate_ProducesDifferentKeys()
     {
         // Sequential draft saves share the VersionId but bump UpdateDate — each must
         // produce a distinct key so the second save isn't dedup'd against the first.
-        var contentKey = Guid.NewGuid();
-        var a = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, 5, new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc));
-        var b = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, 5, new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc));
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForEntitySaveEvent("test.trigger", entityKey, 5, new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc));
+        var b = IdempotencyKeyFactory.ForEntitySaveEvent("test.trigger", entityKey, 5, new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc));
         a.ShouldNotBe(b);
     }
 
     [Fact]
-    public void ForContentSaveEvent_KeyFormat_IsStable()
+    public void ForEntitySaveEvent_KeyFormat_IsStable()
     {
-        var contentKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
-        var key = IdempotencyKeyFactory.ForContentSaveEvent("test.trigger", contentKey, 42, updateDate);
+        var key = IdempotencyKeyFactory.ForEntitySaveEvent("test.trigger", entityKey, 42, updateDate);
         key.ShouldBe($"test.trigger:11111111-1111-1111-1111-111111111111:v42:u{updateDate.Ticks}");
     }
 
     [Fact]
-    public void ForContentSaveBatch_EmptyBatch_ReturnsNull()
-        => IdempotencyKeyFactory.ForContentSaveBatch("test.batch", []).ShouldBeNull();
+    public void ForEntitySaveBatch_EmptyBatch_ReturnsNull()
+        => IdempotencyKeyFactory.ForEntitySaveBatch("test.batch", []).ShouldBeNull();
 
     [Fact]
-    public void ForContentSaveBatch_SameItems_ProducesSameKey()
+    public void ForEntitySaveBatch_SameItems_ProducesSameKey()
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
         var t1 = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
         var t2 = new DateTime(2026, 4, 20, 10, 0, 5, DateTimeKind.Utc);
 
-        var key1 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
-        var key2 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
+        var key1 = IdempotencyKeyFactory.ForEntitySaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
+        var key2 = IdempotencyKeyFactory.ForEntitySaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
 
         key1.ShouldBe(key2);
     }
 
     [Fact]
-    public void ForContentSaveBatch_SameVersionsDifferentUpdateDates_ProduceDifferentKeys()
+    public void ForEntitySaveBatch_SameVersionsDifferentUpdateDates_ProduceDifferentKeys()
     {
         var a = Guid.NewGuid();
         var t1 = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
         var t2 = new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc);
 
-        var key1 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1)]);
-        var key2 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t2)]);
+        var key1 = IdempotencyKeyFactory.ForEntitySaveBatch("test.batch", [(a, 1, t1)]);
+        var key2 = IdempotencyKeyFactory.ForEntitySaveBatch("test.batch", [(a, 1, t2)]);
 
         key1.ShouldNotBe(key2);
     }
 
     [Fact]
-    public void ForContentSaveBatch_OrderInsensitive()
+    public void ForEntitySaveBatch_OrderInsensitive()
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
         var t1 = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
         var t2 = new DateTime(2026, 4, 20, 10, 0, 5, DateTimeKind.Utc);
 
-        var key1 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
-        var key2 = IdempotencyKeyFactory.ForContentSaveBatch("test.batch", [(b, 2, t2), (a, 1, t1)]);
+        var key1 = IdempotencyKeyFactory.ForEntitySaveBatch("test.batch", [(a, 1, t1), (b, 2, t2)]);
+        var key2 = IdempotencyKeyFactory.ForEntitySaveBatch("test.batch", [(b, 2, t2), (a, 1, t1)]);
 
         key1.ShouldBe(key2);
+    }
+
+    [Fact]
+    public void ForVersionlessEntitySaveEvent_SameUpdateDate_ProducesSameKey()
+    {
+        var entityKey = Guid.NewGuid();
+        var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var a = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, updateDate);
+        var b = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, updateDate);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForVersionlessEntitySaveEvent_DifferentUpdateDates_ProduceDifferentKeys()
+    {
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc));
+        var b = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc));
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void ForVersionlessEntitySaveEvent_KeyFormat_IsStable()
+    {
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var updateDate = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var key = IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("test.trigger", entityKey, updateDate);
+        key.ShouldBe($"test.trigger:11111111-1111-1111-1111-111111111111:u{updateDate.Ticks}");
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_SameInputs_ProducesSameKey()
+    {
+        var time = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var a = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", time);
+        var b = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", time);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_DifferentTimes_ProduceDifferentKeys()
+    {
+        var a = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc));
+        var b = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", new DateTime(2026, 4, 20, 10, 0, 1, DateTimeKind.Utc));
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_NullUserId_ProducesStableKey()
+    {
+        // Failed-login notifications may carry a null AffectedUserId — the key should
+        // still be deterministic and not throw.
+        var time = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var a = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", null, time);
+        var b = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", null, time);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForUserAuthEvent_KeyFormat_IsStable()
+    {
+        var time = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var key = IdempotencyKeyFactory.ForUserAuthEvent("test.trigger", "user-123", time);
+        key.ShouldBe($"test.trigger:user-123:t{time.Ticks}");
+    }
+
+    [Fact]
+    public void ForVersionlessEntityEvent_SameEntity_ProducesSameKey()
+    {
+        var entityKey = Guid.NewGuid();
+        var a = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        var b = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void ForVersionlessEntityEvent_KeyFormat_IsStable()
+    {
+        var entityKey = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var key = IdempotencyKeyFactory.ForVersionlessEntityEvent("test.trigger", entityKey);
+        key.ShouldBe("test.trigger:11111111-1111-1111-1111-111111111111");
     }
 }

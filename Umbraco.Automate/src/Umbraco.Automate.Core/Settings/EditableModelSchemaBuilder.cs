@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 
@@ -11,16 +12,27 @@ namespace Umbraco.Automate.Core.Settings;
 /// </summary>
 public static class EditableModelSchemaBuilder
 {
+    // The schema for a given Type is deterministic and immutable across the process
+    // lifetime, but building it requires reflection plus an Activator.CreateInstance
+    // to read default values. Cache by Type so hot paths (deploy export, UI rendering,
+    // settings validation, sensitive-field stripping) only pay that cost once.
+    private static readonly ConcurrentDictionary<Type, EditableModelSchema?> Cache = new();
+
     /// <summary>
     /// Builds the schema from the given settings type.
     /// Properties without <see cref="EditableModelFieldAttribute"/> are included with defaults.
+    /// Results are cached per <see cref="Type"/>.
     /// </summary>
     /// <param name="settingsType">The settings POCO type.</param>
     /// <returns>The schema, or null if the type has no public properties.</returns>
     public static EditableModelSchema? Build(Type settingsType)
     {
         ArgumentNullException.ThrowIfNull(settingsType);
+        return Cache.GetOrAdd(settingsType, BuildUncached);
+    }
 
+    private static EditableModelSchema? BuildUncached(Type settingsType)
+    {
         var properties = settingsType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
         if (properties.Length == 0)
         {
@@ -68,7 +80,7 @@ public static class EditableModelSchemaBuilder
             Label = attr?.Label ?? $"#uaFields_{modelKey}{property.Name}Label",
             PropertyType = property.PropertyType,
             Description = attr?.Description ?? $"#uaFields_{modelKey}{property.Name}Description",
-            EditorUiAlias = attr?.EditorUiAlias,
+            EditorUiAlias = attr?.EditorUiAlias ?? InferEditorUiAlias(property.PropertyType),
             EditorConfig = attr?.EditorConfig,
             DefaultValue = defaultValue,
             SortOrder = attr?.SortOrder ?? 0,
@@ -79,6 +91,44 @@ public static class EditableModelSchemaBuilder
             SupportsBindings = attr?.SupportsBindings ?? false,
             ValidationRules = validationRules,
         };
+    }
+
+    /// <summary>
+    /// Picks a default Umbraco property editor UI alias from the CLR type so settings
+    /// without an explicit <see cref="EditableModelFieldAttribute.EditorUiAlias"/> still
+    /// render the right editor (numeric fields get a number input, booleans get a toggle,
+    /// dates get a date picker). The attribute always wins when set.
+    /// </summary>
+    private static string InferEditorUiAlias(Type type)
+    {
+        var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+
+        if (underlyingType == typeof(string))
+        {
+            return "Umb.PropertyEditorUi.TextBox";
+        }
+
+        if (underlyingType == typeof(int) || underlyingType == typeof(long))
+        {
+            return "Umb.PropertyEditorUi.Integer";
+        }
+
+        if (underlyingType == typeof(bool))
+        {
+            return "Umb.PropertyEditorUi.Toggle";
+        }
+
+        if (underlyingType == typeof(decimal) || underlyingType == typeof(double) || underlyingType == typeof(float))
+        {
+            return "Umb.PropertyEditorUi.Decimal";
+        }
+
+        if (underlyingType == typeof(DateTime) || underlyingType == typeof(DateTimeOffset))
+        {
+            return "Umb.PropertyEditorUi.DatePicker";
+        }
+
+        return "Umb.PropertyEditorUi.TextBox";
     }
 
     private static IEnumerable<ValidationAttribute> InferValidationAttributes(PropertyInfo property)

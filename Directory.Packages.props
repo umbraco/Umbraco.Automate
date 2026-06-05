@@ -7,26 +7,22 @@
   <ItemGroup>
     <GlobalPackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" />
     <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118" />
-    <GlobalPackageReference Include="Umbraco.Code" Version="2.4.0" />
+    <!-- 3.0.0-beta lifts the Microsoft.CodeAnalysis cap to 5.x, required by Microsoft.EntityFrameworkCore.Design 10.x.
+         Bump to 3.0.0 stable when released (build-time analyzer only, does not flow to consumers). -->
+    <GlobalPackageReference Include="Umbraco.Code" Version="3.0.0-beta" />
     <GlobalPackageReference Include="Umbraco.GitVersioning.Extensions" Version="0.2.0" />
     <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.4.0" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Umbraco CMS -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Cms.Core" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[17.1.0, 17.999.999)" />
-  </ItemGroup>
-
-  <!-- Umbraco Deploy -->
-  <ItemGroup>
-    <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.0.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Deploy.UI" Version="[17.0.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Core" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[17.4.0, 17.999.999)" />
   </ItemGroup>
 
   <!-- WorkflowCore (automation engine) -->
@@ -46,15 +42,15 @@
 
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
-    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.2.0, 7.999.999)" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.2.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.4.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.4.0, 7.999.999)" />
   </ItemGroup>
 
 <!-- Shared dependencies -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.0, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.0, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.0, 10.999.999)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.6, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.6, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.6, 10.999.999)" />
   </ItemGroup>
 
   <!-- Test dependencies -->

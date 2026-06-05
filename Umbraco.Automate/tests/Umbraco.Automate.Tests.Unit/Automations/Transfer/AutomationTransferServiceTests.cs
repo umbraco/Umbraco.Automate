@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
@@ -14,6 +15,7 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Automations.Transfer;
 
@@ -47,6 +49,7 @@ public class AutomationTransferTests
         _actions = new ActionCollection(() => []);
         _triggers = new TriggerCollection(() => []);
         _controlFlows = new ControlFlowCollection(() => []);
+        var connectionTypes = new ConnectionTypeCollection(() => []);
 
         _service = new AutomationService(
             _repo.Object,
@@ -54,12 +57,14 @@ public class AutomationTransferTests
             Mock.Of<IEntityVersionService>(),
             _workspaceService.Object,
             _connectionService.Object,
+            Mock.Of<IWorkspaceServiceAccountResolver>(),
             _scopeProvider.Object,
             Mock.Of<IEventMessagesFactory>(),
             _actions,
             _triggers,
             _controlFlows,
-            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows));
+            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows, connectionTypes),
+            new SectionAccessChecker());
     }
 
     #region Export Tests
@@ -405,7 +410,6 @@ public class AutomationTransferTests
 
         captured.ShouldNotBeNull();
         captured!.Status.ShouldBe(AutomationStatus.Draft);
-        captured.IsEnabled.ShouldBeFalse();
         captured.WorkspaceId.ShouldBe(workspaceId);
     }
 
@@ -440,7 +444,6 @@ public class AutomationTransferTests
             .WithName("Old Name")
             .WithWorkspaceId(workspaceId)
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .WithPublishedVersion(3)
             .Build();
 
@@ -466,7 +469,6 @@ public class AutomationTransferTests
         captured!.Id.ShouldBe(existingId);
         captured.WorkspaceId.ShouldBe(workspaceId);
         captured.Status.ShouldBe(AutomationStatus.Published);
-        captured.IsEnabled.ShouldBeTrue();
         captured.Description.ShouldBe("Updated from import");
     }
 

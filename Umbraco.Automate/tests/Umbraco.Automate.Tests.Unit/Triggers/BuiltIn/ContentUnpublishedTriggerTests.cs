@@ -104,15 +104,62 @@ public class ContentUnpublishedTriggerTests
         events[0].IdempotencyKey.ShouldStartWith($"umbracoAutomate.contentUnpublished:{contentKey}:");
     }
 
-    private static IContent CreateContent(Guid key, string name, string contentTypeAlias)
+    [Fact]
+    public void MapEvent_InvariantContent_CulturesIsNull()
+    {
+        var content = CreateContent(Guid.NewGuid(), "Page", "blogPost");
+
+        var notification = new ContentUnpublishedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentUnpublishedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBeNull();
+    }
+
+    [Fact]
+    public void MapEvent_VariantContent_CulturesContainsAllPreviouslyPublishedCultures()
+    {
+        // ContentUnpublishedNotification fires when the whole item is unpublished —
+        // so all currently-published cultures (whether dirty or not) are being unpublished.
+        var publishCultureInfos = ContentPublishedTriggerTests.BuildCultureInfos(
+            clean: new[] { "en-US", "fr-FR" });
+        var content = CreateContent(
+            Guid.NewGuid(),
+            "Page",
+            "blogPost",
+            variations: ContentVariation.Culture,
+            publishCultureInfos: publishCultureInfos);
+
+        var notification = new ContentUnpublishedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentUnpublishedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldNotBeNull();
+        output.Cultures.ShouldBe(new[] { "en-US", "fr-FR" }, ignoreOrder: true);
+    }
+
+    private static IContent CreateContent(
+        Guid key,
+        string name,
+        string contentTypeAlias,
+        ContentVariation variations = ContentVariation.Nothing,
+        ContentCultureInfosCollection? publishCultureInfos = null)
     {
         var contentType = new Mock<ISimpleContentType>();
         contentType.SetupGet(ct => ct.Alias).Returns(contentTypeAlias);
+        contentType.SetupGet(ct => ct.Variations).Returns(variations);
 
         var content = new Mock<IContent>();
         content.SetupGet(c => c.Key).Returns(key);
         content.SetupGet(c => c.Name).Returns(name);
         content.SetupGet(c => c.ContentType).Returns(contentType.Object);
+        content.SetupGet(c => c.PublishCultureInfos).Returns(publishCultureInfos);
 
         return content.Object;
     }

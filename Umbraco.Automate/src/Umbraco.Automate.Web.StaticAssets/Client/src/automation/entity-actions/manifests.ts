@@ -7,6 +7,7 @@ import { UA_WORKSPACE_ENTITY_TYPE } from "../../workspace-management/constants.j
 import { UA_AUTOMATION_FOLDER_REPOSITORY_ALIAS } from "../tree/folder/constants.js";
 import { automationMoveManifests } from "./move/manifests.js";
 import { UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./automation-has-manual-trigger.condition.constants.js";
+import { UA_ENTITY_AUTOMATION_IS_DISABLED_CONDITION_ALIAS } from "./automation-is-disabled.condition.constants.js";
 
 export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
     // The "create" kind opens the entity-create-option-action-list modal
@@ -67,6 +68,29 @@ export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
         alias: UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS,
         name: "Entity Automation Has Manual Trigger Condition",
         api: () => import("./automation-has-manual-trigger.condition.js"),
+    },
+    // Re-enable — only surfaces for automations auto-disabled by the circuit breaker.
+    {
+        type: "entityAction",
+        kind: "default",
+        alias: "UmbracoAutomate.EntityAction.Automation.ReEnable",
+        name: "Re-enable Automation Entity Action",
+        weight: 250,
+        api: () => import("./automation-re-enable.action.js"),
+        forEntityTypes: [UA_AUTOMATION_ENTITY_TYPE],
+        meta: {
+            icon: "icon-check",
+            label: "#uaAutomation_reEnable",
+        },
+        conditions: [
+            { alias: UA_ENTITY_AUTOMATION_IS_DISABLED_CONDITION_ALIAS },
+        ],
+    },
+    {
+        type: "condition",
+        alias: UA_ENTITY_AUTOMATION_IS_DISABLED_CONDITION_ALIAS,
+        name: "Entity Automation Is Disabled Condition",
+        api: () => import("./automation-is-disabled.condition.js"),
     },
     // Export automation as JSON
     {

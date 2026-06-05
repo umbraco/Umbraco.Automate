@@ -81,9 +81,9 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_AutomationNotEnabled_Returns409()
+    public async Task ReceiveWebhook_AutomationUnpublished_Returns409()
     {
-        var automation = CreateAutomation(AutomationStatus.Published, isEnabled: false);
+        var automation = CreateAutomation(AutomationStatus.Unpublished);
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -222,6 +222,31 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
+    public async Task ReceiveWebhook_TargetsTheAddressedAutomation()
+    {
+        // The endpoint is addressed by automation ID, so the dispatched event must target that
+        // automation — otherwise the handler fans out to every published automation sharing the
+        // webhook alias and runs them all.
+        var automation = CreateAutomation(
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = "tok" });
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
+
+        TriggerEvent? captured = null;
+        _dispatcher.Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        captured.ShouldNotBeNull();
+        captured.TargetAutomationId.ShouldBe(automation.Id);
+    }
+
+    [Fact]
     public async Task ReceiveWebhook_ValidHmacSignature_Returns202()
     {
         var key = "hmac-secret-key";
@@ -325,7 +350,6 @@ public class WebhookEndpointControllerTests
         // don't 404 at the routing layer before the allow-list check runs.
         var automation = new AutomationBuilder()
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .WithWebhookTrigger(
                 PlainSecretWebhookAuthenticator.WellKnownAlias,
                 new PlainSecretWebhookAuthenticatorSettings { Secret = "ping" })
@@ -378,14 +402,12 @@ public class WebhookEndpointControllerTests
 
     private static Automation CreateAutomation(
         AutomationStatus status = AutomationStatus.Published,
-        bool isEnabled = true,
         string triggerAlias = "umbracoAutomate.webhook",
         string? authenticatorAlias = null,
         object? authenticatorSettings = null)
     {
         var builder = new AutomationBuilder()
-            .WithStatus(status)
-            .WithIsEnabled(isEnabled);
+            .WithStatus(status);
 
         if (triggerAlias == "umbracoAutomate.webhook")
         {

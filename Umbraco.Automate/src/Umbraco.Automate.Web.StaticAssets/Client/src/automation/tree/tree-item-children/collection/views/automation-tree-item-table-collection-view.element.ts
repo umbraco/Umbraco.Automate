@@ -21,7 +21,7 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
     private _tableColumns: Array<UmbTableColumn> = [
         { name: "Name", alias: "name" },
         { name: "Status", alias: "status" },
-        { name: "Enabled", alias: "isEnabled" },
+        { name: "Health", alias: "health" },
         { name: "", alias: "entityActions", align: "right", width: "1%" },
     ];
 
@@ -53,8 +53,16 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
         switch (status) {
             case "Published": return "positive";
             case "Draft": return "warning";
-            case "Inactive": return "danger";
+            case "Unpublished": return "danger";
             default: return "default";
+        }
+    }
+
+    #healthColor(health: string): string {
+        switch (health) {
+            case "Degraded": return "warning";
+            case "Disabled": return "danger";
+            default: return "positive";
         }
     }
 
@@ -79,11 +87,9 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
                         : "",
                 },
                 {
-                    columnAlias: "isEnabled",
-                    value: isAutomation
-                        ? html`<uui-tag color=${item.isEnabled ? "positive" : "default"} look="secondary">
-                              ${item.isEnabled ? "Enabled" : "Disabled"}
-                          </uui-tag>`
+                    columnAlias: "health",
+                    value: isAutomation && item.health
+                        ? html`<uui-tag color=${this.#healthColor(item.health)} look="secondary">${item.health}</uui-tag>`
                         : "",
                 },
                 {

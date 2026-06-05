@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Connections;
@@ -17,6 +18,8 @@ namespace Umbraco.Automate.Persistence;
 public class UmbracoAutomateDbContext : DbContext
 {
     internal DbSet<AutomationEntity> Automations { get; set; } = null!;
+
+    internal DbSet<AutomationHealthEntity> AutomationHealth { get; set; } = null!;
 
     internal DbSet<AutomationRunEntity> AutomationRuns { get; set; } = null!;
 
@@ -85,6 +88,20 @@ public class UmbracoAutomateDbContext : DbContext
         }
     }
 
+    // All DateTime columns in this DbContext represent UTC instants. Neither SQL Server's
+    // datetime2 nor SQLite's TEXT format preserves DateTimeKind across a round-trip, so
+    // these converters reattach Kind=Utc on read (and normalize stray Local values on write)
+    // for every DateTime/DateTime? property in the model. Without this, callers that rely
+    // on the kind — Cronos, the API's UtcDateTimeJsonConverter, anything calling
+    // ToUniversalTime — would silently shift values by the server's local offset.
+    private static readonly ValueConverter<DateTime, DateTime> s_utcConverter = new(
+        v => v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : v,
+        v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+    private static readonly ValueConverter<DateTime?, DateTime?> s_utcNullableConverter = new(
+        v => v.HasValue && v.Value.Kind == DateTimeKind.Local ? v.Value.ToUniversalTime() : v,
+        v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,7 +115,6 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.Alias).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Name).HasMaxLength(255).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(2000);
-            entity.Property(e => e.IsEnabled).IsRequired();
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.Definition);
             entity.Property(e => e.Version).IsRequired().HasDefaultValue(1).IsConcurrencyToken();
@@ -109,6 +125,16 @@ public class UmbracoAutomateDbContext : DbContext
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.GroupId);
             entity.HasIndex(e => e.WorkspaceId);
+        });
+
+        modelBuilder.Entity<AutomationHealthEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateAutomationHealth");
+            entity.HasKey(e => e.AutomationId);
+
+            entity.Property(e => e.Health).IsRequired();
+
+            entity.HasIndex(e => e.Health);
         });
 
         modelBuilder.Entity<AutomationRunEntity>(entity =>
@@ -338,5 +364,25 @@ public class UmbracoAutomateDbContext : DbContext
             // a unique filtered index (WHERE IdempotencyKey IS NOT NULL) for safety.
             entity.HasIndex(e => new { e.Topic, e.IdempotencyKey });
         });
+
+        ApplyUtcDateTimeConverters(modelBuilder);
+    }
+
+    private static void ApplyUtcDateTimeConverters(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetValueConverter(s_utcConverter);
+                }
+                else if (property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(s_utcNullableConverter);
+                }
+            }
+        }
     }
 }

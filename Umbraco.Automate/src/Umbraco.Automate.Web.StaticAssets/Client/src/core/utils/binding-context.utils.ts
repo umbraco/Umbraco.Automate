@@ -26,7 +26,9 @@ export interface BindingSource {
 /**
  * Builds the binding source tree for a given step in an automation.
  * Computes predecessors via the connections DAG, then resolves output schemas
- * from the catalogue for the trigger and each predecessor step.
+ * from the catalogue for the trigger and each predecessor step. Step types with a
+ * dynamic output schema (e.g. Run AI Agent) are resolved against their configured
+ * settings via the catalogue resolve endpoint rather than the static listing.
  * If the step is inside a ForEach, adds a "Loop Item" source with the item schema.
  */
 export async function buildBindingSources(
@@ -39,13 +41,38 @@ export async function buildBindingSources(
     const sources: BindingSource[] = [];
     const { predecessorIds, triggerReachable } = computePredecessors(currentStepId, connections);
 
+    // Fetch the catalogue listings up front (cached in the repo).
+    const [triggersResult, actionsResult, controlFlowsResult] = await Promise.all([
+        catalogueRepo.requestTriggers(),
+        catalogueRepo.requestActions(),
+        catalogueRepo.requestControlFlows(),
+    ]);
+    const triggers = triggersResult.data ?? [];
+    const actions = actionsResult.data ?? [];
+    const controlFlows = controlFlowsResult.data ?? [];
+
+    // Resolves a catalogue item's output schema. For step types with a dynamic output schema
+    // (e.g. Run AI Agent, whose shape depends on the selected agent), the static listing carries
+    // no usable schema, so we ask the server to resolve it from the step's settings. Static step
+    // types just use the CLR-derived schema already present on the listing.
+    const resolveSchema = async (
+        catalogueItem: { alias: string; outputSchema: Record<string, unknown> | null; hasDynamicOutputSchema: boolean } | undefined,
+        settings: Record<string, unknown> | undefined,
+    ): Promise<Record<string, unknown> | null> => {
+        if (!catalogueItem) return null;
+        if (catalogueItem.hasDynamicOutputSchema) {
+            const { data } = await catalogueRepo.resolveOutputSchema(catalogueItem.alias, settings ?? {});
+            return data ?? null;
+        }
+        return catalogueItem.outputSchema ?? null;
+    };
+
     // Trigger source — resolve schema and cache for loop item resolution below.
     let triggerOutputSchema: Record<string, unknown> | null = null;
     if (triggerReachable && trigger) {
-        const { data: triggers } = await catalogueRepo.requestTriggers();
-        const triggerItem = triggers?.find((t) => t.alias === trigger.triggerAlias);
-        if (triggerItem?.outputSchema) {
-            triggerOutputSchema = triggerItem.outputSchema as Record<string, unknown>;
+        const triggerItem = triggers.find((t) => t.alias === trigger.triggerAlias);
+        triggerOutputSchema = await resolveSchema(triggerItem, trigger.settings);
+        if (triggerItem && triggerOutputSchema) {
             const leaves = flattenJsonSchema(triggerOutputSchema);
             if (leaves.length > 0) {
                 sources.push({
@@ -60,14 +87,9 @@ export async function buildBindingSources(
         }
     }
 
-    // Predecessor step sources
-    const [actionsResult, controlFlowsResult] = await Promise.all([
-        catalogueRepo.requestActions(),
-        catalogueRepo.requestControlFlows(),
-    ]);
-    const actions = actionsResult.data ?? [];
-    const controlFlows = controlFlowsResult.data ?? [];
-
+    // Predecessor step sources. Cache each resolved schema by step id so the "Previous" source
+    // and loop-item resolution below can reuse it without re-resolving.
+    const stepSchemas = new Map<string, Record<string, unknown> | null>();
     for (const predId of predecessorIds) {
         const step = steps.find((s) => s.id === predId);
         if (!step) continue;
@@ -78,7 +100,8 @@ export async function buildBindingSources(
         const catalogueItem = actionItem ?? controlFlowItem;
         if (!catalogueItem) continue;
 
-        const outputSchema = (actionItem?.outputSchema ?? controlFlowItem?.outputSchema) as Record<string, unknown> | null;
+        const outputSchema = await resolveSchema(catalogueItem, step.settings);
+        stepSchemas.set(step.id, outputSchema);
         if (!outputSchema) continue;
 
         const leaves = flattenJsonSchema(outputSchema);
@@ -109,7 +132,9 @@ export async function buildBindingSources(
             const predAction = actions.find((a) => a.alias === predStep.actionAlias);
             const predControlFlow = controlFlows.find((c) => c.alias === predStep.actionAlias);
             const predCatalogue = predAction ?? predControlFlow;
-            const predOutputSchema = (predAction?.outputSchema ?? predControlFlow?.outputSchema) as Record<string, unknown> | null;
+            // The single direct predecessor is always among predecessorIds, so its schema
+            // (static or dynamically resolved) was already computed and cached above.
+            const predOutputSchema = stepSchemas.get(predStep.id) ?? null;
 
             if (predOutputSchema && predCatalogue) {
                 const prevLeaves = flattenJsonSchema(predOutputSchema);
@@ -129,12 +154,19 @@ export async function buildBindingSources(
     // Loop item source — if the step is inside a ForEach, resolve the item schema.
     const forEachStep = findNearestForEach(steps, predecessorIds);
     if (forEachStep) {
-        const itemSchema = resolveLoopItemSchema(forEachStep, triggerOutputSchema, steps, actions, controlFlows);
+        const itemSchema = resolveLoopItemSchema(forEachStep, triggerOutputSchema, steps, stepSchemas);
         const loopLeaves: BindingLeaf[] = [{ path: "index", label: "index", type: "integer" }];
 
         if (itemSchema) {
-            const itemLeaves = flattenJsonSchema(itemSchema);
-            for (const leaf of itemLeaves) {
+            // Always expose the bare `item` so primitive-typed arrays (e.g. string[])
+            // and whole-object pass-through both work from the picker.
+            loopLeaves.push({
+                path: "item",
+                label: "item",
+                type: (itemSchema.type as string) ?? "unknown",
+            });
+
+            for (const leaf of flattenJsonSchema(itemSchema)) {
                 loopLeaves.push({ ...leaf, path: `item.${leaf.path}`, label: leaf.label });
             }
         }
@@ -177,8 +209,7 @@ function resolveLoopItemSchema(
     forEachStep: StepConfigurationModel,
     triggerOutputSchema: Record<string, unknown> | null,
     steps: StepConfigurationModel[],
-    actions: Array<{ alias: string; outputSchema?: Record<string, unknown> | null }>,
-    controlFlows: Array<{ alias: string; outputSchema?: Record<string, unknown> | null }>,
+    stepSchemas: Map<string, Record<string, unknown> | null>,
 ): Record<string, unknown> | null {
     const collection = (forEachStep.settings as Record<string, unknown> | undefined)?.collection as string | undefined
         ?? (forEachStep.settings as Record<string, unknown> | undefined)?.Collection as string | undefined;
@@ -200,10 +231,10 @@ function resolveLoopItemSchema(
     } else if (segments[0] === "steps" && segments.length >= 3) {
         const stepRef = segments[1];
         const step = steps.find((s) => s.id === stepRef || s.alias === stepRef);
+        // The ForEach's collection source must precede it, so its schema (static or dynamically
+        // resolved) was already computed into stepSchemas during predecessor processing.
         if (step) {
-            const actionItem = actions.find((a) => a.alias === step.actionAlias);
-            const controlFlowItem = controlFlows.find((c) => c.alias === step.actionAlias);
-            schema = (actionItem?.outputSchema ?? controlFlowItem?.outputSchema) as Record<string, unknown> | null;
+            schema = stepSchemas.get(step.id) ?? null;
         }
         pathStart = 2;
     }

@@ -43,8 +43,8 @@ public class ContentBatchSavedTriggerTests
     [Fact]
     public void MapEvent_ProducesSingleEventWithAllItems()
     {
-        var content1 = CreateContent(Guid.NewGuid(), "Page One", "blogPost");
-        var content2 = CreateContent(Guid.NewGuid(), "Page Two", "article");
+        var content1 = ContentSavedTriggerTests.CreateContent(Guid.NewGuid(), "Page One", "blogPost", isNew: true);
+        var content2 = ContentSavedTriggerTests.CreateContent(Guid.NewGuid(), "Page Two", "article", isNew: false);
 
         var notification = new ContentSavedNotification(
             new[] { content1, content2 },
@@ -59,7 +59,9 @@ public class ContentBatchSavedTriggerTests
         batchEvent.Output.Count.ShouldBe(2);
         batchEvent.Output.Items.Count.ShouldBe(2);
         batchEvent.Output.Items[0].ContentName.ShouldBe("Page One");
+        batchEvent.Output.Items[0].IsNew.ShouldBeTrue();
         batchEvent.Output.Items[1].ContentName.ShouldBe("Page Two");
+        batchEvent.Output.Items[1].IsNew.ShouldBeFalse();
     }
 
     [Fact]
@@ -120,16 +122,4 @@ public class ContentBatchSavedTriggerTests
         ((ITrigger)_trigger).CanHandle(batch, settings).ShouldBeFalse();
     }
 
-    private static IContent CreateContent(Guid key, string name, string contentTypeAlias)
-    {
-        var contentType = new Mock<ISimpleContentType>();
-        contentType.SetupGet(ct => ct.Alias).Returns(contentTypeAlias);
-
-        var content = new Mock<IContent>();
-        content.SetupGet(c => c.Key).Returns(key);
-        content.SetupGet(c => c.Name).Returns(name);
-        content.SetupGet(c => c.ContentType).Returns(contentType.Object);
-
-        return content.Object;
-    }
 }

@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
+using Umbraco.Automate.Core.Security;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Web;
@@ -14,7 +17,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.getContentProperty", "Get Content Property",
     Description = "Fetches a single property value from a published content item.",
     Group = "Content",
-    Icon = "icon-document")]
+    Icon = "icon-document",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySettings, GetContentPropertyOutput>
 {
     /// <summary>
@@ -32,6 +37,7 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
     private readonly IPublishedContentCache _publishedContentCache;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly IContentValueNormaliser _normaliser;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<GetContentPropertyAction> _logger;
 
     /// <summary>
@@ -42,12 +48,14 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
         IPublishedContentCache publishedContentCache,
         IUmbracoContextFactory umbracoContextFactory,
         IContentValueNormaliser normaliser,
+        IAutomationActionAuthorizer authorizer,
         ILogger<GetContentPropertyAction> logger)
         : base(infrastructure)
     {
         _publishedContentCache = publishedContentCache;
         _umbracoContextFactory = umbracoContextFactory;
         _normaliser = normaliser;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -69,6 +77,11 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
             return ActionResult.Failed(
                 new ArgumentException("Property alias is required."),
                 StepRunErrorCategory.Validation);
+        }
+
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        {
+            return failure;
         }
 
         using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();

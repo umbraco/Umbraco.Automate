@@ -1,10 +1,15 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Versioning;
+using Umbraco.Cms.Core.Models.Membership;
 
 namespace Umbraco.Automate.Core.Dispatch;
 
@@ -18,6 +23,10 @@ internal sealed class TriggerEventHandler : IMessageHandler
     private readonly IAutomationExecutor _executor;
     private readonly IExecutionNodeEligibility _nodeEligibility;
     private readonly TriggerCollection _triggers;
+    private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
+    private readonly ISectionAccessChecker _sectionAccessChecker;
+    private readonly TriggerDispatchAuthorizerCollection _dispatchAuthorizers;
+    private readonly IOptionsMonitor<ExecutionOptions> _executionOptions;
     private readonly ILogger<TriggerEventHandler> _logger;
 
     public TriggerEventHandler(
@@ -26,6 +35,10 @@ internal sealed class TriggerEventHandler : IMessageHandler
         IAutomationExecutor executor,
         IExecutionNodeEligibility nodeEligibility,
         TriggerCollection triggers,
+        IWorkspaceServiceAccountResolver serviceAccountResolver,
+        ISectionAccessChecker sectionAccessChecker,
+        TriggerDispatchAuthorizerCollection dispatchAuthorizers,
+        IOptionsMonitor<ExecutionOptions> executionOptions,
         ILogger<TriggerEventHandler> logger)
     {
         _automationService = automationService;
@@ -33,6 +46,10 @@ internal sealed class TriggerEventHandler : IMessageHandler
         _executor = executor;
         _nodeEligibility = nodeEligibility;
         _triggers = triggers;
+        _serviceAccountResolver = serviceAccountResolver;
+        _sectionAccessChecker = sectionAccessChecker;
+        _dispatchAuthorizers = dispatchAuthorizers;
+        _executionOptions = executionOptions;
         _logger = logger;
     }
 
@@ -55,17 +72,35 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
         _logger.LogDebug("Received trigger event for {TriggerAlias}", message.TriggerAlias);
 
-        // Find all published & enabled automations that use this trigger.
+        // Global chain-length backstop: drop the event before doing any work if the cascade
+        // chain has exceeded the configured limit. This catches loops the per-trigger
+        // SkipAutomationOriginatedEvents toggle misses (e.g. operator deliberately turned
+        // the toggle off, or a chain that doesn't repeat any automation but goes too deep).
+        var maxChainDepth = _executionOptions.CurrentValue.MaxChainDepth;
+        if (message.OriginAutomationChain.Count > maxChainDepth)
+        {
+            _logger.LogWarning(
+                "Dropping trigger {TriggerAlias} — chain length {ChainLength} exceeded MaxChainDepth {MaxChainDepth} (origin run {OriginRunId}, chain {Chain})",
+                message.TriggerAlias, message.OriginAutomationChain.Count, maxChainDepth, message.OriginRunId,
+                string.Join(" -> ", message.OriginAutomationChain));
+            return;
+        }
+
+        // Find all published automations that use this trigger. When the event targets a
+        // specific automation (imperative entry points like the webhook endpoint, addressed by
+        // automation ID), narrow to that one — otherwise this fans out to every published
+        // automation subscribed to the alias, running them all.
         var automations = await _automationService.GetAllAutomationsAsync(cancellationToken);
         var matching = automations
-            .Where(a => a is { Status: AutomationStatus.Published, IsEnabled: true }
-                        && a.Trigger?.TriggerAlias == message.TriggerAlias)
+            .Where(a => a.Status == AutomationStatus.Published
+                        && a.Trigger?.TriggerAlias == message.TriggerAlias
+                        && (message.TargetAutomationId is null || a.Id == message.TargetAutomationId))
             .ToList();
 
         if (matching.Count == 0)
         {
             _logger.LogInformation(
-                "No published & enabled automations matched trigger {TriggerAlias} — event dropped",
+                "No published automations matched trigger {TriggerAlias} — event dropped",
                 message.TriggerAlias);
             return;
         }
@@ -85,9 +120,15 @@ internal sealed class TriggerEventHandler : IMessageHandler
         var trigger = _triggers.GetByAlias(message.TriggerAlias);
 
         // Typed output is only needed when at least one automation has configured
-        // trigger settings. Deserialize lazily to avoid the cost on the common no-filter path.
+        // trigger settings, or when a dispatch authoriser needs to inspect the payload.
+        // Deserialize lazily so the common no-filter / no-authoriser path stays cheap.
         object? typedOutput = null;
         var typedOutputAttempted = false;
+
+        // Per-invocation cache of service-account resolution per workspace. Avoids repeating
+        // the IUserService.GetAsync round-trip when several published automations subscribe
+        // to the same trigger from the same workspace.
+        var serviceAccountCache = new Dictionary<Guid, IUser?>();
 
         foreach (var automation in matching)
         {
@@ -128,11 +169,94 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 if (typedOutput is not null)
                 {
                     var resolvedSettings = trigger.ResolveSettings(triggerSettings);
+
+                    // Origin-aware filtering: only relevant when the event was caused by an
+                    // automation (chain non-empty). Three postures, configured per trigger:
+                    //   - Run        : always fire
+                    //   - SkipOnCycle: skip when this automation is in the chain (direct or
+                    //                  indirect cycle); default for built-in content triggers
+                    //   - SkipAlways : skip whenever any automation caused the event
+                    if (message.OriginAutomationChain.Count > 0
+                        && resolvedSettings is IAutomationOriginatedEventBehavior behaviorConfig)
+                    {
+                        var behavior = behaviorConfig.OnAutomationOriginated;
+                        var shouldSkip = behavior switch
+                        {
+                            AutomationOriginatedEventBehavior.SkipAlways => true,
+                            AutomationOriginatedEventBehavior.SkipOnCycle =>
+                                message.OriginAutomationChain.Contains(executionAutomation.Id),
+                            _ => false,
+                        };
+
+                        if (shouldSkip)
+                        {
+                            _logger.LogDebug(
+                                "Automation {AutomationId} skipped — trigger {TriggerAlias} behavior {Behavior} blocks event from chain {Chain}",
+                                executionAutomation.Id, message.TriggerAlias, behavior,
+                                string.Join(" -> ", message.OriginAutomationChain));
+                            continue;
+                        }
+                    }
+
                     if (!trigger.CanHandle(typedOutput, resolvedSettings))
                     {
                         _logger.LogDebug(
                             "Automation {AutomationId} skipped by trigger {TriggerAlias} settings filter",
                             executionAutomation.Id, message.TriggerAlias);
+                        continue;
+                    }
+                }
+            }
+
+            // Runtime section guard: even if the trigger was permitted at publish time,
+            // the workspace's service account may have been downgraded since. Skip the run
+            // (no run record, no payload exposure) when the account no longer has the
+            // sections the trigger requires. After that, run any registered dispatch
+            // authorisers — built-in NodeScopedTriggerDispatchAuthorizer plus any provider
+            // packages have registered (e.g. Commerce store-scoped).
+            var sectionGated = trigger is not null && trigger.RequiredSections.Count > 0;
+            var hasDispatchAuthorizers = _dispatchAuthorizers.Count > 0;
+            if (sectionGated || hasDispatchAuthorizers)
+            {
+                var serviceAccount = await ResolveServiceAccountAsync(executionAutomation.WorkspaceId, serviceAccountCache, cancellationToken);
+                if (serviceAccount is null)
+                {
+                    _logger.LogWarning(
+                        "Automation {AutomationId} skipped — workspace service account could not be resolved for trigger {TriggerAlias}.",
+                        executionAutomation.Id, message.TriggerAlias);
+                    continue;
+                }
+
+                if (sectionGated && !_sectionAccessChecker.CanAccess(serviceAccount, trigger!))
+                {
+                    _logger.LogWarning(
+                        "Automation {AutomationId} skipped — workspace service account does not satisfy trigger {TriggerAlias} section requirements ({Sections}). Republish or update the service account.",
+                        executionAutomation.Id, message.TriggerAlias, string.Join(", ", trigger!.RequiredSections));
+                    continue;
+                }
+
+                if (hasDispatchAuthorizers && trigger is not null)
+                {
+                    if (!typedOutputAttempted)
+                    {
+                        typedOutput = DeserializeTypedOutput(message.OutputData, trigger.OutputType);
+                        typedOutputAttempted = true;
+                    }
+
+                    var authContext = new TriggerDispatchAuthorizationContext
+                    {
+                        Trigger = trigger,
+                        TypedOutput = typedOutput,
+                        ServiceAccount = serviceAccount,
+                        Automation = executionAutomation,
+                    };
+
+                    var deny = await EvaluateAuthorizersAsync(authContext, cancellationToken);
+                    if (deny is not null)
+                    {
+                        _logger.LogInformation(
+                            "Automation {AutomationId} skipped by dispatch authoriser {Authoriser} (trigger {TriggerAlias}): {Reason}",
+                            executionAutomation.Id, deny.Value.AuthorizerName, message.TriggerAlias, deny.Value.Result.FailureReason);
                         continue;
                     }
                 }
@@ -147,8 +271,40 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 message.InitiatorType,
                 message.InitiatorId,
                 triggerOutputData,
-                cancellationToken);
+                cancellationToken,
+                originChain: message.OriginAutomationChain);
         }
+    }
+
+    private async Task<(AutomationAuthorizationResult Result, string AuthorizerName)?> EvaluateAuthorizersAsync(
+        TriggerDispatchAuthorizationContext context,
+        CancellationToken cancellationToken)
+    {
+        foreach (var authorizer in _dispatchAuthorizers)
+        {
+            var result = await authorizer.AuthorizeAsync(context, cancellationToken);
+            if (!result.Authorized)
+            {
+                return (result, authorizer.GetType().Name);
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<IUser?> ResolveServiceAccountAsync(
+        Guid workspaceId,
+        Dictionary<Guid, IUser?> cache,
+        CancellationToken cancellationToken)
+    {
+        if (cache.TryGetValue(workspaceId, out var cached))
+        {
+            return cached;
+        }
+
+        var user = await _serviceAccountResolver.GetServiceAccountAsync(workspaceId, cancellationToken);
+        cache[workspaceId] = user;
+        return user;
     }
 
     private object? DeserializeTypedOutput(string? outputData, Type? outputType)

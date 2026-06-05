@@ -27,7 +27,7 @@ export default {
         disabled: "Disabled",
         draft: "Draft",
         published: "Published",
-        inactive: "Inactive",
+        unpublished: "Unpublished",
         unpublishedChanges: "Unpublished changes",
         requestedAt: "Requested At",
         id: "Id",
@@ -57,6 +57,17 @@ export default {
         runInfo: "Run Info",
         search: "Search",
     },
+    uaFieldGroups: {
+        advancedLabel: "Advanced",
+    },
+    uaFields: {
+        scheduledTriggerSettingsCronExpressionLabel: "CRON Expression",
+        scheduledTriggerSettingsCronExpressionDescription: "A CRON expression defining the schedule (e.g. '0 9 * * 1-5' for weekdays at 9am).",
+        scheduledTriggerSettingsTimeZoneLabel: "Time Zone",
+        scheduledTriggerSettingsTimeZoneDescription: "IANA time zone ID (e.g. 'Europe/London'). Defaults to UTC.",
+        scheduledTriggerSettingsTimingLabel: "Timing",
+        scheduledTriggerSettingsTimingDescription: "Choose Flexible to spread the load and run around the scheduled time, or Precise to run right on the tick.",
+    },
     uaPlaceholders: {
         enterName: "Enter a name...",
         enterAlias: "Enter an alias...",
@@ -83,6 +94,15 @@ export default {
         runNow: "Run now",
         runNowStarted: "Automation triggered",
         runNowFailed: "Could not run this automation",
+        unpublishSuccess: "Automation unpublished",
+        unpublishFailed: "Could not unpublish this automation",
+        reEnable: "Re-enable",
+        reEnableSuccess: "Automation re-enabled",
+        reEnableFailed: "Could not re-enable this automation",
+        degradedBanner:
+            "This automation is degraded — its recent error rate is high. It will be auto-disabled if errors continue.",
+        disabledBanner:
+            "This automation was auto-disabled by the circuit breaker after repeated failures. Fix the configuration, then re-enable it.",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
@@ -120,6 +140,28 @@ export default {
         channel: "Channel",
         notifyOn: "Notify on",
         addChannel: "Add notification channel",
+        notifyOnFailed: "Failed",
+        notifyOnFailedDesc:
+            "A run finished with an error. Fires once per failed run — can be noisy on flaky automations.",
+        notifyOnSuspended: "Suspended",
+        notifyOnSuspendedDesc: "A run is paused, waiting for input or approval.",
+        notifyOnResumed: "Resumed",
+        notifyOnResumedDesc:
+            "A paused run resumed — e.g. after an approval was granted or a wait-for-event completed.",
+        notifyOnCompleted: "Completed",
+        notifyOnCompletedDesc: "Every successful run. Verbose; usually only useful for auditing.",
+        notifyOnRecovered: "Recovered",
+        notifyOnRecoveredDesc:
+            "A successful run after a previous failure. Quieter than Completed.",
+        notifyOnWarning: "Warning",
+        notifyOnWarningDesc:
+            "The circuit breaker has issued a degradation warning — error rate is climbing.",
+        notifyOnDisabled: "Disabled",
+        notifyOnDisabledDesc:
+            "The circuit breaker has auto-disabled this automation after repeated failures.",
+        notifyOnReEnabled: "Re-enabled",
+        notifyOnReEnabledDesc:
+            "An auto-disabled automation has been re-enabled by an operator.",
     },
     uaWorkspace: {
         deleteConfirm: "Are you sure you want to delete this workspace?",

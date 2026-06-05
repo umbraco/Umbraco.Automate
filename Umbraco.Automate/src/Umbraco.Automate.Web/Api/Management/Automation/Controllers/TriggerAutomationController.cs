@@ -3,21 +3,24 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Api.Common.Builders;
+using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
 /// <summary>
-/// Manually triggers an automation, dispatching a trigger event for immediate execution.
+/// Manually triggers an automation, starting an immediate run.
 /// </summary>
 [ApiVersion("1.0")]
 public sealed class TriggerAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
-    private readonly ITriggerDispatcher _dispatcher;
+    private readonly IAutomationExecutor _executor;
+    private readonly ICircuitBreakerService _circuitBreaker;
+    private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TriggerAutomationController"/> class.
@@ -25,11 +28,15 @@ public sealed class TriggerAutomationController : AutomationControllerBase
     public TriggerAutomationController(
         IAutomationService automationService,
         IAuthorizationService authorizationService,
-        ITriggerDispatcher dispatcher)
+        IAutomationExecutor executor,
+        ICircuitBreakerService circuitBreaker,
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
-        _dispatcher = dispatcher;
+        _executor = executor;
+        _circuitBreaker = circuitBreaker;
+        _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
     }
 
     /// <summary>
@@ -56,24 +63,33 @@ public sealed class TriggerAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        if (automation.Status != AutomationStatus.Published || !automation.IsEnabled)
+        if (automation.Status != AutomationStatus.Published)
         {
             return Conflict(new ProblemDetailsBuilder()
                 .WithTitle("Automation not active")
-                .WithDetail("The automation must be published and enabled to be triggered.")
+                .WithDetail("The automation must be published to be triggered.")
                 .Build());
         }
 
-        // Dispatch using the automation's configured trigger alias so the consumer
-        // matches it correctly — or fall back to manual trigger alias.
-        var triggerAlias = automation.Trigger?.TriggerAlias ?? "umbracoAutomate.manual";
+        if (!await _circuitBreaker.IsRunAllowedAsync(id, TriggerInitiatorType.User, cancellationToken))
+        {
+            return Conflict(new ProblemDetailsBuilder()
+                .WithTitle("Automation auto-disabled")
+                .WithDetail("This automation has been auto-disabled by the circuit breaker. Re-enable it to run.")
+                .Build());
+        }
 
-        await _dispatcher.DispatchAsync(
-            new TriggerEvent
-            {
-                TriggerAlias = triggerAlias,
-                InitiatorType = TriggerInitiatorType.User,
-            },
+        // Start the run directly via the executor rather than dispatching a trigger event.
+        // A trigger event would fan out to every published automation that subscribes to
+        // the same alias — but "Run now" is imperative: this specific automation, now.
+        // Matches the pattern used by ReplayRunController.
+        var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key;
+
+        await _executor.ExecuteAsync(
+            automation,
+            TriggerInitiatorType.User,
+            initiatorId: userKey?.ToString(),
+            triggerOutputData: null,
             cancellationToken);
 
         return Accepted();

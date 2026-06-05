@@ -47,9 +47,6 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.Property<Guid?>("GroupId")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("INTEGER");
-
                     b.Property<Guid?>("ModifiedByUserId")
                         .HasColumnType("TEXT");
 
@@ -85,6 +82,31 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.HasIndex("WorkspaceId");
 
                     b.ToTable("umbracoAutomateAutomation", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Automations.AutomationHealthEntity", b =>
+                {
+                    b.Property<Guid>("AutomationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DisabledUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Health")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("WarningIssuedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("WindowResetUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AutomationId");
+
+                    b.HasIndex("Health");
+
+                    b.ToTable("umbracoAutomateAutomationHealth", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Connections.ConnectionEntity", b =>

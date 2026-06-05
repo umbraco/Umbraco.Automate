@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.contentBatchPublished", "Content Batch Published",
     Description = "Fires once when one or more content items are published, with all items as a collection.",
     Group = "Content",
-    Icon = "icon-documents")]
+    Icon = "icon-documents",
+    RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentBatchPublishedTrigger
     : NotificationTriggerBase<ContentPublishedTriggerSettings, BatchTriggerOutput<ContentPublishedTriggerOutput>, ContentPublishedNotification>
 {
@@ -35,6 +37,7 @@ public sealed class ContentBatchPublishedTrigger
             ContentName = content.Name,
             ContentTypeKey = content.ContentType?.Key,
             ContentTypeAlias = content.ContentType?.Alias,
+            Cultures = ContentCultureHelpers.GetPublishedCultures(content),
         }).ToList();
 
         // Hash the (key, publishedVersionId) tuples so a duplicate notification for the same
@@ -47,7 +50,7 @@ public sealed class ContentBatchPublishedTrigger
         {
             TriggerAlias = Alias,
             InitiatorType = TriggerInitiatorType.System,
-            IdempotencyKey = IdempotencyKeyFactory.ForContentBatch(Alias, batchIdentity),
+            IdempotencyKey = IdempotencyKeyFactory.ForEntityBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentPublishedTriggerOutput>
             {
                 Items = items,
@@ -69,7 +72,7 @@ public sealed class ContentBatchPublishedTrigger
 
         foreach (var item in output.Items)
         {
-            if (ContentTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
+            if (EntityTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
             {
                 return true;
             }

@@ -10,7 +10,7 @@ public sealed class Automation : IPublishableEntity
 {
     /// <inheritdoc />
     [JsonInclude]
-    public Guid Id { get; internal set; }
+    public Guid Id { get; set; }
 
     /// <summary>
     /// Gets or sets the unique, URL-safe alias (e.g. "publishSlackNotification").
@@ -26,11 +26,6 @@ public sealed class Automation : IPublishableEntity
     /// Gets or sets an optional description.
     /// </summary>
     public string? Description { get; set; }
-
-    /// <summary>
-    /// Gets or sets whether triggers are active for this automation.
-    /// </summary>
-    public bool IsEnabled { get; set; }
 
     /// <summary>
     /// Gets or sets the lifecycle status.

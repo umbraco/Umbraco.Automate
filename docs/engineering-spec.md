@@ -554,17 +554,17 @@ internal static IUmbracoBuilder AddUmbracoAutomateCore(this IUmbracoBuilder buil
     return builder;
 }
 
-// Registers EF Core persistence — follows Umbraco Commerce's connection string convention
+// Registers EF Core persistence — resolved via DatabaseConnectionInfo (explicit opt-in)
 internal static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
 {
     builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-        (serviceProvider, options, umbracoConnectionString, umbracoProviderName) =>
+        (serviceProvider, options, _, _) =>
     {
         var config = serviceProvider.GetRequiredService<IConfiguration>();
 
-        // Follow Commerce convention: check for dedicated connection string, fall back to Umbraco's
-        var connectionString = config.GetConnectionString("umbracoAutomateDbDSN") ?? umbracoConnectionString;
-        var providerName = config["ConnectionStrings:umbracoAutomateDbDSN_ProviderName"] ?? umbracoProviderName;
+        // Resolve from dedicated umbracoAutomateDbDSN, OR umbracoDbDSN when
+        // Umbraco:Automate:UseUmbracoDbDSN is explicitly set. Throws if neither is configured.
+        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(config);
 
         switch (providerName)
         {
@@ -871,21 +871,31 @@ WorkflowCore has three pluggable infrastructure abstractions: `IQueueProvider`, 
 **Default behavior** (zero configuration):
 - Queue: in-memory
 - Lock: in-memory (single-node)
-- Persistence: Umbraco's own connection string and database
 - Migrations tracked in `__UmbracoAutomate_MigrationsHistory` (separate from Umbraco core and other products)
 
-**Custom database** (follows the Umbraco Commerce convention — named connection string):
+**Database configuration is explicit** — Automate does not silently share another product's database, because the additional traffic from outbox messages, run history and WorkflowCore engine tables can affect the host's performance. Automate resolves whatever connection string `Umbraco:Automate:UseNamedConnectionString` points at; this setting defaults to `umbracoAutomateDbDSN`.
+
+**Default — dedicated database** (recommended; follows the Umbraco Commerce connection-string convention):
 ```json
 {
     "ConnectionStrings": {
-        "umbracoDbDSN": "Server=...;Database=myUmbracoDb;...",
-        "umbracoDbDSN_ProviderName": "Microsoft.Data.SqlClient",
         "umbracoAutomateDbDSN": "Server=...;Database=myUmbracoAutomateDb;...",
         "umbracoAutomateDbDSN_ProviderName": "Microsoft.Data.SqlClient"
     }
 }
 ```
-When `umbracoAutomateDbDSN` is present, all Automate tables (domain + WorkflowCore engine state) and migrations target the separate database. When absent (default), falls back to `umbracoDbDSN` — tables coexist in the Umbraco database, distinguished by the `UmbracoAutomate_` table prefix and separate migrations history table.
+
+**Share an existing connection string** — point `UseNamedConnectionString` at any registered DSN (e.g. `umbracoDbDSN` to share the Umbraco CMS database, or a custom name shared across products). Useful for hosts like Umbraco Cloud where the CMS connection string is not user-editable so cannot be copied into `umbracoAutomateDbDSN`:
+```json
+{
+    "Umbraco": {
+        "Automate": {
+            "UseNamedConnectionString": "umbracoDbDSN"
+        }
+    }
+}
+```
+With this set, Automate resolves the named connection string at startup. Tables coexist in the target database, distinguished by the `umbracoAutomate*` table prefix and a separate `__UmbracoAutomate_MigrationsHistory` table.
 
 ```csharp
 // Default — just works, uses Umbraco's connection string
@@ -1157,7 +1167,7 @@ Automation
 ├── Name: string
 ├── Description: string
 ├── IsEnabled: bool
-├── Status: Draft | Published | Inactive
+├── Status: Draft | Published | Unpublished
 ├── PublishedVersion: int? (the version currently active for trigger evaluation)
 ├── GroupId: Guid? (for organizing)
 ├── CreatedUtc: DateTime
@@ -1343,7 +1353,7 @@ Automations follow a **draft → publish** lifecycle, similar to most automation
 |--------|---------------|-------------|
 | **Draft** | No | Newly created or never published. Editable but does not trigger. |
 | **Published** | Yes (if enabled) | Has a published version. Triggers evaluate against the published definition. |
-| **Inactive** | No | Previously published, explicitly deactivated. Published version is retained for reference/rollback. |
+| **Unpublished** | No | Previously published, explicitly unpublished. Published version is retained for reference/rollback. |
 
 `IsEnabled` is separate from `Status` — a published automation can be disabled (kill switch) without losing its published state. Re-enabling resumes trigger evaluation immediately.
 
@@ -1843,7 +1853,7 @@ Follows the Umbraco.AI two-column layout (`<umb-automate-workspace-editor-layout
 - **Right column** (aside): Info box
   - **Id** — automation unique ID (or "Unsaved" tag for new)
   - **Alias** — URL-safe alias
-  - **Status** — Draft / Published / Inactive badge
+  - **Status** — Draft / Published / Unpublished badge
   - **Published version** — version number currently live
   - **Date Created** — formatted timestamp
   - **Date Modified** — formatted timestamp
@@ -1958,7 +1968,7 @@ On import, the admin is prompted to fill in the missing sensitive values before 
 
 ### Deploy Connector Implementation
 
-Ships as `Umbraco.Automate.Deploy` — a separate package that registers Umbraco Deploy artifacts and value connectors:
+Ships as `Umbraco.Deploy.Automate` — a separate package that registers Umbraco Deploy artifacts and value connectors:
 
 ```csharp
 // Registers automation as a deployable entity type
@@ -2066,6 +2076,8 @@ These concerns are baked into the architecture, not bolted on later.
 | Concern | Approach |
 |---------|----------|
 | **Secrets management** | Settings marked `[Field(IsSensitive = true)]` are automatically encrypted at rest using ASP.NET Core Data Protection (already in Umbraco's dependency tree) — mirroring Umbraco.AI's `[AIField(IsSensitive = true)]` pattern. Sensitive values are encrypted in-place on the entity (Connection settings, action settings) via EF Core value converters. No separate secrets table — the Connection entity itself centralises shared credentials. |
+| **Configuration references** | Settings fields support a `$Key:Path` syntax that resolves to an `IConfiguration` value at run time (e.g. `$Umbraco:Automate:Secrets:SlackToken`), keeping credentials and per-environment values in app settings / environment variables rather than the database. Because automations run under an elevated service-account identity, resolution follows least-privilege and is **default-deny**: a key resolves only when it falls under one of `AutomateOptions.AllowedConfigurationKeyPrefixes` (default `Umbraco:Automate:Secrets` and `Umbraco:Automate:Variables`, segment-aware, case-insensitive), keeping settings scoped to configuration explicitly intended for automations. The allow-list lives in app settings by design, so only someone who already has the configuration decides which subset is exposable — it is deliberately **not** a backoffice-editable setting. The two default sections mirror the GitHub Actions **Secrets** (sensitive) / **Variables** (non-sensitive) split. Keys under a `SecretConfigurationKeyPrefixes` prefix (default `Umbraco:Automate:Secrets`) may only be referenced from fields marked `[Field(IsSensitive = true)]`, so a resolved secret stays in fields treated as credential-bearing; `Variables` are unrestricted. (General run-log masking of sensitive fields — `GovernanceOptions.SensitiveDataMasking` — remains unimplemented and is tracked separately.) |
+| **Step-type permission gating** | Triggers and actions declare `RequiredSections` (and content actions `RequiredPermissions`, the CMS permission letters) on the `[Trigger(...)]` / `[Action(...)]` attribute. `ISectionAccessChecker` enforces section access at four points: the catalogue picker endpoint filters out items the workspace's service account cannot use; `AutomationService.ValidateForPublishAsync` rejects publishes that would violate them; `TriggerEventHandler` skips dispatch when the trigger requirement is no longer satisfied; `BackOfficeIdentityMiddleware` fails the step at runtime when the action requirement drifts. `IAutomationActionAuthorizer` wraps Umbraco's `IContentPermissionService` / `IMediaPermissionService` to enforce node-level access (start node + granular Browse/Update/Publish) inside each content/media action. `AutomationPermissionDriftHealthCheck` surfaces published automations whose service accounts no longer satisfy the requirements. See [identity-ownership-permissions.md](identity-ownership-permissions.md#step-type-permission-model) for the full model. |
 | **SSRF prevention** | HTTP Request action validates URLs against a configurable allowlist/denylist. Blocks internal IPs (`10.x`, `172.16.x`, `192.168.x`), link-local (`169.254.x`), and localhost by default. |
 | **Step-level timeout enforcement** | `CancellationToken` linked to a `CancellationTokenSource` with the configured timeout. Enforced by the middleware pipeline — actions that ignore cancellation are terminated after a grace period. |
 | **Trigger deduplication** | Optional `IdempotencyKey` on trigger events. `TriggerService` deduplicates within a configurable window (default 5 minutes). Incoming webhooks use `X-Request-Id` header or body hash. |
@@ -2089,6 +2101,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | **Engine Status** | WorkflowCore host is running and processing. Queue provider is reachable. | Error |
 | **Queue Depth** | Work queue depth is below `MaxQueueDepth` threshold. Early warning at 80%. | Warning |
 | **Data Retention** | Purge job has run successfully within the expected interval. | Info |
+| **Automation Service-Account Permissions** | Every published automation's workspace service account still satisfies the trigger/action `RequiredSections`. | Warning |
 
 #### Phase 2
 
@@ -2185,7 +2198,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 - **Named Connections** entity (alias → environment-specific credentials, encrypted via `[Field(IsSensitive = true)]`)
 - OAuth2 support in connections (authorization code flow + automatic refresh)
 - Connection management UI in settings panel
-- **Umbraco Deploy connector** (`Umbraco.Automate.Deploy`) — content transfer with credential stripping, disabled-on-arrival, missing connection validation
+- **Umbraco Deploy connector** (`Umbraco.Deploy.Automate`) — content transfer with credential stripping, disabled-on-arrival, missing connection validation
 - Dead letter queue
 - Run replay ("Retry" button)
 - Startup validation of automation definitions (including missing connections)

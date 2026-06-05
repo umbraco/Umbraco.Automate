@@ -8,11 +8,6 @@ namespace Umbraco.Automate.Core.Triggers;
 /// <see cref="ITriggerSubscriptionRegistry"/> cache so that the next subscriber lookup
 /// reflects the new state.
 /// </summary>
-/// <remarks>
-/// We listen for Saved (in case <c>IsEnabled</c> was toggled via the API),
-/// Published / Unpublished (status change), and Deleted (subscription removed).
-/// Invalidation is cheap: the next call to <c>HasSubscribersAsync</c> rebuilds.
-/// </remarks>
 internal sealed class TriggerSubscriptionInvalidator(ITriggerSubscriptionRegistry registry) :
     INotificationAsyncHandler<AutomationSavedNotification>,
     INotificationAsyncHandler<AutomationPublishedNotification>,

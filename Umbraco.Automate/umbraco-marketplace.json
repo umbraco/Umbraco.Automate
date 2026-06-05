@@ -18,5 +18,31 @@
         "Umbraco.Commerce",
         "Umbraco.Engage"
     ],
+    "RelatedPackages": [
+        {
+            "PackageId": "Umbraco.Automate.Slack",
+            "Description": "Slack connection and actions add-on for Umbraco Automate"
+        },
+        {
+            "PackageId": "Umbraco.Forms.Automate",
+            "Description": "Umbraco Forms triggers and actions for Umbraco Automate"
+        },
+        {
+            "PackageId": "Umbraco.Commerce.Automate",
+            "Description": "Umbraco Commerce triggers and actions for Umbraco Automate"
+        },
+        {
+            "PackageId": "Umbraco.Workflow.Automate",
+            "Description": "Umbraco Workflow triggers for Umbraco Automate"
+        },
+        {
+            "PackageId": "Umbraco.Deploy.Automate",
+            "Description": "Umbraco Deploy triggers and actions for Umbraco Automate"
+        },
+        {
+            "PackageId": "Umbraco.Engage.Automate",
+            "Description": "Umbraco Engage triggers and actions for Umbraco Automate"
+        }
+    ],
     "Tags": ["umbraco", "automate", "automation", "workflow", "triggers", "actions"]
 }

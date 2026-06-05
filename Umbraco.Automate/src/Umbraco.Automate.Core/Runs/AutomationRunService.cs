@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Notifications;
+using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Core.Runs;
@@ -10,15 +12,18 @@ internal sealed class AutomationRunService : IAutomationRunService
 {
     private readonly IAutomationRunRepository _runRepository;
     private readonly IWorkflowHost _workflowHost;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutomationRunService> _logger;
 
     public AutomationRunService(
         IAutomationRunRepository runRepository,
         IWorkflowHost workflowHost,
+        IEventAggregator eventAggregator,
         ILogger<AutomationRunService> logger)
     {
         _runRepository = runRepository;
         _workflowHost = workflowHost;
+        _eventAggregator = eventAggregator;
         _logger = logger;
     }
 
@@ -37,6 +42,13 @@ internal sealed class AutomationRunService : IAutomationRunService
         Guid currentRunId,
         CancellationToken cancellationToken = default)
         => _runRepository.GetPreviousTerminalRunStatusAsync(automationId, currentRunId, cancellationToken);
+
+    public Task<IReadOnlyList<AutomationRunStatus>> GetRecentTerminalStatusesAsync(
+        Guid automationId,
+        int windowSize,
+        DateTime since,
+        CancellationToken cancellationToken = default)
+        => _runRepository.GetRecentTerminalStatusesAsync(automationId, windowSize, since, cancellationToken);
 
     public Task<IReadOnlyList<(AutomationRun Run, StepRun StepRun)>> GetStepRunsByStatusAsync(
         string actionAlias,
@@ -128,6 +140,10 @@ internal sealed class AutomationRunService : IAutomationRunService
 
         run.Status = AutomationRunStatus.Running;
         await _runRepository.SaveAsync(run, cancellationToken);
+
+        await _eventAggregator.PublishAsync(
+            new AutomationRunResumedNotification(run, new EventMessages()),
+            cancellationToken);
 
         _logger.LogInformation("Run {RunId} resumed via lifecycle API", runId);
         return RunLifecycleResult.Success;

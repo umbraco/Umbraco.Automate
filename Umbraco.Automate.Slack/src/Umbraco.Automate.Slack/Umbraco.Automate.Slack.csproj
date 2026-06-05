@@ -3,6 +3,8 @@
     <PropertyGroup>
         <Title>Umbraco Automate Slack</Title>
         <Description>Slack connection and actions for Umbraco Automate</Description>
+        <PackageReadmeFile>docs\README.md</PackageReadmeFile>
+        <PackageTags>umbraco automate automation slack messaging umbraco-marketplace</PackageTags>
         <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
         <StaticWebAssetBasePath>App_Plugins/UmbracoAutomateSlack</StaticWebAssetBasePath>
         <!-- Razor SDK auto-includes root-level JSON as Content, which collides with the
@@ -13,6 +15,10 @@
     <PropertyGroup>
         <UseProjectReferences Condition="'$(UseProjectReferences)' == ''">true</UseProjectReferences>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="docs" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="OpenIddict.Client.WebIntegration" />

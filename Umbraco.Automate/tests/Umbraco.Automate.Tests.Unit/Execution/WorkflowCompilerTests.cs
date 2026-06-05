@@ -47,6 +47,7 @@ public class WorkflowCompilerTests
 
         var services = new ServiceCollection();
         services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
+        services.AddSingleton(Mock.Of<Umbraco.Cms.Core.Events.IEventAggregator>());
         services.Configure<Umbraco.Automate.Core.Configuration.ExecutionOptions>(_ => { });
         var sp = services.BuildServiceProvider();
 

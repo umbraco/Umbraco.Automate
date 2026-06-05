@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.contentBatchSaved", "Content Batch Saved",
     Description = "Fires once when one or more content items are saved, with all items as a collection.",
     Group = "Content",
-    Icon = "icon-documents")]
+    Icon = "icon-documents",
+    RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentBatchSavedTrigger
     : NotificationTriggerBase<ContentSavedTriggerSettings, BatchTriggerOutput<ContentSavedTriggerOutput>, ContentSavedNotification>
 {
@@ -35,6 +37,8 @@ public sealed class ContentBatchSavedTrigger
             ContentName = content.Name,
             ContentTypeKey = content.ContentType?.Key,
             ContentTypeAlias = content.ContentType?.Alias,
+            IsNew = content.CreateDate == content.UpdateDate,
+            Cultures = ContentCultureHelpers.GetSavedCultures(content),
         }).ToList();
 
         // Draft saves reuse the same VersionId per item; UpdateDate is what advances per save,
@@ -47,7 +51,7 @@ public sealed class ContentBatchSavedTrigger
         {
             TriggerAlias = Alias,
             InitiatorType = TriggerInitiatorType.System,
-            IdempotencyKey = IdempotencyKeyFactory.ForContentSaveBatch(Alias, batchIdentity),
+            IdempotencyKey = IdempotencyKeyFactory.ForEntitySaveBatch(Alias, batchIdentity),
             Output = new BatchTriggerOutput<ContentSavedTriggerOutput>
             {
                 Items = items,
@@ -69,7 +73,7 @@ public sealed class ContentBatchSavedTrigger
 
         foreach (var item in output.Items)
         {
-            if (ContentTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
+            if (EntityTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
             {
                 return true;
             }

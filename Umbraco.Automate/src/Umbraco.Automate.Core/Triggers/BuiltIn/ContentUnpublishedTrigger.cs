@@ -1,3 +1,4 @@
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger("umbracoAutomate.contentUnpublished", "Content Unpublished",
     Description = "Fires when content is unpublished.",
     Group = "Content",
-    Icon = "icon-globe")]
+    Icon = "icon-globe",
+    RequiredSections = [UmbracoConstants.Applications.Content])]
 public sealed class ContentUnpublishedTrigger
     : NotificationTriggerBase<ContentUnpublishedTriggerSettings, ContentUnpublishedTriggerOutput, ContentUnpublishedNotification>
 {
@@ -40,6 +42,7 @@ public sealed class ContentUnpublishedTrigger
                     ContentName = content.Name,
                     ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
+                    Cultures = ContentCultureHelpers.GetUnpublishedCultures(content),
                 },
             };
         }
@@ -47,5 +50,5 @@ public sealed class ContentUnpublishedTrigger
 
     /// <inheritdoc />
     protected override bool CanHandle(ContentUnpublishedTriggerOutput output, ContentUnpublishedTriggerSettings? settings)
-        => ContentTypesFilter.Matches(output.ContentTypeKey, settings?.ContentTypes);
+        => EntityTypesFilter.Matches(output.ContentTypeKey, settings?.ContentTypes);
 }

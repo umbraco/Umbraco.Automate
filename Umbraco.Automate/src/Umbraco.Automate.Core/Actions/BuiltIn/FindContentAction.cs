@@ -3,11 +3,13 @@ using Examine;
 using Examine.Search;
 using Lucene.Net.QueryParsers.Classic;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Infrastructure.Examine;
 using Umbraco.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
@@ -22,7 +24,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.findContent", "Find Content",
     Description = "Finds content items by name, optionally filtered by content type.",
     Group = "Content",
-    Icon = "icon-search")]
+    Icon = "icon-search",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class FindContentAction : ActionBase<FindContentSettings, FindContentOutput>
 {
     // Not ICmsAction — this is a read, so no audit trail entry is written.
@@ -38,6 +42,7 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
     private readonly IPublishedContentCache _publishedContentCache;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly IPublishedUrlProvider _urlProvider;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<FindContentAction> _logger;
 
     /// <summary>
@@ -50,6 +55,7 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
         IPublishedContentCache publishedContentCache,
         IUmbracoContextFactory umbracoContextFactory,
         IPublishedUrlProvider urlProvider,
+        IAutomationActionAuthorizer authorizer,
         ILogger<FindContentAction> logger)
         : base(infrastructure)
     {
@@ -58,6 +64,7 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
         _publishedContentCache = publishedContentCache;
         _umbracoContextFactory = umbracoContextFactory;
         _urlProvider = urlProvider;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -137,7 +144,20 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
             .Select(r => Project(r, settings.Culture))
             .ToList();
 
-        await Task.CompletedTask; // keeping the method async-safe in case URL resolution becomes async later
+        // Post-hoc per-node filter: drop results outside the service account's path / permissions.
+        // LimitReached is computed against the pre-filter result count so callers can still tell
+        // whether Examine hit the limit (and would have produced more matches the account simply
+        // could not see).
+        var preFilterCount = matches.Count;
+        if (matches.Count > 0)
+        {
+            var authorizedKeys = await _authorizer.FilterAuthorizedContentAsync(
+                matches.Select(m => m.ContentKey),
+                RequiredPermissions.ToHashSet(),
+                cancellationToken);
+
+            matches = matches.Where(m => authorizedKeys.Contains(m.ContentKey)).ToList();
+        }
 
         if (matches.Count == 0)
         {
@@ -147,7 +167,7 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
         return Success(new FindContentOutput
         {
             Matches = matches,
-            LimitReached = matches.Count >= settings.Limit,
+            LimitReached = preFilterCount >= settings.Limit,
         });
     }
 

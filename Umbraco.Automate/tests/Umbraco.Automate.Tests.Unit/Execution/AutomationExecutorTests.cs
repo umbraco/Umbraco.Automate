@@ -43,6 +43,7 @@ public class AutomationExecutorTests
 
         var services = new ServiceCollection();
         services.AddSingleton(Mock.Of<ILogger<ActionStepBody>>());
+        services.AddSingleton(Mock.Of<Umbraco.Cms.Core.Events.IEventAggregator>());
         services.Configure<Umbraco.Automate.Core.Configuration.ExecutionOptions>(_ => { });
         var sp = services.BuildServiceProvider();
 
@@ -94,6 +95,11 @@ public class AutomationExecutorTests
         _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AutomationRun r, CancellationToken _) => r);
 
+        var circuitBreaker = new Mock<ICircuitBreakerService>();
+        circuitBreaker
+            .Setup(c => c.IsRunAllowedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
         _executor = new AutomationExecutor(
             _workflowHost.Object,
             _workflowRegistry.Object,
@@ -101,6 +107,7 @@ public class AutomationExecutorTests
             _runRepo.Object,
             _workspaceService.Object,
             Mock.Of<IRateLimitService>(),
+            circuitBreaker.Object,
             conditionEvaluator,
             metrics,
             Mock.Of<ILogger<AutomationExecutor>>());

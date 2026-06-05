@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
@@ -13,6 +14,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Automations;
 
@@ -39,12 +41,14 @@ internal sealed class AutomationService : IAutomationService
     private readonly IEntityVersionService _versionService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IConnectionService _connectionService;
+    private readonly IWorkspaceServiceAccountResolver _serviceAccountResolver;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
     private readonly ActionCollection _actions;
     private readonly TriggerCollection _triggers;
     private readonly ControlFlowCollection _controlFlows;
     private readonly ISensitiveSettingsStripper _sensitiveStripper;
+    private readonly ISectionAccessChecker _sectionAccessChecker;
 
     public AutomationService(
         IAutomationRepository automationRepository,
@@ -52,24 +56,28 @@ internal sealed class AutomationService : IAutomationService
         IEntityVersionService versionService,
         IWorkspaceService workspaceService,
         IConnectionService connectionService,
+        IWorkspaceServiceAccountResolver serviceAccountResolver,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory,
         ActionCollection actions,
         TriggerCollection triggers,
         ControlFlowCollection controlFlows,
-        ISensitiveSettingsStripper sensitiveStripper)
+        ISensitiveSettingsStripper sensitiveStripper,
+        ISectionAccessChecker sectionAccessChecker)
     {
         _automationRepository = automationRepository;
         _runRepository = runRepository;
         _versionService = versionService;
         _workspaceService = workspaceService;
         _connectionService = connectionService;
+        _serviceAccountResolver = serviceAccountResolver;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
         _actions = actions;
         _triggers = triggers;
         _controlFlows = controlFlows;
         _sensitiveStripper = sensitiveStripper;
+        _sectionAccessChecker = sectionAccessChecker;
     }
 
     public Task<Automation?> GetAutomationAsync(Guid id, CancellationToken cancellationToken = default)
@@ -165,14 +173,6 @@ internal sealed class AutomationService : IAutomationService
         }
 
         automation.PublishedVersion = automation.Version;
-
-        // Only enable on first publish (Draft → Published). Re-publishing an already-published
-        // automation preserves the user's enabled/disabled choice.
-        if (automation.Status != AutomationStatus.Published)
-        {
-            automation.IsEnabled = true;
-        }
-
         automation.Status = AutomationStatus.Published;
 
         var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
@@ -187,44 +187,93 @@ internal sealed class AutomationService : IAutomationService
     {
         var errors = new List<string>();
 
-        // 1. Trigger must be configured.
         if (automation.Trigger is null)
         {
             errors.Add("A trigger must be configured before publishing.");
         }
 
-        // 2. Workspace must exist and have a valid service account.
         var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken);
         if (workspace is null)
         {
             errors.Add($"Workspace '{automation.WorkspaceId}' not found.");
+            ThrowIfErrors(automation, errors);
+            return;
         }
-        else
+
+        if (workspace.ServiceAccountKey == Guid.Empty)
         {
-            if (workspace.ServiceAccountKey == Guid.Empty)
-            {
-                errors.Add("The workspace's service account is not configured.");
-            }
-
-            // 3. All step connections must be allowed by the workspace.
-            var stepConnectionIds = automation.Steps
-                .Where(s => s.ConnectionId.HasValue)
-                .Select(s => s.ConnectionId!.Value)
-                .Distinct()
-                .ToList();
-
-            if (stepConnectionIds.Count > 0)
-            {
-                var allowedSet = workspace.AllowedConnections.ToHashSet();
-                var disallowed = stepConnectionIds.Where(id => !allowedSet.Contains(id)).ToList();
-
-                foreach (var connectionId in disallowed)
-                {
-                    errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
-                }
-            }
+            errors.Add("The workspace's service account is not configured.");
         }
 
+        AddDisallowedConnectionErrors(automation, workspace, errors);
+
+        if (workspace.ServiceAccountKey != Guid.Empty)
+        {
+            await AddSectionAccessErrorsAsync(automation, workspace, errors, cancellationToken);
+        }
+
+        ThrowIfErrors(automation, errors);
+    }
+
+    private static void AddDisallowedConnectionErrors(Automation automation, Workspace workspace, List<string> errors)
+    {
+        var allowed = workspace.AllowedConnections.ToHashSet();
+        var disallowed = automation.Steps
+            .Where(s => s.ConnectionId.HasValue && !allowed.Contains(s.ConnectionId!.Value))
+            .Select(s => s.ConnectionId!.Value)
+            .Distinct();
+
+        foreach (var connectionId in disallowed)
+        {
+            errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
+        }
+    }
+
+    private async Task AddSectionAccessErrorsAsync(
+        Automation automation,
+        Workspace workspace,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        // Catches publish paths that bypassed the catalogue filter (direct API call,
+        // import, stale draft after account downgrade).
+        var serviceAccount = await _serviceAccountResolver.GetServiceAccountAsync(workspace.Id, cancellationToken);
+        if (serviceAccount is null)
+        {
+            errors.Add($"Service account '{workspace.ServiceAccountKey}' for workspace '{workspace.Name}' not found.");
+            return;
+        }
+
+        if (automation.Trigger is not null
+            && _triggers.GetByAlias(automation.Trigger.TriggerAlias) is { } trigger
+            && !_sectionAccessChecker.CanAccess(serviceAccount, trigger))
+        {
+            errors.Add($"Trigger '{trigger.Name}' requires section access ({string.Join(", ", trigger.RequiredSections)}) the workspace's service account does not have.");
+        }
+
+        foreach (var step in automation.Steps)
+        {
+            // Control-flow step types are not in _actions; their section requirements are unenforced.
+            if (_actions.GetByAlias(step.ActionAlias) is not { } action)
+            {
+                continue;
+            }
+
+            if (!_sectionAccessChecker.CanAccess(serviceAccount, action))
+            {
+                errors.Add($"Step '{step.Name}' uses action '{action.Name}' which requires section access ({string.Join(", ", action.RequiredSections)}) the workspace's service account does not have.");
+                continue;
+            }
+
+            if (!_sectionAccessChecker.HasRequiredPermissions(serviceAccount, action))
+            {
+                errors.Add($"Step '{step.Name}' uses action '{action.Name}' which requires permissions ({string.Join(", ", action.RequiredPermissions)}) the workspace's service account does not have on any node.");
+            }
+        }
+    }
+
+    private static void ThrowIfErrors(Automation automation, List<string> errors)
+    {
         if (errors.Count > 0)
         {
             throw new AutomationValidationException(
@@ -240,6 +289,13 @@ internal sealed class AutomationService : IAutomationService
         var automation = await _automationRepository.GetAsync(id, cancellationToken)
             ?? throw new InvalidOperationException($"Automation '{id}' not found.");
 
+        if (automation.Status != AutomationStatus.Published)
+        {
+            throw new AutomationValidationException(
+                $"Cannot unpublish automation '{automation.Name}'.",
+                [$"Only published automations can be unpublished (current status: {automation.Status})."]);
+        }
+
         var eventMessages = _eventMessagesFactory.Get();
 
         var unpublishingNotification = new AutomationUnpublishingNotification(automation, eventMessages);
@@ -248,7 +304,7 @@ internal sealed class AutomationService : IAutomationService
             throw new OperationCanceledException("Automation unpublish was cancelled by a notification handler.");
         }
 
-        automation.Status = AutomationStatus.Inactive;
+        automation.Status = AutomationStatus.Unpublished;
 
         var saved = await _automationRepository.SaveMetadataAsync(automation, userId, cancellationToken);
 
@@ -317,7 +373,7 @@ internal sealed class AutomationService : IAutomationService
             ?? throw new InvalidOperationException($"Version {targetVersion} not found for automation '{automationId}'.");
 
         // Rollback is a draft-only operation: restore content fields from the target version
-        // into a new draft. Lifecycle state (PublishedVersion, Status, IsEnabled) is preserved
+        // into a new draft. Lifecycle state (PublishedVersion, Status) is preserved
         // from the current entity — the user must explicitly re-publish if desired.
         var current = await _automationRepository.GetAsync(automationId, cancellationToken)
             ?? throw new InvalidOperationException($"Automation '{automationId}' not found.");
@@ -484,7 +540,6 @@ internal sealed class AutomationService : IAutomationService
             Alias = def.Alias,
             Name = def.Name,
             Description = def.Description,
-            IsEnabled = false,
             Status = AutomationStatus.Draft,
             WorkspaceId = workspaceId,
             Trigger = def.Trigger,

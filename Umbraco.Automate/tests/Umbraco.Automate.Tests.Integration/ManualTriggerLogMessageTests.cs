@@ -13,11 +13,13 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
@@ -25,6 +27,9 @@ using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common.Fixtures;
+using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -98,6 +103,18 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             .ReturnsAsync(_workspace);
         services.AddSingleton(workspaceService.Object);
 
+        // Service-account resolver + section access checker — required by the dispatch-time
+        // section guard even though this test's manual trigger declares no section requirements.
+        var serviceAccountResolver = new Mock<IWorkspaceServiceAccountResolver>();
+        serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.AllowedSections == new[] { "content", "media", "members", "users" }));
+        services.AddSingleton(serviceAccountResolver.Object);
+        services.AddSingleton<ISectionAccessChecker, SectionAccessChecker>();
+
+        // Dispatch authorisers — the manual trigger in this smoke test has no payload an
+        // authoriser would inspect, so an empty collection is sufficient.
+        services.AddSingleton(new TriggerDispatchAuthorizerCollection(Array.Empty<ITriggerDispatchAuthorizer>));
+
         services.AddSingleton(Mock.Of<IConnectionService>());
 
         // Rate limiting — disabled for tests.
@@ -107,6 +124,8 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         // Execution.
         services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
+        services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
+        services.AddSingleton<IEventAggregator>(Mock.Of<IEventAggregator>());
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();
@@ -139,6 +158,10 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
             _provider.GetRequiredService<IAutomationExecutor>(),
             nodeEligibility.Object,
             triggers,
+            _provider.GetRequiredService<IWorkspaceServiceAccountResolver>(),
+            _provider.GetRequiredService<ISectionAccessChecker>(),
+            _provider.GetRequiredService<TriggerDispatchAuthorizerCollection>(),
+            _provider.GetRequiredService<IOptionsMonitor<ExecutionOptions>>(),
             _provider.GetRequiredService<ILogger<TriggerEventHandler>>());
     }
 

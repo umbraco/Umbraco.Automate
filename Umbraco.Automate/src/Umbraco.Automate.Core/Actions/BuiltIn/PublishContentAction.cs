@@ -1,4 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Security;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.ContentPublishing;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -13,12 +16,15 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.publishContent", "Publish Content",
     Description = "Publishes a content item in Umbraco CMS.",
     Group = "Content",
-    Icon = "icon-globe")]
+    Icon = "icon-globe",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionPublish.ActionLetter])]
 public sealed class PublishContentAction : ActionBase<PublishContentSettings, PublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<PublishContentAction> _logger;
 
     /// <summary>
@@ -29,12 +35,14 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
         IContentPublishingService contentPublishingService,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoContextFactory umbracoContextFactory,
+        IAutomationActionAuthorizer authorizer,
         ILogger<PublishContentAction> logger)
         : base(infrastructure)
     {
         _contentPublishingService = contentPublishingService;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _umbracoContextFactory = umbracoContextFactory;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -48,6 +56,11 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
             return ActionResult.Failed(
                 new ArgumentException($"Invalid or missing content key: '{settings.ContentKey}'."),
                 StepRunErrorCategory.Validation);
+        }
+
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        {
+            return failure;
         }
 
         var culturesToPublish = ParseCultures(settings.Cultures);

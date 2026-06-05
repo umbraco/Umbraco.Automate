@@ -23,9 +23,6 @@ public sealed class AutomationResponseModel
     /// <summary>Optional description.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; set; }
-
     /// <summary>The lifecycle status.</summary>
     [Required]
     public AutomationStatus Status { get; set; }
@@ -63,4 +60,14 @@ public sealed class AutomationResponseModel
 
     /// <summary>Notification channel settings.</summary>
     public AutomationNotificationSettings? NotificationSettings { get; set; }
+
+    /// <summary>The circuit-breaker health, a separate axis from <see cref="Status"/>.</summary>
+    [Required]
+    public AutomationHealth Health { get; set; }
+
+    /// <summary>When the most recent degradation warning was issued, or null.</summary>
+    public DateTime? WarningIssuedUtc { get; set; }
+
+    /// <summary>When the automation was auto-disabled by the circuit breaker, or null.</summary>
+    public DateTime? DisabledUtc { get; set; }
 }

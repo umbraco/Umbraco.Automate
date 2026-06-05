@@ -1,4 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Security;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
@@ -12,12 +15,15 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.unpublishContent", "Unpublish Content",
     Description = "Unpublishes a content item in Umbraco CMS.",
     Group = "Content",
-    Icon = "icon-globe")]
+    Icon = "icon-globe",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionPublish.ActionLetter])]
 public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSettings, UnpublishContentOutput>, ICmsAction
 {
     private readonly IContentPublishingService _contentPublishingService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<UnpublishContentAction> _logger;
 
     /// <summary>
@@ -28,12 +34,14 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
         IContentPublishingService contentPublishingService,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoContextFactory umbracoContextFactory,
+        IAutomationActionAuthorizer authorizer,
         ILogger<UnpublishContentAction> logger)
         : base(infrastructure)
     {
         _contentPublishingService = contentPublishingService;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _umbracoContextFactory = umbracoContextFactory;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -47,6 +55,11 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
             return ActionResult.Failed(
                 new ArgumentException($"Invalid or missing content key: '{settings.ContentKey}'."),
                 StepRunErrorCategory.Validation);
+        }
+
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        {
+            return failure;
         }
 
         var cultures = ParseCultures(settings.Cultures);

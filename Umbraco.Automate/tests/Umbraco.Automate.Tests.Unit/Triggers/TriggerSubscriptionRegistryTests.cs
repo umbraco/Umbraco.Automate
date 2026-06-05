@@ -42,12 +42,11 @@ public class TriggerSubscriptionRegistryTests
     }
 
     [Fact]
-    public async Task HasSubscribers_PublishedEnabledAutomation_ReturnsTrue()
+    public async Task HasSubscribers_PublishedAutomation_ReturnsTrue()
     {
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentPublished")
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .Build();
 
         var registry = new TriggerSubscriptionRegistry(
@@ -59,12 +58,11 @@ public class TriggerSubscriptionRegistryTests
     }
 
     [Fact]
-    public async Task HasSubscribers_DisabledAutomation_ReturnsFalse()
+    public async Task HasSubscribers_DraftAutomation_ReturnsFalse()
     {
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentPublished")
-            .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(false)
+            .WithStatus(AutomationStatus.Draft)
             .Build();
 
         var registry = new TriggerSubscriptionRegistry(
@@ -80,8 +78,7 @@ public class TriggerSubscriptionRegistryTests
     {
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentPublished")
-            .WithStatus(AutomationStatus.Draft)
-            .WithIsEnabled(true)
+            .WithStatus(AutomationStatus.Unpublished)
             .Build();
 
         var registry = new TriggerSubscriptionRegistry(
@@ -98,7 +95,6 @@ public class TriggerSubscriptionRegistryTests
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentPublished")
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .Build();
 
         var registry = new TriggerSubscriptionRegistry(
@@ -115,7 +111,6 @@ public class TriggerSubscriptionRegistryTests
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentPublished")
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .Build();
 
         var registry = new TriggerSubscriptionRegistry(
@@ -132,7 +127,6 @@ public class TriggerSubscriptionRegistryTests
         var automation = new AutomationBuilder()
             .WithTrigger("umbracoAutomate.contentPublished")
             .WithStatus(AutomationStatus.Published)
-            .WithIsEnabled(true)
             .Build();
 
         var svc = AutomationService(automation);

@@ -13,7 +13,6 @@ export const UaAutomationTypeMapper = {
             alias: response.alias,
             name: response.name,
             description: response.description ?? null,
-            isEnabled: response.isEnabled,
             workspaceId: response.workspaceId,
             groupId: response.groupId ?? null,
             status: response.status,
@@ -27,6 +26,9 @@ export const UaAutomationTypeMapper = {
             version: response.version,
             dateCreated: response.dateCreated,
             dateModified: response.dateModified,
+            health: response.health,
+            warningIssuedUtc: response.warningIssuedUtc ?? null,
+            disabledUtc: response.disabledUtc ?? null,
         };
     },
 
@@ -37,11 +39,11 @@ export const UaAutomationTypeMapper = {
             alias: response.alias,
             name: response.name,
             description: response.description ?? null,
-            isEnabled: response.isEnabled,
             status: response.status,
             version: response.version,
             dateCreated: response.dateCreated,
             dateModified: response.dateModified,
+            health: response.health,
         };
     },
 
@@ -52,7 +54,6 @@ export const UaAutomationTypeMapper = {
             description: model.description,
             workspaceId: model.workspaceId,
             groupId: model.groupId,
-            isEnabled: model.isEnabled,
             trigger: model.trigger,
             steps: model.steps,
             connections: model.connections,
@@ -67,7 +68,6 @@ export const UaAutomationTypeMapper = {
             alias: model.alias,
             name: model.name,
             description: model.description,
-            isEnabled: model.isEnabled,
             trigger: model.trigger,
             steps: model.steps,
             connections: model.connections,

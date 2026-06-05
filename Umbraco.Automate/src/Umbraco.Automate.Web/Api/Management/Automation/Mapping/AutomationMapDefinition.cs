@@ -38,7 +38,6 @@ public class AutomationMapDefinition : IMapDefinition
     private static void MapFromCreateRequest(CreateAutomationRequestModel source, Core.Automations.Automation target, MapperContext context)
     {
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
@@ -54,7 +53,6 @@ public class AutomationMapDefinition : IMapDefinition
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.GroupId = source.GroupId;
         target.Trigger = source.Trigger;
         target.Steps = source.Steps;
@@ -63,14 +61,15 @@ public class AutomationMapDefinition : IMapDefinition
         target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll
+    // Umbraco.Code.MapAll -Health -WarningIssuedUtc -DisabledUtc
+    // Health properties are populated by the controller from ICircuitBreakerService (a separate
+    // axis not present on the Automation definition).
     private static void MapToResponse(Core.Automations.Automation source, AutomationResponseModel target, MapperContext context)
     {
         target.Id = source.Id;
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.Status = source.Status;
         target.PublishedVersion = source.PublishedVersion;
         target.WorkspaceId = source.WorkspaceId;
@@ -85,14 +84,13 @@ public class AutomationMapDefinition : IMapDefinition
         target.NotificationSettings = source.NotificationSettings;
     }
 
-    // Umbraco.Code.MapAll -NotificationSettings
+    // Umbraco.Code.MapAll -NotificationSettings -Health
     private static void MapToItemResponse(Core.Automations.Automation source, AutomationItemResponseModel target, MapperContext context)
     {
         target.Id = source.Id;
         target.Alias = source.Alias;
         target.Name = source.Name;
         target.Description = source.Description;
-        target.IsEnabled = source.IsEnabled;
         target.WorkspaceId = source.WorkspaceId;
         target.GroupId = source.GroupId;
         target.Status = source.Status;

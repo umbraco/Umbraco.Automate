@@ -34,7 +34,7 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
     private _columns: UmbTableColumn[] = [
         { name: "Name", alias: "name" },
         { name: "Status", alias: "status" },
-        { name: "Enabled", alias: "isEnabled" },
+        { name: "Health", alias: "health" },
         { name: "Modified", alias: "dateModified" },
     ];
 
@@ -71,10 +71,21 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
                 return "positive";
             case "Draft":
                 return "warning";
-            case "Inactive":
+            case "Unpublished":
                 return "danger";
             default:
                 return "default";
+        }
+    }
+
+    #healthColor(health: string): string {
+        switch (health) {
+            case "Degraded":
+                return "warning";
+            case "Disabled":
+                return "danger";
+            default:
+                return "positive";
         }
     }
 
@@ -97,10 +108,12 @@ export class UaAutomationTableCollectionViewElement extends UmbLitElement {
                     </uui-tag>`,
                 },
                 {
-                    columnAlias: "isEnabled",
-                    value: html`<uui-tag color=${item.isEnabled ? "positive" : "default"} look="secondary">
-                        ${item.isEnabled ? "Enabled" : "Disabled"}
-                    </uui-tag>`,
+                    columnAlias: "health",
+                    value: item.health
+                        ? html`<uui-tag color=${this.#healthColor(item.health)} look="secondary">
+                              ${item.health}
+                          </uui-tag>`
+                        : html`<span>-</span>`,
                 },
                 {
                     columnAlias: "dateModified",

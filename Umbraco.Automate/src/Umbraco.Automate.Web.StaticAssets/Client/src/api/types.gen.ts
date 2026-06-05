@@ -56,6 +56,8 @@ export type AutomationExportModel = {
     connectionReferences: Array<ConnectionReferenceModel>;
 };
 
+export type AutomationHealthModel = 'Healthy' | 'Degraded' | 'Disabled';
+
 export type AutomationImportResultModel = {
     success: boolean;
     automationId?: string | null;
@@ -69,7 +71,6 @@ export type AutomationItemResponseModel = {
     alias: string;
     name: string;
     description?: string | null;
-    isEnabled: boolean;
     workspaceId: string;
     groupId?: string | null;
     status: AutomationStatusModel;
@@ -78,6 +79,7 @@ export type AutomationItemResponseModel = {
     publishedVersion?: number | null;
     dateCreated: string;
     dateModified: string;
+    health: AutomationHealthModel;
 };
 
 export type AutomationNotificationSettingsModel = {
@@ -89,7 +91,6 @@ export type AutomationResponseModel = {
     alias: string;
     name: string;
     description?: string | null;
-    isEnabled: boolean;
     status: AutomationStatusModel;
     publishedVersion?: number | null;
     workspaceId: string;
@@ -102,6 +103,9 @@ export type AutomationResponseModel = {
     dateCreated: string;
     dateModified: string;
     notificationSettings?: AutomationNotificationSettingsModel | null;
+    health: AutomationHealthModel;
+    warningIssuedUtc?: string | null;
+    disabledUtc?: string | null;
 };
 
 export type AutomationRunCountModel = {
@@ -127,7 +131,7 @@ export type AutomationRunResponseModel = {
 
 export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Suspended' | 'Cancelled';
 
-export type AutomationStatusModel = 'Draft' | 'Published' | 'Inactive';
+export type AutomationStatusModel = 'Draft' | 'Published' | 'Unpublished';
 
 export type ChannelConfigurationModel = {
     channelAlias: string;
@@ -220,7 +224,6 @@ export type CreateAutomationRequestModel = {
     name: string;
     description?: string | null;
     workspaceId: string;
-    isEnabled: boolean;
     groupId?: string | null;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
@@ -328,7 +331,7 @@ export type NotificationChannelItemResponseModel = {
     settingsSchema?: EditableModelSchemaModel | null;
 };
 
-export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered';
+export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered' | 'Disabled' | 'Warning' | 'ReEnabled' | 'Resumed';
 
 export type PagedAutomationItemResponseModel = {
     total: number;
@@ -365,7 +368,7 @@ export type ProblemDetails = {
     status?: number | null;
     detail?: string | null;
     instance?: string | null;
-    [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
+    [key: string]: unknown;
 };
 
 export type ResolveOutputSchemaRequestModel = {
@@ -476,7 +479,6 @@ export type UpdateAutomationRequestModel = {
     alias: string;
     name: string;
     description?: string | null;
-    isEnabled: boolean;
     groupId?: string | null;
     trigger?: TriggerConfigurationModel | null;
     steps: Array<StepConfigurationModel>;
@@ -885,6 +887,35 @@ export type PostAutomationsByIdPublishResponses = {
     200: unknown;
 };
 
+export type PostAutomationsByIdReEnableData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/re-enable';
+};
+
+export type PostAutomationsByIdReEnableErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostAutomationsByIdReEnableError = PostAutomationsByIdReEnableErrors[keyof PostAutomationsByIdReEnableErrors];
+
+export type PostAutomationsByIdReEnableResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetAutomationsByIdRunsData = {
     body?: never;
     path: {
@@ -970,6 +1001,10 @@ export type PostAutomationsByIdUnpublishErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsByIdUnpublishError = PostAutomationsByIdUnpublishErrors[keyof PostAutomationsByIdUnpublishErrors];
@@ -1073,7 +1108,9 @@ export type PostAutomationsImportValidateResponse = PostAutomationsImportValidat
 export type GetCatalogueActionsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        workspaceId?: string;
+    };
     url: '/umbraco/automate/management/api/v1/catalogue/actions';
 };
 
@@ -1082,6 +1119,10 @@ export type GetCatalogueActionsErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
 };
 
 export type GetCatalogueActionsResponses = {
@@ -1223,7 +1264,9 @@ export type PostCatalogueStepTypesByAliasOutputSchemaResponse = PostCatalogueSte
 export type GetCatalogueTriggersData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        workspaceId?: string;
+    };
     url: '/umbraco/automate/management/api/v1/catalogue/triggers';
 };
 
@@ -1232,6 +1275,10 @@ export type GetCatalogueTriggersErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
 };
 
 export type GetCatalogueTriggersResponses = {

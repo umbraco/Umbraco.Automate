@@ -4,14 +4,7 @@ import type { ChannelConfigurationModel, NotifyOnModel } from "../../../api/type
 import type { SettingsChangeDetail } from "../../../core/components/settings-form/settings-form.element.js";
 import "../../../core/components/settings-form/settings-form.element.js";
 import type { UaNotificationChannelModalData, UaNotificationChannelModalValue } from "./types.js";
-
-const NOTIFY_ON_OPTIONS: Array<{ name: string; value: NotifyOnModel }> = [
-    { name: "Failed", value: "Failed" },
-    { name: "Suspended", value: "Suspended" },
-    { name: "Failed or Suspended", value: "FailedOrSuspended" },
-    { name: "Completed", value: "Completed" },
-    { name: "Recovered", value: "Recovered" },
-];
+import { NOTIFY_ON_FLAGS, parseNotifyOn, serializeNotifyOn, type NotifyOnFlag } from "./notify-on.helpers.js";
 
 @customElement("ua-notification-channel-modal")
 export class UaNotificationChannelModalElement extends UmbModalBaseElement<
@@ -21,17 +14,33 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
     @state()
     private _channel?: ChannelConfigurationModel;
 
+    @state()
+    private _notifyOnFlags = new Set<NotifyOnFlag>();
+
     override connectedCallback() {
         super.connectedCallback();
         if (this.data?.channel) {
             this._channel = structuredClone(this.data.channel);
+            this._notifyOnFlags = parseNotifyOn(this._channel.notifyOn);
         }
     }
 
-    #onNotifyOnChange(e: Event) {
-        const select = e.target as HTMLSelectElement;
+    #onNotifyOnFlagToggle(flag: NotifyOnFlag, e: Event) {
+        const toggle = e.target as HTMLInputElement;
         if (!this._channel) return;
-        this._channel = { ...this._channel, notifyOn: select.value as NotifyOnModel };
+
+        const next = new Set(this._notifyOnFlags);
+        if (toggle.checked) {
+            next.add(flag);
+        } else {
+            next.delete(flag);
+        }
+
+        this._notifyOnFlags = next;
+        // The wire format may be a comma-separated combination of NotifyOnFlag values,
+        // which the strict NotifyOnModel union can't express — the backend's [Flags] enum
+        // accepts it at runtime.
+        this._channel = { ...this._channel, notifyOn: serializeNotifyOn(next) as NotifyOnModel };
     }
 
     #onEnabledChange(e: Event) {
@@ -77,20 +86,6 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
                               `
                             : nothing}
                         <umb-property-layout
-                            label=${this.localize.term("uaNotifications_notifyOn")}
-                            orientation="vertical"
-                        >
-                            <div slot="editor">
-                                <uui-select
-                                    .options=${NOTIFY_ON_OPTIONS.map((o) => ({
-                                        ...o,
-                                        selected: o.value === this._channel!.notifyOn,
-                                    }))}
-                                    @change=${this.#onNotifyOnChange}
-                                ></uui-select>
-                            </div>
-                        </umb-property-layout>
-                        <umb-property-layout
                             label=${this.localize.term("uaLabels_enabled")}
                             orientation="vertical"
                         >
@@ -102,6 +97,26 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
                                 ></uui-toggle>
                             </div>
                         </umb-property-layout>
+                    </uui-box>
+
+                    <uui-box .headline=${this.localize.term("uaNotifications_notifyOn")}>
+                        <div class="notify-list">
+                            ${NOTIFY_ON_FLAGS.map((flag) => {
+                                const key = "uaNotifications_notifyOn" + flag;
+                                return html`
+                                    <div class="notify-row">
+                                        <uui-toggle
+                                            ?checked=${this._notifyOnFlags.has(flag)}
+                                            @change=${(e: Event) => this.#onNotifyOnFlagToggle(flag, e)}
+                                            label=${this.localize.term(key)}
+                                        ></uui-toggle>
+                                        <div class="notify-desc">
+                                            ${this.localize.term(key + "Desc")}
+                                        </div>
+                                    </div>
+                                `;
+                            })}
+                        </div>
                     </uui-box>
                 </div>
                 <div slot="actions">
@@ -122,8 +137,10 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
 
     static override styles = [
         css`
-            uui-select {
-                width: 100%;
+            #content {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-layout-1);
             }
 
             umb-property-layout[orientation="vertical"] {
@@ -132,6 +149,24 @@ export class UaNotificationChannelModalElement extends UmbModalBaseElement<
 
             umb-property-layout:first-of-type {
                 padding-top: 0;
+            }
+
+            .notify-list {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-space-5);
+            }
+
+            .notify-row {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-space-1);
+            }
+
+            .notify-desc {
+                color: var(--uui-color-text-alt);
+                font-size: var(--uui-type-small-size);
+                line-height: 1.4;
             }
         `,
     ];

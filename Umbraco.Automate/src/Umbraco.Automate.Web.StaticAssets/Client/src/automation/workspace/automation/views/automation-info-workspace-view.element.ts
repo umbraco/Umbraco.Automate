@@ -3,9 +3,11 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice/entity-action";
+import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import type { UaAutomationDetailModel } from "../../../types.js";
 import { UA_AUTOMATION_ENTITY_TYPE } from "../../../constants.js";
 import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
+import { AutomationsService } from "../../../../api/sdk.gen.js";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
 import "../../../../core/version-history/components/version-history/version-history.element.js";
@@ -37,6 +39,7 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
         if (!this._model) return html`<uui-loader></uui-loader>`;
 
         return html`
+            ${this.#renderHealthBanner()}
             <div class="container">
                 <ua-version-history
                     entity-id=${this._model.unique}
@@ -60,13 +63,6 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                         <div slot="editor">
                             <uui-tag color=${this.#statusColor(this._model.status)} look="secondary">
                                 ${this._model.status}
-                            </uui-tag>
-                        </div>
-                    </umb-property-layout>
-                    <umb-property-layout label=${this.localize.term("uaLabels_enabled")} orientation="vertical">
-                        <div slot="editor">
-                            <uui-tag color=${this._model.isEnabled ? "positive" : "default"} look="secondary">
-                                ${this._model.isEnabled ? this.localize.term("uaLabels_enabled") : this.localize.term("uaLabels_disabled")}
                             </uui-tag>
                         </div>
                     </umb-property-layout>
@@ -124,13 +120,69 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
         }
     }
 
+    #renderHealthBanner() {
+        const health = this._model?.health;
+
+        if (health === "Disabled") {
+            return html`
+                <div class="health-banner danger">
+                    <uui-icon name="icon-block"></uui-icon>
+                    <span>${this.localize.term("uaAutomation_disabledBanner")}</span>
+                    <uui-button
+                        look="primary"
+                        color="danger"
+                        label=${this.localize.term("uaAutomation_reEnable")}
+                        @click=${this.#reEnable}
+                    >
+                        ${this.localize.term("uaAutomation_reEnable")}
+                    </uui-button>
+                </div>
+            `;
+        }
+
+        if (health === "Degraded") {
+            return html`
+                <div class="health-banner warning">
+                    <uui-icon name="icon-alert"></uui-icon>
+                    <span>${this.localize.term("uaAutomation_degradedBanner")}</span>
+                </div>
+            `;
+        }
+
+        return html``;
+    }
+
+    async #reEnable() {
+        const unique = this.#workspaceContext?.getUnique();
+        if (!unique) return;
+
+        const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+
+        const { error } = await AutomationsService.postAutomationsByIdReEnable({ path: { id: unique } });
+        if (error) {
+            notifications?.peek("danger", {
+                data: { headline: this.localize.term("uaAutomation_reEnableFailed"), message: "" },
+            });
+            return;
+        }
+
+        notifications?.peek("positive", {
+            data: { headline: this.localize.term("uaAutomation_reEnableSuccess"), message: "" },
+        });
+
+        await this.#workspaceContext?.reload();
+        this.#eventContext?.dispatchEvent(
+            new UmbRequestReloadStructureForEntityEvent({ entityType: UA_AUTOMATION_ENTITY_TYPE, unique }),
+        );
+    }
+
     #statusColor(status: string): string {
         switch (status) {
             case "Published":
                 return "positive";
             case "Draft":
                 return "warning";
-            case "Inactive":
+            case "Unpublished":
                 return "danger";
             default:
                 return "default";
@@ -180,6 +232,30 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                 flex: 1;
                 word-break: break-all;
                 font-size: var(--uui-size-4);
+            }
+
+            .health-banner {
+                grid-column: 1 / -1;
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-3);
+                padding: var(--uui-size-space-4) var(--uui-size-space-5);
+                border-radius: var(--uui-border-radius);
+                border: 1px solid;
+            }
+
+            .health-banner span {
+                flex: 1;
+            }
+
+            .health-banner.danger {
+                background-color: color-mix(in srgb, var(--uui-color-danger) 10%, transparent);
+                border-color: var(--uui-color-danger);
+            }
+
+            .health-banner.warning {
+                background-color: color-mix(in srgb, var(--uui-color-warning) 12%, transparent);
+                border-color: var(--uui-color-warning);
             }
         `,
     ];

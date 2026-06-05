@@ -118,10 +118,6 @@ Add-ProductProjects -ProductFolder "Umbraco.Automate.OpenIddict" -SolutionFolder
 Write-Host "Adding Umbraco.Automate.Slack projects..." -ForegroundColor Green
 Add-ProductProjects -ProductFolder "Umbraco.Automate.Slack" -SolutionFolder "Slack"
 
-# Step 7b: Add Deploy projects
-Write-Host "Adding Umbraco.Automate.Deploy projects..." -ForegroundColor Green
-Add-ProductProjects -ProductFolder "Umbraco.Automate.Deploy" -SolutionFolder "Deploy"
-
 # Step 8: Add demo site to solution
 Write-Host "Adding demo site to solution..." -ForegroundColor Green
 dotnet sln "Umbraco.Automate.local.slnx" add "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
@@ -142,11 +138,6 @@ if (Test-Path "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Umbra
 # Slack add-on
 if (Test-Path "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj") {
     dotnet add $demoProject reference "Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj"
-}
-
-# Deploy add-on
-if (Test-Path "Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj") {
-    dotnet add $demoProject reference "Umbraco.Automate.Deploy/src/Umbraco.Automate.Deploy/Umbraco.Automate.Deploy.csproj"
 }
 
 Write-Host ""

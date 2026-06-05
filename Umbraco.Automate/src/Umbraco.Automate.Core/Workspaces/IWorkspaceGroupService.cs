@@ -36,14 +36,6 @@ public interface IWorkspaceGroupService
     Task<WorkspaceGroup> UpdateGroupAsync(WorkspaceGroup group, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Upserts a group for Deploy restore. Bypasses the workspace/parent-existence and unique-name
-    /// checks that <see cref="CreateGroupAsync"/> and <see cref="UpdateGroupAsync"/> enforce for
-    /// interactive callers — Deploy sequences artifacts across processing passes, and a nested
-    /// group may briefly land at root before it is re-parented.
-    /// </summary>
-    Task<WorkspaceGroup> SaveGroupForDeployAsync(WorkspaceGroup group, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Deletes a group and cascade-deletes all child groups and automations within.
     /// </summary>
     Task<bool> DeleteGroupAsync(Guid id, CancellationToken cancellationToken = default);

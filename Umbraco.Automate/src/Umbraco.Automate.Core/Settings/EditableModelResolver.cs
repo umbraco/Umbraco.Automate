@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 
 namespace Umbraco.Automate.Core.Settings;
@@ -10,15 +12,34 @@ namespace Umbraco.Automate.Core.Settings;
 /// Service for resolving editable models from various storage formats.
 /// Handles JSON deserialization, configuration variable substitution, and validation.
 /// </summary>
+/// <remarks>
+/// Configuration substitution (<c>$Key:Path</c>) is default-deny: a key is only resolved
+/// when it falls under one of <see cref="AutomateOptions.AllowedConfigurationKeyPrefixes"/>,
+/// keeping resolution scoped to configuration explicitly intended for automations rather than
+/// the whole configuration tree under the elevated run identity.
+/// </remarks>
 internal sealed class EditableModelResolver : IEditableModelResolver
 {
     private const string ConfigPrefix = "$";
 
     private readonly IConfiguration _configuration;
+    private readonly IReadOnlyList<string> _allowedConfigKeyPrefixes;
+    private readonly IReadOnlyList<string> _secretConfigKeyPrefixes;
 
-    public EditableModelResolver(IConfiguration configuration)
+    public EditableModelResolver(IConfiguration configuration, IOptions<AutomateOptions>? options = null)
     {
         _configuration = configuration;
+
+        // Fall back to defaults (the Secrets/Variables allow-list) when constructed without
+        // options. Production always supplies them via DI; this keeps the default secure
+        // rather than permissive.
+        var automateOptions = options?.Value ?? new AutomateOptions();
+        _allowedConfigKeyPrefixes = automateOptions.AllowedConfigurationKeyPrefixes
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .ToArray();
+        _secretConfigKeyPrefixes = automateOptions.SecretConfigurationKeyPrefixes
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .ToArray();
     }
 
     /// <inheritdoc />
@@ -77,9 +98,25 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"Failed to resolve model '{modelId}' to type {modelType.Name}",
+                BuildResolveFailureMessage(modelId, modelType, ex),
                 ex);
         }
+    }
+
+    /// <summary>
+    /// Builds a diagnostic message naming the model, the inner failure type and message,
+    /// and (for JSON failures) the JSON path of the offending property — without this,
+    /// callers see only "Failed to resolve model ..." with no hint at the broken field.
+    /// </summary>
+    private static string BuildResolveFailureMessage(string modelId, Type modelType, Exception ex)
+    {
+        var path = (ex as JsonException)?.Path;
+
+        var details = string.IsNullOrEmpty(path)
+            ? $"{ex.GetType().Name}: {ex.Message}"
+            : $"{ex.GetType().Name} at '{path}': {ex.Message}";
+
+        return $"Failed to resolve model '{modelId}' to type {modelType.Name}. {details}";
     }
 
     private void ResolveConfigurationVariablesInObject(object obj)
@@ -94,8 +131,14 @@ internal sealed class EditableModelResolver : IEditableModelResolver
                 continue;
             }
 
+            // Read the field's sensitivity from its attribute (FieldAttribute derives from
+            // EditableModelFieldAttribute), so secret config keys can be restricted to
+            // sensitive fields without depending on the optional schema.
+            var isSensitiveField = property
+                .GetCustomAttribute<EditableModelFieldAttribute>()?.IsSensitive ?? false;
+
             var value = property.GetValue(obj);
-            var resolvedValue = ResolveConfigurationVariable(value, property.PropertyType);
+            var resolvedValue = ResolveConfigurationVariable(value, property.PropertyType, isSensitiveField);
 
             if (!Equals(value, resolvedValue))
             {
@@ -104,7 +147,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         }
     }
 
-    private object? ResolveConfigurationVariable(object? value, Type targetType)
+    private object? ResolveConfigurationVariable(object? value, Type targetType, bool isSensitiveField)
     {
         if (value is not string strValue || !strValue.StartsWith(ConfigPrefix))
         {
@@ -118,6 +161,32 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         }
 
         var configKey = strValue[ConfigPrefix.Length..];
+
+        // Default-deny: only keys under an allowed prefix may be dereferenced. Checked
+        // before the lookup so an out-of-scope key returns the same result whether or not it
+        // exists in configuration. See AllowedConfigurationKeyPrefixes.
+        if (!MatchesPrefix(configKey, _allowedConfigKeyPrefixes))
+        {
+            throw new InvalidOperationException(
+                $"Configuration key '{configKey}' is not permitted in settings. " +
+                $"Only keys under an allowed prefix may be referenced with the $ syntax " +
+                $"(by default '{string.Join("', '", _allowedConfigKeyPrefixes)}'). " +
+                $"An administrator can place the value under an allowed section or extend " +
+                $"Umbraco:Automate:AllowedConfigurationKeyPrefixes in app settings.");
+        }
+
+        // Secret keys may only resolve into sensitive fields, so a resolved secret stays in
+        // fields the system treats as credential-bearing rather than ones whose values may be
+        // surfaced in clear. See SecretConfigurationKeyPrefixes.
+        if (!isSensitiveField && MatchesPrefix(configKey, _secretConfigKeyPrefixes))
+        {
+            throw new InvalidOperationException(
+                $"Configuration key '{configKey}' is a secret and may only be referenced from " +
+                $"a sensitive field (one marked [Field(IsSensitive = true)]). Move the value " +
+                $"to a non-secret section (e.g. Umbraco:Automate:Variables) if it is safe to " +
+                $"expose in this field, or reference it from a sensitive field instead.");
+        }
+
         var configValue = _configuration[configKey];
 
         if (configValue is null)
@@ -128,6 +197,30 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         }
 
         return ConvertToTargetType(configValue, targetType);
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="configKey"/> falls under one of <paramref name="prefixes"/>.
+    /// Matching is segment-aware (a prefix matches the whole key or a key whose next character
+    /// is the <c>:</c> section separator) and case-insensitive, so <c>Umbraco:Automate:Secrets</c>
+    /// permits <c>Umbraco:Automate:Secrets:Token</c> but not <c>Umbraco:Automate:SecretsBackup:Token</c>.
+    /// </summary>
+    private static bool MatchesPrefix(string configKey, IReadOnlyList<string> prefixes)
+    {
+        foreach (var prefix in prefixes)
+        {
+            if (!configKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (configKey.Length == prefix.Length || configKey[prefix.Length] == ':')
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static object ConvertToTargetType(string value, Type targetType)

@@ -1,33 +1,44 @@
-# Umbraco.Automate
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo_white.png">
+    <source media="(prefers-color-scheme: light)" srcset="./assets/logo_dark.png">
+    <img alt="Umbraco Automate" src="./assets/logo_dark.png" width="600">
+  </picture>
+  <br />
+  Provider-driven automation for Umbraco CMS.
+</p>
 
-A provider-driven automation system for [Umbraco CMS](https://umbraco.com). Compose triggers and actions into automations via the backoffice UI.
+<hr />
 
-## Packages
+## Products
 
-| Package | Description |
-|---------|-------------|
-| **Umbraco.Automate** | Core automation system |
-| **Umbraco.Automate.OpenIddict** | Reusable OAuth infrastructure via OpenIddict WebIntegration |
-| **Umbraco.Automate.Slack** | Slack connection and actions |
+This is a monorepo containing multiple Umbraco.Automate packages:
 
-## Quick Start
+### Core
 
-```bash
-dotnet add package Umbraco.Automate
-```
+| Product                                   | Description                            | Version | Location            |
+| ----------------------------------------- | -------------------------------------- | ------- | ------------------- |
+| [**Umbraco.Automate**](Umbraco.Automate/) | Core automation system for Umbraco CMS | 0.x     | `Umbraco.Automate/` |
+
+### Add-ons
+
+| Product                                                                       | Description                                                 | Version | Location                       |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------- | ------- | ------------------------------ |
+| [**Umbraco.Automate.OpenIddict**](Umbraco.Automate.OpenIddict/)               | Reusable OAuth infrastructure via OpenIddict WebIntegration | 0.x     | `Umbraco.Automate.OpenIddict/` |
+| [**Umbraco.Automate.Slack**](Umbraco.Automate.Slack/)                         | Slack connection and actions                                | 0.x     | `Umbraco.Automate.Slack/`      |
 
 ## Key Concepts
 
-| Term | Description |
-|------|-------------|
-| **Provider** | A package that contributes triggers and actions to the system |
-| **Action** | A reusable unit of work (e.g. "Send Slack Message", "Create Content") |
-| **Trigger** | An event that starts an automation (e.g. "Content Published", "Webhook Received") |
-| **Automation** | A user-defined trigger + steps sequence created in the backoffice |
-| **Step** | A configured instance of an action within an automation |
-| **Workspace** | An admin-configured container that groups automations and scopes permissions |
-| **Connection** | A named, reusable credential set for external services |
-| **Run** | A single execution of an automation with per-step tracking |
+| Term           | Description                                                                        |
+| -------------- | ---------------------------------------------------------------------------------- |
+| **Provider**   | A package that contributes triggers and actions to the system                      |
+| **Action**     | A reusable unit of work (e.g. "Send Slack Message", "Create Content")              |
+| **Trigger**    | An event that starts an automation (e.g. "Content Published", "Webhook Received")  |
+| **Automation** | A user-defined trigger + steps sequence created in the backoffice                  |
+| **Step**       | A configured instance of an action within an automation                            |
+| **Workspace**  | An admin-configured container that groups automations and scopes permissions       |
+| **Connection** | A named, reusable credential set for external services                             |
+| **Run**        | A single execution of an automation with per-step tracking                         |
 
 Built on [WorkflowCore](https://github.com/danielgerlag/workflow-core).
 
@@ -65,59 +76,125 @@ Named, reusable credential sets for external services. Connections are scoped to
 
 Automations follow a draft/published lifecycle consistent with the Umbraco content model, with full version history tracking.
 
-## Development
+## Quick Start
+
+The fastest way to get started is using the install-demo script, which creates a unified development environment with all packages and a demo Umbraco site:
+
+```bash
+# Windows
+.\scripts\install-demo-site.ps1
+
+# Linux/Mac
+./scripts/install-demo-site.sh
+```
+
+This creates:
+
+- `Umbraco.Automate.local.slnx` - Unified solution with all products
+- `demo/Umbraco.Automate.DemoSite/` - Umbraco instance with all packages referenced
+
+After running the script, build the frontend and backend:
+
+```bash
+# Install frontend dependencies
+npm install
+
+# Build all frontend packages
+npm run build
+
+# Build the unified solution
+dotnet build Umbraco.Automate.local.slnx
+
+# Run the demo site (from demo/Umbraco.Automate.DemoSite/)
+cd demo/Umbraco.Automate.DemoSite
+dotnet run
+```
+
+**Demo site credentials:** admin@example.com / password1234
+
+## Local Development
 
 ### Prerequisites
 
 - .NET 10.0 SDK
-- Node.js 20.x
+- Node.js 22.x
 - Git
 
-### Build & Test
+### Building Individual Products
+
+Each product has its own solution file and can be built independently:
 
 ```bash
-# Core
+# Build individual products
 dotnet build Umbraco.Automate/Umbraco.Automate.slnx
-dotnet test Umbraco.Automate/Umbraco.Automate.slnx
-
-# OpenIddict (OAuth infrastructure)
 dotnet build Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.slnx
-dotnet test Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.slnx
-
-# Slack provider
 dotnet build Umbraco.Automate.Slack/Umbraco.Automate.Slack.slnx
+
+# Run tests
+dotnet test Umbraco.Automate/Umbraco.Automate.slnx
+dotnet test Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.slnx
 ```
 
-### Demo Site
+### Frontend Development (npm Workspaces)
 
-A demo Umbraco site is available at `demo/Umbraco.Automate.DemoSite/` for manual testing.
+This monorepo uses **npm workspaces** for frontend dependency management:
 
-### Project Structure
+```bash
+# Install all workspace dependencies (run from monorepo root)
+npm install
 
-```
-Umbraco.Automate/
-├── src/
-│   ├── Umbraco.Automate/                    # Meta-package (NuGet distribution)
-│   ├── Umbraco.Automate.Core/              # Domain models, services, interfaces
-│   ├── Umbraco.Automate.Web/               # Management API
-│   ├── Umbraco.Automate.Web.StaticAssets/   # TypeScript/Lit frontend
-│   ├── Umbraco.Automate.Persistence/        # EF Core DbContext, repositories
-│   ├── Umbraco.Automate.Persistence.SqlServer/
-│   ├── Umbraco.Automate.Persistence.Sqlite/
-│   └── Umbraco.Automate.Startup/            # Umbraco Composer, DI registration
-├── tests/
-│   ├── Umbraco.Automate.Tests.Unit/
-│   ├── Umbraco.Automate.Tests.Integration/
-│   └── Umbraco.Automate.Tests.Common/
-└── docs/
-    ├── engineering-spec.md                   # Full technical specification
-    ├── functional-overview.md                # Business-focused feature overview
-    ├── identity-ownership-permissions.md     # Access control & identity spec
-    └── vocabulary.md                         # Standard terminology
+# Build all frontends
+npm run build
+
+# Watch all frontends in parallel
+npm run watch
+
+# Regenerate OpenAPI clients (requires a running demo site)
+npm run generate-client
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+## Architecture
+
+```
+Umbraco.Automate (Core)
+    ├── Umbraco.Automate.OpenIddict (Add-on - depends on Core)
+    └── Umbraco.Automate.Slack (Provider - depends on Core + OpenIddict)
+```
+
+Built on [WorkflowCore](https://github.com/danielgerlag/workflow-core) with a provider-driven extensibility model.
+
+## Documentation
+
+- [CLAUDE.md](CLAUDE.md) - Development guide, build commands, and coding standards
+- Product-specific guides:
+    - [Umbraco.Automate/CLAUDE.md](Umbraco.Automate/CLAUDE.md) - Core package
+    - [Umbraco.Automate.OpenIddict/CLAUDE.md](Umbraco.Automate.OpenIddict/CLAUDE.md) - OAuth infrastructure add-on
+    - [Umbraco.Automate.Slack/CLAUDE.md](Umbraco.Automate.Slack/CLAUDE.md) - Slack provider
+- Specifications:
+    - [docs/engineering-spec.md](docs/engineering-spec.md) - Full technical specification
+    - [docs/functional-overview.md](docs/functional-overview.md) - Business-focused feature overview
+    - [docs/identity-ownership-permissions.md](docs/identity-ownership-permissions.md) - Access control & identity spec
+
+## Target Framework
+
+- .NET 10.0 (`net10.0`)
+- Umbraco CMS 17.x
+- WorkflowCore 3.9.0
+- Central Package Management via `Directory.Packages.props`
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+
+- Development workflow and branch naming conventions
+- Commit message format (conventional commits)
+- Changelog generation and maintenance
+- Pull request process
+- Release and deployment procedures
+- Coding standards
+
+For development setup and build commands, see [CLAUDE.md](CLAUDE.md).
 
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

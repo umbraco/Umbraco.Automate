@@ -15,6 +15,7 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.StepTypes;
+using Umbraco.Cms.Core.Events;
 using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Core.Execution;
@@ -188,6 +189,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 _errorClassifier,
                 _serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>(),
                 _metrics,
+                _serviceProvider.GetRequiredService<IEventAggregator>(),
                 _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
 
             var workflowStep = new ActionWorkflowStep(stepBody);

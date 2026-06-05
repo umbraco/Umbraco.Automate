@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Api.Common.Builders;
 
 namespace Umbraco.Automate.Web.Api.Management.Run.Controllers;
@@ -19,6 +20,7 @@ public sealed class ReplayRunController : RunControllerBase
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
     private readonly IAutomationExecutor _executor;
+    private readonly ICircuitBreakerService _circuitBreaker;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ReplayRunController"/> class.
@@ -27,12 +29,14 @@ public sealed class ReplayRunController : RunControllerBase
         IAutomationRunService runService,
         IAutomationService automationService,
         IAuthorizationService authorizationService,
-        IAutomationExecutor executor)
+        IAutomationExecutor executor,
+        ICircuitBreakerService circuitBreaker)
     {
         _runService = runService;
         _automationService = automationService;
         _authorizationService = authorizationService;
         _executor = executor;
+        _circuitBreaker = circuitBreaker;
     }
 
     /// <summary>
@@ -66,11 +70,11 @@ public sealed class ReplayRunController : RunControllerBase
             return forbidden;
         }
 
-        if (automation.Status != AutomationStatus.Published || !automation.IsEnabled)
+        if (automation.Status != AutomationStatus.Published)
         {
             return Conflict(new ProblemDetailsBuilder()
                 .WithTitle("Automation not active")
-                .WithDetail("The automation must be published and enabled to replay a run.")
+                .WithDetail("The automation must be published to replay a run.")
                 .Build());
         }
 
@@ -82,6 +86,14 @@ public sealed class ReplayRunController : RunControllerBase
                 .Build());
         }
 
+        if (!await _circuitBreaker.IsRunAllowedAsync(automation.Id, TriggerInitiatorType.Replay, cancellationToken))
+        {
+            return Conflict(new ProblemDetailsBuilder()
+                .WithTitle("Automation auto-disabled")
+                .WithDetail("This automation has been auto-disabled by the circuit breaker. Re-enable it to replay runs.")
+                .Build());
+        }
+
         Dictionary<string, object?>? triggerData = null;
         if (!string.IsNullOrEmpty(run.TriggerData))
         {
@@ -90,7 +102,7 @@ public sealed class ReplayRunController : RunControllerBase
 
         await _executor.ExecuteAsync(
             automation,
-            "replay",
+            TriggerInitiatorType.Replay,
             run.Id.ToString(),
             triggerData,
             cancellationToken);

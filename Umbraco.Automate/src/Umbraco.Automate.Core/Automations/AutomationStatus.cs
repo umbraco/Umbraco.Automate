@@ -16,7 +16,7 @@ public enum AutomationStatus
     Published = 1,
 
     /// <summary>
-    /// Previously published, explicitly deactivated. Published version retained for rollback.
+    /// Previously published, explicitly unpublished. Published version retained for rollback.
     /// </summary>
-    Inactive = 2,
+    Unpublished = 2,
 }
