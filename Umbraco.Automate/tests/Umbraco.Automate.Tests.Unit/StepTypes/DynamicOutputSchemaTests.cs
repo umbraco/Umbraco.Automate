@@ -1,0 +1,154 @@
+using Json.Schema;
+using Json.Schema.Generation;
+using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
+
+namespace Umbraco.Automate.Tests.Unit.StepTypes;
+
+public class DynamicOutputSchemaTests
+{
+    private static readonly ActionInfrastructure ActionDeps = CreateActionInfrastructure();
+
+    [Fact]
+    public void StaticAction_HasDynamicOutputSchema_IsFalse()
+    {
+        var action = new StaticAction(ActionDeps);
+
+        action.HasDynamicOutputSchema.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DynamicAction_HasDynamicOutputSchema_IsTrue()
+    {
+        var action = new DynamicAction(ActionDeps);
+
+        action.HasDynamicOutputSchema.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void StaticAction_GetOutputSchema_ReturnsCLRBasedSchema()
+    {
+        var action = new StaticAction(ActionDeps);
+
+        var schema = action.GetOutputSchema();
+
+        schema.ShouldNotBeNull();
+        var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
+        properties.ShouldNotBeNull();
+        properties.Keys.ShouldContain("name");
+    }
+
+    [Fact]
+    public async Task StaticAction_GetOutputSchemaAsync_ReturnsSameAsStaticSchema()
+    {
+        IStepType action = new StaticAction(ActionDeps);
+
+        var schema = await action.GetOutputSchemaAsync(null);
+
+        schema.ShouldNotBeNull();
+        var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
+        properties.ShouldNotBeNull();
+        properties.Keys.ShouldContain("name");
+    }
+
+    [Fact]
+    public async Task DynamicAction_GetOutputSchemaAsync_ReturnsSettingsDependentSchema()
+    {
+        IStepType action = new DynamicAction(ActionDeps);
+
+        var settings = new Dictionary<string, object?> { ["schemaType"] = "detailed" };
+        var schema = await action.GetOutputSchemaAsync(settings);
+
+        schema.ShouldNotBeNull();
+        var properties = schema.GetKeyword<PropertiesKeyword>()?.Properties;
+        properties.ShouldNotBeNull();
+        properties.Keys.ShouldContain("detailedField");
+    }
+
+    [Fact]
+    public async Task DynamicAction_GetOutputSchemaAsync_NullSettings_ReturnsNull()
+    {
+        IStepType action = new DynamicAction(ActionDeps);
+
+        var schema = await action.GetOutputSchemaAsync(null);
+
+        schema.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task DynamicAction_GetOutputSchemaAsync_EmptySettings_ReturnsNull()
+    {
+        IStepType action = new DynamicAction(ActionDeps);
+
+        var schema = await action.GetOutputSchemaAsync([]);
+
+        schema.ShouldBeNull();
+    }
+
+    private static ActionInfrastructure CreateActionInfrastructure()
+    {
+        var resolver = new Mock<IEditableModelResolver>();
+        resolver.Setup(r => r.ResolveModel<DynamicSettings>(
+                It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<EditableModelSchema?>()))
+            .Returns((string _, object? data, EditableModelSchema? _) =>
+            {
+                if (data is not Dictionary<string, object?> dict)
+                {
+                    return null;
+                }
+
+                return new DynamicSettings
+                {
+                    SchemaType = dict.TryGetValue("schemaType", out var v) ? v?.ToString() : null,
+                };
+            });
+        return new ActionInfrastructure(resolver.Object);
+    }
+
+    #region Test Doubles
+
+    private class StaticOutput
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    [Action("test.static", "Static Action")]
+    private class StaticAction(ActionInfrastructure infrastructure)
+        : ActionBase<object, StaticOutput>(infrastructure)
+    {
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => Task.FromResult(Success(new StaticOutput()));
+    }
+
+    private class DynamicSettings
+    {
+        public string? SchemaType { get; set; }
+    }
+
+    [Action("test.dynamic", "Dynamic Action")]
+    private class DynamicAction(ActionInfrastructure infrastructure)
+        : DynamicOutputActionBase<DynamicSettings>(infrastructure)
+    {
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        protected override Task<JsonSchema?> GetOutputSchemaAsync(
+            DynamicSettings? settings, CancellationToken cancellationToken)
+        {
+            if (settings?.SchemaType is null)
+            {
+                return Task.FromResult<JsonSchema?>(null);
+            }
+
+            var builder = new JsonSchemaBuilder()
+                .Type(SchemaValueType.Object)
+                .Properties(
+                    ("detailedField", new JsonSchemaBuilder().Type(SchemaValueType.String)));
+
+            return Task.FromResult<JsonSchema?>(builder.Build());
+        }
+    }
+
+    #endregion
+}

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Umbraco.Automate.Core.Models;
 
 namespace Umbraco.Automate.Core.Automations;
@@ -5,10 +6,11 @@ namespace Umbraco.Automate.Core.Automations;
 /// <summary>
 /// An automation definition — a trigger plus a sequence of steps built visually on a canvas.
 /// </summary>
-public sealed class Automation : IVersionableEntity
+public sealed class Automation : IPublishableEntity
 {
     /// <inheritdoc />
-    public Guid Id { get; internal set; }
+    [JsonInclude]
+    public Guid Id { get; set; }
 
     /// <summary>
     /// Gets or sets the unique, URL-safe alias (e.g. "publishSlackNotification").
@@ -26,11 +28,6 @@ public sealed class Automation : IVersionableEntity
     public string? Description { get; set; }
 
     /// <summary>
-    /// Gets or sets whether triggers are active for this automation.
-    /// </summary>
-    public bool IsEnabled { get; set; }
-
-    /// <summary>
     /// Gets or sets the lifecycle status.
     /// </summary>
     public AutomationStatus Status { get; set; } = AutomationStatus.Draft;
@@ -41,9 +38,9 @@ public sealed class Automation : IVersionableEntity
     public int? PublishedVersion { get; set; }
 
     /// <summary>
-    /// Gets or sets the latest draft version number.
+    /// Gets or sets the workspace this automation belongs to.
     /// </summary>
-    public int DraftVersion { get; set; }
+    public Guid WorkspaceId { get; set; }
 
     /// <summary>
     /// Gets or sets the folder group ID, or null if at the root.
@@ -66,11 +63,17 @@ public sealed class Automation : IVersionableEntity
     public IList<StepConnection> Connections { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets the notification settings for failure alerting.
+    /// </summary>
+    public AutomationNotificationSettings? NotificationSettings { get; set; }
+
+    /// <summary>
     /// Gets or sets the serialised canvas state (viewport, layout).
     /// </summary>
     public string? CanvasState { get; set; }
 
     /// <inheritdoc />
+    [JsonInclude]
     public int Version { get; internal set; } = 1;
 
     /// <inheritdoc />

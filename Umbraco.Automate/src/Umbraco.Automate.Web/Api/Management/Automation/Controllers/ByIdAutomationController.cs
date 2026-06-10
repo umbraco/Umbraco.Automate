@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
@@ -14,14 +15,22 @@ namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 public sealed class ByIdAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
+    private readonly IAuthorizationService _authorizationService;
+    private readonly ICircuitBreakerService _circuitBreaker;
     private readonly IUmbracoMapper _mapper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ByIdAutomationController"/> class.
     /// </summary>
-    public ByIdAutomationController(IAutomationService automationService, IUmbracoMapper mapper)
+    public ByIdAutomationController(
+        IAutomationService automationService,
+        IAuthorizationService authorizationService,
+        ICircuitBreakerService circuitBreaker,
+        IUmbracoMapper mapper)
     {
         _automationService = automationService;
+        _authorizationService = authorizationService;
+        _circuitBreaker = circuitBreaker;
         _mapper = mapper;
     }
 
@@ -42,6 +51,19 @@ public sealed class ByIdAutomationController : AutomationControllerBase
             return AutomationNotFound();
         }
 
-        return Ok(_mapper.Map<AutomationResponseModel>(automation));
+        var forbidden = await AuthorizeWorkspaceAccessAsync(_authorizationService, automation.WorkspaceId);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
+        var model = _mapper.Map<AutomationResponseModel>(automation)!;
+
+        var health = await _circuitBreaker.GetHealthAsync(id, cancellationToken);
+        model.Health = health.Health;
+        model.WarningIssuedUtc = health.WarningIssuedUtc;
+        model.DisabledUtc = health.DisabledUtc;
+
+        return Ok(model);
     }
 }

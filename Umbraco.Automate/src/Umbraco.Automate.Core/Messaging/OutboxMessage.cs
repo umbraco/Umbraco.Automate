@@ -18,6 +18,12 @@ internal sealed class OutboxMessage
     public required string Body { get; set; }
 
     /// <summary>
+    /// Optional idempotency key. When set, the outbox store enforces uniqueness
+    /// per topic+key to prevent duplicate message processing.
+    /// </summary>
+    public string? IdempotencyKey { get; set; }
+
+    /// <summary>
     /// When the message was created.
     /// </summary>
     public DateTime CreatedUtc { get; set; }

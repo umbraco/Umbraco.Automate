@@ -97,16 +97,25 @@ internal sealed class QueueMessage
 internal sealed class WorkflowQueueHandler : IMessageHandler
 {
     private readonly OutboxQueueProvider _queueProvider;
+    private readonly IExecutionNodeEligibility _nodeEligibility;
 
-    public WorkflowQueueHandler(OutboxQueueProvider queueProvider)
+    public WorkflowQueueHandler(OutboxQueueProvider queueProvider, IExecutionNodeEligibility nodeEligibility)
     {
         _queueProvider = queueProvider;
+        _nodeEligibility = nodeEligibility;
     }
 
     public string Topic => OutboxQueueProvider.WorkflowQueueTopic;
 
+    public bool CanProcessNow() => _nodeEligibility.CanExecuteWorkflows();
+
     public Task HandleAsync(string body, CancellationToken cancellationToken)
     {
+        if (!_nodeEligibility.CanExecuteWorkflows())
+        {
+            throw new NodeNotEligibleException(Topic);
+        }
+
         var message = JsonSerializer.Deserialize<QueueMessage>(body, JsonOptions.Default)
                       ?? throw new InvalidOperationException("Failed to deserialize QueueMessage");
         _queueProvider.EnqueueLocally(QueueType.Workflow, message.Id);
@@ -120,16 +129,25 @@ internal sealed class WorkflowQueueHandler : IMessageHandler
 internal sealed class EventQueueHandler : IMessageHandler
 {
     private readonly OutboxQueueProvider _queueProvider;
+    private readonly IExecutionNodeEligibility _nodeEligibility;
 
-    public EventQueueHandler(OutboxQueueProvider queueProvider)
+    public EventQueueHandler(OutboxQueueProvider queueProvider, IExecutionNodeEligibility nodeEligibility)
     {
         _queueProvider = queueProvider;
+        _nodeEligibility = nodeEligibility;
     }
 
     public string Topic => OutboxQueueProvider.EventQueueTopic;
 
+    public bool CanProcessNow() => _nodeEligibility.CanExecuteWorkflows();
+
     public Task HandleAsync(string body, CancellationToken cancellationToken)
     {
+        if (!_nodeEligibility.CanExecuteWorkflows())
+        {
+            throw new NodeNotEligibleException(Topic);
+        }
+
         var message = JsonSerializer.Deserialize<QueueMessage>(body, JsonOptions.Default)
                       ?? throw new InvalidOperationException("Failed to deserialize QueueMessage");
         _queueProvider.EnqueueLocally(QueueType.Event, message.Id);

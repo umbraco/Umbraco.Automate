@@ -19,8 +19,12 @@ public sealed class CreateAutomationRequestModel
     /// <summary>Optional description.</summary>
     public string? Description { get; init; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; init; }
+    /// <summary>The workspace this automation belongs to.</summary>
+    [Required]
+    public required Guid WorkspaceId { get; init; }
+
+    /// <summary>The group (folder) to place this automation in, or null for root.</summary>
+    public Guid? GroupId { get; init; }
 
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; init; }
@@ -33,4 +37,7 @@ public sealed class CreateAutomationRequestModel
 
     /// <summary>The serialised canvas state.</summary>
     public string? CanvasState { get; init; }
+
+    /// <summary>Notification channel settings.</summary>
+    public AutomationNotificationSettings? NotificationSettings { get; init; }
 }

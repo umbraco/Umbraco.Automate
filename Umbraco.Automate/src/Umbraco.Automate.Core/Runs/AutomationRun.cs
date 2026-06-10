@@ -21,6 +21,16 @@ public sealed class AutomationRun : IAutomateEntity
     public required int AutomationVersion { get; init; }
 
     /// <summary>
+    /// Gets or sets the workspace ID at the time of execution (snapshot).
+    /// </summary>
+    public required Guid WorkspaceId { get; init; }
+
+    /// <summary>
+    /// Gets or sets the service account key used for execution (snapshot).
+    /// </summary>
+    public required Guid ServiceAccountKey { get; init; }
+
+    /// <summary>
     /// Gets or sets the execution status.
     /// </summary>
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Pending;
@@ -54,6 +64,14 @@ public sealed class AutomationRun : IAutomateEntity
     /// Gets or sets the error message if the run failed.
     /// </summary>
     public string? Error { get; set; }
+
+    /// <summary>
+    /// Gets or sets the WorkflowCore instance ID that backs this run. Populated after
+    /// <c>StartWorkflow</c> returns; used for lifecycle operations (suspend, resume,
+    /// terminate) via <c>IWorkflowHost</c>. Null for runs created before this field
+    /// was introduced.
+    /// </summary>
+    public string? WorkflowInstanceId { get; set; }
 
     /// <summary>
     /// Gets or sets the step runs within this automation run.

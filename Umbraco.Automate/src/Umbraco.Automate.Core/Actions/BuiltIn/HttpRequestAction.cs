@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -6,27 +7,22 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// <summary>
 /// A built-in action that makes an HTTP request to an external URL.
 /// </summary>
-[Action("umbracoAutomate.httpRequest", "HTTP Request")]
-public sealed class HttpRequestAction : ActionBase<HttpRequestSettings>
+[Action("umbracoAutomate.httpRequest", "HTTP Request",
+    Description = "Sends an HTTP request to an external URL.",
+    Group = "Core",
+    Icon = "icon-cloud-upload")]
+public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequestOutput>
 {
     private readonly IHttpClientFactory _httpClientFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HttpRequestAction"/> class.
     /// </summary>
-    public HttpRequestAction(IHttpClientFactory httpClientFactory)
+    public HttpRequestAction(ActionInfrastructure infrastructure, IHttpClientFactory httpClientFactory)
+        : base(infrastructure)
     {
         _httpClientFactory = httpClientFactory;
     }
-
-    /// <inheritdoc />
-    public override string? Description => "Sends an HTTP request to an external URL.";
-
-    /// <inheritdoc />
-    public override string? Group => "Core";
-
-    /// <inheritdoc />
-    public override string? Icon => "icon-cloud-upload";
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -45,7 +41,16 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings>
 
         if (!string.IsNullOrWhiteSpace(settings.Body) && HasBody(settings.Method))
         {
-            request.Content = new StringContent(settings.Body, Encoding.UTF8, settings.ContentType);
+            // Encode the body as UTF-8, but set the Content-Type header from the configured
+            // value verbatim rather than letting StringContent append "; charset=utf-8".
+            // Some webhook receivers (e.g. Slack, Discord) reject the charset parameter and
+            // treat the request as if it had no body.
+            request.Content = new StringContent(settings.Body, Encoding.UTF8);
+            if (!string.IsNullOrWhiteSpace(settings.ContentType)
+                && MediaTypeHeaderValue.TryParse(settings.ContentType, out var contentType))
+            {
+                request.Content.Headers.ContentType = contentType;
+            }
         }
 
         ApplyHeaders(request, settings.Headers);
@@ -61,7 +66,7 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings>
         };
 
         return response.IsSuccessStatusCode
-            ? ActionResult.Success(output)
+            ? Success(output)
             : ActionResult.Failed(
                 new HttpRequestException($"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}"),
                 StepRunErrorCategory.InvalidResponse);

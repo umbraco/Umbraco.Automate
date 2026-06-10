@@ -70,4 +70,19 @@ public sealed class StepRun : IAutomateEntity
     /// Gets or sets the execution duration.
     /// </summary>
     public TimeSpan? Duration { get; set; }
+
+    /// <summary>
+    /// Gets or sets the branch outcome that was selected (for If/Switch control flow steps).
+    /// </summary>
+    public string? BranchOutcome { get; set; }
+
+    /// <summary>
+    /// Gets or sets the iteration index (for ForEach/While container steps).
+    /// </summary>
+    public int? IterationIndex { get; set; }
+
+    /// <summary>
+    /// Gets or sets the total iteration count (for ForEach/While container steps).
+    /// </summary>
+    public int? IterationTotal { get; set; }
 }

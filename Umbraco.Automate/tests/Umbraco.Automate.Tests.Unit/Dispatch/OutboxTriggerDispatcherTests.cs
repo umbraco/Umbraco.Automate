@@ -1,6 +1,8 @@
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Triggers;
@@ -14,9 +16,19 @@ public class OutboxTriggerDispatcherTests
 
     public OutboxTriggerDispatcherTests()
     {
+        var meterFactory = CreateMeterFactory();
         _sut = new OutboxTriggerDispatcher(
             _outbox.Object,
+            new AutomateMetrics(meterFactory),
             Mock.Of<ILogger<OutboxTriggerDispatcher>>());
+    }
+
+    private static IMeterFactory CreateMeterFactory()
+    {
+        var mock = new Mock<IMeterFactory>();
+        mock.Setup(f => f.Create(It.IsAny<MeterOptions>()))
+            .Returns((MeterOptions opts) => new Meter(opts.Name));
+        return mock.Object;
     }
 
     [Fact]
@@ -27,9 +39,10 @@ public class OutboxTriggerDispatcherTests
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
                 It.IsAny<object>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, object, CancellationToken>(
-                (_, msg, _) => captured = msg)
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent
@@ -44,7 +57,8 @@ public class OutboxTriggerDispatcherTests
             p => p.PublishAsync(
                 OutboxTriggerDispatcher.TopicName,
                 It.IsAny<object>(),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()),
             Times.Once);
 
         captured.ShouldNotBeNull();
@@ -61,9 +75,10 @@ public class OutboxTriggerDispatcherTests
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
                 It.IsAny<object>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, object, CancellationToken>(
-                (_, msg, _) => captured = msg)
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent<TestOutput>
@@ -91,9 +106,10 @@ public class OutboxTriggerDispatcherTests
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
                 It.IsAny<object>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, object, CancellationToken>(
-                (_, msg, _) => captured = msg)
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent
@@ -118,9 +134,10 @@ public class OutboxTriggerDispatcherTests
             .Setup(p => p.PublishAsync(
                 It.IsAny<string>(),
                 It.IsAny<object>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, object, CancellationToken>(
-                (_, msg, _) => captured = msg)
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
             .Returns(Task.CompletedTask);
 
         var triggerEvent = new TriggerEvent
@@ -135,6 +152,113 @@ public class OutboxTriggerDispatcherTests
         captured.ShouldNotBeNull();
         var msg = captured.ShouldBeOfType<TriggerEventMessage>();
         msg.InitiatorId.ShouldBe("user-42");
+    }
+
+    [Fact]
+    public async Task DispatchAsync_TargetAutomationId_IsPassedThrough()
+    {
+        object? captured = null;
+        _outbox
+            .Setup(p => p.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
+            .Returns(Task.CompletedTask);
+
+        var automationId = Guid.NewGuid();
+        var triggerEvent = new TriggerEvent
+        {
+            TriggerAlias = "umbracoAutomate.webhook",
+            InitiatorType = "webhook",
+            TargetAutomationId = automationId,
+        };
+
+        await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
+
+        captured.ShouldNotBeNull();
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.TargetAutomationId.ShouldBe(automationId);
+    }
+
+    [Fact]
+    public async Task DispatchAsync_NoTargetAutomationId_LeavesItNull()
+    {
+        object? captured = null;
+        _outbox
+            .Setup(p => p.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, msg, _, _) => captured = msg)
+            .Returns(Task.CompletedTask);
+
+        var triggerEvent = new TriggerEvent
+        {
+            TriggerAlias = "contentPublished",
+            InitiatorType = "system",
+        };
+
+        await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
+
+        captured.ShouldNotBeNull();
+        var msg = captured.ShouldBeOfType<TriggerEventMessage>();
+        msg.TargetAutomationId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task DispatchAsync_IdempotencyKey_IsPassedToOutbox()
+    {
+        string? capturedDedup = null;
+        _outbox
+            .Setup(p => p.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, _, _, dedup) => capturedDedup = dedup)
+            .Returns(Task.CompletedTask);
+
+        var triggerEvent = new TriggerEvent
+        {
+            TriggerAlias = "contentPublished",
+            InitiatorType = "system",
+            IdempotencyKey = "contentPublished:abc-123:2026-03-11T10:00:00Z",
+        };
+
+        await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
+
+        capturedDedup.ShouldBe("contentPublished:abc-123:2026-03-11T10:00:00Z");
+    }
+
+    [Fact]
+    public async Task DispatchAsync_NoIdempotencyKey_PassesNullToOutbox()
+    {
+        string? capturedDedup = "not-null";
+        _outbox
+            .Setup(p => p.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
+            .Callback<string, object, CancellationToken, string?>(
+                (_, _, _, dedup) => capturedDedup = dedup)
+            .Returns(Task.CompletedTask);
+
+        var triggerEvent = new TriggerEvent
+        {
+            TriggerAlias = "manual",
+            InitiatorType = "user",
+        };
+
+        await _sut.DispatchAsync(triggerEvent, CancellationToken.None);
+
+        capturedDedup.ShouldBeNull();
     }
 
     private class TestOutput

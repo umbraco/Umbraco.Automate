@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Title>Umbraco Automate OpenIddict Persistence SQLite</Title>
+        <Description>SQLite migrations for Umbraco Automate OpenIddict persistence</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+        <PackageReference Include="Umbraco.Cms.Persistence.EFCore.Sqlite" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Umbraco.Automate.OpenIddict.Core\Umbraco.Automate.OpenIddict.Core.csproj" />
+    </ItemGroup>
+
+</Project>

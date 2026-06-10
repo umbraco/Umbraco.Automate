@@ -23,19 +23,33 @@ public sealed class AutomationItemResponseModel
     /// <summary>Optional description.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; set; }
+    /// <summary>The workspace this automation belongs to.</summary>
+    [Required]
+    public Guid WorkspaceId { get; set; }
+
+    /// <summary>The group (folder) this automation belongs to, or null.</summary>
+    public Guid? GroupId { get; set; }
 
     /// <summary>The lifecycle status.</summary>
     [Required]
     public AutomationStatus Status { get; set; }
 
+    /// <summary>The alias of the configured trigger, or null if no trigger is configured.</summary>
+    public string? TriggerAlias { get; set; }
+
     /// <summary>The entity version.</summary>
     public int Version { get; set; }
+
+    /// <summary>The published version number, or null if never published. Compare against <see cref="Version"/> to detect unpublished changes.</summary>
+    public int? PublishedVersion { get; set; }
 
     /// <summary>When the automation was created.</summary>
     public DateTime DateCreated { get; set; }
 
     /// <summary>When the automation was last modified.</summary>
     public DateTime DateModified { get; set; }
+
+    /// <summary>The circuit-breaker health, a separate axis from <see cref="Status"/>.</summary>
+    [Required]
+    public AutomationHealth Health { get; set; }
 }

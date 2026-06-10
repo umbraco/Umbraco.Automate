@@ -1,0 +1,1 @@
+export const UA_AUTOMATION_TREE_ITEM_CHILDREN_COLLECTION_ALIAS = "UmbracoAutomate.Collection.Automation.TreeItemChildren";

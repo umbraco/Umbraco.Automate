@@ -31,6 +31,14 @@ internal interface IOutboxStore
     Task MarkFailedAsync(long messageId, string error, DateTime? nextRetryUtc, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Releases a claimed message back to <c>Pending</c> without incrementing the retry count.
+    /// Used when the handler determines it can't process the message right now (e.g. node
+    /// became ineligible between claim and handle) and another node — or this node on a later
+    /// poll — should be allowed to claim it indefinitely.
+    /// </summary>
+    Task ReleaseClaimAsync(long messageId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Marks a message as dead-lettered (no more retries).
     /// </summary>
     Task MarkDeadLetteredAsync(long messageId, string error, CancellationToken cancellationToken);
@@ -39,4 +47,9 @@ internal interface IOutboxStore
     /// Removes completed messages older than the specified age.
     /// </summary>
     Task CleanupCompletedAsync(TimeSpan olderThan, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets the count of messages grouped by status.
+    /// </summary>
+    Task<OutboxStats> GetStatsAsync(CancellationToken cancellationToken);
 }

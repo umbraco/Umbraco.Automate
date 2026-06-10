@@ -15,7 +15,13 @@ public sealed class AutomationSavingNotification(Automation target, EventMessage
 /// Notification fired after an automation has been saved.
 /// </summary>
 public sealed class AutomationSavedNotification(Automation target, EventMessages messages)
-    : ObjectNotification<Automation>(target, messages);
+    : ObjectNotification<Automation>(target, messages)
+{
+    /// <summary>
+    /// Gets the saved automation.
+    /// </summary>
+    public Automation Automation { get; } = target;
+}
 
 /// <summary>
 /// Notification fired before an automation is published. Can be cancelled.
@@ -27,7 +33,13 @@ public sealed class AutomationPublishingNotification(Automation target, EventMes
 /// Notification fired after an automation has been published.
 /// </summary>
 public sealed class AutomationPublishedNotification(Automation target, EventMessages messages)
-    : ObjectNotification<Automation>(target, messages);
+    : ObjectNotification<Automation>(target, messages)
+{
+    /// <summary>
+    /// Gets the published automation.
+    /// </summary>
+    public Automation Automation { get; } = target;
+}
 
 /// <summary>
 /// Notification fired before an automation is unpublished. Can be cancelled.
@@ -51,7 +63,13 @@ public sealed class AutomationDeletingNotification(Automation target, EventMessa
 /// Notification fired after an automation has been deleted.
 /// </summary>
 public sealed class AutomationDeletedNotification(Automation target, EventMessages messages)
-    : ObjectNotification<Automation>(target, messages);
+    : ObjectNotification<Automation>(target, messages)
+{
+    /// <summary>
+    /// Gets the deleted automation.
+    /// </summary>
+    public Automation Automation { get; } = target;
+}
 
 /// <summary>
 /// Notification fired before an automation run starts. Can be cancelled.
@@ -63,10 +81,52 @@ public sealed class AutomationRunStartingNotification(AutomationRun target, Even
 /// Notification fired after an automation run has completed (any status).
 /// </summary>
 public sealed class AutomationRunCompletedNotification(AutomationRun target, EventMessages messages)
-    : ObjectNotification<AutomationRun>(target, messages);
+    : ObjectNotification<AutomationRun>(target, messages)
+{
+    /// <summary>
+    /// Gets the completed automation run.
+    /// </summary>
+    public AutomationRun Run { get; } = target;
+}
+
+/// <summary>
+/// Notification fired when a suspended run resumes (Suspended → Running). Fires from both the
+/// explicit lifecycle API (<c>IAutomationRunService.ResumeRunAsync</c>) and the implicit
+/// approval/wait-for-event continuation in <c>ActionStepBody.HandleResumeAsync</c>.
+/// </summary>
+public sealed class AutomationRunResumedNotification(AutomationRun target, EventMessages messages)
+    : ObjectNotification<AutomationRun>(target, messages)
+{
+    /// <summary>
+    /// Gets the resumed automation run.
+    /// </summary>
+    public AutomationRun Run { get; } = target;
+}
 
 /// <summary>
 /// Notification fired after a step run has completed (any status).
 /// </summary>
 public sealed class StepRunCompletedNotification(StepRun target, EventMessages messages)
     : ObjectNotification<StepRun>(target, messages);
+
+/// <summary>
+/// Notification fired when the circuit breaker changes an automation's health (a degradation
+/// warning, an auto-disable, or a reset back to healthy). Handlers can alert owners and refresh
+/// read models. The target carries the new <see cref="AutomationHealthState"/>.
+/// </summary>
+public sealed class AutomationHealthChangedNotification(
+    AutomationHealthState target,
+    AutomationHealth previousHealth,
+    string? reason,
+    EventMessages messages)
+    : ObjectNotification<AutomationHealthState>(target, messages)
+{
+    /// <summary>Gets the new health state.</summary>
+    public AutomationHealthState State { get; } = target;
+
+    /// <summary>Gets the health before this change.</summary>
+    public AutomationHealth PreviousHealth { get; } = previousHealth;
+
+    /// <summary>Gets an optional human-readable reason for the change.</summary>
+    public string? Reason { get; } = reason;
+}

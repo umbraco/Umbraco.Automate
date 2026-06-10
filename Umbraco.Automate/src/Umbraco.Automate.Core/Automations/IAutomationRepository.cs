@@ -21,18 +21,29 @@ internal interface IAutomationRepository
     Task<IEnumerable<Automation>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a paged list of automations.
+    /// Gets a paged list of automations, optionally scoped to specific workspace IDs.
     /// </summary>
+    /// <param name="groupId">
+    /// When not null, filters by group.
+    /// Pass <see cref="Guid.Empty"/> to get root-level automations (those with no group).
+    /// </param>
     Task<(IEnumerable<Automation> Items, int Total)> GetPagedAsync(
         string? filter = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
+        Guid? groupId = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Saves an automation (insert or update).
+    /// Saves an automation (insert or update). Increments the version number on update.
     /// </summary>
     Task<Automation> SaveAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves lifecycle metadata (status, published version, enabled) without incrementing the version.
+    /// </summary>
+    Task<Automation> SaveMetadataAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes an automation by its ID.
@@ -43,4 +54,16 @@ internal interface IAutomationRepository
     /// Checks whether an automation with the given ID exists.
     /// </summary>
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks whether any automations exist in the given workspace.
+    /// </summary>
+    Task<bool> ExistsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the published version references for all automations that have a published version.
+    /// This is a lightweight projection — no full entity mapping.
+    /// </summary>
+    Task<IReadOnlyCollection<(Guid Id, int PublishedVersion)>> GetPublishedVersionReferencesAsync(
+        CancellationToken cancellationToken = default);
 }

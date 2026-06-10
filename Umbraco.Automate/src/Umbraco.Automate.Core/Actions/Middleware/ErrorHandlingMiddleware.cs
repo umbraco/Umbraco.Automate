@@ -22,6 +22,20 @@ internal sealed class ErrorHandlingMiddleware : IActionMiddleware
         {
             return await next(context, cancellationToken);
         }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // The step's timeout-linked token was cancelled, but the workflow-level token was not.
+            // This means the step exceeded its configured timeout.
+            _logger.LogError(
+                "Action '{ActionAlias}' timed out for step {StepId} in run {RunId}.",
+                context.ActionAlias,
+                context.StepId,
+                context.RunId);
+
+            return ActionResult.Failed(
+                new TimeoutException($"Action '{context.ActionAlias}' exceeded the step timeout."),
+                StepRunErrorCategory.Timeout);
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(

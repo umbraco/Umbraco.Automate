@@ -14,6 +14,8 @@ internal static class AutomationRunFactory
             Id = entity.Id,
             AutomationId = entity.AutomationId,
             AutomationVersion = entity.AutomationVersion,
+            WorkspaceId = entity.WorkspaceId,
+            ServiceAccountKey = entity.ServiceAccountKey,
             Status = (AutomationRunStatus)entity.Status,
             StartedUtc = entity.StartedUtc,
             CompletedUtc = entity.CompletedUtc,
@@ -21,6 +23,7 @@ internal static class AutomationRunFactory
             InitiatedBy = entity.InitiatedBy,
             CorrelationId = entity.CorrelationId,
             Error = entity.Error,
+            WorkflowInstanceId = entity.WorkflowInstanceId,
             StepRuns = stepRuns ?? [],
         };
     }
@@ -32,6 +35,8 @@ internal static class AutomationRunFactory
             Id = run.Id,
             AutomationId = run.AutomationId,
             AutomationVersion = run.AutomationVersion,
+            WorkspaceId = run.WorkspaceId,
+            ServiceAccountKey = run.ServiceAccountKey,
             Status = (int)run.Status,
             StartedUtc = run.StartedUtc,
             CompletedUtc = run.CompletedUtc,
@@ -39,6 +44,7 @@ internal static class AutomationRunFactory
             InitiatedBy = run.InitiatedBy,
             CorrelationId = run.CorrelationId,
             Error = run.Error,
+            WorkflowInstanceId = run.WorkflowInstanceId,
         };
     }
 
@@ -48,5 +54,6 @@ internal static class AutomationRunFactory
         entity.StartedUtc = run.StartedUtc;
         entity.CompletedUtc = run.CompletedUtc;
         entity.Error = run.Error;
+        entity.WorkflowInstanceId = run.WorkflowInstanceId;
     }
 }

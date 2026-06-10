@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -8,10 +9,21 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class WebhookTriggerSettings
 {
     /// <summary>
-    /// Gets or sets the secret used to authenticate incoming webhook requests.
-    /// Validated via the <c>X-Webhook-Secret</c> header or <c>secret</c> query parameter.
-    /// Auto-generated on first save if empty.
+    /// Gets or sets the HTTP method this webhook accepts (e.g. "POST", "GET").
+    /// Defaults to POST.
     /// </summary>
-    [Field(Label = "Webhook Secret", Description = "Secret token for authenticating incoming requests. Auto-generated if left empty.", IsSensitive = true)]
-    public string? Secret { get; set; }
+    [Field(
+        Label = "Allowed Method",
+        Description = "HTTP method this webhook accepts.",
+        EditorUiAlias = "Umb.Automate.WebhookMethodPicker")]
+    public string AllowedMethod { get; set; } = "POST";
+
+    /// <summary>
+    /// Gets or sets the authentication strategy and its strategy-specific settings.
+    /// </summary>
+    [Field(
+        Label = "Authentication",
+        Description = "How incoming webhook requests are authenticated.",
+        EditorUiAlias = "Umb.Automate.WebhookAuthenticatorPicker")]
+    public WebhookAuthenticatorConfig Authenticator { get; set; } = new();
 }

@@ -30,7 +30,7 @@ It is the first CMS-embedded automation engine in the .NET ecosystem.
 | **Step** | A configured instance of an action within an automation, with specific settings and position on the canvas |
 | **Connection** | A named, reusable set of credentials for an external service (e.g. "Production Slack", "Staging SMTP") |
 | **Run** | A single execution of an automation, with full step-by-step audit trail |
-| **Expression** | Data binding between steps using `${ trigger.contentName | truncate:100 }` syntax |
+| **Binding** | Data binding between steps using `${ trigger.contentName | truncate:100 }` syntax |
 
 ---
 
@@ -72,13 +72,12 @@ Automations are built in a full-screen visual node graph editor within the Umbra
 - **Pencil icon** on each node opens a settings modal with auto-generated forms
 - **No sidebars** — maximum canvas space for complex automations
 - **Minimap, keyboard shortcuts, copy/paste, undo/redo**
-- **Dry run mode** — test an automation visually with green/red status per node
 
 ---
 
 ## Data Flow Between Steps
 
-Steps pass data to each other using an expression syntax inspired by Umbraco's UFM:
+Steps pass data to each other using a binding syntax inspired by Umbraco's UFM:
 
 ```
 ${ trigger.contentName }                        — reference trigger output
@@ -98,9 +97,9 @@ Automations follow a **draft → publish** lifecycle, consistent with Umbraco's 
 
 | Status | Triggers fire? | Description |
 |--------|---------------|-------------|
-| **Draft** | No | Being edited. Can be tested via dry run. |
+| **Draft** | No | Being edited. Does not respond to triggers. |
 | **Published** | Yes (if enabled) | Live version responds to triggers. |
-| **Inactive** | No | Explicitly deactivated. Published version retained for rollback. |
+| **Unpublished** | No | Explicitly unpublished. Published version retained for rollback. |
 
 - **Editing a published automation** saves draft versions without affecting the live version
 - **"Unpublished changes"** indicator shows when the draft is ahead of the published version
@@ -133,7 +132,6 @@ A dedicated backoffice view for investigating runs:
 
 | Feature | Description |
 |---------|-------------|
-| **Dry run mode** | Execute without side effects — steps return what they *would* do |
 | **Rate limiting** | Configurable max runs per automation per time window |
 | **Kill switch** | Global and per-automation emergency disable |
 | **Version rollback** | Restore any previous version instantly |
@@ -260,7 +258,7 @@ A new backoffice section with:
 ## Extensibility for Developers
 
 - **Custom triggers and actions** — implement an interface, add an attribute, register via DI
-- **Custom expression filters** — extend the `${ }` expression system with new filters
+- **Custom binding filters** — extend the `${ }` binding system with new filters
 - **Custom notification channels** — add PagerDuty, OpsGenie, or any alerting system
 - **Middleware pipeline** — insert cross-cutting concerns (logging, metrics, validation) around action execution
 - **Lifecycle notifications** — react to automation events (saving, running, completing) from other packages
@@ -272,8 +270,8 @@ A new backoffice section with:
 ## Database & Infrastructure
 
 - **SQL Server and SQLite** supported (same as Umbraco CMS)
-- **Shared database by default** — tables coexist with Umbraco, prefixed with `UmbracoAutomate_`
-- **Separate database optional** — configure `umbracoAutomateDbDSN` connection string (follows Umbraco Commerce convention)
+- **Explicit database configuration** — by default Automate resolves a dedicated `umbracoAutomateDbDSN` connection string (recommended). Point `Umbraco:Automate:UseNamedConnectionString` at another entry (e.g. `umbracoDbDSN`) to share an existing connection. Reuse is opt-in because the additional traffic can affect the target database's performance.
+- **Tables coexist cleanly** when sharing — prefixed with `umbracoAutomate*` and tracked in a separate migrations history table
 - **Distributed deployment** — swap in Redis, Azure, RabbitMQ, or AWS queue/lock providers via NuGet packages
 - **Health checks** — engine status, queue depth, and data retention registered with Umbraco's health check system
 - **OpenTelemetry** — metrics for runs, failures, and step duration (Prometheus, Application Insights, etc.)
@@ -287,7 +285,7 @@ A new backoffice section with:
 Core engine, basic triggers/actions (Manual, Scheduled, Webhook, Content Published), canvas editor, run logging, security hardening, draft/publish lifecycle.
 
 ### Phase 2: HITL, Branching & Hardening
-Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, dry run mode, import/export, automation templates.
+Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, import/export, automation templates.
 
 ### Phase 3: AI Integration
 AI agents as actions, AI events as triggers, automations as AI tools, HITL gates for AI-initiated runs.

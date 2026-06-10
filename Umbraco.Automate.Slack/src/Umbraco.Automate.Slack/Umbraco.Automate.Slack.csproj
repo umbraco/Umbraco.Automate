@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <Title>Umbraco Automate Slack</Title>
+        <Description>Slack connection and actions for Umbraco Automate</Description>
+        <PackageReadmeFile>docs\README.md</PackageReadmeFile>
+        <PackageTags>umbraco automate automation slack messaging umbraco-marketplace</PackageTags>
+        <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+        <StaticWebAssetBasePath>App_Plugins/UmbracoAutomateSlack</StaticWebAssetBasePath>
+        <!-- Razor SDK auto-includes root-level JSON as Content, which collides with the
+             explicit include of the generated appsettings-schema JSON below. -->
+        <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <UseProjectReferences Condition="'$(UseProjectReferences)' == ''">true</UseProjectReferences>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="docs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="OpenIddict.Client.WebIntegration" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(UseProjectReferences)' == 'true'">
+        <ProjectReference Include="..\..\..\Umbraco.Automate\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
+        <ProjectReference Include="..\..\..\Umbraco.Automate.OpenIddict\src\Umbraco.Automate.OpenIddict\Umbraco.Automate.OpenIddict.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(UseProjectReferences)' != 'true'">
+        <PackageReference Include="Umbraco.Automate.Core" />
+        <PackageReference Include="Umbraco.Automate.OpenIddict" />
+    </ItemGroup>
+
+    <!-- Add JSON schema file to package output -->
+    <PropertyGroup>
+        <_UmbracoAutomateSlackJsonSchemaReference>appsettings-schema.Umbraco.Automate.Slack.json</_UmbracoAutomateSlackJsonSchemaReference>
+    </PropertyGroup>
+    <ItemGroup>
+        <Content Include="$(_UmbracoAutomateSlackJsonSchemaReference)" PackagePath="" Visible="false" />
+    </ItemGroup>
+
+    <!-- Generate JSON schema on build (and before copying to project) -->
+    <Target Name="GenerateAppsettingsSchema" BeforeTargets="Build;CopyUmbracoJsonSchemaFiles" Inputs="$(TargetPath)" Outputs="$(_UmbracoAutomateSlackJsonSchemaReference)">
+        <Message Text="Generating $(_UmbracoAutomateSlackJsonSchemaReference)" Importance="high" />
+        <JsonSchemaGenerate AssemblyPath="$(TargetPath)" TypeName="UmbracoAutomateSlackSchema" OutputPath="$(_UmbracoAutomateSlackJsonSchemaReference)" IncludeObsoleteProperties="false" />
+        <ItemGroup>
+            <FileWrites Include="$(_UmbracoAutomateSlackJsonSchemaReference)" />
+        </ItemGroup>
+    </Target>
+
+</Project>

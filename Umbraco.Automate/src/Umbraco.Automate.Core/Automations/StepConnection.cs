@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Conditions;
+
 namespace Umbraco.Automate.Core.Automations;
 
 /// <summary>
@@ -29,4 +31,10 @@ public sealed class StepConnection
     /// Gets or sets the named outcome that activates this connection (e.g. "true", "false").
     /// </summary>
     public string? Outcome { get; set; }
+
+    /// <summary>
+    /// Gets or sets an optional filter condition set. When present, the connection is only
+    /// followed if the conditions evaluate to true against the current binding data.
+    /// </summary>
+    public ConditionSet? Filter { get; set; }
 }

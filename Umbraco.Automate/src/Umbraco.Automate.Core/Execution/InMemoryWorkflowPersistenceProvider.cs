@@ -16,11 +16,17 @@ namespace Umbraco.Automate.Core.Execution;
 /// </remarks>
 internal sealed class InMemoryWorkflowPersistenceProvider : IPersistenceProvider
 {
+    private readonly RunFinalizer _runFinalizer;
     private readonly ConcurrentDictionary<string, string> _workflows = new();
     private readonly ConcurrentDictionary<string, string> _subscriptions = new();
     private readonly ConcurrentDictionary<string, string> _events = new();
     private readonly ConcurrentDictionary<string, string> _scheduledCommands = new();
     private readonly ConcurrentBag<ExecutionError> _errors = [];
+
+    public InMemoryWorkflowPersistenceProvider(RunFinalizer runFinalizer)
+    {
+        _runFinalizer = runFinalizer;
+    }
 
     private static readonly JsonSerializerSettings JsonSettings = new()
     {
@@ -58,13 +64,13 @@ internal sealed class InMemoryWorkflowPersistenceProvider : IPersistenceProvider
         return Task.FromResult(workflow.Id);
     }
 
-    public Task PersistWorkflow(WorkflowInstance workflow, CancellationToken cancellationToken)
+    public async Task PersistWorkflow(WorkflowInstance workflow, CancellationToken cancellationToken)
     {
         _workflows[workflow.Id] = Serialize(workflow);
-        return Task.CompletedTask;
+        await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
     }
 
-    public Task PersistWorkflow(WorkflowInstance workflow, List<EventSubscription> subscriptions, CancellationToken cancellationToken)
+    public async Task PersistWorkflow(WorkflowInstance workflow, List<EventSubscription> subscriptions, CancellationToken cancellationToken)
     {
         _workflows[workflow.Id] = Serialize(workflow);
         foreach (var sub in subscriptions)
@@ -72,7 +78,7 @@ internal sealed class InMemoryWorkflowPersistenceProvider : IPersistenceProvider
             _subscriptions[sub.Id] = Serialize(sub);
         }
 
-        return Task.CompletedTask;
+        await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
     }
 
     public Task<IEnumerable<string>> GetRunnableInstances(DateTime asAt, CancellationToken cancellationToken)

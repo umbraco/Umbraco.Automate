@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Cms.Persistence.EFCore.Scoping;
 
 namespace Umbraco.Automate.Persistence.Automations;
 
@@ -9,144 +9,192 @@ namespace Umbraco.Automate.Persistence.Automations;
 /// </summary>
 internal sealed class EFCoreAutomationRepository : IAutomationRepository
 {
-    private readonly IEFCoreScopeProvider<UmbracoAutomateDbContext> _scopeProvider;
+    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
+    private readonly AutomationFactory _factory;
 
-    public EFCoreAutomationRepository(IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider)
+    public EFCoreAutomationRepository(
+        IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
+        AutomationFactory factory)
     {
-        _scopeProvider = scopeProvider;
+        _dbContextFactory = dbContextFactory;
+        _factory = factory;
     }
 
     public async Task<Automation?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        AutomationEntity? entity = await scope.ExecuteWithContextAsync(async db =>
-            await db.Automations.FirstOrDefaultAsync(a => a.Id == id, cancellationToken));
+        AutomationEntity? entity = await db.Automations
+            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
-        scope.Complete();
-        return entity is null ? null : AutomationFactory.BuildDomain(entity);
+        return entity is null ? null : _factory.BuildDomain(entity);
     }
 
     public async Task<Automation?> GetByAliasAsync(string alias, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        AutomationEntity? entity = await scope.ExecuteWithContextAsync(async db =>
-            await db.Automations.FirstOrDefaultAsync(
-                a => a.Alias == alias, cancellationToken));
+        AutomationEntity? entity = await db.Automations
+            .FirstOrDefaultAsync(a => a.Alias == alias, cancellationToken);
 
-        scope.Complete();
-        return entity is null ? null : AutomationFactory.BuildDomain(entity);
+        return entity is null ? null : _factory.BuildDomain(entity);
     }
 
     public async Task<IEnumerable<Automation>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var entities = await scope.ExecuteWithContextAsync(async db =>
-            await db.Automations
-                .OrderBy(a => a.Name)
-                .ToListAsync(cancellationToken));
+        var entities = await db.Automations
+            .OrderBy(a => a.Name)
+            .ToListAsync(cancellationToken);
 
-        scope.Complete();
-        return entities.Select(AutomationFactory.BuildDomain);
+        return entities.Select(_factory.BuildDomain);
     }
 
     public async Task<(IEnumerable<Automation> Items, int Total)> GetPagedAsync(
         string? filter = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
+        Guid? groupId = null,
         int skip = 0,
         int take = 100,
         CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
+        IQueryable<AutomationEntity> query = db.Automations;
+
+        if (workspaceIds is not null)
         {
-            IQueryable<AutomationEntity> query = db.Automations;
+            query = query.Where(a => workspaceIds.Contains(a.WorkspaceId));
+        }
 
-            if (!string.IsNullOrWhiteSpace(filter))
-            {
-                query = query.Where(a => a.Name.Contains(filter) || a.Alias.Contains(filter));
-            }
+        if (groupId is not null)
+        {
+            // Guid.Empty means "root level" (no group).
+            query = groupId.Value == Guid.Empty
+                ? query.Where(a => a.GroupId == null)
+                : query.Where(a => a.GroupId == groupId.Value);
+        }
 
-            var total = await query.CountAsync(cancellationToken);
-            var items = await query
-                .OrderBy(a => a.Name)
-                .Skip(skip)
-                .Take(take)
-                .ToListAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(filter))
+        {
+            query = query.Where(a => a.Name.Contains(filter) || a.Alias.Contains(filter));
+        }
 
-            return (items, total);
-        });
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(a => a.Name)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
 
-        scope.Complete();
-        return (result.items.Select(AutomationFactory.BuildDomain), result.total);
+        return (items.Select(_factory.BuildDomain), total);
     }
 
     public async Task<Automation> SaveAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var savedAutomation = await scope.ExecuteWithContextAsync(async db =>
+        AutomationEntity? existing = await db.Automations.FindAsync([automation.Id], cancellationToken);
+
+        if (existing is null)
         {
-            AutomationEntity? existing = await db.Automations.FindAsync([automation.Id], cancellationToken);
+            automation.Version = 1;
+            automation.DateModified = DateTime.UtcNow;
+            automation.CreatedByUserId = userId;
+            automation.ModifiedByUserId = userId;
 
-            if (existing is null)
-            {
-                automation.Version = 1;
-                automation.DateModified = DateTime.UtcNow;
-                automation.CreatedByUserId = userId;
-                automation.ModifiedByUserId = userId;
+            AutomationEntity newEntity = _factory.BuildEntity(automation);
+            db.Automations.Add(newEntity);
+        }
+        else
+        {
+            // Set EF Core's original value to the client's version so the WHERE clause
+            // detects races between the controller read and this repository save.
+            db.Entry(existing).Property(e => e.Version).OriginalValue = automation.Version;
 
-                AutomationEntity newEntity = AutomationFactory.BuildEntity(automation);
-                db.Automations.Add(newEntity);
-            }
-            else
-            {
-                automation.Version = existing.Version + 1;
-                automation.DateModified = DateTime.UtcNow;
-                automation.ModifiedByUserId = userId;
+            automation.Version = existing.Version + 1;
+            automation.DateModified = DateTime.UtcNow;
+            automation.ModifiedByUserId = userId;
 
-                AutomationFactory.UpdateEntity(existing, automation);
-            }
+            _factory.UpdateEntity(existing, automation);
+        }
 
+        try
+        {
             await db.SaveChangesAsync(cancellationToken);
-            return automation;
-        });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException(nameof(Automation), automation.Id);
+        }
 
-        scope.Complete();
-        return savedAutomation;
+        return automation;
+    }
+
+    public async Task<Automation> SaveMetadataAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        AutomationEntity? existing = await db.Automations.FindAsync([automation.Id], cancellationToken)
+            ?? throw new InvalidOperationException($"Automation '{automation.Id}' not found.");
+
+        db.Entry(existing).Property(e => e.Version).OriginalValue = automation.Version;
+
+        automation.DateModified = DateTime.UtcNow;
+        automation.ModifiedByUserId = userId;
+
+        _factory.UpdateMetadata(existing, automation);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyConflictException(nameof(Automation), automation.Id);
+        }
+
+        return automation;
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var deleted = await scope.ExecuteWithContextAsync(async db =>
+        AutomationEntity? entity = await db.Automations.FindAsync([id], cancellationToken);
+        if (entity is null)
         {
-            AutomationEntity? entity = await db.Automations.FindAsync([id], cancellationToken);
-            if (entity is null)
-            {
-                return false;
-            }
+            return false;
+        }
 
-            db.Automations.Remove(entity);
-            await db.SaveChangesAsync(cancellationToken);
-            return true;
-        });
-
-        scope.Complete();
-        return deleted;
+        db.Automations.Remove(entity);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        using IEfCoreScope<UmbracoAutomateDbContext> scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Automations.AnyAsync(a => a.Id == id, cancellationToken);
+    }
 
-        var exists = await scope.ExecuteWithContextAsync(async db =>
-            await db.Automations.AnyAsync(a => a.Id == id, cancellationToken));
+    public async Task<bool> ExistsByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Automations.AnyAsync(a => a.WorkspaceId == workspaceId, cancellationToken);
+    }
 
-        scope.Complete();
-        return exists;
+    public async Task<IReadOnlyCollection<(Guid Id, int PublishedVersion)>> GetPublishedVersionReferencesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var results = await db.Automations
+            .Where(a => a.PublishedVersion != null)
+            .Select(a => new { a.Id, PublishedVersion = a.PublishedVersion!.Value })
+            .ToListAsync(cancellationToken);
+
+        return results.Select(r => (r.Id, r.PublishedVersion)).ToList();
     }
 }

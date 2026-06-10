@@ -11,6 +11,10 @@ internal sealed class AutomationRunEntity
 
     public int AutomationVersion { get; set; }
 
+    public Guid WorkspaceId { get; set; }
+
+    public Guid ServiceAccountKey { get; set; }
+
     public int Status { get; set; }
 
     public DateTime? StartedUtc { get; set; }
@@ -24,4 +28,6 @@ internal sealed class AutomationRunEntity
     public string? CorrelationId { get; set; }
 
     public string? Error { get; set; }
+
+    public string? WorkflowInstanceId { get; set; }
 }

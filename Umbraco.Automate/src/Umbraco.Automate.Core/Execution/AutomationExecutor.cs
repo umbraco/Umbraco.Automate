@@ -1,13 +1,11 @@
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Umbraco.Automate.Core.Actions;
-using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Core.Expressions;
+using Umbraco.Automate.Core.Conditions;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Workspaces;
 using WorkflowCore.Interface;
-using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Core.Execution;
 
@@ -19,30 +17,36 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 {
     private readonly IWorkflowHost _workflowHost;
     private readonly IWorkflowRegistry _workflowRegistry;
-    private readonly ActionCollection _actions;
-    private readonly ActionMiddlewarePipeline _pipeline;
-    private readonly ExpressionEvaluator _expressionEvaluator;
+    private readonly IWorkflowCompiler _compiler;
     private readonly IAutomationRunRepository _runRepository;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IWorkspaceService _workspaceService;
+    private readonly IRateLimitService _rateLimitService;
+    private readonly ICircuitBreakerService _circuitBreaker;
+    private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly AutomateMetrics _metrics;
     private readonly ILogger<AutomationExecutor> _logger;
 
     public AutomationExecutor(
         IWorkflowHost workflowHost,
         IWorkflowRegistry workflowRegistry,
-        ActionCollection actions,
-        ActionMiddlewarePipeline pipeline,
-        ExpressionEvaluator expressionEvaluator,
+        IWorkflowCompiler compiler,
         IAutomationRunRepository runRepository,
-        IServiceProvider serviceProvider,
+        IWorkspaceService workspaceService,
+        IRateLimitService rateLimitService,
+        ICircuitBreakerService circuitBreaker,
+        ConditionEvaluator conditionEvaluator,
+        AutomateMetrics metrics,
         ILogger<AutomationExecutor> logger)
     {
         _workflowHost = workflowHost;
         _workflowRegistry = workflowRegistry;
-        _actions = actions;
-        _pipeline = pipeline;
-        _expressionEvaluator = expressionEvaluator;
+        _compiler = compiler;
         _runRepository = runRepository;
-        _serviceProvider = serviceProvider;
+        _workspaceService = workspaceService;
+        _rateLimitService = rateLimitService;
+        _circuitBreaker = circuitBreaker;
+        _conditionEvaluator = conditionEvaluator;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -51,14 +55,35 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         string initiatorType,
         string? initiatorId,
         Dictionary<string, object?>? triggerOutputData,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<Guid>? originChain = null)
     {
+        // Check rate limits before creating the run record.
+        await _rateLimitService.CheckRateLimitAsync(automation.Id, cancellationToken);
+
+        // Circuit breaker gate: an auto-disabled automation does not run, except for permitted
+        // interactive test runs. Quiet skip (no run record, no workflow) — the trigger dispatch
+        // path ignores the return value; interactive Web controllers gate earlier and return 409.
+        if (!await _circuitBreaker.IsRunAllowedAsync(automation.Id, initiatorType, cancellationToken))
+        {
+            _logger.LogDebug(
+                "Run skipped — circuit open for automation {AutomationId} ({AutomationAlias}), initiator {Initiator}",
+                automation.Id, automation.Alias, initiatorType);
+            return Guid.Empty;
+        }
+
+        // Resolve workspace and service account.
+        var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken)
+            ?? throw new InvalidOperationException($"Workspace '{automation.WorkspaceId}' not found for automation '{automation.Name}'.");
+
         // Create the automation run record.
         var run = new AutomationRun
         {
             Id = Guid.NewGuid(),
             AutomationId = automation.Id,
-            AutomationVersion = automation.PublishedVersion ?? automation.DraftVersion,
+            AutomationVersion = automation.PublishedVersion ?? automation.Version,
+            WorkspaceId = workspace.Id,
+            ServiceAccountKey = workspace.ServiceAccountKey,
             Status = AutomationRunStatus.Running,
             StartedUtc = DateTime.UtcNow,
             InitiatedBy = initiatorType,
@@ -70,13 +95,32 @@ internal sealed class AutomationExecutor : IAutomationExecutor
 
         await _runRepository.SaveAsync(run, cancellationToken);
 
+        _metrics.RunStarted(automation.Alias);
+
+        // Set the execution context for the current async flow.
+        var executionContext = new AutomationExecutionContext
+        {
+            ServiceAccountKey = workspace.ServiceAccountKey,
+            WorkspaceId = workspace.Id,
+            WorkspaceName = workspace.Name,
+            AutomationId = automation.Id,
+            AutomationName = automation.Name,
+            RunId = run.Id,
+            InitiatorType = initiatorType,
+            InitiatorId = initiatorId,
+            AllowedConnections = workspace.AllowedConnections.ToList(),
+            OriginChain = originChain ?? [],
+        };
+
+        using var _ = ExecutionContextAccessor.Set(executionContext);
+
         // Register the workflow definition if not already registered.
         var workflowId = $"automate-{automation.Id}-v{automation.Version}";
         var existing = _workflowRegistry.GetDefinition(workflowId);
 
         if (existing is null)
         {
-            var definition = CompileWorkflowDefinition(automation, workflowId);
+            var definition = _compiler.Compile(automation, workflowId);
             _workflowRegistry.RegisterWorkflow(definition);
         }
 
@@ -85,125 +129,88 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         {
             RunId = run.Id,
             AutomationId = automation.Id,
+            AutomationAlias = automation.Alias,
             TriggerOutput = triggerOutputData ?? [],
+            StepAliases = automation.Steps
+                .Where(s => !string.IsNullOrEmpty(s.Alias))
+                .ToDictionary(s => s.Id, s => s.Alias!),
+            ExecutionContext = executionContext,
         };
+
+        // Trigger-edge filters can't be wired as ValueOutcomes (the trigger isn't a
+        // WorkflowCore step), so evaluate them here against trigger data only.
+        // If the entry edge's filter rejects the run, complete it without starting
+        // the workflow at all.
+        if (!EvaluateTriggerFilter(automation, workflowData))
+        {
+            run.Status = AutomationRunStatus.Completed;
+            run.CompletedUtc = DateTime.UtcNow;
+            await _runRepository.SaveAsync(run, cancellationToken);
+
+            _metrics.RunCompleted(automation.Alias);
+
+            _logger.LogInformation(
+                "Skipped run {RunId} for automation {AutomationName}: trigger-edge filter evaluated to false",
+                run.Id, automation.Name);
+
+            return run.Id;
+        }
 
         var instanceId = await _workflowHost.StartWorkflow(workflowId, workflowData);
 
+        // Scoped update so lifecycle operations (suspend / resume / terminate) can
+        // map the run back to its workflow. A full SaveAsync here would overwrite
+        // Status / CompletedUtc / Error with the stale local run (still Running)
+        // and race with RunFinalizer when the first step is WaitForEvent or
+        // fast-completing.
+        run.WorkflowInstanceId = instanceId;
+        await _runRepository.SetWorkflowInstanceIdAsync(run.Id, instanceId, cancellationToken);
+
         _logger.LogInformation(
-            "Started workflow {WorkflowId} (instance {InstanceId}) for run {RunId}",
-            workflowId, instanceId, run.Id);
+            "Started workflow {WorkflowId} (instance {InstanceId}) for run {RunId} as service account {ServiceAccountKey}",
+            workflowId, instanceId, run.Id, workspace.ServiceAccountKey);
 
         return run.Id;
     }
 
-    private WorkflowDefinition CompileWorkflowDefinition(Automation automation, string workflowId)
-    {
-        var definition = new WorkflowDefinition
-        {
-            Id = workflowId,
-            Version = automation.Version,
-            DataType = typeof(AutomationWorkflowData),
-        };
-
-        // Sort steps by connections to determine execution order.
-        var orderedSteps = TopologicalSort(automation.Steps, automation.Connections);
-        var stepIndex = 0;
-
-        foreach (var stepConfig in orderedSteps)
-        {
-            var action = _actions.FirstOrDefault(a => a.Alias == stepConfig.ActionAlias);
-            if (action is null)
-            {
-                _logger.LogWarning("Action '{ActionAlias}' not found, skipping step {StepId}", stepConfig.ActionAlias, stepConfig.Id);
-                continue;
-            }
-
-            var stepBody = new ActionStepBody(
-                stepConfig,
-                action,
-                _pipeline,
-                _expressionEvaluator,
-                _runRepository,
-                _serviceProvider.GetRequiredService<ILogger<ActionStepBody>>());
-
-            var workflowStep = new ActionWorkflowStep(stepBody)
-            {
-                Id = stepIndex++,
-                Name = stepConfig.Name,
-            };
-
-            definition.Steps.Add(workflowStep);
-        }
-
-        // Wire up step transitions (sequential for now — each step goes to the next).
-        for (var i = 0; i < definition.Steps.Count - 1; i++)
-        {
-            definition.Steps.FindById(i).Outcomes.Add(new ValueOutcome { NextStep = i + 1 });
-        }
-
-        return definition;
-    }
-
     /// <summary>
-    /// Orders steps by their connections using topological sort.
-    /// Falls back to original order if no connections exist.
+    /// Evaluates filters on connections originating from the trigger (Guid.Empty source)
+    /// against trigger data only. Returns true if the run should proceed:
+    /// — no trigger-edge filter exists, or
+    /// — at least one trigger-edge filter passes.
+    /// Returns false only when every trigger-edge has a filter and all of them fail.
     /// </summary>
-    private static List<StepConfiguration> TopologicalSort(
-        IList<StepConfiguration> steps,
-        IList<StepConnection> connections)
+    private bool EvaluateTriggerFilter(Automation automation, AutomationWorkflowData workflowData)
     {
-        if (connections.Count == 0)
+        var triggerEdges = automation.Connections
+            .Where(c => c.SourceStepId == Guid.Empty)
+            .ToList();
+
+        if (triggerEdges.Count == 0)
         {
-            return [..steps];
+            return true;
         }
 
-        var adjacency = new Dictionary<Guid, List<Guid>>();
-        var inDegree = new Dictionary<Guid, int>();
+        var bindingData = BindingDataBuilder.Build(workflowData);
 
-        foreach (var step in steps)
+        var passed = false;
+        var any = false;
+        foreach (var edge in triggerEdges)
         {
-            adjacency[step.Id] = [];
-            inDegree[step.Id] = 0;
-        }
-
-        foreach (var conn in connections)
-        {
-            if (adjacency.ContainsKey(conn.SourceStepId) && inDegree.ContainsKey(conn.TargetStepId))
+            if (edge.Filter is null)
             {
-                adjacency[conn.SourceStepId].Add(conn.TargetStepId);
-                inDegree[conn.TargetStepId]++;
+                // An unfiltered trigger edge always proceeds.
+                return true;
+            }
+
+            any = true;
+            if (_conditionEvaluator.Evaluate(edge.Filter, bindingData))
+            {
+                passed = true;
+                break;
             }
         }
 
-        var queue = new Queue<Guid>(inDegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));
-        var result = new List<StepConfiguration>();
-        var stepLookup = steps.ToDictionary(s => s.Id);
-
-        while (queue.Count > 0)
-        {
-            var id = queue.Dequeue();
-            if (stepLookup.TryGetValue(id, out var step))
-            {
-                result.Add(step);
-            }
-
-            foreach (var neighbor in adjacency[id])
-            {
-                inDegree[neighbor]--;
-                if (inDegree[neighbor] == 0)
-                {
-                    queue.Enqueue(neighbor);
-                }
-            }
-        }
-
-        // If topological sort didn't include all steps (cycle), fall back.
-        if (result.Count < steps.Count)
-        {
-            return [..steps];
-        }
-
-        return result;
+        return !any || passed;
     }
 }

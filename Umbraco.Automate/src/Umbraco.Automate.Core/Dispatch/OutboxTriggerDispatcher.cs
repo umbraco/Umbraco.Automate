@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Triggers;
 
@@ -14,11 +15,13 @@ internal sealed class OutboxTriggerDispatcher : ITriggerDispatcher
     internal const string TopicName = "umbraco.automate.trigger";
 
     private readonly IOutbox _outbox;
+    private readonly AutomateMetrics _metrics;
     private readonly ILogger<OutboxTriggerDispatcher> _logger;
 
-    public OutboxTriggerDispatcher(IOutbox outbox, ILogger<OutboxTriggerDispatcher> logger)
+    public OutboxTriggerDispatcher(IOutbox outbox, AutomateMetrics metrics, ILogger<OutboxTriggerDispatcher> logger)
     {
         _outbox = outbox;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -29,6 +32,10 @@ internal sealed class OutboxTriggerDispatcher : ITriggerDispatcher
             TriggerAlias = triggerEvent.TriggerAlias,
             InitiatorType = triggerEvent.InitiatorType,
             InitiatorId = triggerEvent.InitiatorId,
+            TargetAutomationId = triggerEvent.TargetAutomationId,
+            IdempotencyKey = triggerEvent.IdempotencyKey,
+            OriginRunId = triggerEvent.OriginRunId,
+            OriginAutomationChain = [.. triggerEvent.OriginAutomationChain],
         };
 
         // Extract output data from typed trigger events.
@@ -40,6 +47,18 @@ internal sealed class OutboxTriggerDispatcher : ITriggerDispatcher
 
         _logger.LogDebug("Dispatching trigger event for {TriggerAlias}", triggerEvent.TriggerAlias);
 
-        await _outbox.PublishAsync(TopicName, message, cancellationToken);
+        try
+        {
+            await _outbox.PublishAsync(TopicName, message, cancellationToken, triggerEvent.IdempotencyKey);
+        }
+        catch (OutboxBackpressureException)
+        {
+            _metrics.OutboxBackpressureRejection();
+            throw;
+        }
+
+        _metrics.TriggerDispatched(triggerEvent.TriggerAlias);
+        _metrics.OutboxMessagePublished(TopicName);
     }
+
 }

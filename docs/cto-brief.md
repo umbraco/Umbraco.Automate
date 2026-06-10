@@ -49,7 +49,7 @@ A lightweight custom outbox built on EF Core handles both trigger event dispatch
 
 ### Database
 
-Uses Umbraco's existing database (SQL Server or SQLite) by default. Optionally configurable to a separate database via `umbracoAutomateDbDSN` connection string (follows the Umbraco Commerce convention). EF Core migrations prefixed with `UmbracoAutomate_`.
+Database configuration is explicit: by default Automate resolves a dedicated `umbracoAutomateDbDSN` connection string (recommended; follows the Umbraco Commerce convention). Point `Umbraco:Automate:UseNamedConnectionString` at another entry (e.g. `umbracoDbDSN` to share the CMS database, or a custom name shared across products) to reuse an existing connection. Reuse is opt-in so the performance impact of co-locating Automate's outbox, run history and engine tables is a conscious decision. EF Core migrations prefixed with `UmbracoAutomate_`.
 
 ---
 
@@ -68,7 +68,7 @@ Triggers and actions are the extension points. Third-party developers (and DXP p
 | `Umbraco.Workflow.Automate` | Workflow team | Approval Requested trigger, Approve Content action |
 | `Umbraco.Engage.Automate` | Engage team | Segment Entered trigger, Assign Persona action |
 | `Umbraco.AI.Automate` | AI team | AI agents as actions, AI events as triggers, automations as agent tools |
-| `Umbraco.Automate.Deploy` | Automate team | Deploy integration for transferring automations between environments |
+| `Umbraco.Deploy.Automate` | Deploy team | Deploy integration for transferring automations between environments |
 
 **Naming convention**: `{OwningProduct}.Automate` — follows the established DXP pattern (e.g. `Umbraco.Commerce.Deploy`). Each product team owns their Automate integration because they know their events and domain model best. Products depend only on `Umbraco.Automate.Core`, not on each other.
 
@@ -117,7 +117,7 @@ Only scheduled (CRON) triggers are restricted to the SchedulingPublisher node. E
 Core engine, basic triggers/actions (Manual, Scheduled, Webhook, Content Published), canvas editor, run logging, draft/publish lifecycle, security hardening, developer tooling (test harness, project template).
 
 ### Phase 2: HITL, Branching & Hardening
-Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, dry run mode, automation templates.
+Approval workflows, conditional branching (If/Switch), named connections with OAuth2, Deploy integration, failure notifications, automation templates.
 
 ### Phase 3: AI Integration
 `Umbraco.AI.Automate` — agents as actions, AI events as triggers, automations as agent tools, HITL gates for AI-initiated runs.
@@ -139,7 +139,7 @@ Parallel execution, sub-automations, version diff, distributed tracing.
 | **Messaging / resilience** | Custom outbox vs DotNetCore.CAP vs MassTransit vs Wolverine | Custom outbox | Zero external dependencies, uses existing EF Core infrastructure. Single table with optimistic concurrency, exponential backoff, dead-lettering. CAP had sealed internals requiring workarounds; MassTransit too heavy; Wolverine no SQLite. |
 | **Trigger architecture** | Subscribe method on triggers vs activation interfaces | Activation interfaces | Triggers are definitions (metadata + output schema). Activation (which event to listen to) is declared via typed base classes (`NotificationTriggerBase`, `ScheduledTriggerBase`, etc.). Infrastructure auto-wires at startup. Subscribe method doesn't work because Umbraco notification handlers must be registered at DI composition time. |
 | **Settings UI** | Hand-crafted UI per action vs auto-generated from POCO | Auto-generated | `[Field]` attribute on settings POCO properties drives config UI. Matches Umbraco.AI's established `[AIField]` pattern. Developers write a POCO, get a form. |
-| **Expression syntax** | Reuse UFM code vs port UFM design | Port design | UFM is entirely frontend TypeScript — no server code to reuse. We adopt the `${ }` syntax and filter pipes, implemented as a purpose-built C# tokenizer/evaluator. |
+| **Binding syntax** | Reuse UFM code vs port UFM design | Port design | UFM is entirely frontend TypeScript — no server code to reuse. We adopt the `${ }` syntax and filter pipes, implemented as a purpose-built C# tokenizer/evaluator. |
 | **Persistence** | Use WorkflowCore's EF tables vs custom tables | Custom `IPersistenceProvider` | WorkflowCore's EF provider targets EF 9.x — incompatible with Umbraco 17 (EF 10.x). Custom implementation uses Umbraco's EF scope, avoids version clash. |
 | **Package naming** | `Umbraco.Automate.{Product}` vs `Umbraco.{Product}.Automate` | `{Product}.Automate` | Follows established DXP convention (`Umbraco.Commerce.Deploy`). Product team owns their integration — they know their events and domain model best. |
 | **Load balancing** | SchedulingPublisher-only vs all-node execution | All nodes via outbox | Optimistic concurrency on `ClaimedByInstance` column guarantees exactly-once consumption. All nodes run WorkflowCore and process triggers. Only CRON triggers gated to SchedulingPublisher. |

@@ -11,7 +11,7 @@ public class TriggerEvent
     public required string TriggerAlias { get; init; }
 
     /// <summary>
-    /// Gets the type of initiator ("system", "user", "webhook", "ai-agent").
+    /// Gets the type of initiator. Use <see cref="TriggerInitiatorType"/> constants.
     /// </summary>
     public required string InitiatorType { get; init; }
 
@@ -19,6 +19,39 @@ public class TriggerEvent
     /// Gets an optional identifier for the initiator (e.g. user key, webhook ID).
     /// </summary>
     public string? InitiatorId { get; init; }
+
+    /// <summary>
+    /// Gets an optional target automation. When set, the event runs exactly this automation
+    /// rather than fanning out to every published automation subscribed to
+    /// <see cref="TriggerAlias"/>. Used by imperative, per-automation entry points (e.g. the
+    /// webhook endpoint, which is addressed by automation ID). <c>null</c> for pub/sub triggers
+    /// (content events, scheduled) that should dispatch to all subscribers.
+    /// </summary>
+    public Guid? TargetAutomationId { get; init; }
+
+    /// <summary>
+    /// Gets an optional idempotency key. When set, the outbox will silently drop
+    /// duplicate messages with the same topic and key.
+    /// Triggers should generate deterministic keys based on event identity
+    /// (e.g. "{triggerAlias}:{entityKey}:{eventTimestamp}").
+    /// </summary>
+    public string? IdempotencyKey { get; init; }
+
+    /// <summary>
+    /// Gets the run ID of the automation run that produced this event as a side effect,
+    /// or <c>null</c> when the event was raised outside an automation (user save, scheduled
+    /// trigger, external webhook, etc.). Stamped by the dispatch path from the ambient
+    /// <see cref="Execution.IAutomationOriginAccessor"/>.
+    /// </summary>
+    public Guid? OriginRunId { get; set; }
+
+    /// <summary>
+    /// Gets the automation cascade chain that produced this event — ordered list of
+    /// automation IDs (oldest to newest) including the most recent automation as the last
+    /// entry. Empty for events raised outside an automation. Receivers detect cycles by
+    /// checking whether their own automation ID appears in this chain.
+    /// </summary>
+    public IReadOnlyList<Guid> OriginAutomationChain { get; set; } = [];
 }
 
 /// <summary>

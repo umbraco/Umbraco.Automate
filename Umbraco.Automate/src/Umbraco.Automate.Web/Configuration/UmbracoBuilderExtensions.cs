@@ -1,19 +1,35 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
+using OpenIddict.Validation.AspNetCore;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Realtime;
+using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
+using Umbraco.Automate.Web.Realtime;
 using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 using Umbraco.Automate.Web.Api.Management.Common.Configuration;
 using Umbraco.Automate.Web.Api.Management.Common.Json;
 using Umbraco.Automate.Web.Api.Management.Run.Mapping;
+using Umbraco.Automate.Web.Api.Management.Connection.Mapping;
+using Umbraco.Automate.Web.Api.Management.Versioning.Mapping;
+using Umbraco.Automate.Web.Api.Management.Workspace.Group.Mapping;
+using Umbraco.Automate.Web.Api.Management.Workspace.Mapping;
 using Umbraco.Cms.Api.Common.DependencyInjection;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Mapping;
+using Umbraco.Cms.Web.Common.ApplicationBuilder;
 
 namespace Umbraco.Automate.Extensions;
 
@@ -27,9 +43,36 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     internal static IUmbracoBuilder AddUmbracoAutomateWeb(this IUmbracoBuilder builder)
     {
+        builder.AddUmbracoAutomateAuthorization();
         builder.AddUmbracoAutomateManagementApi();
         builder.AddUmbracoAutomateWebhookApi();
         builder.AddUmbracoAutomateMapDefinitions();
+        builder.AddUmbracoAutomateRealtime();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateRealtime(this IUmbracoBuilder builder)
+    {
+        // Do NOT configure JsonHubProtocolOptions here — that options object is app-wide,
+        // and mutating it would change the wire format for every other SignalR hub in the
+        // process (notably Umbraco Deploy's hubs, whose frontend expects numeric enum
+        // values). Our own backoffice listener reads numeric enum values instead.
+        builder.Services.AddSignalR();
+        builder.Services.AddSingleton<IEditorNotifier, EditorNotifier>();
+
+        // Map the hub endpoint. The Endpoints callback runs before Umbraco's own UseEndpoints,
+        // so calling UseEndpoints here adds our hub middleware ahead of the main endpoint mapping.
+        builder.Services.Configure<UmbracoPipelineOptions>(options =>
+        {
+            options.AddFilter(new UmbracoPipelineFilter("UmbracoAutomateEditorNotificationHub")
+            {
+                Endpoints = app => app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapHub<EditorNotificationHub>(EditorNotificationHub.Route);
+                }),
+            });
+        });
 
         return builder;
     }
@@ -39,7 +82,35 @@ public static partial class UmbracoBuilderExtensions
         builder.WithCollectionBuilder<MapDefinitionCollectionBuilder>()
             .Add<AutomationMapDefinition>()
             .Add<RunMapDefinition>()
-            .Add<CatalogueMapDefinition>();
+            .Add<CatalogueMapDefinition>()
+            .Add<WorkspaceMapDefinition>()
+            .Add<ConnectionMapDefinition>()
+            .Add<WorkspaceGroupMapDefinition>()
+            .Add<VersioningMapDefinition>();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateAuthorization(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddSingleton<IAuthorizationHandler, WorkspaceAccessHandler>();
+
+        builder.Services.AddAuthorization(o =>
+        {
+            o.AddPolicy(AutomateAuthorizationPolicies.SectionAccessAutomate, policy =>
+            {
+                policy.AuthenticationSchemes.Add(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+#pragma warning disable CS0618 // Type or member is obsolete
+                policy.RequireClaim(Umbraco.Cms.Core.Constants.Security.AllowedApplicationsClaimType, Core.Constants.Sections.Automate);
+#pragma warning restore CS0618 // Type or member is obsolete
+            });
+
+            o.AddPolicy(AutomateAuthorizationPolicies.WorkspaceAccess, policy =>
+            {
+                policy.AuthenticationSchemes.Add(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+                policy.Requirements.Add(new WorkspaceAccessRequirement());
+            });
+        });
 
         return builder;
     }
@@ -61,6 +132,9 @@ public static partial class UmbracoBuilderExtensions
                 });
 
             options.OperationFilter<UmbracoAutomateManagementApiBackOfficeSecurityRequirementsOperationFilter>(Constants.ManagementApi.ApiName);
+
+            // Map System.Type to string in OpenAPI schema (JsonStringTypeConverter handles serialization)
+            options.MapType<Type>(() => new OpenApiSchema { Type = JsonSchemaType.String });
         });
 
         builder.Services.AddSingleton<IOperationIdHandler, UmbracoAutomateApiOperationIdHandler>();
@@ -88,6 +162,51 @@ public static partial class UmbracoBuilderExtensions
                 });
         });
 
+        builder.AddUmbracoAutomateWebhookRateLimiting();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateWebhookRateLimiting(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.AddPolicy(Constants.WebhookApi.RateLimitPolicy, context =>
+            {
+                var webhookOptions = context.RequestServices
+                    .GetRequiredService<IOptions<WebhookOptions>>().Value;
+
+                var partitionKey = context.Request.RouteValues["automationId"]?.ToString() ?? "global";
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: partitionKey,
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = webhookOptions.RateLimitPerMinute,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                    });
+            });
+
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                context.HttpContext.Response.Headers.RetryAfter = "60";
+            };
+        });
+
+        // Register an Umbraco pipeline filter to add UseRateLimiter() middleware
+        // after routing (so route values are available for partitioning).
+        builder.Services.Configure<UmbracoPipelineOptions>(options =>
+        {
+            options.AddFilter(new UmbracoPipelineFilter(
+                "UmbracoAutomateWebhookRateLimiting")
+            {
+                PostRouting = app => app.UseRateLimiter(),
+            });
+        });
+
         return builder;
     }
 
@@ -106,6 +225,7 @@ public static partial class UmbracoBuilderExtensions
                 };
 
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                options.JsonSerializerOptions.Converters.Add(new JsonStringTypeConverter());
                 options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
                 options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeJsonConverter());
             });
@@ -129,4 +249,5 @@ public static partial class UmbracoBuilderExtensions
                 typeInfo.Properties.Add(properties[i]);
             }
         };
+
 }

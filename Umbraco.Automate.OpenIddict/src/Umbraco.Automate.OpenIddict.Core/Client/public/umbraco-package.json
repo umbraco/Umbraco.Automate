@@ -1,0 +1,14 @@
+{
+    "id": "Umbraco.Automate.OpenIddict",
+    "name": "Umbraco Automate OpenIddict",
+    "version": "0.0.0",
+    "allowTelemetry": true,
+    "extensions": [
+        {
+            "name": "Umbraco Automate OpenIddict",
+            "alias": "UmbracoAutomateOpenIddict.Bundle",
+            "type": "bundle",
+            "js": "/App_Plugins/UmbracoAutomateOpenIddict/umbraco-automate-openiddict-manifests.js"
+        }
+    ]
+}

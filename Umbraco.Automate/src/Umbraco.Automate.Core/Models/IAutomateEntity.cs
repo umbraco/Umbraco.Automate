@@ -47,3 +47,14 @@ public interface IVersionableEntity : IAuditableEntity
     /// </summary>
     int Version { get; }
 }
+
+/// <summary>
+/// A versionable entity that supports a draft/published lifecycle.
+/// </summary>
+public interface IPublishableEntity : IVersionableEntity
+{
+    /// <summary>
+    /// Gets the currently published version number, or null if never published.
+    /// </summary>
+    int? PublishedVersion { get; }
+}

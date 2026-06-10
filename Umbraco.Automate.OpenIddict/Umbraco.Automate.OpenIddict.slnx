@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.csproj" />
+    <Project Path="src/Umbraco.Automate.OpenIddict.Core/Umbraco.Automate.OpenIddict.Core.csproj" />
+    <Project Path="src/Umbraco.Automate.OpenIddict.Persistence.SqlServer/Umbraco.Automate.OpenIddict.Persistence.SqlServer.csproj" />
+    <Project Path="src/Umbraco.Automate.OpenIddict.Persistence.Sqlite/Umbraco.Automate.OpenIddict.Persistence.Sqlite.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/Umbraco.Automate.OpenIddict.Tests.Unit/Umbraco.Automate.OpenIddict.Tests.Unit.csproj" />
+    <Project Path="tests/Umbraco.Automate.OpenIddict.Tests.Integration/Umbraco.Automate.OpenIddict.Tests.Integration.csproj" />
+  </Folder>
+</Solution>

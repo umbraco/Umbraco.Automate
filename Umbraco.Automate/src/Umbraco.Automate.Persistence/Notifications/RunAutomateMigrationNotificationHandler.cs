@@ -1,4 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core;
+using Umbraco.Automate.Core.Persistence;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
 
@@ -10,25 +14,48 @@ namespace Umbraco.Automate.Persistence.Notifications;
 public class RunAutomateMigrationNotificationHandler
     : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
-    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
+    private readonly IConfiguration _configuration;
+    private readonly AutomateReadinessSignal _readinessSignal;
+    private readonly ILogger<RunAutomateMigrationNotificationHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of <see cref="RunAutomateMigrationNotificationHandler"/>.
     /// </summary>
-    public RunAutomateMigrationNotificationHandler(IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory)
-        => _dbContextFactory = dbContextFactory;
+    public RunAutomateMigrationNotificationHandler(
+        IConfiguration configuration,
+        AutomateReadinessSignal readinessSignal,
+        ILogger<RunAutomateMigrationNotificationHandler> logger)
+    {
+        _configuration = configuration;
+        _readinessSignal = readinessSignal;
+        _logger = logger;
+    }
 
     /// <inheritdoc />
     public async Task HandleAsync(
         UmbracoApplicationStartedNotification notification,
         CancellationToken cancellationToken)
     {
-        await using UmbracoAutomateDbContext dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        // Create a standalone DbContext rather than using IDbContextFactory. Umbraco's EFCoreScope
+        // infrastructure shares NPoco connections (wrapped with MiniProfiler's ProfiledDbConnection)
+        // onto pooled EF Core contexts via SetDbConnection(). These tainted contexts cause
+        // NullReferenceException in SqliteDatabaseCreator.Exists() when the ProfiledDbConnection's
+        // inner connection is disposed. Creating the context directly avoids the pooled factory.
+        // See: https://github.com/umbraco/Umbraco-CMS/issues/22124
+        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(_configuration);
+        var optionsBuilder = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
+        UmbracoAutomateDbContext.ConfigureProvider(optionsBuilder, connectionString, providerName);
+
+        await using UmbracoAutomateDbContext dbContext = new UmbracoAutomateDbContext(optionsBuilder.Options);
 
         IEnumerable<string> pending = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
         if (pending.Any())
         {
+            _logger.LogInformation("Running {Count} pending Automate migrations", pending.Count());
             await dbContext.Database.MigrateAsync(cancellationToken);
+            _logger.LogInformation("Automate migrations completed successfully");
         }
+
+        _readinessSignal.Signal();
     }
 }

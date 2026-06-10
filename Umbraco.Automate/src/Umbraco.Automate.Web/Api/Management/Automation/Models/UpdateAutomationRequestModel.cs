@@ -19,8 +19,8 @@ public sealed class UpdateAutomationRequestModel
     /// <summary>Optional description.</summary>
     public string? Description { get; init; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; init; }
+    /// <summary>The group (folder) to place this automation in, or null for root.</summary>
+    public Guid? GroupId { get; init; }
 
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; init; }
@@ -33,4 +33,16 @@ public sealed class UpdateAutomationRequestModel
 
     /// <summary>The serialised canvas state.</summary>
     public string? CanvasState { get; init; }
+
+    /// <summary>Notification channel settings.</summary>
+    public AutomationNotificationSettings? NotificationSettings { get; init; }
+
+    /// <summary>
+    /// The version of the automation that the client last read.
+    /// Used for optimistic concurrency — the server returns 409 Conflict if this
+    /// does not match the current version.
+    /// </summary>
+    [Required]
+    [Range(1, int.MaxValue)]
+    public int Version { get; init; }
 }

@@ -1,3 +1,6 @@
+using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Execution;
+
 namespace Umbraco.Automate.Core.Actions;
 
 /// <summary>
@@ -47,4 +50,27 @@ public sealed class ActionContext
     /// Gets a cancellation token linked to the step timeout.
     /// </summary>
     public CancellationToken CancellationToken { get; init; }
+
+    /// <summary>
+    /// Gets the execution context carrying the service account identity and workspace info.
+    /// Available for CMS-modifying actions that need to execute as the workspace's service account.
+    /// </summary>
+    public AutomationExecutionContext? ExecutionContext { get; init; }
+
+    /// <summary>
+    /// Gets the configured connection for this step, or null if no connection is configured.
+    /// Contains the resolved connection type and decrypted settings, ready for runtime use.
+    /// </summary>
+    public ConfiguredConnection? Connection { get; init; }
+
+    /// <summary>
+    /// Gets the action instance being executed. Set by the pipeline for middleware inspection.
+    /// </summary>
+    public IAction? Action { get; init; }
+
+    /// <summary>
+    /// Gets the runtime binding data (trigger output + step outputs) for actions that
+    /// need to evaluate bindings directly (e.g. condition evaluation in the If action).
+    /// </summary>
+    public IReadOnlyDictionary<string, object?>? BindingData { get; init; }
 }

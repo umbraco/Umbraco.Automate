@@ -65,6 +65,75 @@ public class Constants
             }
 
             /// <summary>
+            /// Workspace feature constants.
+            /// </summary>
+            public static class Workspace
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "workspaces";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Workspaces";
+            }
+
+            /// <summary>
+            /// Connection feature constants.
+            /// </summary>
+            public static class Connection
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "connections";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Connections";
+            }
+
+            /// <summary>
+            /// Workspace group feature constants.
+            /// </summary>
+            public static class Group
+            {
+                /// <summary>The route segment, nested under workspaces.</summary>
+                public const string RouteSegment = "workspaces/{id:guid}/groups";
+            }
+
+            /// <summary>
+            /// Approval feature constants.
+            /// </summary>
+            public static class Approval
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "approvals";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Approvals";
+            }
+
+            /// <summary>
+            /// Version history feature constants.
+            /// </summary>
+            public static class Versioning
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "version-history";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Version History";
+            }
+
+            /// <summary>
+            /// Metrics feature constants.
+            /// </summary>
+            public static class Metrics
+            {
+                /// <summary>The route segment.</summary>
+                public const string RouteSegment = "metrics";
+
+                /// <summary>The Swagger group name.</summary>
+                public const string GroupName = "Metrics";
+            }
+
+            /// <summary>
             /// Catalogue feature constants (triggers + actions registry).
             /// </summary>
             public static class Catalogue
@@ -76,6 +145,24 @@ public class Constants
                 public const string GroupName = "Catalogue";
             }
         }
+    }
+
+    /// <summary>
+    /// Entity type identifiers used by the backoffice frontend tree.
+    /// </summary>
+    public static class EntityType
+    {
+        /// <summary>The workspace entity type.</summary>
+        public const string Workspace = "ua:workspace";
+
+        /// <summary>The workspace root entity type.</summary>
+        public const string WorkspaceRoot = "ua:workspace-root";
+
+        /// <summary>The automation group (folder) entity type.</summary>
+        public const string AutomationGroup = "ua:automation-group";
+
+        /// <summary>The automation entity type.</summary>
+        public const string Automation = "ua:automation";
     }
 
     /// <summary>
@@ -92,5 +179,10 @@ public class Constants
         /// The API title.
         /// </summary>
         public const string ApiTitle = "Umbraco Automate Webhook API";
+
+        /// <summary>
+        /// The rate limiter policy name applied to webhook endpoints.
+        /// </summary>
+        public const string RateLimitPolicy = "automate-webhook-rate-limit";
     }
 }

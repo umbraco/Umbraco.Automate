@@ -1,18 +1,33 @@
 <Solution>
-  <Folder Name="/Tests/">
+  <Folder Name="/Umbraco.Automate/" />
+  <Folder Name="/Umbraco.Automate/src/">
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate/Umbraco.Automate.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Core/Umbraco.Automate.Core.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Persistence/Umbraco.Automate.Persistence.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Persistence.SqlServer/Umbraco.Automate.Persistence.SqlServer.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Persistence.Sqlite/Umbraco.Automate.Persistence.Sqlite.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Web/Umbraco.Automate.Web.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Testing/Umbraco.Automate.Testing.csproj" />
+    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj" />
+  </Folder>
+  <Folder Name="/Umbraco.Automate/tests/">
     <Project Path="Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/Umbraco.Automate.Tests.Common.csproj" />
     <Project Path="Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/Umbraco.Automate.Tests.Integration.csproj" />
     <Project Path="Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/Umbraco.Automate.Tests.Unit.csproj" />
   </Folder>
-  <Folder Name="/Umbraco.Automate/" />
-  <Folder Name="/Umbraco.Automate/src/">
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Core/Umbraco.Automate.Core.csproj" />
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Persistence.Sqlite/Umbraco.Automate.Persistence.Sqlite.csproj" />
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Persistence.SqlServer/Umbraco.Automate.Persistence.SqlServer.csproj" />
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Persistence/Umbraco.Automate.Persistence.csproj" />
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj" />
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj" />
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate.Web/Umbraco.Automate.Web.csproj" />
-    <Project Path="Umbraco.Automate/src/Umbraco.Automate/Umbraco.Automate.csproj" />
+  <Folder Name="/Umbraco.Automate.OpenIddict/" />
+  <Folder Name="/Umbraco.Automate.OpenIddict/src/">
+    <Project Path="Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict/Umbraco.Automate.OpenIddict.csproj" />
+    <Project Path="Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/Umbraco.Automate.OpenIddict.Core.csproj" />
+    <Project Path="Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Persistence.SqlServer/Umbraco.Automate.OpenIddict.Persistence.SqlServer.csproj" />
+    <Project Path="Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Persistence.Sqlite/Umbraco.Automate.OpenIddict.Persistence.Sqlite.csproj" />
+  </Folder>
+  <Folder Name="/Umbraco.Automate.OpenIddict/tests/">
+    <Project Path="Umbraco.Automate.OpenIddict/tests/Umbraco.Automate.OpenIddict.Tests.Unit/Umbraco.Automate.OpenIddict.Tests.Unit.csproj" />
+    <Project Path="Umbraco.Automate.OpenIddict/tests/Umbraco.Automate.OpenIddict.Tests.Integration/Umbraco.Automate.OpenIddict.Tests.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Umbraco.Automate.Slack/">
+    <Project Path="Umbraco.Automate.Slack/src/Umbraco.Automate.Slack/Umbraco.Automate.Slack.csproj" />
   </Folder>
 </Solution>

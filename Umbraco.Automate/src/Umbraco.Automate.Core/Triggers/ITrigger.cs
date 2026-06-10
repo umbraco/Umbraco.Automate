@@ -1,5 +1,4 @@
-using Umbraco.Automate.Core.Settings;
-using Umbraco.Cms.Core.Composing;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Core.Triggers;
 
@@ -7,50 +6,17 @@ namespace Umbraco.Automate.Core.Triggers;
 /// Defines an automation trigger — the event that starts an automation.
 /// Triggers are discovered at startup and registered in the trigger catalogue.
 /// </summary>
-public interface ITrigger : IDiscoverable
+public interface ITrigger : IStepType
 {
     /// <summary>
-    /// Gets the unique alias for this trigger (e.g. "contentPublished").
+    /// Determines whether this trigger should handle the given event output for an automation
+    /// configured with the given settings. Called by the dispatcher for each subscribing
+    /// automation to filter events based on that automation's trigger settings
+    /// (e.g. <c>ContentTypes</c> on content triggers).
+    /// Defaults to <c>true</c> — triggers without filterable settings need not override.
     /// </summary>
-    string Alias { get; }
-
-    /// <summary>
-    /// Gets the human-readable display name (e.g. "Content Published").
-    /// </summary>
-    string Name { get; }
-
-    /// <summary>
-    /// Gets an optional description of what this trigger does.
-    /// </summary>
-    string? Description { get; }
-
-    /// <summary>
-    /// Gets the category group for UI organisation (e.g. "Content", "Media").
-    /// </summary>
-    string? Group { get; }
-
-    /// <summary>
-    /// Gets the Umbraco icon alias (e.g. "icon-globe").
-    /// </summary>
-    string? Icon { get; }
-
-    /// <summary>
-    /// Gets the settings POCO type that drives the configuration UI, or null if the trigger has no settings.
-    /// </summary>
-    Type? SettingsType { get; }
-
-    /// <summary>
-    /// Gets the output POCO type that describes the data produced by this trigger, or null if no output.
-    /// </summary>
-    Type? OutputType { get; }
-
-    /// <summary>
-    /// Gets the settings schema used to render the configuration UI.
-    /// </summary>
-    EditableModelSchema? GetSettingsSchema();
-
-    /// <summary>
-    /// Gets the output properties available for expression binding.
-    /// </summary>
-    IReadOnlyList<TriggerOutputProperty> GetOutputProperties();
+    /// <param name="output">The trigger event output.</param>
+    /// <param name="settings">The automation's resolved trigger settings, or <c>null</c> if unconfigured.</param>
+    /// <returns><c>true</c> if the event should fire for an automation with these settings; otherwise <c>false</c>.</returns>
+    bool CanHandle(object output, object? settings) => true;
 }

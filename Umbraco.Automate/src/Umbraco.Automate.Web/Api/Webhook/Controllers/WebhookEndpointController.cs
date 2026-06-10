@@ -1,36 +1,39 @@
-using System.Security.Cryptography;
-using Asp.Versioning;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
+using Umbraco.Automate.Core.Triggers.Webhooks;
+using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
+using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Cms.Api.Common.Attributes;
-using Umbraco.Cms.Api.Common.Filters;
 
 namespace Umbraco.Automate.Web.Api.Webhook.Controllers;
 
 /// <summary>
 /// Public endpoint for receiving incoming webhooks that trigger automations.
-/// Authenticated via a per-trigger secret (<c>X-Webhook-Secret</c> header or <c>secret</c> query param).
+/// Each trigger selects an authentication strategy (e.g. plain-secret header, HMAC-SHA256, provider-specific).
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
-[Route("/umbraco/automate/api/v{version:apiVersion}/webhook")]
+[Route("automate/webhook")]
 [MapToApi(Constants.WebhookApi.ApiName)]
-[JsonOptionsName(Constants.WebhookApi.ApiName)]
 [ApiExplorerSettings(GroupName = "Webhooks")]
+[EnableRateLimiting(Constants.WebhookApi.RateLimitPolicy)]
 public sealed class WebhookEndpointController : ControllerBase
 {
-    internal const string SecretHeaderName = "X-Webhook-Secret";
-    internal const string SecretQueryParam = "secret";
-    internal const string SecretSettingsKey = "secret";
-
     private readonly IAutomationService _automationService;
     private readonly ITriggerDispatcher _dispatcher;
     private readonly TriggerCollection _triggers;
+    private readonly WebhookAuthenticatorCollection _authenticators;
+    private readonly IEditableModelResolver _modelResolver;
+    private readonly IOptions<WebhookOptions> _webhookOptions;
     private readonly ILogger<WebhookEndpointController> _logger;
 
     /// <inheritdoc cref="WebhookEndpointController"/>
@@ -38,28 +41,38 @@ public sealed class WebhookEndpointController : ControllerBase
         IAutomationService automationService,
         ITriggerDispatcher dispatcher,
         TriggerCollection triggers,
+        WebhookAuthenticatorCollection authenticators,
+        IEditableModelResolver modelResolver,
+        IOptions<WebhookOptions> webhookOptions,
         ILogger<WebhookEndpointController> logger)
     {
         _automationService = automationService;
         _dispatcher = dispatcher;
         _triggers = triggers;
+        _authenticators = authenticators;
+        _modelResolver = modelResolver;
+        _webhookOptions = webhookOptions;
         _logger = logger;
     }
 
     /// <summary>
     /// Receives an incoming webhook request and triggers the matching automation.
-    /// Requires a valid secret via <c>X-Webhook-Secret</c> header or <c>secret</c> query parameter.
+    /// Authentication is performed by the strategy configured on the trigger.
     /// </summary>
+    [HttpGet("{automationId:guid}")]
     [HttpPost("{automationId:guid}")]
     [HttpPut("{automationId:guid}")]
     [HttpPatch("{automationId:guid}")]
     [HttpDelete("{automationId:guid}")]
-    [MapToApiVersion("1.0")]
+    [HttpHead("{automationId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status405MethodNotAllowed)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> ReceiveWebhook(
         Guid automationId,
         CancellationToken cancellationToken)
@@ -70,12 +83,12 @@ public sealed class WebhookEndpointController : ControllerBase
             return NotFound();
         }
 
-        if (automation.Status != AutomationStatus.Published || !automation.IsEnabled)
+        if (automation.Status != AutomationStatus.Published)
         {
             return Conflict(new ProblemDetails
             {
                 Title = "Automation not active",
-                Detail = "The automation must be published and enabled to receive webhooks.",
+                Detail = "The automation must be published to receive webhooks.",
                 Status = StatusCodes.Status409Conflict,
             });
         }
@@ -87,35 +100,118 @@ public sealed class WebhookEndpointController : ControllerBase
         }
 
         // Verify the automation's trigger is a webhook trigger and accepts this HTTP method.
-        var trigger = _triggers.FirstOrDefault(t => t.Alias == triggerAlias);
-        if (trigger is not IWebhookTrigger webhookTrigger)
+        var trigger = _triggers.GetByAlias<WebhookTrigger>(triggerAlias);
+        if (trigger is null)
         {
             return NotFound();
         }
 
-        // Validate the webhook secret.
-        var expectedSecret = GetSecretFromSettings(automation.Trigger);
-        if (!string.IsNullOrEmpty(expectedSecret) && !ValidateSecret(expectedSecret))
-        {
-            return Unauthorized();
-        }
+        // Resolve trigger settings (resolves $ConfigKey references via the trigger's resolver).
+        var triggerSettings = automation.Trigger?.Settings != null
+            ? trigger.ResolveSettings(automation.Trigger.Settings)
+            : null;
 
-        if (!webhookTrigger.AllowedMethods.Contains(Request.Method, StringComparer.OrdinalIgnoreCase))
+        var allowedMethod = string.IsNullOrEmpty(triggerSettings?.AllowedMethod) ? "POST" : triggerSettings.AllowedMethod;
+        if (!string.Equals(allowedMethod, Request.Method, StringComparison.OrdinalIgnoreCase))
         {
             return StatusCode(StatusCodes.Status405MethodNotAllowed, new ProblemDetails
             {
                 Title = "Method not allowed",
-                Detail = $"This webhook accepts: {string.Join(", ", webhookTrigger.AllowedMethods)}",
+                Detail = $"This webhook accepts: {allowedMethod}",
                 Status = StatusCodes.Status405MethodNotAllowed,
             });
         }
 
-        // Read the request body.
+        var authenticator = ResolveAuthenticator(triggerSettings);
+        var authenticatorSettings = authenticator is not null
+            ? ResolveAuthenticatorSettings(authenticator, triggerSettings?.Authenticator)
+            : null;
+
+        // Run pre-body authentication for authenticators that don't need the body.
+        // Lets large-payload spam fail fast with 401 before we read into memory.
+        if (authenticator is not null && !authenticator.RequiresBody)
+        {
+            var preBodyContext = new WebhookAuthenticationContext
+            {
+                Request = Request,
+                Body = null,
+            };
+            if (!authenticator.Validate(preBodyContext, authenticatorSettings))
+            {
+                return Unauthorized();
+            }
+
+            // Already validated — skip post-body check.
+            authenticator = null;
+        }
+
+        // Validate payload size before reading into memory.
+        var maxPayloadBytes = _webhookOptions.Value.MaxPayloadBytes;
+        if (Request.ContentLength > maxPayloadBytes)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge, new ProblemDetails
+            {
+                Title = "Payload too large",
+                Detail = $"Maximum webhook payload size is {maxPayloadBytes} bytes.",
+                Status = StatusCodes.Status413PayloadTooLarge,
+            });
+        }
+
+        // Read the request body with size-limited stream.
         string? body = null;
         if (Request.ContentLength is > 0)
         {
+            Request.Body = new LimitedStream(Request.Body, maxPayloadBytes);
             using var reader = new StreamReader(Request.Body);
-            body = await reader.ReadToEndAsync(cancellationToken);
+
+            try
+            {
+                body = await reader.ReadToEndAsync(cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+                return StatusCode(StatusCodes.Status413PayloadTooLarge, new ProblemDetails
+                {
+                    Title = "Payload too large",
+                    Detail = $"Maximum webhook payload size is {maxPayloadBytes} bytes.",
+                    Status = StatusCodes.Status413PayloadTooLarge,
+                });
+            }
+
+            // Validate JSON structure when content type declares JSON.
+            var contentType = Request.ContentType;
+            if (contentType is not null
+                && contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(body))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(body);
+                }
+                catch (JsonException)
+                {
+                    return UnprocessableEntity(new ProblemDetails
+                    {
+                        Title = "Invalid JSON",
+                        Detail = "The request body is not valid JSON.",
+                        Status = StatusCodes.Status422UnprocessableEntity,
+                    });
+                }
+            }
+        }
+
+        // Post-body authentication for strategies that need the body (e.g. HMAC).
+        if (authenticator is not null)
+        {
+            var postBodyContext = new WebhookAuthenticationContext
+            {
+                Request = Request,
+                Body = body,
+            };
+            if (!authenticator.Validate(postBodyContext, authenticatorSettings))
+            {
+                return Unauthorized();
+            }
         }
 
         var output = new WebhookTriggerOutput
@@ -133,11 +229,14 @@ public sealed class WebhookEndpointController : ControllerBase
             "Webhook received for automation {AutomationId} ({AutomationAlias})",
             automationId, automation.Alias);
 
+        // Target this exact automation. The endpoint is addressed by automation ID, so the
+        // dispatch must not fan out to every published automation sharing the webhook alias.
         await _dispatcher.DispatchAsync(
             new TriggerEvent<WebhookTriggerOutput>
             {
                 TriggerAlias = triggerAlias,
-                InitiatorType = "webhook",
+                TargetAutomationId = automationId,
+                InitiatorType = TriggerInitiatorType.Webhook,
                 Output = output,
             },
             cancellationToken);
@@ -145,30 +244,38 @@ public sealed class WebhookEndpointController : ControllerBase
         return Accepted();
     }
 
-    private static string? GetSecretFromSettings(TriggerConfiguration? trigger)
+    /// <summary>
+    /// Resolves the authenticator for the trigger. Unknown or missing aliases fall back
+    /// to the built-in plain-secret authenticator so stale config never leaves the endpoint
+    /// errored; whether the request passes authentication is still up to the strategy.
+    /// </summary>
+    private IWebhookAuthenticator? ResolveAuthenticator(WebhookTriggerSettings? settings)
     {
-        if (trigger?.Settings.TryGetValue(SecretSettingsKey, out var value) is true)
+        var alias = settings?.Authenticator?.Alias;
+        if (!string.IsNullOrEmpty(alias))
         {
-            return value?.ToString();
+            var match = _authenticators.GetByAlias(alias);
+            if (match is not null)
+            {
+                return match;
+            }
+
+            _logger.LogWarning(
+                "Webhook authenticator '{Alias}' not registered, falling back to '{Fallback}'",
+                alias, PlainSecretWebhookAuthenticator.WellKnownAlias);
         }
 
-        return null;
+        return _authenticators.GetByAlias(PlainSecretWebhookAuthenticator.WellKnownAlias);
     }
 
-    private bool ValidateSecret(string expectedSecret)
+    private object? ResolveAuthenticatorSettings(IWebhookAuthenticator authenticator, WebhookAuthenticatorConfig? config)
     {
-        // Check header first, then query param fallback.
-        var providedSecret = Request.Headers[SecretHeaderName].FirstOrDefault()
-                             ?? Request.Query[SecretQueryParam].FirstOrDefault();
-
-        if (string.IsNullOrEmpty(providedSecret))
+        if (authenticator.SettingsType is null)
         {
-            return false;
+            return null;
         }
 
-        // Constant-time comparison to prevent timing attacks.
-        return CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(expectedSecret),
-            System.Text.Encoding.UTF8.GetBytes(providedSecret));
+        var raw = config?.Settings ?? [];
+        return _modelResolver.ResolveModel(authenticator.Alias, authenticator.SettingsType, raw, authenticator.GetSettingsSchema());
     }
 }

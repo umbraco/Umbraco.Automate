@@ -187,11 +187,11 @@ public interface ITrigger
     string? Group { get; }
     string? Icon { get; }
     Type? SettingsType { get; }    // Input: drives config UI
-    Type? OutputType { get; }      // Output: drives expression autocompletion
+    Type? OutputType { get; }      // Output: drives binding autocompletion
     EditableModelSchema? GetSettingsSchema();
 
     /// <summary>
-    /// Describes the output properties this trigger produces, for expression autocompletion
+    /// Describes the output properties this trigger produces, for binding autocompletion
     /// and validation. Auto-derived from OutputType by the base class — override only if needed.
     /// </summary>
     IReadOnlyList<TriggerOutputProperty> GetOutputProperties();
@@ -304,7 +304,7 @@ public abstract class WebhookTriggerBase<TSettings, TOutput>
 
 // Each trigger defines a strongly-typed POCO for its output.
 // These are compile-time safe at the handler boundary, then flattened
-// to a dictionary at the dispatcher for the dynamic expression engine.
+// to a dictionary at the dispatcher for the dynamic binding engine.
 
 public class ContentPublishedOutput
 {
@@ -554,17 +554,17 @@ internal static IUmbracoBuilder AddUmbracoAutomateCore(this IUmbracoBuilder buil
     return builder;
 }
 
-// Registers EF Core persistence — follows Umbraco Commerce's connection string convention
+// Registers EF Core persistence — resolved via DatabaseConnectionInfo (explicit opt-in)
 internal static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
 {
     builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-        (serviceProvider, options, umbracoConnectionString, umbracoProviderName) =>
+        (serviceProvider, options, _, _) =>
     {
         var config = serviceProvider.GetRequiredService<IConfiguration>();
 
-        // Follow Commerce convention: check for dedicated connection string, fall back to Umbraco's
-        var connectionString = config.GetConnectionString("umbracoAutomateDbDSN") ?? umbracoConnectionString;
-        var providerName = config["ConnectionStrings:umbracoAutomateDbDSN_ProviderName"] ?? umbracoProviderName;
+        // Resolve from dedicated umbracoAutomateDbDSN, OR umbracoDbDSN when
+        // Umbraco:Automate:UseUmbracoDbDSN is explicitly set. Throws if neither is configured.
+        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(config);
 
         switch (providerName)
         {
@@ -675,10 +675,10 @@ The endpoint:
 public class WebhookReceivedTriggerSettings
 {
     [Field(IsSensitive = true)]
-    public string? Secret { get; set; }  // Optional shared secret for validation
+    public string? Secret { get; set; }  // Shared secret used by the selected strategy
 
-    [Field]
-    public bool ValidateSignature { get; set; }  // HMAC-SHA256 signature validation
+    [Field(EditorUiAlias = "Umb.Automate.WebhookAuthenticatorPicker")]
+    public string AuthenticatorAlias { get; set; } = "plain-secret";  // Authentication strategy
 
     [Field]
     public string? AllowedMethods { get; set; } = "POST";  // Comma-separated HTTP methods
@@ -871,21 +871,31 @@ WorkflowCore has three pluggable infrastructure abstractions: `IQueueProvider`, 
 **Default behavior** (zero configuration):
 - Queue: in-memory
 - Lock: in-memory (single-node)
-- Persistence: Umbraco's own connection string and database
 - Migrations tracked in `__UmbracoAutomate_MigrationsHistory` (separate from Umbraco core and other products)
 
-**Custom database** (follows the Umbraco Commerce convention — named connection string):
+**Database configuration is explicit** — Automate does not silently share another product's database, because the additional traffic from outbox messages, run history and WorkflowCore engine tables can affect the host's performance. Automate resolves whatever connection string `Umbraco:Automate:UseNamedConnectionString` points at; this setting defaults to `umbracoAutomateDbDSN`.
+
+**Default — dedicated database** (recommended; follows the Umbraco Commerce connection-string convention):
 ```json
 {
     "ConnectionStrings": {
-        "umbracoDbDSN": "Server=...;Database=myUmbracoDb;...",
-        "umbracoDbDSN_ProviderName": "Microsoft.Data.SqlClient",
         "umbracoAutomateDbDSN": "Server=...;Database=myUmbracoAutomateDb;...",
         "umbracoAutomateDbDSN_ProviderName": "Microsoft.Data.SqlClient"
     }
 }
 ```
-When `umbracoAutomateDbDSN` is present, all Automate tables (domain + WorkflowCore engine state) and migrations target the separate database. When absent (default), falls back to `umbracoDbDSN` — tables coexist in the Umbraco database, distinguished by the `UmbracoAutomate_` table prefix and separate migrations history table.
+
+**Share an existing connection string** — point `UseNamedConnectionString` at any registered DSN (e.g. `umbracoDbDSN` to share the Umbraco CMS database, or a custom name shared across products). Useful for hosts like Umbraco Cloud where the CMS connection string is not user-editable so cannot be copied into `umbracoAutomateDbDSN`:
+```json
+{
+    "Umbraco": {
+        "Automate": {
+            "UseNamedConnectionString": "umbracoDbDSN"
+        }
+    }
+}
+```
+With this set, Automate resolves the named connection string at startup. Tables coexist in the target database, distinguished by the `umbracoAutomate*` table prefix and a separate `__UmbracoAutomate_MigrationsHistory` table.
 
 ```csharp
 // Default — just works, uses Umbraco's connection string
@@ -1157,9 +1167,8 @@ Automation
 ├── Name: string
 ├── Description: string
 ├── IsEnabled: bool
-├── Status: Draft | Published | Inactive
+├── Status: Draft | Published | Unpublished
 ├── PublishedVersion: int? (the version currently active for trigger evaluation)
-├── DraftVersion: int (the latest version, may be ahead of PublishedVersion)
 ├── GroupId: Guid? (for organizing)
 ├── CreatedUtc: DateTime
 ├── UpdatedUtc: DateTime
@@ -1342,16 +1351,16 @@ Automations follow a **draft → publish** lifecycle, similar to most automation
 
 | Status | Triggers fire? | Description |
 |--------|---------------|-------------|
-| **Draft** | No | Newly created or never published. Can be edited and tested via dry run. |
+| **Draft** | No | Newly created or never published. Editable but does not trigger. |
 | **Published** | Yes (if enabled) | Has a published version. Triggers evaluate against the published definition. |
-| **Inactive** | No | Previously published, explicitly deactivated. Published version is retained for reference/rollback. |
+| **Unpublished** | No | Previously published, explicitly unpublished. Published version is retained for reference/rollback. |
 
 `IsEnabled` is separate from `Status` — a published automation can be disabled (kill switch) without losing its published state. Re-enabling resumes trigger evaluation immediately.
 
 ### How it works
 
-1. **Every save** creates a new `EntityVersion` record (entity type `"automation"`) with a full JSON snapshot of the definition (trigger, steps, connections, canvas state). `DraftVersion` increments.
-2. **Publishing** sets `PublishedVersion = DraftVersion` and compiles the definition into a WorkflowCore workflow registration. Only published automations register triggers with the engine.
+1. **Every save** creates a new `EntityVersion` record (entity type `"automation"`) with a full JSON snapshot of the definition (trigger, steps, connections, canvas state). `Version` auto-increments.
+2. **Publishing** sets `PublishedVersion = Version` and compiles the definition into a WorkflowCore workflow registration. Only published automations register triggers with the engine.
 3. **Editing a published automation** continues saving new draft versions without affecting the live version. The canvas shows a "unpublished changes" indicator (like Umbraco content).
 4. **In-flight runs** always execute against the version they started with (`AutomationRun.AutomationVersion`). Publishing a new version does not affect running instances.
 
@@ -1375,7 +1384,7 @@ Deploy transfers the **published version** of an automation. On arrival, the aut
 
 ---
 
-## Data Flow & Expression Syntax
+## Data Flow & Binding Syntax
 
 ### Runtime Data Model
 
@@ -1395,9 +1404,9 @@ public class AutomationRunData
 }
 ```
 
-When a step completes, the action execution middleware writes its output to `Steps[stepId]`. Downstream steps can reference these outputs in their settings via expressions.
+When a step completes, the action execution middleware writes its output to `Steps[stepId]`. Downstream steps can reference these outputs in their settings via bindings.
 
-### Expression Syntax
+### Binding Syntax
 
 Inspired by **UFM** (Umbraco Flavoured Markdown) — uses the familiar `${ }` interpolation syntax with `|` filter pipes. Evaluated **server-side** in C#.
 
@@ -1410,7 +1419,7 @@ ${ steps.sendEmail.messageId }        — output from a named step
 ${ variables.counter }                — user-defined variable
 ```
 
-Steps are referenced by their **user-defined name** (slugified to camelCase), not by GUID. This keeps expressions readable and stable across environments.
+Steps are referenced by their **user-defined name** (slugified to camelCase), not by GUID. This keeps bindings readable and stable across environments.
 
 #### Filters (chainable)
 
@@ -1434,12 +1443,12 @@ ${ trigger.email | fallback:no-reply@example.com }
 | `stripHtml` | Remove HTML tags | `${ body \| stripHtml }` |
 | `json` | Serialize to JSON | `${ data \| json }` |
 
-#### Where expressions are used
+#### Where bindings are used
 
-Expressions can appear in any **string-type** settings field on an action. The `EditableModelSchemaBuilder` marks string fields as expression-enabled by default. The middleware resolves expressions before passing settings to `ExecuteAsync`.
+Bindings can appear in any **string-type** settings field on an action. The `EditableModelSchemaBuilder` marks string fields as binding-enabled by default. The middleware resolves bindings before passing settings to `ExecuteAsync`.
 
 ```csharp
-// Settings POCO — expressions resolve before the action sees the values
+// Settings POCO — bindings resolve before the action sees the values
 public class SendSlackMessageSettings
 {
     [Field]
@@ -1448,20 +1457,20 @@ public class SendSlackMessageSettings
 }
 ```
 
-At runtime, the expression `"Published: ${ trigger.contentName }"` resolves to `"Published: Summer Sale Page"` before the action executes.
+At runtime, the binding `"Published: ${ trigger.contentName }"` resolves to `"Published: Summer Sale Page"` before the action executes.
 
 #### Extensible filters
 
 Third parties register custom filters via collection builder:
 
 ```csharp
-builder.ExpressionFilters()
+builder.BindingFilters()
     .Add<TruncateFilter>()
     .Add<FormatDateFilter>();
 
 // Custom filter
-[ExpressionFilter("currencyFormat")]
-public class CurrencyFormatFilter : IExpressionFilter
+[BindingFilter("currencyFormat")]
+public class CurrencyFormatFilter : IBindingFilter
 {
     public object? Apply(object? value, string[] args)
     {
@@ -1477,39 +1486,39 @@ public class CurrencyFormatFilter : IExpressionFilter
 
 We investigated whether the CMS's **UFM (Umbraco Flavoured Markdown)** implementation could be reused. Key findings:
 
-**UFM is entirely frontend.** There is zero server-side C# code — all parsing, expression evaluation, and filter execution lives in TypeScript (`src/Umbraco.Web.UI.Client/src/packages/ufm/`). The expression engine uses `@heximal/expressions` (a browser-only JS expression evaluator) and rendering produces Lit web components. No C# parser, tokenizer, or filter system exists in the CMS codebase.
+**UFM is entirely frontend.** There is zero server-side C# code — all parsing, expression evaluation, and filter execution lives in TypeScript (`src/Umbraco.Web.UI.Client/src/packages/ufm/`). The UFM expression engine uses `@heximal/expressions` (a browser-only JS expression evaluator) and rendering produces Lit web components. No C# parser, tokenizer, or filter system exists in the CMS codebase.
 
 **What we adopt from UFM (design, not code):**
 
 | UFM Concept | Automate Equivalent | Reuse Type |
 |-------------|---------------------|------------|
-| `${ expression }` syntax | Same tokenizer pattern (`/\$\{((?:[^{}]\|\{[^{}]*\})*)\}/`) | Pattern only — reimplemented in C# |
+| `${ expression }` syntax | Same tokenizer pattern (`/\$\{((?:[^{}]\|\{[^{}]*\})*)\}/`) | Pattern only — reimplemented in C# as binding engine |
 | `\| filter:arg1:arg2` pipe syntax | Same pipe syntax | Pattern only |
-| `UmbUfmFilterApi` interface (`filter(...args)`) | `IExpressionFilter.Apply(object?, string[])` | Mirrored interface shape |
-| Extension manifest registration (`ufmFilter` type) | `ExpressionFilterCollectionBuilder` | Umbraco DI equivalent |
+| `UmbUfmFilterApi` interface (`filter(...args)`) | `IBindingFilter.Apply(object?, string[])` | Mirrored interface shape |
+| Extension manifest registration (`ufmFilter` type) | `BindingFilterCollectionBuilder` | Umbraco DI equivalent |
 | Built-in filters (truncate, fallback, lowercase, uppercase, stripHtml) | Same filter set, ported to C# | Behaviour ported |
 
 **What we cannot reuse:**
-- `@heximal/expressions` — JavaScript-only, browser-only expression evaluator
+- `@heximal/expressions` — JavaScript-only, browser-only evaluator
 - `Marked.js` plugins — UFM extends a Markdown parser; we are not rendering Markdown
 - Lit web components (`<umb-ufm-render>`, `<umb-ufm-js-expression>`) — browser rendering concerns
 
-**Decision:** Build a lightweight C# expression engine that mirrors UFM's syntax and filter semantics but is purpose-built for server-side automation data binding. The tokenizer regex from UFM's `marked-ufmjs.plugin.ts` translates directly to .NET `Regex`. The filter interface is a 1:1 port. Users familiar with UFM expressions in the backoffice will find the automation expression syntax immediately recognizable.
+**Decision:** Build a lightweight C# binding engine that mirrors UFM's syntax and filter semantics but is purpose-built for server-side automation data binding. The tokenizer regex from UFM's `marked-ufmjs.plugin.ts` translates directly to .NET `Regex`. The filter interface is a 1:1 port. Users familiar with UFM expressions in the backoffice will find the automation binding syntax immediately recognizable.
 
 #### Implementation
 
-Server-side expression parser using a simple tokenizer (not a full JS engine). Resolves property paths against `AutomationRunData`, applies filters in sequence. **No arbitrary code execution** — expressions are pure data lookups with transformations, sandboxed by design.
+Server-side binding parser using a simple tokenizer (not a full JS engine). Resolves property paths against `AutomationRunData`, applies filters in sequence. **No arbitrary code execution** — bindings are pure data lookups with transformations, sandboxed by design.
 
 The tokenizer is a direct port of UFM's regex pattern:
 
 ```csharp
 // C# port of UFM's marked-ufmjs.plugin.ts tokenizer
-private static readonly Regex ExpressionPattern = new(
+private static readonly Regex BindingPattern = new(
     @"\$\{((?:[^{}]|\{[^{}]*\})*)\}",
     RegexOptions.Compiled);
 
 // Filter pipe parsing
-private static (string path, FilterCall[] filters) ParseExpression(string expr)
+private static (string path, FilterCall[] filters) ParseBinding(string expr)
 {
     // "trigger.name | truncate:100:... | uppercase"
     var segments = expr.Split('|').Select(s => s.Trim()).ToArray();
@@ -1557,7 +1566,6 @@ Leverage Umbraco's existing user group / permission model:
 
 | Feature | Description |
 |---------|-------------|
-| **Dry run mode** | Execute an automation without side effects; steps return what they *would* do |
 | **Rate limiting** | Configurable max runs per automation per time window |
 | **Kill switch** | Global and per-automation emergency disable |
 | **Automation versioning** | Each save creates an immutable version snapshot. Draft/publish lifecycle ensures edits don't affect live triggers. Running instances complete on their original version. Rollback restores any previous version. |
@@ -1814,12 +1822,11 @@ Opened by clicking an automation in the tree. Uses workspace apps (tabs) followi
 **Workspace App: Workflow** (primary tab, `icon-nodes`)
 The canvas editor for building the automation.
 
-- **Top bar**: Automation name, alias, save, **publish** (with split button for "save draft"), enable/disable toggle, test/dry-run button. Shows "unpublished changes" badge when draft is ahead of published version.
+- **Top bar**: Automation name, alias, save, **publish** (with split button for "save draft"), enable/disable toggle. Shows "unpublished changes" badge when draft is ahead of published version.
 - **Full-width canvas**: React Flow node graph — no sidebars, maximum canvas space
   - Trigger node (single, at the top)
   - Action nodes with typed input/output handles
   - Connection lines between nodes (with optional filter badges)
-  - Visual status during dry-run (green check / red X per node)
   - Each node shows a **pencil icon** — clicking opens the settings modal
   - **Add button** (on canvas or toolbar) opens a picker modal to insert a new trigger/action
 
@@ -1846,7 +1853,7 @@ Follows the Umbraco.AI two-column layout (`<umb-automate-workspace-editor-layout
 - **Right column** (aside): Info box
   - **Id** — automation unique ID (or "Unsaved" tag for new)
   - **Alias** — URL-safe alias
-  - **Status** — Draft / Published / Inactive badge
+  - **Status** — Draft / Published / Unpublished badge
   - **Published version** — version number currently live
   - **Date Created** — formatted timestamp
   - **Date Modified** — formatted timestamp
@@ -1961,7 +1968,7 @@ On import, the admin is prompted to fill in the missing sensitive values before 
 
 ### Deploy Connector Implementation
 
-Ships as `Umbraco.Automate.Deploy` — a separate package that registers Umbraco Deploy artifacts and value connectors:
+Ships as `Umbraco.Deploy.Automate` — a separate package that registers Umbraco Deploy artifacts and value connectors:
 
 ```csharp
 // Registers automation as a deployable entity type
@@ -2069,6 +2076,8 @@ These concerns are baked into the architecture, not bolted on later.
 | Concern | Approach |
 |---------|----------|
 | **Secrets management** | Settings marked `[Field(IsSensitive = true)]` are automatically encrypted at rest using ASP.NET Core Data Protection (already in Umbraco's dependency tree) — mirroring Umbraco.AI's `[AIField(IsSensitive = true)]` pattern. Sensitive values are encrypted in-place on the entity (Connection settings, action settings) via EF Core value converters. No separate secrets table — the Connection entity itself centralises shared credentials. |
+| **Configuration references** | Settings fields support a `$Key:Path` syntax that resolves to an `IConfiguration` value at run time (e.g. `$Umbraco:Automate:Secrets:SlackToken`), keeping credentials and per-environment values in app settings / environment variables rather than the database. Because automations run under an elevated service-account identity, resolution follows least-privilege and is **default-deny**: a key resolves only when it falls under one of `AutomateOptions.AllowedConfigurationKeyPrefixes` (default `Umbraco:Automate:Secrets` and `Umbraco:Automate:Variables`, segment-aware, case-insensitive), keeping settings scoped to configuration explicitly intended for automations. The allow-list lives in app settings by design, so only someone who already has the configuration decides which subset is exposable — it is deliberately **not** a backoffice-editable setting. The two default sections mirror the GitHub Actions **Secrets** (sensitive) / **Variables** (non-sensitive) split. Keys under a `SecretConfigurationKeyPrefixes` prefix (default `Umbraco:Automate:Secrets`) may only be referenced from fields marked `[Field(IsSensitive = true)]`, so a resolved secret stays in fields treated as credential-bearing; `Variables` are unrestricted. (General run-log masking of sensitive fields — `GovernanceOptions.SensitiveDataMasking` — remains unimplemented and is tracked separately.) |
+| **Step-type permission gating** | Triggers and actions declare `RequiredSections` (and content actions `RequiredPermissions`, the CMS permission letters) on the `[Trigger(...)]` / `[Action(...)]` attribute. `ISectionAccessChecker` enforces section access at four points: the catalogue picker endpoint filters out items the workspace's service account cannot use; `AutomationService.ValidateForPublishAsync` rejects publishes that would violate them; `TriggerEventHandler` skips dispatch when the trigger requirement is no longer satisfied; `BackOfficeIdentityMiddleware` fails the step at runtime when the action requirement drifts. `IAutomationActionAuthorizer` wraps Umbraco's `IContentPermissionService` / `IMediaPermissionService` to enforce node-level access (start node + granular Browse/Update/Publish) inside each content/media action. `AutomationPermissionDriftHealthCheck` surfaces published automations whose service accounts no longer satisfy the requirements. See [identity-ownership-permissions.md](identity-ownership-permissions.md#step-type-permission-model) for the full model. |
 | **SSRF prevention** | HTTP Request action validates URLs against a configurable allowlist/denylist. Blocks internal IPs (`10.x`, `172.16.x`, `192.168.x`), link-local (`169.254.x`), and localhost by default. |
 | **Step-level timeout enforcement** | `CancellationToken` linked to a `CancellationTokenSource` with the configured timeout. Enforced by the middleware pipeline — actions that ignore cancellation are terminated after a grace period. |
 | **Trigger deduplication** | Optional `IdempotencyKey` on trigger events. `TriggerService` deduplicates within a configurable window (default 5 minutes). Incoming webhooks use `X-Request-Id` header or body hash. |
@@ -2092,6 +2101,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | **Engine Status** | WorkflowCore host is running and processing. Queue provider is reachable. | Error |
 | **Queue Depth** | Work queue depth is below `MaxQueueDepth` threshold. Early warning at 80%. | Warning |
 | **Data Retention** | Purge job has run successfully within the expected interval. | Info |
+| **Automation Service-Account Permissions** | Every published automation's workspace service account still satisfies the trigger/action `RequiredSections`. | Warning |
 
 #### Phase 2
 
@@ -2185,11 +2195,10 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 - If/Switch step types in the canvas
 - Email notification action
 - Failure notification channels (email, webhook)
-- Dry run mode
 - **Named Connections** entity (alias → environment-specific credentials, encrypted via `[Field(IsSensitive = true)]`)
 - OAuth2 support in connections (authorization code flow + automatic refresh)
 - Connection management UI in settings panel
-- **Umbraco Deploy connector** (`Umbraco.Automate.Deploy`) — content transfer with credential stripping, disabled-on-arrival, missing connection validation
+- **Umbraco Deploy connector** (`Umbraco.Deploy.Automate`) — content transfer with credential stripping, disabled-on-arrival, missing connection validation
 - Dead letter queue
 - Run replay ("Retry" button)
 - Startup validation of automation definitions (including missing connections)
@@ -2239,7 +2248,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | 7 | **AI provider abstraction** | Direct SDK calls vs Umbraco AI abstraction | ✅ **Decided: Via Umbraco.AI.** All AI integration ships as `Umbraco.AI.Automate` and depends on Umbraco.AI's abstractions. Deferred to Phase 3. |
 | 8 | **Newtonsoft.Json** | Accept dual dependency vs replace | ✅ **Decided: Accept it.** WorkflowCore has a hard dep on Newtonsoft.Json. Isolated to the engine layer — our domain model and API use System.Text.Json. |
 | 9 | **Workflow data model** | Typed TData POCO vs generic dictionary bag | ✅ **Decided: `AutomationRunData` dictionary bag.** User-defined automations have variable steps, so a generic `Dictionary<string, object?>` data bag is the right fit. Steps read/write via typed accessors. |
-| 10 | **Expression syntax** | Reuse UFM code vs port UFM design | ✅ **Decided: Port UFM design to C#.** UFM is entirely frontend (TypeScript/Lit/Marked.js) — no server-side code exists. We adopt the `${ }` syntax, `\| filter:args` pipes, and filter interface shape, but implement a purpose-built C# tokenizer and evaluator. Users familiar with UFM will find the syntax immediately recognizable. |
+| 10 | **Binding syntax** | Reuse UFM code vs port UFM design | ✅ **Decided: Port UFM design to C#.** UFM is entirely frontend (TypeScript/Lit/Marked.js) — no server-side code exists. We adopt the `${ }` syntax, `\| filter:args` pipes, and filter interface shape, but implement a purpose-built C# tokenizer and evaluator. Users familiar with UFM will find the syntax immediately recognizable. |
 
 ---
 

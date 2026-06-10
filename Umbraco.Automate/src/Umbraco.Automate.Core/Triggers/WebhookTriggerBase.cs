@@ -12,6 +12,10 @@ public abstract class WebhookTriggerBase<TSettings, TOutput>
     where TSettings : class, new()
     where TOutput : class
 {
-    /// <inheritdoc />
-    public abstract IEnumerable<string> AllowedMethods { get; }
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WebhookTriggerBase{TSettings, TOutput}"/> class.
+    /// </summary>
+    protected WebhookTriggerBase(TriggerInfrastructure infrastructure) : base(infrastructure)
+    {
+    }
 }

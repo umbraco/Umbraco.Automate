@@ -19,4 +19,21 @@
       <ProjectReference Include="..\Umbraco.Automate.Web.StaticAssets\Umbraco.Automate.Web.StaticAssets.csproj" />
     </ItemGroup>
 
+    <!-- Add JSON schema file to package output -->
+    <PropertyGroup>
+        <_UmbracoAutomateJsonSchemaReference>appsettings-schema.Umbraco.Automate.json</_UmbracoAutomateJsonSchemaReference>
+    </PropertyGroup>
+    <ItemGroup>
+        <Content Include="$(_UmbracoAutomateJsonSchemaReference)" PackagePath="" Visible="false" />
+    </ItemGroup>
+
+    <!-- Generate JSON schema on build (and before copying to project) -->
+    <Target Name="GenerateAppsettingsSchema" BeforeTargets="Build;CopyUmbracoJsonSchemaFiles" Inputs="$(TargetPath)" Outputs="$(_UmbracoAutomateJsonSchemaReference)">
+        <Message Text="Generating $(_UmbracoAutomateJsonSchemaReference)" Importance="high" />
+        <JsonSchemaGenerate AssemblyPath="$(TargetPath)" TypeName="UmbracoAutomateSchema" OutputPath="$(_UmbracoAutomateJsonSchemaReference)" IncludeObsoleteProperties="false" />
+        <ItemGroup>
+            <FileWrites Include="$(_UmbracoAutomateJsonSchemaReference)" />
+        </ItemGroup>
+    </Target>
+
 </Project>

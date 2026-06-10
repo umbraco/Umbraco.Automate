@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Umbraco.Cms.Persistence.EFCore.Scoping;
+using Umbraco.Automate.Core.Execution;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -8,11 +9,13 @@ namespace Umbraco.Automate.Persistence.Workflows;
 
 /// <summary>
 /// EF Core-backed <see cref="IPersistenceProvider"/> for WorkflowCore.
-/// Uses Umbraco's <see cref="IEFCoreScopeProvider{T}"/> for database access.
+/// Uses <see cref="IDbContextFactory{T}"/> for database access with an isolated connection.
 /// </summary>
 internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 {
-    private readonly IEFCoreScopeProvider<UmbracoAutomateDbContext> _scopeProvider;
+    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
+    private readonly RunFinalizer _runFinalizer;
+    private readonly ILogger<EFCoreWorkflowPersistenceProvider> _logger;
 
     private static readonly JsonSerializerSettings JsonSettings = new()
     {
@@ -20,9 +23,14 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
     };
 
-    public EFCoreWorkflowPersistenceProvider(IEFCoreScopeProvider<UmbracoAutomateDbContext> scopeProvider)
+    public EFCoreWorkflowPersistenceProvider(
+        IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
+        RunFinalizer runFinalizer,
+        ILogger<EFCoreWorkflowPersistenceProvider> logger)
     {
-        _scopeProvider = scopeProvider;
+        _dbContextFactory = dbContextFactory;
+        _runFinalizer = runFinalizer;
+        _logger = logger;
     }
 
     // === IPersistenceProvider ===
@@ -48,135 +56,119 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             workflow.Id = Guid.NewGuid().ToString();
         }
 
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
-        {
-            db.WorkflowInstances.Add(ToEntity(workflow));
-            await db.SaveChangesAsync(cancellationToken);
-        });
+        db.WorkflowInstances.Add(ToEntity(workflow));
+        await db.SaveChangesAsync(cancellationToken);
 
-        scope.Complete();
         return workflow.Id;
     }
 
     public async Task PersistWorkflow(WorkflowInstance workflow, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
+        if (entity is not null)
         {
-            var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
-            if (entity is not null)
-            {
-                UpdateEntity(entity, workflow);
-                await db.SaveChangesAsync(cancellationToken);
-            }
-        });
+            UpdateEntity(entity, workflow);
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
-        scope.Complete();
+        await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
     }
 
     public async Task PersistWorkflow(WorkflowInstance workflow, List<EventSubscription> subscriptions, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
+        if (entity is not null)
         {
-            var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
-            if (entity is not null)
+            UpdateEntity(entity, workflow);
+        }
+
+        foreach (var sub in subscriptions)
+        {
+            if (string.IsNullOrEmpty(sub.Id))
             {
-                UpdateEntity(entity, workflow);
+                sub.Id = Guid.NewGuid().ToString();
             }
 
-            foreach (var sub in subscriptions)
-            {
-                if (string.IsNullOrEmpty(sub.Id))
-                {
-                    sub.Id = Guid.NewGuid().ToString();
-                }
+            db.EventSubscriptions.Add(ToEntity(sub));
+        }
 
-                db.EventSubscriptions.Add(ToEntity(sub));
-            }
+        await db.SaveChangesAsync(cancellationToken);
 
-            await db.SaveChangesAsync(cancellationToken);
-        });
-
-        scope.Complete();
+        await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
     }
 
     public async Task<WorkflowInstance> GetWorkflowInstance(string id, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-        {
-            var entity = await db.WorkflowInstances
-                .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await db.WorkflowInstances
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
-            return entity is not null ? ToDomain(entity) : null;
-        });
+        if (entity is null)
+            throw new InvalidOperationException($"Workflow instance '{id}' not found.");
 
-        scope.Complete();
-        return result ?? throw new InvalidOperationException($"Workflow instance '{id}' not found.");
+        var wf = ToDomain(entity);
+        _logger.LogDebug(
+            "GetWorkflowInstance {Id}: Status={Status}, PointersNull={PointersNull}, PointerCount={Count}",
+            id, wf.Status, wf.ExecutionPointers is null, wf.ExecutionPointers?.Count ?? -1);
+        return wf;
     }
 
     public async Task<IEnumerable<WorkflowInstance>> GetWorkflowInstances(IEnumerable<string> ids, CancellationToken cancellationToken)
     {
         var idList = ids.ToList();
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-        {
-            var entities = await db.WorkflowInstances
-                .AsNoTracking()
-                .Where(e => idList.Contains(e.Id))
-                .ToListAsync(cancellationToken);
+        var entities = await db.WorkflowInstances
+            .AsNoTracking()
+            .Where(e => idList.Contains(e.Id))
+            .ToListAsync(cancellationToken);
 
-            return entities.Select(ToDomain).ToList();
-        });
-
-        scope.Complete();
-        return result;
+        return entities.Select(ToDomain).ToList();
     }
 
     public async Task<IEnumerable<WorkflowInstance>> GetWorkflowInstances(
         WorkflowStatus? status, string type, DateTime? createdFrom, DateTime? createdTo, int skip, int take)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync();
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
+        IQueryable<WorkflowInstanceEntity> query = db.WorkflowInstances.AsNoTracking();
+
+        if (status.HasValue)
         {
-            IQueryable<WorkflowInstanceEntity> query = db.WorkflowInstances.AsNoTracking();
+            var statusInt = (int)status.Value;
+            query = query.Where(e => e.Status == statusInt);
+        }
 
-            if (status.HasValue)
-            {
-                var statusInt = (int)status.Value;
-                query = query.Where(e => e.Status == statusInt);
-            }
+        if (!string.IsNullOrEmpty(type))
+        {
+            query = query.Where(e => e.WorkflowDefinitionId == type);
+        }
 
-            if (!string.IsNullOrEmpty(type))
-            {
-                query = query.Where(e => e.WorkflowDefinitionId == type);
-            }
+        if (createdFrom.HasValue)
+        {
+            query = query.Where(e => e.CreateTime >= createdFrom.Value);
+        }
 
-            if (createdFrom.HasValue)
-            {
-                query = query.Where(e => e.CreateTime >= createdFrom.Value);
-            }
+        if (createdTo.HasValue)
+        {
+            query = query.Where(e => e.CreateTime <= createdTo.Value);
+        }
 
-            if (createdTo.HasValue)
-            {
-                query = query.Where(e => e.CreateTime <= createdTo.Value);
-            }
-
-            var entities = await query.Skip(skip).Take(take).ToListAsync();
-            return entities.Select(ToDomain).ToList();
-        });
-
-        scope.Complete();
-        return result;
+        var entities = await query
+            .OrderBy(e => e.CreateTime)
+            .ThenBy(e => e.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+        return entities.Select(ToDomain).ToList();
     }
 
     public async Task<IEnumerable<string>> GetRunnableInstances(DateTime asAt, CancellationToken cancellationToken)
@@ -184,17 +176,13 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         var ticks = asAt.Ticks;
         var runnableStatus = (int)WorkflowStatus.Runnable;
 
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-            await db.WorkflowInstances
-                .AsNoTracking()
-                .Where(e => e.Status == runnableStatus && e.NextExecution.HasValue && e.NextExecution <= ticks)
-                .Select(e => e.Id)
-                .ToListAsync(cancellationToken));
-
-        scope.Complete();
-        return result;
+        return await db.WorkflowInstances
+            .AsNoTracking()
+            .Where(e => e.Status == runnableStatus && e.NextExecution.HasValue && e.NextExecution <= ticks)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
     }
 
     // === ISubscriptionRepository ===
@@ -206,139 +194,105 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             subscription.Id = Guid.NewGuid().ToString();
         }
 
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
-        {
-            db.EventSubscriptions.Add(ToEntity(subscription));
-            await db.SaveChangesAsync(cancellationToken);
-        });
+        db.EventSubscriptions.Add(ToEntity(subscription));
+        await db.SaveChangesAsync(cancellationToken);
 
-        scope.Complete();
         return subscription.Id;
     }
 
     public async Task<EventSubscription> GetSubscription(string eventSubscriptionId, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-        {
-            var entity = await db.EventSubscriptions
-                .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.Id == eventSubscriptionId, cancellationToken);
+        var entity = await db.EventSubscriptions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == eventSubscriptionId, cancellationToken);
 
-            return entity is not null ? ToDomain(entity) : null;
-        });
-
-        scope.Complete();
-        return result ?? throw new InvalidOperationException($"Subscription '{eventSubscriptionId}' not found.");
+        return entity is not null ? ToDomain(entity) : throw new InvalidOperationException($"Subscription '{eventSubscriptionId}' not found.");
     }
 
     public async Task<EventSubscription> GetFirstOpenSubscription(
         string eventName, string eventKey, DateTime asOf, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-        {
-            var entity = await db.EventSubscriptions
-                .AsNoTracking()
-                .FirstOrDefaultAsync(e =>
-                    e.EventName == eventName
-                    && e.EventKey == eventKey
-                    && e.SubscribeAsOf <= asOf
-                    && e.ExternalToken == null,
-                    cancellationToken);
+        var entity = await db.EventSubscriptions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e =>
+                e.EventName == eventName
+                && e.EventKey == eventKey
+                && e.SubscribeAsOf <= asOf
+                && e.ExternalToken == null,
+                cancellationToken);
 
-            return entity is not null ? ToDomain(entity) : null;
-        });
-
-        scope.Complete();
-        return result!;
+        return entity is not null ? ToDomain(entity) : null!;
     }
 
     public async Task<IEnumerable<EventSubscription>> GetSubscriptions(
         string eventName, string eventKey, DateTime asOf, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-        {
-            var entities = await db.EventSubscriptions
-                .AsNoTracking()
-                .Where(e =>
-                    e.EventName == eventName
-                    && e.EventKey == eventKey
-                    && e.SubscribeAsOf <= asOf
-                    && e.ExternalToken == null)
-                .ToListAsync(cancellationToken);
+        var entities = await db.EventSubscriptions
+            .AsNoTracking()
+            .Where(e =>
+                e.EventName == eventName
+                && e.EventKey == eventKey
+                && e.SubscribeAsOf <= asOf
+                && e.ExternalToken == null)
+            .ToListAsync(cancellationToken);
 
-            return entities.Select(ToDomain).ToList();
-        });
-
-        scope.Complete();
+        var result = entities.Select(ToDomain).ToList();
+        _logger.LogDebug(
+            "GetSubscriptions: Name={Name}, Key={Key}, AsOf={AsOf}, Found={Count}",
+            eventName, eventKey, asOf, result.Count);
         return result;
     }
 
     public async Task TerminateSubscription(string eventSubscriptionId, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
+        if (entity is not null)
         {
-            var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
-            if (entity is not null)
-            {
-                db.EventSubscriptions.Remove(entity);
-                await db.SaveChangesAsync(cancellationToken);
-            }
-        });
-
-        scope.Complete();
+            db.EventSubscriptions.Remove(entity);
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task<bool> SetSubscriptionToken(
         string eventSubscriptionId, string token, string workerId, DateTime expiry, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
+        var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
+        if (entity is null)
         {
-            var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
-            if (entity is null)
-            {
-                return false;
-            }
+            return false;
+        }
 
-            entity.ExternalToken = token;
-            entity.ExternalWorkerId = workerId;
-            entity.ExternalTokenExpiry = expiry;
-            await db.SaveChangesAsync(cancellationToken);
-            return true;
-        });
-
-        scope.Complete();
-        return result;
+        entity.ExternalToken = token;
+        entity.ExternalWorkerId = workerId;
+        entity.ExternalTokenExpiry = expiry;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task ClearSubscriptionToken(string eventSubscriptionId, string token, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
+        if (entity is not null && entity.ExternalToken == token)
         {
-            var entity = await db.EventSubscriptions.FindAsync([eventSubscriptionId], cancellationToken);
-            if (entity is not null && entity.ExternalToken == token)
-            {
-                entity.ExternalToken = null;
-                entity.ExternalWorkerId = null;
-                entity.ExternalTokenExpiry = null;
-                await db.SaveChangesAsync(cancellationToken);
-            }
-        });
-
-        scope.Complete();
+            entity.ExternalToken = null;
+            entity.ExternalWorkerId = null;
+            entity.ExternalTokenExpiry = null;
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     // === IEventRepository ===
@@ -350,98 +304,77 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             newEvent.Id = Guid.NewGuid().ToString();
         }
 
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
-        {
-            db.Events.Add(ToEntity(newEvent));
-            await db.SaveChangesAsync(cancellationToken);
-        });
+        db.Events.Add(ToEntity(newEvent));
+        await db.SaveChangesAsync(cancellationToken);
 
-        scope.Complete();
         return newEvent.Id;
     }
 
     public async Task<Event> GetEvent(string id, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-        {
-            var entity = await db.Events
-                .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        var entity = await db.Events
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
-            return entity is not null ? ToDomain(entity) : null;
-        });
+        if (entity is null)
+            throw new InvalidOperationException($"Event '{id}' not found.");
 
-        scope.Complete();
-        return result ?? throw new InvalidOperationException($"Event '{id}' not found.");
+        var evt = ToDomain(entity);
+        _logger.LogDebug(
+            "GetEvent {Id}: Name={Name}, Key={Key}, DataType={DataType}, DataNull={DataNull}, Processed={Processed}",
+            id, evt.EventName, evt.EventKey, evt.EventData?.GetType().Name ?? "null", evt.EventData is null, evt.IsProcessed);
+        return evt;
     }
 
     public async Task<IEnumerable<string>> GetRunnableEvents(DateTime asAt, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-            await db.Events
-                .AsNoTracking()
-                .Where(e => !e.IsProcessed && e.EventTime <= asAt)
-                .Select(e => e.Id)
-                .ToListAsync(cancellationToken));
-
-        scope.Complete();
-        return result;
+        return await db.Events
+            .AsNoTracking()
+            .Where(e => !e.IsProcessed && e.EventTime <= asAt)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<string>> GetEvents(
         string eventName, string eventKey, DateTime asOf, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var result = await scope.ExecuteWithContextAsync(async db =>
-            await db.Events
-                .AsNoTracking()
-                .Where(e => e.EventName == eventName && e.EventKey == eventKey && e.EventTime >= asOf)
-                .Select(e => e.Id)
-                .ToListAsync(cancellationToken));
-
-        scope.Complete();
-        return result;
+        return await db.Events
+            .AsNoTracking()
+            .Where(e => e.EventName == eventName && e.EventKey == eventKey && e.EventTime >= asOf)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task MarkEventProcessed(string id, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        var entity = await db.Events.FindAsync([id], cancellationToken);
+        if (entity is not null)
         {
-            var entity = await db.Events.FindAsync([id], cancellationToken);
-            if (entity is not null)
-            {
-                entity.IsProcessed = true;
-                await db.SaveChangesAsync(cancellationToken);
-            }
-        });
-
-        scope.Complete();
+            entity.IsProcessed = true;
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task MarkEventUnprocessed(string id, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        var entity = await db.Events.FindAsync([id], cancellationToken);
+        if (entity is not null)
         {
-            var entity = await db.Events.FindAsync([id], cancellationToken);
-            if (entity is not null)
-            {
-                entity.IsProcessed = false;
-                await db.SaveChangesAsync(cancellationToken);
-            }
-        });
-
-        scope.Complete();
+            entity.IsProcessed = false;
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     // === IScheduledCommandRepository ===
@@ -450,50 +383,40 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
     public async Task ScheduleCommand(ScheduledCommand command)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync();
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        db.ScheduledCommands.Add(new ScheduledCommandEntity
         {
-            db.ScheduledCommands.Add(new ScheduledCommandEntity
-            {
-                CommandName = command.CommandName,
-                Data = command.Data,
-                ExecuteTime = new DateTime(command.ExecuteTime, DateTimeKind.Utc),
-            });
-            await db.SaveChangesAsync();
+            CommandName = command.CommandName,
+            Data = command.Data,
+            ExecuteTime = new DateTime(command.ExecuteTime, DateTimeKind.Utc),
         });
-
-        scope.Complete();
+        await db.SaveChangesAsync();
     }
 
     public async Task ProcessCommands(
         DateTimeOffset asOf, Func<ScheduledCommand, Task> action, CancellationToken cancellationToken)
     {
-        using var scope = _scopeProvider.CreateScope();
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        await scope.ExecuteWithContextAsync<Task>(async db =>
+        var asOfUtc = asOf.UtcDateTime;
+        var due = await db.ScheduledCommands
+            .Where(c => c.ExecuteTime <= asOfUtc)
+            .ToListAsync(cancellationToken);
+
+        foreach (var entity in due)
         {
-            var asOfUtc = asOf.UtcDateTime;
-            var due = await db.ScheduledCommands
-                .Where(c => c.ExecuteTime <= asOfUtc)
-                .ToListAsync(cancellationToken);
-
-            foreach (var entity in due)
+            await action(new ScheduledCommand
             {
-                await action(new ScheduledCommand
-                {
-                    CommandName = entity.CommandName,
-                    Data = entity.Data,
-                    ExecuteTime = entity.ExecuteTime.Ticks,
-                });
+                CommandName = entity.CommandName,
+                Data = entity.Data,
+                ExecuteTime = entity.ExecuteTime.Ticks,
+            });
 
-                db.ScheduledCommands.Remove(entity);
-            }
+            db.ScheduledCommands.Remove(entity);
+        }
 
-            await db.SaveChangesAsync(cancellationToken);
-        });
-
-        scope.Complete();
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     // === Entity mapping ===

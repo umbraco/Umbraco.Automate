@@ -1,0 +1,357 @@
+/* Node base — aligned with uui-box */
+.ua-node {
+    position: relative;
+    background: var(--uui-color-surface, #fff);
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    border-radius: 6px;
+    min-width: 220px;
+    max-width: 280px;
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
+    font-family: var(--uui-font-family, inherit);
+    font-size: var(--uui-type-small-size, 13px);
+    transition: box-shadow 120ms ease;
+}
+
+/* Type stripe — left edge accent. Each node type sets --ua-node-stripe.
+ * Inset by 1px and rounded so it fits inside the rounded border without overflow:hidden
+ * (which would clip handles and the floating + button). */
+.ua-node::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    bottom: -1px;
+    width: 4px;
+    background: var(--ua-node-stripe, var(--uui-color-text-alt, #6b7280));
+    border-radius: 6px 0 0 6px;
+}
+
+.ua-node:hover {
+    box-shadow: var(--uui-shadow-depth-2, 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23));
+}
+
+/* Header — slim divider beneath, similar to uui-tab's underline */
+.ua-node__header {
+    display: flex;
+    align-items: center;
+    gap: var(--uui-size-space-4, 12px);
+    padding: var(--uui-size-space-3, 9px) var(--uui-size-space-4, 12px);
+    padding-left: calc(var(--uui-size-space-4, 12px) + 4px); /* clear the stripe */
+    border-bottom: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+}
+
+/* Connected pill action-bar (edit + delete on nodes, edit/filter/delete on edges) —
+ * mirrors the umb-block-list-entry uui-action-bar treatment: rounded pill, hairline
+ * dividers between buttons, hover background tint, danger variant for delete. */
+.ua-action-bar {
+    display: inline-flex;
+    align-items: stretch;
+    background: var(--uui-color-surface, #fff);
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    border-radius: 50px;
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
+    overflow: hidden;
+}
+
+.ua-action-bar__btn {
+    width: 28px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--uui-color-text-alt, #6b7280);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.ua-action-bar__btn + .ua-action-bar__btn {
+    border-left: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+}
+
+.ua-action-bar__btn:hover {
+    background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
+    color: var(--uui-color-text, inherit);
+}
+
+.ua-action-bar__btn:focus-visible {
+    outline: 2px solid var(--uui-color-focus, #2152a3);
+    outline-offset: -2px;
+}
+
+.ua-action-bar__btn--active {
+    color: var(--uui-color-warning, #f59e0b);
+}
+
+.ua-action-bar__btn--danger:hover {
+    background: var(--uui-color-danger, #dc2626);
+    color: #fff;
+}
+
+.ua-action-bar__btn uui-icon {
+    font-size: 14px;
+}
+
+/* Node action-bar — show on node hover only */
+.ua-node__actions {
+    opacity: 0;
+    margin-left: var(--uui-size-space-5, 18px);
+    transition: opacity 120ms ease;
+}
+
+.ua-node:hover .ua-node__actions,
+.ua-node__actions:focus-within {
+    opacity: 1;
+}
+
+.ua-node__title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.ua-node__kind-tag {
+    align-self: flex-start;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.ua-node__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--ua-node-stripe, var(--uui-color-text-alt, #6b7280));
+}
+
+.ua-node__icon uui-icon {
+    font-size: 18px;
+}
+
+.ua-node__type {
+    flex: 1;
+    font-size: var(--uui-type-default-size, 14px);
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ua-node__body {
+    padding: var(--uui-size-space-3, 9px) var(--uui-size-space-4, 12px);
+    padding-left: calc(var(--uui-size-space-4, 12px) + 4px);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ua-node__body:empty {
+    display: none;
+}
+
+.ua-node__header:has(+ .ua-node__body:empty),
+.ua-node:not(:has(.ua-node__body)) .ua-node__header {
+    border-bottom: none;
+}
+
+.ua-node__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ua-node__chip,
+.ua-node__step-alias {
+    font-family: var(--uui-font-monospace, monospace);
+    font-size: 11px;
+    color: var(--uui-color-text-alt, #6b7280);
+    background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.ua-node__step-alias {
+    align-self: flex-start;
+}
+
+.ua-node__chip--id {
+    opacity: 0.7;
+}
+
+.dark .ua-node__chip,
+.dark .ua-node__step-alias {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.ua-node__add-action {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--uui-color-border, #d1d5db);
+    border-radius: 50%;
+    background: var(--uui-color-surface, #fff);
+    color: var(--uui-color-text-alt, #6b7280);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    z-index: 5;
+}
+
+.ua-node:hover .ua-node__add-action,
+.ua-node__add-action:focus-visible {
+    opacity: 1;
+}
+
+.ua-node__add-action:hover {
+    color: var(--uui-color-positive, #2bc37c);
+    border-color: var(--uui-color-positive, #2bc37c);
+}
+
+.dark .ua-node__add-action {
+    background: var(--uui-color-surface, #1f2937);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.ua-node--placeholder {
+    border: 2px dashed var(--uui-color-border, #d1d5db);
+    background: transparent;
+    color: var(--uui-color-text-alt, #6b7280);
+    padding: var(--uui-size-space-3, 9px) var(--uui-size-space-4, 12px);
+    display: flex;
+    align-items: center;
+    gap: var(--uui-size-space-2, 6px);
+    cursor: pointer;
+    border-radius: 6px;
+    min-width: 180px;
+    justify-content: center;
+    pointer-events: all;
+    font-family: inherit;
+    font-size: inherit;
+    box-shadow: none;
+}
+
+.ua-node--placeholder::before {
+    display: none;
+}
+
+.ua-node--placeholder:hover {
+    border-color: var(--uui-color-positive, #2bc37c);
+    color: var(--uui-color-positive, #2bc37c);
+}
+
+.ua-node__placeholder-label {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 12px;
+}
+
+/* Handle labels for branching nodes */
+.ua-node__handle-labels {
+    display: flex;
+    justify-content: space-around;
+    padding: 2px 8px 6px;
+    font-size: 10px;
+    color: var(--uui-color-text-alt, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ua-node__handle-label {
+    text-align: center;
+    flex: 1;
+}
+
+/* Edge label */
+.ua-edge__label {
+    font-size: 11px;
+    fill: var(--uui-color-text-alt, #6b7280);
+}
+
+/* Edge action-bar — show on edge hover/select */
+.ua-edge__actions {
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.react-flow__edge:hover .ua-edge__actions,
+.react-flow__edge.selected .ua-edge__actions,
+.ua-edge__actions:hover,
+.ua-edge__actions:focus-within {
+    opacity: 1;
+}
+
+/* Node type stripe colors */
+.ua-node--trigger { --ua-node-stripe: #6366f1; }
+.ua-node--action { --ua-node-stripe: #3b82f6; }
+.ua-node--if { --ua-node-stripe: #f59e0b; }
+.ua-node--switch { --ua-node-stripe: #8b5cf6; }
+
+/* Handle overrides */
+.react-flow__handle {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--uui-color-surface, #fff);
+    background: var(--uui-color-border, #c4c4c4);
+}
+
+.react-flow__handle:hover {
+    background: var(--uui-color-interactive, #1b264f);
+}
+
+/* Dark mode */
+.dark .ua-node {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.dark .ua-node:hover {
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* Run status overlays */
+.run-status-completed .ua-node {
+    border-color: #22c55e;
+}
+
+.run-status-running .ua-node {
+    border-color: #f59e0b;
+}
+
+.run-status-failed .ua-node {
+    border-color: #ef4444;
+}
+
+.run-status-waitingforinput .ua-node {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+}
+
+.run-status-pending .ua-node {
+    opacity: 0.5;
+}
+
+.run-status-skipped .ua-node {
+    opacity: 0.4;
+    border-style: dashed;
+}

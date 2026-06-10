@@ -48,6 +48,12 @@ public class EditableModelFieldAttribute : Attribute
     /// The value should be a PascalCase identifier (e.g. "Advanced", "Authentication").
     /// </summary>
     public string? Group { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether <c>${ binding }</c> syntax is evaluated
+    /// at runtime against automation run data (trigger output, step outputs).
+    /// </summary>
+    public bool SupportsBindings { get; set; }
 }
 
 /// <summary>

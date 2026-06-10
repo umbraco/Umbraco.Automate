@@ -1,0 +1,104 @@
+using Json.Schema;
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Cms.Core.Composing;
+
+namespace Umbraco.Automate.Core.StepTypes;
+
+/// <summary>
+/// Base interface for all step types in the automation catalogue (actions, control flow, triggers).
+/// Provides shared metadata, settings resolution, and output schema used for discovery and configuration UI.
+/// </summary>
+public interface IStepType : IDiscoverable
+{
+    /// <summary>
+    /// Gets the unique alias for this step type (e.g. "httpRequest", "umbracoAutomate.if").
+    /// </summary>
+    string Alias { get; }
+
+    /// <summary>
+    /// Gets the human-readable display name (e.g. "HTTP Request", "If").
+    /// </summary>
+    string Name { get; }
+
+    /// <summary>
+    /// Gets an optional description of what this step type does.
+    /// </summary>
+    string? Description { get; }
+
+    /// <summary>
+    /// Gets the category group for UI organisation (e.g. "Core", "Flow Control").
+    /// </summary>
+    string? Group { get; }
+
+    /// <summary>
+    /// Gets the Umbraco icon alias (e.g. "icon-message").
+    /// </summary>
+    string? Icon { get; }
+
+    /// <summary>
+    /// Gets the connection type alias that this step type requires, or null if no connection is needed.
+    /// </summary>
+    string? ConnectionTypeAlias { get; }
+
+    /// <summary>
+    /// Gets the backoffice section aliases the workspace's service account must have access to in
+    /// order to use this step type. Empty list means no requirement. See <c>RequiredSections</c> on
+    /// <see cref="StepTypeAttribute"/> for semantics.
+    /// </summary>
+    IReadOnlyList<string> RequiredSections { get; }
+
+    /// <summary>
+    /// Gets the CMS permission letters the service account must hold on the target node when this
+    /// step type's action runs. Empty list means no node-level permission is enforced. See
+    /// <c>RequiredPermissions</c> on <see cref="StepTypeAttribute"/> for semantics.
+    /// </summary>
+    IReadOnlyList<string> RequiredPermissions { get; }
+
+    /// <summary>
+    /// Gets the settings POCO type that drives the configuration UI, or null if the step type has no settings.
+    /// </summary>
+    Type? SettingsType { get; }
+
+    /// <summary>
+    /// Gets the settings schema used to render the configuration UI.
+    /// </summary>
+    EditableModelSchema? GetSettingsSchema();
+
+    /// <summary>
+    /// Resolves step type settings from a raw dictionary to a typed instance,
+    /// applying configuration variable substitution and validation.
+    /// </summary>
+    /// <param name="settings">The raw settings dictionary from the step configuration.</param>
+    /// <returns>The resolved settings object, or null if settings are empty or the step type has no settings type.</returns>
+    object? ResolveSettings(Dictionary<string, object?> settings);
+
+    /// <summary>
+    /// Gets the output POCO type that describes the data produced by this step type, or null if no output.
+    /// </summary>
+    Type? OutputType { get; }
+
+    /// <summary>
+    /// Gets the JSON Schema describing the output data structure for binding expression autocomplete.
+    /// Returns null if the step type produces no output.
+    /// </summary>
+    JsonSchema? GetOutputSchema();
+
+    /// <summary>
+    /// Gets whether this step type supports dynamic output schema resolution based on settings.
+    /// When true, the output schema depends on the step's configured settings and should be
+    /// resolved via <see cref="GetOutputSchemaAsync"/> rather than <see cref="GetOutputSchema"/>.
+    /// </summary>
+    bool HasDynamicOutputSchema { get; }
+
+    /// <summary>
+    /// Resolves the output JSON Schema, optionally using the step's configured settings for
+    /// step types that support dynamic output schemas. For static step types, returns the same
+    /// result as <see cref="GetOutputSchema"/>.
+    /// </summary>
+    /// <param name="settings">The step's configured settings dictionary, or null if unconfigured.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A JSON Schema describing the output data structure, or null if no output.</returns>
+    Task<JsonSchema?> GetOutputSchemaAsync(
+        Dictionary<string, object?>? settings,
+        CancellationToken cancellationToken = default);
+}

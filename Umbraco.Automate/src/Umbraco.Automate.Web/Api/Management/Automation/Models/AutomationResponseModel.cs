@@ -23,9 +23,6 @@ public sealed class AutomationResponseModel
     /// <summary>Optional description.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Whether triggers are active.</summary>
-    public bool IsEnabled { get; set; }
-
     /// <summary>The lifecycle status.</summary>
     [Required]
     public AutomationStatus Status { get; set; }
@@ -33,8 +30,12 @@ public sealed class AutomationResponseModel
     /// <summary>The published version number, or null.</summary>
     public int? PublishedVersion { get; set; }
 
-    /// <summary>The draft version number.</summary>
-    public int DraftVersion { get; set; }
+    /// <summary>The workspace this automation belongs to.</summary>
+    [Required]
+    public Guid WorkspaceId { get; set; }
+
+    /// <summary>The group (folder) this automation belongs to, or null.</summary>
+    public Guid? GroupId { get; set; }
 
     /// <summary>The trigger configuration.</summary>
     public TriggerConfiguration? Trigger { get; set; }
@@ -56,4 +57,17 @@ public sealed class AutomationResponseModel
 
     /// <summary>When the automation was last modified.</summary>
     public DateTime DateModified { get; set; }
+
+    /// <summary>Notification channel settings.</summary>
+    public AutomationNotificationSettings? NotificationSettings { get; set; }
+
+    /// <summary>The circuit-breaker health, a separate axis from <see cref="Status"/>.</summary>
+    [Required]
+    public AutomationHealth Health { get; set; }
+
+    /// <summary>When the most recent degradation warning was issued, or null.</summary>
+    public DateTime? WarningIssuedUtc { get; set; }
+
+    /// <summary>When the automation was auto-disabled by the circuit breaker, or null.</summary>
+    public DateTime? DisabledUtc { get; set; }
 }
