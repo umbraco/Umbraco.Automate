@@ -6,7 +6,7 @@
         "Url": "https://umbraco.com",
         "ImageUrl": "https://avatars.githubusercontent.com/u/1419552?s=200&v=4"
     },
-    "Category": "Automation",
+    "Category": "Editor Tools",
     "LicenseTypes": ["Free"],
     "DocumentationUrl": "https://github.com/umbraco/Umbraco.Automate",
     "IssueTrackerUrl": "https://github.com/umbraco/Umbraco.Automate/issues",
