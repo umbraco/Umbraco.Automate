@@ -1031,3 +1031,12 @@ Write-PipelineVariables -Products $products -ChangedProducts $changedProducts -B
 
 Write-Host ""
 Write-Host "Change detection complete" -ForegroundColor Green
+
+# This script signals genuine failures via `throw` (terminating, non-zero exit).
+# Reaching this line means change detection succeeded, so the task must report
+# success. Handled, non-fatal native commands can leave a non-zero $LASTEXITCODE
+# behind — notably `git describe --tags` returns non-zero on the very first
+# release when no tags exist yet (we intentionally fall back to merge-base). The
+# PowerShell@2 task runs `exit $LASTEXITCODE`, so that stray code would fail the
+# step despite success. Force a clean exit to reflect the script's real outcome.
+exit 0
