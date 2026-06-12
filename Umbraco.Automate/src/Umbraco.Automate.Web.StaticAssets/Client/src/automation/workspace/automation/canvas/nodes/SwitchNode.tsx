@@ -53,8 +53,20 @@ function SwitchNode({ data, id }: NodeProps) {
         }));
     }, [nodeData.cases]);
 
+    // Grow the node so each outcome (cases + default) keeps a legible, non-overlapping
+    // slot for its handle, label, and add-action button. Small switches keep the default
+    // node width; wide ones expand horizontally rather than cramming everything into 280px.
+    const nodeWidth = useMemo(() => {
+        const PER_OUTCOME = 90;
+        return Math.max(280, handles.length * PER_OUTCOME);
+    }, [handles.length]);
+
     return (
-        <div className="ua-node ua-node--switch" onDoubleClick={onDoubleClick}>
+        <div
+            className="ua-node ua-node--switch"
+            style={{ width: `${nodeWidth}px`, maxWidth: "none" }}
+            onDoubleClick={onDoubleClick}
+        >
             <Handle type="target" position={Position.Top} />
             <div className="ua-node__header">
                 {nodeData.icon && (
@@ -102,7 +114,7 @@ function SwitchNode({ data, id }: NodeProps) {
             ))}
             <div className="ua-node__handle-labels">
                 {handles.map((handle) => (
-                    <span key={handle.id} className="ua-node__handle-label">
+                    <span key={handle.id} className="ua-node__handle-label" title={handle.id}>
                         {handle.id}
                     </span>
                 ))}

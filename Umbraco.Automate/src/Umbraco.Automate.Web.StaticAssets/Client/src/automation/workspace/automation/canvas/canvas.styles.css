@@ -281,6 +281,11 @@
 .ua-node__handle-label {
     text-align: center;
     flex: 1;
+    min-width: 0;
+    padding: 0 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Edge label */
