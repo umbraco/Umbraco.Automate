@@ -1,9 +1,11 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using OpenIddict.Client;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.OpenIddict;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Automate.OpenIddict.Credentials.Persistence;
@@ -85,10 +87,14 @@ public static class UmbracoBuilderExtensions
 
     private static void AddPersistence(IUmbracoBuilder builder)
     {
-        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(builder.Config);
-
-        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>((_, options, _, _) =>
+        // Resolve the connection string lazily inside the factory (run time), not here at
+        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
+        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
+        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>((serviceProvider, options, _, _) =>
         {
+            var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                serviceProvider.GetRequiredService<IConfiguration>());
             OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
         });
 
