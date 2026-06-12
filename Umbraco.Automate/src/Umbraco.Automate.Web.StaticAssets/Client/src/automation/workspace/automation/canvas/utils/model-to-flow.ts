@@ -71,9 +71,11 @@ export function modelToNodes(
             settings: step.settings,
         };
 
-        // For switch nodes, extract case names from settings so the node can render dynamic handles
+        // For switch nodes, extract case names from settings so the node can render dynamic handles.
+        // Settings keys are camelCase (EditableModelSchemaBuilder derives field keys via ToCamelCase),
+        // so the field is "cases" — the nested case objects keep their PascalCase Name/Conditions.
         if (nodeType === "switch") {
-            const cases = step.settings?.Cases as Array<{ Name: string }> | undefined;
+            const cases = step.settings?.cases as Array<{ Name: string }> | undefined;
             data.cases = cases?.map((c) => c.Name) ?? [];
         }
 
