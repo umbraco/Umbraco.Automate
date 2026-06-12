@@ -34,12 +34,19 @@
         <PackageReference Include="Umbraco.Automate.OpenIddict" />
     </ItemGroup>
 
+    <!-- Ship buildTransitive props so consuming sites' CopyUmbracoJsonSchemaFiles target
+         (from Umbraco.Cms.Targets) discovers the schema and copies it into the project. -->
+    <ItemGroup>
+        <Content Include="buildTransitive\**" PackagePath="buildTransitive" />
+    </ItemGroup>
+
     <!-- Add JSON schema file to package output -->
     <PropertyGroup>
         <_UmbracoAutomateSlackJsonSchemaReference>appsettings-schema.Umbraco.Automate.Slack.json</_UmbracoAutomateSlackJsonSchemaReference>
     </PropertyGroup>
     <ItemGroup>
         <Content Include="$(_UmbracoAutomateSlackJsonSchemaReference)" PackagePath="" Visible="false" />
+        <Clean Include="$(_UmbracoAutomateSlackJsonSchemaReference)" />
     </ItemGroup>
 
     <!-- Generate JSON schema on build (and before copying to project) -->
