@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
@@ -35,10 +37,14 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
     {
-        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(builder.Config);
-
-        builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>((_, options, _, _) =>
+        // Resolve the connection string lazily inside the factory (run time), not here at
+        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
+        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
+        builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>((serviceProvider, options, _, _) =>
         {
+            var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                serviceProvider.GetRequiredService<IConfiguration>());
             UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
         });
 

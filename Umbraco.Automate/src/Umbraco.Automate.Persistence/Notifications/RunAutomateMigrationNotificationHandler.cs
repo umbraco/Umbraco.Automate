@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
 
@@ -15,6 +17,7 @@ public class RunAutomateMigrationNotificationHandler
     : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     private readonly IConfiguration _configuration;
+    private readonly IOptionsMonitor<ConnectionStrings> _connectionStrings;
     private readonly AutomateReadinessSignal _readinessSignal;
     private readonly ILogger<RunAutomateMigrationNotificationHandler> _logger;
 
@@ -23,10 +26,12 @@ public class RunAutomateMigrationNotificationHandler
     /// </summary>
     public RunAutomateMigrationNotificationHandler(
         IConfiguration configuration,
+        IOptionsMonitor<ConnectionStrings> connectionStrings,
         AutomateReadinessSignal readinessSignal,
         ILogger<RunAutomateMigrationNotificationHandler> logger)
     {
         _configuration = configuration;
+        _connectionStrings = connectionStrings;
         _readinessSignal = readinessSignal;
         _logger = logger;
     }
@@ -42,7 +47,7 @@ public class RunAutomateMigrationNotificationHandler
         // NullReferenceException in SqliteDatabaseCreator.Exists() when the ProfiledDbConnection's
         // inner connection is disposed. Creating the context directly avoids the pooled factory.
         // See: https://github.com/umbraco/Umbraco-CMS/issues/22124
-        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(_configuration);
+        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(_connectionStrings, _configuration);
         var optionsBuilder = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
         UmbracoAutomateDbContext.ConfigureProvider(optionsBuilder, connectionString, providerName);
 

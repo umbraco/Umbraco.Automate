@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Shouldly;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Cms.Core.Configuration.Models;
 
 namespace Umbraco.Automate.Tests.Unit.Persistence;
 
@@ -88,6 +91,58 @@ public class DatabaseConnectionInfoTests
             .Message.ShouldContain("umbracoAutomateDbDSN");
     }
 
+    [Fact]
+    public void Resolve_triggers_options_pipeline_so_a_deferred_connection_string_is_materialised()
+    {
+        // Mirrors Umbraco Cloud / Deploy: umbracoDbDSN is absent from configuration and is only
+        // synthesised when the ConnectionStrings options are first resolved.
+        var config = BuildConfig(new Dictionary<string, string?>
+        {
+            ["Umbraco:Automate:UseNamedConnectionString"] = "umbracoDbDSN",
+        });
+
+        var services = new ServiceCollection();
+        services.AddOptions();
+        services.AddSingleton<IConfiguration>(config);
+        services.AddSingleton<IConfigureOptions<ConnectionStrings>>(
+            new DeferredConnectionStringConfigurator(config));
+        using var provider = services.BuildServiceProvider();
+        var monitor = provider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>();
+
+        // Not present until the options pipeline runs.
+        config.GetConnectionString("umbracoDbDSN").ShouldBeNullOrEmpty();
+
+        // The IConfiguration-only overload cannot see it.
+        Should.Throw<InvalidOperationException>(() => DatabaseConnectionInfo.Resolve(config));
+
+        // The options-aware overload triggers the configurator, which populates it.
+        var (cs, providerName) = DatabaseConnectionInfo.Resolve(monitor, config);
+
+        cs.ShouldBe("Data Source=Umbraco.sqlite.db;");
+        providerName.ShouldBe("Microsoft.Data.Sqlite");
+    }
+
     private static IConfiguration BuildConfig(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+
+    /// <summary>
+    /// Stand-in for Umbraco Deploy's <c>ConfigureConnectionStrings</c>: writes a generated DSN
+    /// back into <see cref="IConfiguration"/> only when the options are resolved.
+    /// </summary>
+    private sealed class DeferredConnectionStringConfigurator : IConfigureNamedOptions<ConnectionStrings>
+    {
+        private readonly IConfiguration _config;
+
+        public DeferredConnectionStringConfigurator(IConfiguration config) => _config = config;
+
+        public void Configure(ConnectionStrings options) => Configure(Options.DefaultName, options);
+
+        public void Configure(string? name, ConnectionStrings options)
+        {
+            _config["ConnectionStrings:umbracoDbDSN"] = "Data Source=Umbraco.sqlite.db;";
+            _config["ConnectionStrings:umbracoDbDSN_ProviderName"] = "Microsoft.Data.Sqlite";
+            options.ConnectionString = "Data Source=Umbraco.sqlite.db;";
+            options.ProviderName = "Microsoft.Data.Sqlite";
+        }
+    }
 }
