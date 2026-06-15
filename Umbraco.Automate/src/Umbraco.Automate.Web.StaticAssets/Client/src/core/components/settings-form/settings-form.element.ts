@@ -172,6 +172,7 @@ export class UaSettingsFormElement extends UmbLitElement {
                 label=${this.localize.string(field.label)}
                 description=${this.localize.string(field.description ?? "")}
                 alias=${field.key}
+                data-path=${`$.${field.key}`}
                 property-editor-ui-alias=${this.#resolveEditorAlias(field)}
                 .appearance=${{ labelOnTop: this.labelOnTop }}
                 .config=${this.#buildFieldConfig(field)}
