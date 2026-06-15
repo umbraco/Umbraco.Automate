@@ -43,30 +43,16 @@ function SwitchNode({ data, id }: NodeProps) {
         [id, deleteElements],
     );
 
-    const handles = useMemo(() => {
-        const cases = nodeData.cases ?? [];
-        const allCases = [...cases, "default"];
-        const total = allCases.length;
-        return allCases.map((caseName, i) => ({
-            id: caseName,
-            left: `${((i + 1) / (total + 1)) * 100}%`,
-        }));
-    }, [nodeData.cases]);
-
-    // Grow the node so each outcome (cases + default) keeps a legible, non-overlapping
-    // slot for its handle, label, and add-action button. Small switches keep the default
-    // node width; wide ones expand horizontally rather than cramming everything into 280px.
-    const nodeWidth = useMemo(() => {
-        const PER_OUTCOME = 90;
-        return Math.max(280, handles.length * PER_OUTCOME);
-    }, [handles.length]);
+    // Outcomes stack vertically (cases first, then the default branch) so the node stays
+    // a fixed, legible width regardless of case count — it grows downward instead of
+    // sideways. Each outcome gets its own source handle on the right edge.
+    const outcomes = useMemo(
+        () => [...(nodeData.cases ?? []), "default"],
+        [nodeData.cases],
+    );
 
     return (
-        <div
-            className="ua-node ua-node--switch"
-            style={{ width: `${nodeWidth}px`, maxWidth: "none" }}
-            onDoubleClick={onDoubleClick}
-        >
+        <div className="ua-node ua-node--switch" onDoubleClick={onDoubleClick}>
             <Handle type="target" position={Position.Top} />
             <div className="ua-node__header">
                 {nodeData.icon && (
@@ -103,30 +89,23 @@ function SwitchNode({ data, id }: NodeProps) {
                     </code>
                 )}
             </div>
-            {handles.map((handle) => (
-                <Handle
-                    key={handle.id}
-                    type="source"
-                    position={Position.Bottom}
-                    id={handle.id}
-                    style={{ left: handle.left }}
-                />
-            ))}
-            <div className="ua-node__handle-labels">
-                {handles.map((handle) => (
-                    <span key={handle.id} className="ua-node__handle-label" title={handle.id}>
-                        {handle.id}
-                    </span>
+            <div className="ua-node__switch-cases">
+                {outcomes.map((outcome) => (
+                    <div key={outcome} className="ua-node__switch-case">
+                        <span className="ua-node__switch-case-label" title={outcome}>
+                            {outcome}
+                        </span>
+                        <Handle type="source" position={Position.Right} id={outcome} />
+                        {!nodeData.runStatus && (
+                            <AddActionButton
+                                nodeId={id}
+                                sourceHandle={outcome}
+                                className="ua-node__add-action--right"
+                            />
+                        )}
+                    </div>
                 ))}
             </div>
-            {!nodeData.runStatus && handles.map((handle) => (
-                <AddActionButton
-                    key={`add-${handle.id}`}
-                    nodeId={id}
-                    sourceHandle={handle.id}
-                    style={{ left: handle.left }}
-                />
-            ))}
         </div>
     );
 }
