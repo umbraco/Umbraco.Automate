@@ -10,6 +10,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 /// subsequent edits — Umbraco raises <see cref="MemberSavedNotification"/> for both,
 /// with <see cref="MemberSavedTriggerOutput.IsNew"/> distinguishing them).
 /// Produces one <see cref="TriggerEvent"/> per saved member.
+/// Login-only updates (last-login date / security stamp), which Umbraco also raises as
+/// <see cref="MemberSavedNotification"/>, are excluded — they are not member edits.
 /// </summary>
 [Trigger("umbracoAutomate.memberSaved", "Member Saved",
     Description = "Fires when a member is saved (created or updated).",
@@ -41,6 +43,17 @@ public sealed class MemberSavedTrigger
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(MemberSavedNotification notification)
     {
+        // Umbraco raises MemberSavedNotification for login-only updates (last-login date,
+        // security stamp) via MemberService.UpdateLoginPropertiesAsync — these advance neither
+        // UpdateDate nor VersionId and are not member edits. The CMS flags them in notification
+        // state; skip them so a login does not fire a phantom "member saved" automation.
+        if (notification.State.TryGetValue(
+                UmbracoConstants.Conventions.Member.LoginPropertiesOnlyStateKey, out var loginOnly)
+            && loginOnly is true)
+        {
+            yield break;
+        }
+
         foreach (var member in notification.SavedEntities)
         {
             yield return new TriggerEvent<MemberSavedTriggerOutput>

@@ -124,6 +124,21 @@ public class MemberSavedTriggerTests
     }
 
     [Fact]
+    public void MapEvent_LoginOnlyUpdate_ProducesNoEvents()
+    {
+        StubMemberGroups();
+        var member = CreateMember(Guid.NewGuid(), "Alice", "alice", "alice@example.com", "Customer");
+
+        // Umbraco flags login-only saves (last-login date / security stamp) in notification state.
+        var notification = new MemberSavedNotification(new[] { member }, new EventMessages());
+        notification.State[Umbraco.Cms.Core.Constants.Conventions.Member.LoginPropertiesOnlyStateKey] = true;
+
+        var events = _trigger.MapEvent(notification).ToList();
+
+        events.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void MapEvent_SetsIdempotencyKey()
     {
         StubMemberGroups();
