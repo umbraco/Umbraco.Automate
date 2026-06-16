@@ -1,5 +1,6 @@
 import { html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
+import { UmbValidationContext } from "@umbraco-cms/backoffice/validation";
 import type { UaTriggerSettingsModalData, UaTriggerSettingsModalValue } from "./types.js";
 import type { SettingsChangeDetail } from "../../../core/components/settings-form/settings-form.element.js";
 import "../../../core/components/settings-form/settings-form.element.js";
@@ -12,6 +13,11 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
     @state()
     private _settings: Record<string, unknown> = {};
 
+    // Provides UMB_VALIDATION_CONTEXT to the descendant settings form and its umb-property
+    // fields (the context API crosses shadow-DOM boundaries), so their mandatory validators
+    // register here and #onSubmit can gate submission on validate().
+    #validationContext = new UmbValidationContext(this);
+
     override connectedCallback() {
         super.connectedCallback();
         this._settings = { ...this.data?.settings };
@@ -21,7 +27,14 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
         this._settings = event.detail.settings;
     }
 
-    #onSubmit() {
+    async #onSubmit() {
+        try {
+            await this.#validationContext.validate();
+        } catch {
+            // Validation failed (e.g. a required field is empty) — keep the modal open
+            // so the field-level errors stay visible.
+            return;
+        }
         this.value = { settings: this._settings };
         this.modalContext?.submit();
     }

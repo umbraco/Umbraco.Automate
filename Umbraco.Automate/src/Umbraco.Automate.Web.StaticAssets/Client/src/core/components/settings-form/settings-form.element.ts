@@ -167,11 +167,16 @@ export class UaSettingsFormElement extends UmbLitElement {
     labelOnTop = false;
 
     #renderField(field: EditableModelFieldDescriptorModel) {
+        // data-path lets the field's validators report client-side messages (e.g. mandatory)
+        // to the hosting modal's UmbValidationContext so they render inline. This is a
+        // client-only path — settings have no server-model validation, so it intentionally
+        // does not match the CMS `$.values[...]` shape that server ModelState messages bind to.
         return html`
             <umb-property
                 label=${this.localize.string(field.label)}
                 description=${this.localize.string(field.description ?? "")}
                 alias=${field.key}
+                data-path=${`$.${field.key}`}
                 property-editor-ui-alias=${this.#resolveEditorAlias(field)}
                 .appearance=${{ labelOnTop: this.labelOnTop }}
                 .config=${this.#buildFieldConfig(field)}

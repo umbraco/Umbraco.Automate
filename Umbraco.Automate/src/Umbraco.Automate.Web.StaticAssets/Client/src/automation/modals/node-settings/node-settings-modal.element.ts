@@ -1,5 +1,6 @@
 import { css, html, nothing, customElement, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
+import { UmbValidationContext } from "@umbraco-cms/backoffice/validation";
 import type { UUISelectElement, UUISelectEvent } from "@umbraco-cms/backoffice/external/uui";
 import type { UaNodeSettingsModalData, UaNodeSettingsModalValue } from "./types.js";
 import type { SettingsChangeDetail } from "../../../core/components/settings-form/settings-form.element.js";
@@ -27,6 +28,11 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
 
     @state()
     private _availableConnections: UaConnectionItemModel[] = [];
+
+    // Provides UMB_VALIDATION_CONTEXT to the descendant settings form and its umb-property
+    // fields (the context API crosses shadow-DOM boundaries), so their mandatory validators
+    // register here and #onSubmit can gate submission on validate().
+    #validationContext = new UmbValidationContext(this);
 
     #catalogueRepo = new UaCatalogueRepository(this);
     #connectionRepo = new UaConnectionCollectionRepository(this);
@@ -92,7 +98,14 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
         this._connectionId = next === "" ? null : next;
     }
 
-    #onSubmit() {
+    async #onSubmit() {
+        try {
+            await this.#validationContext.validate();
+        } catch {
+            // Validation failed (e.g. a required field is empty) — keep the modal open
+            // so the field-level errors stay visible.
+            return;
+        }
         this.value = { settings: this._settings, connectionId: this._connectionId };
         this.modalContext?.submit();
     }
