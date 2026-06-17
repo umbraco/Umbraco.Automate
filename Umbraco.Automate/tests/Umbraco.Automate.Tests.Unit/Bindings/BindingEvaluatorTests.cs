@@ -8,13 +8,14 @@ namespace Umbraco.Automate.Tests.Unit.Bindings;
 public class BindingEvaluatorTests
 {
     private readonly BindingEvaluator _evaluator = new(
-    [
-        new TruncateFilter(),
-        new LowercaseFilter(),
-        new UppercaseFilter(),
-        new FallbackFilter(),
-        new StripHtmlFilter(),
-    ]);
+        new BindingFilterCollection(() =>
+        [
+            new TruncateFilter(),
+            new LowercaseFilter(),
+            new UppercaseFilter(),
+            new FallbackFilter(),
+            new StripHtmlFilter(),
+        ]));
 
     private readonly Dictionary<string, object?> _data = new()
     {

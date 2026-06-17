@@ -14,7 +14,7 @@ public sealed class BindingEvaluator
     /// Initializes a new instance of the <see cref="BindingEvaluator"/> class.
     /// </summary>
     /// <param name="filters">The available binding filters.</param>
-    public BindingEvaluator(IEnumerable<IBindingFilter> filters)
+    public BindingEvaluator(BindingFilterCollection filters)
     {
         _filters = filters.ToDictionary(f => f.Alias, StringComparer.OrdinalIgnoreCase);
     }
