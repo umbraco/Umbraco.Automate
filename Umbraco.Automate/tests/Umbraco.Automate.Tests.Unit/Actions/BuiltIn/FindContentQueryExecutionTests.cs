@@ -44,6 +44,12 @@ public sealed class FindContentQueryExecutionTests : IDisposable
             CreateItem("3", "Compress Archive"),
             CreateItem("4", "Homepage"),
         ]);
+
+        // LuceneIndex processes and commits index operations on a background thread, so a query
+        // issued immediately after IndexItems can race the writer and observe a partially built
+        // (or empty) index. Block until the queue is flushed so every test sees a fully committed
+        // index — without this the assertions pass locally but flake under CI load.
+        _index.WaitForChanges();
     }
 
     [Fact]
