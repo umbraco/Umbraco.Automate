@@ -36,6 +36,16 @@ public sealed class FindContentQueryExecutionTests : IDisposable
             "TestIndex",
             new TestOptionsMonitor(options.Value));
 
+        // LuceneIndex.RunAsync defaults to true, so IndexItems queues the work onto a background
+        // task and returns immediately — a query issued straight after observes an empty index and
+        // returns no results. (WaitForChanges is no help here: it only reopens the NRT reader once
+        // a generation has been written and the reopen thread exists, neither of which is true yet.)
+        // IndexOperationComplete fires when the background batch has finished writing, after which
+        // the first Searcher access reopens the reader to the committed generation. Blocking on it
+        // makes every test deterministic — without it the assertions pass locally but flake in CI.
+        using var indexingComplete = new ManualResetEventSlim(false);
+        _index.IndexOperationComplete += OnIndexOperationComplete;
+
         // Index a handful of content items mirroring how Umbraco indexes nodeName / __IndexType.
         _index.IndexItems(
         [
@@ -45,11 +55,14 @@ public sealed class FindContentQueryExecutionTests : IDisposable
             CreateItem("4", "Homepage"),
         ]);
 
-        // LuceneIndex processes and commits index operations on a background thread, so a query
-        // issued immediately after IndexItems can race the writer and observe a partially built
-        // (or empty) index. Block until the queue is flushed so every test sees a fully committed
-        // index — without this the assertions pass locally but flake under CI load.
-        _index.WaitForChanges();
+        if (!indexingComplete.Wait(TimeSpan.FromSeconds(30)))
+        {
+            throw new TimeoutException("Examine indexing did not complete within 30 seconds.");
+        }
+
+        _index.IndexOperationComplete -= OnIndexOperationComplete;
+
+        void OnIndexOperationComplete(object? sender, IndexOperationEventArgs e) => indexingComplete.Set();
     }
 
     [Fact]
