@@ -1,5 +1,7 @@
 using System.Globalization;
 using Examine;
+using Examine.Lucene.Providers;
+using Examine.Lucene.Search;
 using Examine.Search;
 using Lucene.Net.QueryParsers.Classic;
 using Microsoft.Extensions.Logging;
@@ -121,9 +123,7 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
         ISearchResults results;
         try
         {
-            results = index.Searcher
-                .CreateQuery()
-                .NativeQuery(query)
+            results = CreateNativeQuery(index.Searcher, query)
                 .Execute(QueryOptions.SkipTake(0, settings.Limit));
         }
         catch (Exception ex)
@@ -169,6 +169,40 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
             Matches = matches,
             LimitReached = preFilterCount >= settings.Limit,
         });
+    }
+
+    /// <summary>
+    /// Creates the native Examine query, enabling leading wildcards so the "Contains" match
+    /// mode (which emits <c>nodeName:*term*</c>) does not throw at runtime.
+    /// </summary>
+    /// <remarks>
+    /// Lucene's query parser rejects <c>*</c>/<c>?</c> as the first character of a wildcard
+    /// term by default ("'*' or '?' not allowed as first character in WildcardQuery"), which is
+    /// what broke the Contains mode (issue #90). Examine exposes this as the documented
+    /// <see cref="LuceneSearchOptions.AllowLeadingWildcard"/> option, but only the concrete
+    /// <see cref="BaseLuceneSearcher.CreateQuery(string, Examine.Search.BooleanOperation, Lucene.Net.Analysis.Analyzer, LuceneSearchOptions)"/>
+    /// overload accepts it — the <see cref="ISearcher"/> interface does not. We therefore cast
+    /// to <see cref="BaseLuceneSearcher"/> (always the case for Umbraco's Lucene-backed indexes)
+    /// and opt leading wildcards in. If a non-Lucene searcher is ever swapped in, we fall back
+    /// to the interface overload; the native query is then parsed by that provider's own rules.
+    /// Leading-wildcard queries can be slow on very large indexes — acceptable here because the
+    /// matched result set is capped by <see cref="MaxLimit"/> and the user explicitly opted into
+    /// a Contains search.
+    /// </remarks>
+    private static IBooleanOperation CreateNativeQuery(ISearcher searcher, string query)
+    {
+        if (searcher is BaseLuceneSearcher luceneSearcher)
+        {
+            return luceneSearcher
+                .CreateQuery(
+                    category: null,
+                    defaultOperation: BooleanOperation.And,
+                    luceneAnalyzer: luceneSearcher.LuceneAnalyzer,
+                    searchOptions: new LuceneSearchOptions { AllowLeadingWildcard = true })
+                .NativeQuery(query);
+        }
+
+        return searcher.CreateQuery().NativeQuery(query);
     }
 
     /// <summary>
