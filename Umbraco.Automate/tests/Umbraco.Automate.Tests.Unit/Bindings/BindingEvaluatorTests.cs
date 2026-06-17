@@ -17,6 +17,17 @@ public class BindingEvaluatorTests
             new StripHtmlFilter(),
         ]));
 
+    [Fact]
+    public void Constructor_Throws_WhenTwoFiltersShareAnAlias()
+    {
+        // Filters are auto-discovered across all assemblies, so a colliding alias must
+        // fail fast (and name both types) rather than silently shadow one filter.
+        var act = () => new BindingEvaluator(
+            new BindingFilterCollection(() => [new StripHtmlFilter(), new StripHtmlFilter()]));
+
+        act.ShouldThrow<InvalidOperationException>().Message.ShouldContain("stripHtml");
+    }
+
     private readonly Dictionary<string, object?> _data = new()
     {
         ["trigger"] = new Dictionary<string, object?>
