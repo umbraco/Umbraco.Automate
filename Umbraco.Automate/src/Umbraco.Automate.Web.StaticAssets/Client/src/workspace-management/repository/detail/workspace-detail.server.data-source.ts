@@ -82,9 +82,14 @@ export class UaWorkspaceDetailServerDataSource implements UmbDetailDataSource<Ua
     }
 
     async delete(unique: string) {
+        // Disable the built-in tryExecute notification so the delete entity action
+        // (UaDeleteActionBase) is the single place that surfaces the server's
+        // ProblemDetails title/detail (e.g. the 409 "Workspace not empty" error),
+        // avoiding a duplicate peek-error notification.
         const { error } = await tryExecute(
             this.#host,
             WorkspacesService.deleteWorkspacesById({ path: { id: unique } }),
+            { disableNotifications: true },
         );
 
         if (error) {
