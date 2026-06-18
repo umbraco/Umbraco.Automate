@@ -17,8 +17,8 @@ internal sealed class SettingsBindingResolver
     }
 
     /// <summary>
-    /// Walks the public string properties of <paramref name="settings"/> and evaluates
-    /// <c>${ }</c> bindings on those marked with <c>SupportsBindings = true</c>.
+    /// Walks the public string and <c>List&lt;string&gt;</c> properties of <paramref name="settings"/>
+    /// and evaluates <c>${ }</c> bindings on those marked with <c>SupportsBindings = true</c>.
     /// The settings object is mutated in-place.
     /// </summary>
     public void ResolveBindings(object settings, IReadOnlyDictionary<string, object?> bindingData)
@@ -27,7 +27,7 @@ internal sealed class SettingsBindingResolver
 
         foreach (var property in properties)
         {
-            if (property.PropertyType != typeof(string) || !property.CanRead || !property.CanWrite)
+            if (!property.CanRead)
             {
                 continue;
             }
@@ -38,14 +38,37 @@ internal sealed class SettingsBindingResolver
                 continue;
             }
 
-            var value = (string?)property.GetValue(settings);
-            if (string.IsNullOrEmpty(value))
+            if (property.PropertyType == typeof(string))
             {
-                continue;
-            }
+                if (!property.CanWrite)
+                {
+                    continue;
+                }
 
-            var resolved = _bindingEvaluator.Evaluate(value, bindingData);
-            property.SetValue(settings, resolved);
+                var value = (string?)property.GetValue(settings);
+                if (string.IsNullOrEmpty(value))
+                {
+                    continue;
+                }
+
+                property.SetValue(settings, _bindingEvaluator.Evaluate(value, bindingData));
+            }
+            else if (property.PropertyType == typeof(List<string>))
+            {
+                var list = (List<string>?)property.GetValue(settings);
+                if (list is null)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < list.Count; i++)
+                {
+                    if (!string.IsNullOrEmpty(list[i]))
+                    {
+                        list[i] = _bindingEvaluator.Evaluate(list[i], bindingData);
+                    }
+                }
+            }
         }
     }
 }
