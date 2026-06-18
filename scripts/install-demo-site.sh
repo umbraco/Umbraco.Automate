@@ -48,6 +48,29 @@ echo "========================================="
 echo "Working directory: $REPO_ROOT"
 echo ""
 
+# Toolchain check — required Node version comes from package.json's engines.node, so this
+# stays in lockstep with the npm-side enforcement and the .nvmrc.
+REQUIRED_NODE_RANGE=$(grep -oE '"node"[[:space:]]*:[[:space:]]*"[^"]+"' "$REPO_ROOT/package.json" | head -1 | grep -oE '"[^"]+"$' | tr -d '"')
+REQUIRED_NODE_MAJOR=$(echo "$REQUIRED_NODE_RANGE" | grep -oE '[0-9]+' | head -1)
+if [ -z "$REQUIRED_NODE_MAJOR" ]; then
+    echo "ERROR: Could not parse engines.node ('$REQUIRED_NODE_RANGE') from package.json." >&2
+    exit 1
+fi
+if ! command -v node >/dev/null 2>&1; then
+    echo "ERROR: Node.js is not installed or not on PATH. package.json requires '$REQUIRED_NODE_RANGE'." >&2
+    echo "Install Node $REQUIRED_NODE_MAJOR+ (e.g. 'nvm install $REQUIRED_NODE_MAJOR && nvm use $REQUIRED_NODE_MAJOR') and re-run." >&2
+    exit 1
+fi
+NODE_VERSION_RAW=$(node --version | sed 's/^v//')
+NODE_MAJOR=${NODE_VERSION_RAW%%.*}
+if [ "${NODE_MAJOR:-0}" -lt "$REQUIRED_NODE_MAJOR" ]; then
+    echo "ERROR: Node $NODE_VERSION_RAW detected; package.json requires '$REQUIRED_NODE_RANGE'." >&2
+    echo "Run 'nvm install $REQUIRED_NODE_MAJOR && nvm use $REQUIRED_NODE_MAJOR' (or equivalent) before re-running this script." >&2
+    exit 1
+fi
+echo "Node $NODE_VERSION_RAW detected (satisfies '$REQUIRED_NODE_RANGE')."
+echo ""
+
 # Check if demo already exists
 if [ -d "demo" ] && [ "$FORCE" = false ]; then
     echo "Demo folder already exists. Use --force to recreate."
@@ -68,7 +91,15 @@ fi
 # Step 1: Install Umbraco templates
 if [ "$SKIP_TEMPLATE_INSTALL" = false ]; then
     echo "Installing Umbraco templates..."
-    dotnet new install Umbraco.Templates --force
+    # Uninstall any existing version to avoid conflicts
+    echo "Removing any existing Umbraco.Templates installations..."
+    if dotnet new uninstall 2>&1 | grep -q "Umbraco\.Templates"; then
+        dotnet new uninstall Umbraco.Templates 2>/dev/null || true
+    fi
+    # Pin to 18.0.0-rc2 to match the Umbraco.Cms.Core minimum in Directory.Packages.props. v18 ships
+    # via the umbracoprereleases MyGet feed for now — drop the explicit pin (or move it forward) once
+    # v18 stable lands on nuget.org. Bump in lockstep when the CMS floor moves.
+    dotnet new install Umbraco.Templates::18.0.0-rc2 --force
 fi
 
 # Step 2: Create demo folder with build overrides
@@ -90,7 +121,8 @@ popd > /dev/null
 # Step 3.1: Install Clean starter kit
 echo "Installing Clean starter kit..."
 pushd "demo/Umbraco.Automate.DemoSite" > /dev/null
-dotnet add package Clean
+# --prerelease: the CMS-v18-compatible Clean (8.0.0-rc1) is still prerelease.
+dotnet add package Clean --prerelease
 popd > /dev/null
 
 # Step 3.2: Set fixed port for consistent development

@@ -18,6 +18,7 @@ using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Realtime;
 using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
+using Umbraco.Automate.Web.Api.Management.Common.Configuration;
 using Umbraco.Automate.Web.Api.Management.Common.Json;
 using Umbraco.Automate.Web.Api.Management.Run.Mapping;
 using Umbraco.Automate.Web.Api.Management.Connection.Mapping;
@@ -131,7 +132,7 @@ public static partial class UmbracoBuilderExtensions
                     options,
                     $"Describes the {Constants.ManagementApi.ApiTitle} available for managing automations, triggers, actions, and runs when authenticated as a backoffice user.");
                 PreserveAutomateSchemaIds(options);
-                NormalizeNumericSchemas(options);
+                AddAutomateSchemaTransformers(options);
             }));
 
         return builder;
@@ -148,6 +149,7 @@ public static partial class UmbracoBuilderExtensions
                     options,
                     "Public webhook endpoints for triggering automations from external systems. No authentication required.");
                 PreserveAutomateSchemaIds(options);
+                AddAutomateSchemaTransformers(options);
             }));
 
         builder.AddUmbracoAutomateWebhookRateLimiting();
@@ -192,28 +194,20 @@ public static partial class UmbracoBuilderExtensions
     }
 
     /// <summary>
-    /// Collapses the v18 numeric-as-string representation back to a plain numeric schema.
+    /// Registers the schema transformers that keep the v18 OpenAPI document — and the client generated from it —
+    /// shaped like the v17 (Swashbuckle) output, so no downstream UI changes are required.
     /// </summary>
-    /// <remarks>
-    /// Microsoft.AspNetCore.OpenApi widens numeric types (<c>int</c>, <c>long</c>, etc.) to
-    /// <c>type: ["integer"/"number","string"]</c> with a numeric pattern, to allow string-encoded values.
-    /// Swashbuckle emitted a plain numeric type in v17 and the generated client typed these as <c>number</c>;
-    /// keeping the string member widens them to <c>number | string</c> and breaks every consumer. Strip the
-    /// string member (and the now-redundant pattern) so the v17 shape is preserved.
-    /// </remarks>
-    private static void NormalizeNumericSchemas(OpenApiOptions options)
-        => options.AddSchemaTransformer((schema, _, _) =>
-        {
-            if (schema.Type is { } type
-                && type.HasFlag(JsonSchemaType.String)
-                && (type.HasFlag(JsonSchemaType.Integer) || type.HasFlag(JsonSchemaType.Number)))
-            {
-                schema.Type = type & ~JsonSchemaType.String;
-                schema.Pattern = null;
-            }
+    private static void AddAutomateSchemaTransformers(OpenApiOptions options)
+    {
+        // [Flags] enums (e.g. NotifyOn) -> string enum of member names instead of a bare `string`.
+        options.AddSchemaTransformer<FlagsEnumSchemaTransformer>();
 
-            return Task.CompletedTask;
-        });
+        // Custom-converter-backed properties (UTC DateTime, System.Type) -> string / date-time instead of `unknown`.
+        options.AddSchemaTransformer<ConverterBackedPropertySchemaTransformer>();
+
+        // Numeric `["integer"/"number","string"]` widening -> plain numeric (`number`, not `number | string`).
+        options.AddSchemaTransformer<NumericStringUnionSchemaTransformer>();
+    }
 
     private static IUmbracoBuilder AddUmbracoAutomateWebhookRateLimiting(this IUmbracoBuilder builder)
     {
@@ -266,13 +260,14 @@ public static partial class UmbracoBuilderExtensions
             {
                 ConfigureManagementApiJson(options.JsonSerializerOptions);
 
-                // Runtime-only: serialise DateTimes as UTC. These are deliberately NOT applied to the
-                // schema-generation options below — a custom JsonConverter<DateTime> erases the schema's
-                // "type" (leaving an untyped {format: date-time}, which generates as `unknown`). For schema
-                // purposes DateTime maps to string/date-time natively, which still matches the UTC string the
-                // converter emits at runtime.
-                options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
-                options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeJsonConverter());
+                // Runtime-only: alphabetise the JSON payload. Deliberately NOT applied to the schema-generation
+                // options so the OpenAPI document preserves v17's declaration property order — Swashbuckle did
+                // not honour this modifier, and reordering every model would churn the generated client without
+                // changing any of its types.
+                options.JsonSerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver
+                {
+                    Modifiers = { AlphabetizeProperties() },
+                };
             });
 
         // OpenAPI schema generation reads the *Http* JSON options selected via
@@ -292,13 +287,10 @@ public static partial class UmbracoBuilderExtensions
         options.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
         options.WriteIndented = false;
 
-        options.TypeInfoResolver = new DefaultJsonTypeInfoResolver
-        {
-            Modifiers = { AlphabetizeProperties() },
-        };
-
         options.Converters.Add(new JsonStringEnumConverter());
         options.Converters.Add(new JsonStringTypeConverter());
+        options.Converters.Add(new UtcDateTimeJsonConverter());
+        options.Converters.Add(new UtcNullableDateTimeJsonConverter());
     }
 
     private static Action<JsonTypeInfo> AlphabetizeProperties() =>

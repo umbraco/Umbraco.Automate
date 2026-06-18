@@ -6,80 +6,80 @@ export type ClientOptions = {
 
 export type ActionItemResponseModel = {
     alias: string;
-    connectionTypeAlias?: null | string;
+    name: string;
     description?: null | string;
     group?: null | string;
-    hasDynamicOutputSchema: boolean;
     icon?: null | string;
-    name: string;
+    connectionTypeAlias?: null | string;
+    settingsSchema?: null | EditableModelSchemaModel;
     outputSchema?: null | {
         [key: string]: unknown;
     };
-    settingsSchema?: null | EditableModelSchemaModel;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
 export type ApprovalDecisionRequestModel = {
-    comment?: null | string;
     outcome: ApprovalOutcomeModel;
+    comment?: null | string;
 };
 
 export type ApprovalOutcomeModel = 'Approved' | 'Rejected';
 
 export type AutomationAncestorResponseModel = {
-    entityType: string;
-    hasChildren: boolean;
     id: string;
-    isFolder: boolean;
+    entityType: string;
     name: string;
-    parentEntityType?: null | string;
     parentId?: null | string;
+    parentEntityType?: null | string;
+    hasChildren: boolean;
+    isFolder: boolean;
 };
 
 export type AutomationExportDefinitionModel = {
-    alias: string;
-    canvasState?: null | string;
-    connections: Array<StepConnectionModel>;
-    description?: null | string;
     id: string;
+    alias: string;
     name: string;
-    notificationSettings?: null | AutomationNotificationSettingsModel;
-    steps: Array<ExportStepModel>;
+    description?: null | string;
     trigger?: null | TriggerConfigurationModel;
+    steps: Array<ExportStepModel>;
+    connections: Array<StepConnectionModel>;
+    canvasState?: null | string;
+    notificationSettings?: null | AutomationNotificationSettingsModel;
 };
 
 export type AutomationExportModel = {
-    automation: AutomationExportDefinitionModel;
-    connectionReferences: Array<ConnectionReferenceModel>;
+    formatVersion: string;
     exportedAt: string;
     exportedFrom: ExportSourceModel;
-    formatVersion: string;
+    automation: AutomationExportDefinitionModel;
+    connectionReferences: Array<ConnectionReferenceModel>;
 };
 
 export type AutomationHealthModel = 'Healthy' | 'Degraded' | 'Disabled';
 
 export type AutomationImportResultModel = {
-    automationAlias?: null | string;
-    automationId?: null | string;
-    errors: Array<string>;
     success: boolean;
+    automationId?: null | string;
+    automationAlias?: null | string;
+    errors: Array<string>;
     warnings: Array<string>;
 };
 
 export type AutomationItemResponseModel = {
-    alias: string;
-    dateCreated: string;
-    dateModified: string;
-    description?: null | string;
-    groupId?: null | string;
-    health: AutomationHealthModel;
     id: string;
+    alias: string;
     name: string;
-    publishedVersion?: null | number;
+    description?: null | string;
+    workspaceId: string;
+    groupId?: null | string;
     status: AutomationStatusModel;
     triggerAlias?: null | string;
     version: number;
-    workspaceId: string;
+    publishedVersion?: null | number;
+    dateCreated: string;
+    dateModified: string;
+    health: AutomationHealthModel;
 };
 
 export type AutomationNotificationSettingsModel = {
@@ -87,45 +87,45 @@ export type AutomationNotificationSettingsModel = {
 };
 
 export type AutomationResponseModel = {
+    id: string;
     alias: string;
-    canvasState?: null | string;
+    name: string;
+    description?: null | string;
+    status: AutomationStatusModel;
+    publishedVersion?: null | number;
+    workspaceId: string;
+    groupId?: null | string;
+    trigger?: null | TriggerConfigurationModel;
+    steps: Array<StepConfigurationModel>;
     connections: Array<StepConnectionModel>;
+    canvasState?: null | string;
+    version: number;
     dateCreated: string;
     dateModified: string;
-    description?: null | string;
-    disabledUtc?: null | string;
-    groupId?: null | string;
-    health: AutomationHealthModel;
-    id: string;
-    name: string;
     notificationSettings?: null | AutomationNotificationSettingsModel;
-    publishedVersion?: null | number;
-    status: AutomationStatusModel;
-    steps: Array<StepConfigurationModel>;
-    trigger?: null | TriggerConfigurationModel;
-    version: number;
+    health: AutomationHealthModel;
     warningIssuedUtc?: null | string;
-    workspaceId: string;
+    disabledUtc?: null | string;
 };
 
 export type AutomationRunCountModel = {
     automationId: string;
     automationName: string;
-    failCount: number;
-    successCount: number;
     totalRuns: number;
+    successCount: number;
+    failCount: number;
 };
 
 export type AutomationRunResponseModel = {
+    id: string;
     automationId: string;
     automationVersion: number;
+    status: AutomationRunStatusModel;
+    startedUtc?: null | string;
     completedUtc?: null | string;
+    initiatedBy: string;
     correlationId?: null | string;
     error?: null | string;
-    id: string;
-    initiatedBy: string;
-    startedUtc?: null | string;
-    status: AutomationRunStatusModel;
     stepRuns: Array<StepRunResponseModel>;
 };
 
@@ -135,11 +135,11 @@ export type AutomationStatusModel = 'Draft' | 'Published' | 'Unpublished';
 
 export type ChannelConfigurationModel = {
     channelAlias: string;
-    isEnabled: boolean;
-    notifyOn: NotifyOnModel;
     settings: {
         [key: string]: unknown;
     };
+    isEnabled: boolean;
+    notifyOn: NotifyOnModel;
 };
 
 export type ConditionGroupModel = {
@@ -159,86 +159,86 @@ export type ConditionSetModel = {
 };
 
 export type ConnectionItemResponseModel = {
-    alias: string;
-    dateCreated: string;
-    dateModified: string;
     id: string;
+    alias: string;
     name: string;
     type: string;
     version: number;
+    dateCreated: string;
+    dateModified: string;
 };
 
 export type ConnectionReferenceModel = {
     alias: string;
-    name: string;
     type: string;
+    name: string;
 };
 
 export type ConnectionResponseModel = {
-    alias: string;
-    dateCreated: string;
-    dateModified: string;
     id: string;
+    alias: string;
     name: string;
+    type: string;
     settings: {
         [key: string]: unknown;
     };
-    type: string;
     version: number;
+    dateCreated: string;
+    dateModified: string;
 };
 
 export type ConnectionTypeItemResponseModel = {
     alias: string;
+    name: string;
     description?: null | string;
     group?: null | string;
     icon?: null | string;
-    name: string;
     settingsSchema?: null | EditableModelSchemaModel;
 };
 
 export type ConnectionValidationResponseModel = {
-    details: Array<string>;
-    message?: null | string;
     status: ConnectionValidationStatusModel;
+    message?: null | string;
+    details: Array<string>;
 };
 
 export type ConnectionValidationStatusModel = 'Success' | 'Warning' | 'Failure';
 
 export type ControlFlowItemResponseModel = {
     alias: string;
-    connectionTypeAlias?: null | string;
+    name: string;
     description?: null | string;
     group?: null | string;
-    hasDynamicOutputSchema: boolean;
     icon?: null | string;
-    name: string;
+    connectionTypeAlias?: null | string;
+    settingsSchema?: null | EditableModelSchemaModel;
     outputSchema?: null | {
         [key: string]: unknown;
     };
-    settingsSchema?: null | EditableModelSchemaModel;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
 export type CreateAutomationRequestModel = {
     alias: string;
-    canvasState?: null | string;
-    connections: Array<StepConnectionModel>;
-    description?: null | string;
-    groupId?: null | string;
     name: string;
-    notificationSettings?: null | AutomationNotificationSettingsModel;
-    steps: Array<StepConfigurationModel>;
-    trigger?: null | TriggerConfigurationModel;
+    description?: null | string;
     workspaceId: string;
+    groupId?: null | string;
+    trigger?: null | TriggerConfigurationModel;
+    steps: Array<StepConfigurationModel>;
+    connections: Array<StepConnectionModel>;
+    canvasState?: null | string;
+    notificationSettings?: null | AutomationNotificationSettingsModel;
 };
 
 export type CreateConnectionRequestModel = {
     alias: string;
     name: string;
+    type: string;
     settings: {
         [key: string]: unknown;
     };
-    type: string;
 };
 
 export type CreateWorkspaceGroupRequestModel = {
@@ -248,23 +248,23 @@ export type CreateWorkspaceGroupRequestModel = {
 
 export type CreateWorkspaceRequestModel = {
     alias: string;
-    allowedConnections: Array<string>;
     name: string;
     serviceAccountKey: string;
     userGroups: Array<string>;
+    allowedConnections: Array<string>;
 };
 
 export type EditableModelFieldDescriptorModel = {
-    defaultValue?: unknown;
-    description?: null | string;
-    editorConfig?: null | string;
-    editorUiAlias?: null | string;
-    group?: null | string;
-    isRequired: boolean;
-    isSensitive: boolean;
     key: string;
     label: string;
+    description?: null | string;
+    editorUiAlias?: null | string;
+    editorConfig?: null | string;
+    defaultValue?: unknown;
     sortOrder: number;
+    isSensitive: boolean;
+    isRequired: boolean;
+    group?: null | string;
     supportsBindings: boolean;
 };
 
@@ -273,26 +273,26 @@ export type EditableModelSchemaModel = {
 };
 
 export type EntityVersionComparisonResponseModel = {
-    changes: Array<ValueChangeModel>;
     fromVersion: number;
     toVersion: number;
+    changes: Array<ValueChangeModel>;
 };
 
 export type EntityVersionHistoryResponseModel = {
     currentVersion: number;
-    publishedVersion?: null | number;
     totalVersions: number;
+    publishedVersion?: null | number;
     versions: Array<EntityVersionResponseModel>;
 };
 
 export type EntityVersionResponseModel = {
-    changeDescription?: null | string;
-    createdByUserId?: null | string;
-    dateCreated: string;
-    entityId: string;
     id: string;
-    isPublished: boolean;
+    entityId: string;
     version: number;
+    dateCreated: string;
+    createdByUserId?: null | string;
+    changeDescription?: null | string;
+    isPublished: boolean;
 };
 
 export type ExportSourceModel = {
@@ -301,73 +301,73 @@ export type ExportSourceModel = {
 };
 
 export type ExportStepModel = {
+    id: string;
     actionAlias: string;
+    name: string;
     alias?: null | string;
     connectionAlias?: null | string;
-    errorBehavior: StepErrorBehaviorModel;
-    id: string;
-    inputMappings: {
-        [key: string]: string;
-    };
-    maxRetries?: null | number;
-    name: string;
-    position: StepPositionModel;
-    retryInterval?: null | string;
     settings: {
         [key: string]: unknown;
     };
+    inputMappings: {
+        [key: string]: string;
+    };
+    position: StepPositionModel;
+    errorBehavior: StepErrorBehaviorModel;
+    retryInterval?: null | string;
+    maxRetries?: null | number;
 };
 
 export type ImportAutomationRequestModel = {
-    exportModel: AutomationExportModel;
     workspaceId: string;
+    exportModel: AutomationExportModel;
 };
 
 export type NotificationChannelItemResponseModel = {
     alias: string;
+    name: string;
     description?: null | string;
     icon?: null | string;
-    name: string;
     settingsSchema?: null | EditableModelSchemaModel;
 };
 
-export type NotifyOnModel = string;
+export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered' | 'Disabled' | 'Warning' | 'ReEnabled' | 'Resumed';
 
 export type PagedAutomationItemResponseModel = {
-    items: Array<AutomationItemResponseModel>;
     total: number;
+    items: Array<AutomationItemResponseModel>;
 };
 
 export type PagedAutomationRunResponseModel = {
-    items: Array<AutomationRunResponseModel>;
     total: number;
+    items: Array<AutomationRunResponseModel>;
 };
 
 export type PagedConnectionItemResponseModel = {
-    items: Array<ConnectionItemResponseModel>;
     total: number;
+    items: Array<ConnectionItemResponseModel>;
 };
 
 export type PagedWorkspaceItemResponseModel = {
-    items: Array<WorkspaceItemResponseModel>;
     total: number;
+    items: Array<WorkspaceItemResponseModel>;
 };
 
 export type PendingApprovalResponseModel = {
+    runId: string;
+    stepId: string;
     automationId: string;
     automationName: string;
     prompt?: null | string;
     requestedUtc?: null | string;
-    runId: string;
-    stepId: string;
 };
 
 export type ProblemDetails = {
+    type?: null | string;
+    title?: null | string;
+    status?: null | number;
     detail?: null | string;
     instance?: null | string;
-    status?: null | number;
-    title?: null | string;
-    type?: null | string;
 };
 
 export type ResolveOutputSchemaRequestModel = {
@@ -377,38 +377,38 @@ export type ResolveOutputSchemaRequestModel = {
 };
 
 export type RunSummaryModel = {
+    totalRuns: number;
     byStatus: {
         [key: string]: number;
     };
     successRate: number;
-    totalRuns: number;
 };
 
 export type StepConfigurationModel = {
+    id: string;
     actionAlias: string;
+    name: string;
     alias?: null | string;
     connectionId?: null | string;
-    errorBehavior: StepErrorBehaviorModel;
-    id: string;
-    inputMappings: {
-        [key: string]: string;
-    };
-    maxRetries?: null | number;
-    name: string;
-    position: StepPositionModel;
-    retryInterval?: null | string;
     settings: {
         [key: string]: unknown;
     };
+    inputMappings: {
+        [key: string]: string;
+    };
+    position: StepPositionModel;
+    errorBehavior: StepErrorBehaviorModel;
+    retryInterval?: null | string;
+    maxRetries?: null | number;
 };
 
 export type StepConnectionModel = {
-    filter?: null | ConditionSetModel;
-    outcome?: null | string;
-    sourceHandle?: null | string;
     sourceStepId: string;
-    targetHandle?: null | string;
+    sourceHandle?: null | string;
     targetStepId: string;
+    targetHandle?: null | string;
+    outcome?: null | string;
+    filter?: null | ConditionSetModel;
 };
 
 export type StepErrorBehaviorModel = 'Retry' | 'Suspend' | 'Terminate' | 'Compensate';
@@ -419,76 +419,76 @@ export type StepPositionModel = {
 };
 
 export type StepRunResponseModel = {
-    actionAlias: string;
-    completedUtc?: null | string;
-    durationMs?: null | number;
-    error?: null | string;
     id: string;
-    retryCount: number;
-    startedUtc?: null | string;
-    status: StepRunStatusModel;
     stepId: string;
+    actionAlias: string;
+    status: StepRunStatusModel;
+    startedUtc?: null | string;
+    completedUtc?: null | string;
+    error?: null | string;
+    retryCount: number;
+    durationMs?: null | number;
 };
 
 export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput' | 'Sleeping';
 
 export type StepTypeItemResponseModel = {
     alias: string;
-    connectionTypeAlias?: null | string;
+    name: string;
     description?: null | string;
     group?: null | string;
-    hasDynamicOutputSchema: boolean;
     icon?: null | string;
-    name: string;
+    connectionTypeAlias?: null | string;
+    settingsSchema?: null | EditableModelSchemaModel;
     outputSchema?: null | {
         [key: string]: unknown;
     };
-    settingsSchema?: null | EditableModelSchemaModel;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
 export type TriggerConfigurationModel = {
+    triggerAlias: string;
     settings: {
         [key: string]: unknown;
     };
-    triggerAlias: string;
 };
 
 export type TriggerItemResponseModel = {
     alias: string;
-    connectionTypeAlias?: null | string;
+    name: string;
     description?: null | string;
     group?: null | string;
-    hasDynamicOutputSchema: boolean;
     icon?: null | string;
-    name: string;
+    connectionTypeAlias?: null | string;
+    settingsSchema?: null | EditableModelSchemaModel;
     outputSchema?: null | {
         [key: string]: unknown;
     };
-    settingsSchema?: null | EditableModelSchemaModel;
+    hasDynamicOutputSchema: boolean;
     type: string;
 };
 
 export type UpdateAutomationRequestModel = {
     alias: string;
-    canvasState?: null | string;
-    connections: Array<StepConnectionModel>;
+    name: string;
     description?: null | string;
     groupId?: null | string;
-    name: string;
-    notificationSettings?: null | AutomationNotificationSettingsModel;
-    steps: Array<StepConfigurationModel>;
     trigger?: null | TriggerConfigurationModel;
+    steps: Array<StepConfigurationModel>;
+    connections: Array<StepConnectionModel>;
+    canvasState?: null | string;
+    notificationSettings?: null | AutomationNotificationSettingsModel;
     version: number;
 };
 
 export type UpdateConnectionRequestModel = {
     alias: string;
     name: string;
+    type: string;
     settings: {
         [key: string]: unknown;
     };
-    type: string;
     version: number;
 };
 
@@ -499,54 +499,54 @@ export type UpdateWorkspaceGroupRequestModel = {
 
 export type UpdateWorkspaceRequestModel = {
     alias: string;
-    allowedConnections: Array<string>;
     name: string;
     serviceAccountKey: string;
     userGroups: Array<string>;
+    allowedConnections: Array<string>;
     version: number;
 };
 
 export type ValueChangeModel = {
-    newValue?: null | string;
-    oldValue?: null | string;
     path: string;
+    oldValue?: null | string;
+    newValue?: null | string;
 };
 
 export type WebhookAuthenticatorItemResponseModel = {
     alias: string;
-    description?: null | string;
     name: string;
+    description?: null | string;
     settingsSchema?: null | EditableModelSchemaModel;
 };
 
 export type WorkspaceGroupResponseModel = {
-    dateCreated: string;
     id: string;
     name: string;
     parentId?: null | string;
     workspaceId: string;
+    dateCreated: string;
 };
 
 export type WorkspaceItemResponseModel = {
-    alias: string;
-    dateCreated: string;
-    dateModified: string;
     id: string;
+    alias: string;
     name: string;
     serviceAccountKey: string;
     version: number;
+    dateCreated: string;
+    dateModified: string;
 };
 
 export type WorkspaceResponseModel = {
-    alias: string;
-    allowedConnections: Array<string>;
-    dateCreated: string;
-    dateModified: string;
     id: string;
+    alias: string;
     name: string;
     serviceAccountKey: string;
     userGroups: Array<string>;
+    allowedConnections: Array<string>;
     version: number;
+    dateCreated: string;
+    dateModified: string;
 };
 
 export type PostApprovalsByRunIdStepsByStepIdDecisionData = {
@@ -1550,8 +1550,8 @@ export type GetMetricsData = {
     path?: never;
     query?: {
         workspaceId?: string;
-        from?: string;
-        to?: string;
+        from?: unknown;
+        to?: unknown;
     };
     url: '/umbraco/automate/management/api/v1/metrics';
 };
@@ -1577,8 +1577,8 @@ export type GetMetricsByAutomationData = {
     path?: never;
     query?: {
         workspaceId?: string;
-        from?: string;
-        to?: string;
+        from?: unknown;
+        to?: unknown;
         take?: number;
     };
     url: '/umbraco/automate/management/api/v1/metrics/by-automation';
