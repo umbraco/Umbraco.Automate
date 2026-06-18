@@ -5,16 +5,16 @@
     "scripts": {
         "watch": "tsc && vite build --watch",
         "build": "tsc && vite build",
-        "generate-client": "node scripts/generate-openapi.js https://localhost:44380/umbraco/swagger/automate-management/swagger.json"
+        "generate-client": "node scripts/generate-openapi.js https://localhost:44380/umbraco/openapi/automate-management.json"
     },
     "dependencies": {
-        "@umbraco-cms/backoffice": "^17.4.0",
+        "@umbraco-cms/backoffice": "^18.0.0-rc2",
         "@xyflow/react": "^12.10.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4"
     },
     "devDependencies": {
-        "@hey-api/openapi-ts": "^0.96.0",
+        "@hey-api/openapi-ts": "^0.97.0",
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.1.4",
