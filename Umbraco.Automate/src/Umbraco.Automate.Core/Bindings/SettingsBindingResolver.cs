@@ -17,8 +17,11 @@ internal sealed class SettingsBindingResolver
     }
 
     /// <summary>
-    /// Walks the public string and <c>List&lt;string&gt;</c> properties of <paramref name="settings"/>
-    /// and evaluates <c>${ }</c> bindings on those marked with <c>SupportsBindings = true</c>.
+    /// Walks the public properties of <paramref name="settings"/> and evaluates <c>${ }</c> bindings
+    /// on those marked with <c>SupportsBindings = true</c>. Supports plain <c>string</c> properties
+    /// and any property whose value implements <see cref="IList{T}"/> of <c>string</c> — covering
+    /// <c>List&lt;string&gt;</c>, <c>string[]</c>, and other settable string collections alike,
+    /// rather than enumerating concrete collection types one by one.
     /// The settings object is mutated in-place.
     /// </summary>
     public void ResolveBindings(object settings, IReadOnlyDictionary<string, object?> bindingData)
@@ -38,36 +41,26 @@ internal sealed class SettingsBindingResolver
                 continue;
             }
 
-            if (property.PropertyType == typeof(string))
+            switch (property.GetValue(settings))
             {
-                if (!property.CanWrite)
-                {
-                    continue;
-                }
+                case string value when property.CanWrite && !string.IsNullOrEmpty(value):
+                    property.SetValue(settings, _bindingEvaluator.Evaluate(value, bindingData));
+                    break;
 
-                var value = (string?)property.GetValue(settings);
-                if (string.IsNullOrEmpty(value))
-                {
-                    continue;
-                }
-
-                property.SetValue(settings, _bindingEvaluator.Evaluate(value, bindingData));
+                case IList<string> list:
+                    ResolveListBindings(list, bindingData);
+                    break;
             }
-            else if (property.PropertyType == typeof(List<string>))
-            {
-                var list = (List<string>?)property.GetValue(settings);
-                if (list is null)
-                {
-                    continue;
-                }
+        }
+    }
 
-                for (var i = 0; i < list.Count; i++)
-                {
-                    if (!string.IsNullOrEmpty(list[i]))
-                    {
-                        list[i] = _bindingEvaluator.Evaluate(list[i], bindingData);
-                    }
-                }
+    private void ResolveListBindings(IList<string> list, IReadOnlyDictionary<string, object?> bindingData)
+    {
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (!string.IsNullOrEmpty(list[i]))
+            {
+                list[i] = _bindingEvaluator.Evaluate(list[i], bindingData);
             }
         }
     }
