@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Cms.Api.Common.Builders;
 using Umbraco.Cms.Core.Security;
 
 namespace Umbraco.Automate.Web.Api.Management.Workspace.Controllers;
@@ -50,12 +51,10 @@ public sealed class DeleteWorkspaceController : WorkspaceControllerBase
 
         if (await _automationService.ExistsByWorkspaceAsync(id, cancellationToken))
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Workspace not empty",
-                Detail = "Cannot delete a workspace that contains automations. Delete or move the automations first.",
-                Status = StatusCodes.Status409Conflict,
-            });
+            return Conflict(new ProblemDetailsBuilder()
+                .WithTitle("Workspace not empty")
+                .WithDetail("Cannot delete a workspace that contains automations. Delete or move the automations first.")
+                .Build());
         }
 
         var deleted = await _workspaceService.DeleteWorkspaceAsync(id, cancellationToken);

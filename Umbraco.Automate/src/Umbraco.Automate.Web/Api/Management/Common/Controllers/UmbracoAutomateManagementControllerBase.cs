@@ -89,12 +89,10 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
     /// Returns a 409 Conflict response for an optimistic concurrency violation.
     /// </summary>
     protected IActionResult ConcurrencyConflict(string entityName)
-        => Conflict(new ProblemDetails
-        {
-            Title = "Concurrency conflict",
-            Detail = $"The {entityName} was modified by another request. Reload and try again.",
-            Status = StatusCodes.Status409Conflict,
-        });
+        => Conflict(new ProblemDetailsBuilder()
+            .WithTitle("Concurrency conflict")
+            .WithDetail($"The {entityName} was modified by another request. Reload and try again.")
+            .Build());
 
     /// <summary>
     /// Authorizes workspace access for the current user. Returns <c>null</c> if authorized,
