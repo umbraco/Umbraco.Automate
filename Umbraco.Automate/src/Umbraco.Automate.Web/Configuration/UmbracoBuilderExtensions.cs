@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Realtime;
@@ -130,6 +131,7 @@ public static partial class UmbracoBuilderExtensions
                     options,
                     $"Describes the {Constants.ManagementApi.ApiTitle} available for managing automations, triggers, actions, and runs when authenticated as a backoffice user.");
                 PreserveAutomateSchemaIds(options);
+                NormalizeNumericSchemas(options);
             }));
 
         return builder;
@@ -189,6 +191,30 @@ public static partial class UmbracoBuilderExtensions
         return targetType.Namespace?.StartsWith(Constants.AppNamespaceRoot) is true;
     }
 
+    /// <summary>
+    /// Collapses the v18 numeric-as-string representation back to a plain numeric schema.
+    /// </summary>
+    /// <remarks>
+    /// Microsoft.AspNetCore.OpenApi widens numeric types (<c>int</c>, <c>long</c>, etc.) to
+    /// <c>type: ["integer"/"number","string"]</c> with a numeric pattern, to allow string-encoded values.
+    /// Swashbuckle emitted a plain numeric type in v17 and the generated client typed these as <c>number</c>;
+    /// keeping the string member widens them to <c>number | string</c> and breaks every consumer. Strip the
+    /// string member (and the now-redundant pattern) so the v17 shape is preserved.
+    /// </remarks>
+    private static void NormalizeNumericSchemas(OpenApiOptions options)
+        => options.AddSchemaTransformer((schema, _, _) =>
+        {
+            if (schema.Type is { } type
+                && type.HasFlag(JsonSchemaType.String)
+                && (type.HasFlag(JsonSchemaType.Integer) || type.HasFlag(JsonSchemaType.Number)))
+            {
+                schema.Type = type & ~JsonSchemaType.String;
+                schema.Pattern = null;
+            }
+
+            return Task.CompletedTask;
+        });
+
     private static IUmbracoBuilder AddUmbracoAutomateWebhookRateLimiting(this IUmbracoBuilder builder)
     {
         builder.Services.AddRateLimiter(options =>
@@ -234,25 +260,45 @@ public static partial class UmbracoBuilderExtensions
 
     private static IUmbracoBuilder AddUmbracoAutomateJsonOptions(this IUmbracoBuilder builder)
     {
+        // Runtime serialization for controllers tagged [JsonOptionsName(ApiName)] (MVC JSON options).
         builder.Services.AddControllers()
             .AddJsonOptions(Constants.ManagementApi.ApiName, options =>
             {
-                options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-                options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
-                options.JsonSerializerOptions.WriteIndented = false;
+                ConfigureManagementApiJson(options.JsonSerializerOptions);
 
-                options.JsonSerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver
-                {
-                    Modifiers = { AlphabetizeProperties() },
-                };
-
-                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-                options.JsonSerializerOptions.Converters.Add(new JsonStringTypeConverter());
+                // Runtime-only: serialise DateTimes as UTC. These are deliberately NOT applied to the
+                // schema-generation options below — a custom JsonConverter<DateTime> erases the schema's
+                // "type" (leaving an untyped {format: date-time}, which generates as `unknown`). For schema
+                // purposes DateTime maps to string/date-time natively, which still matches the UTC string the
+                // converter emits at runtime.
                 options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
                 options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeJsonConverter());
             });
 
+        // OpenAPI schema generation reads the *Http* JSON options selected via
+        // BackOfficeOpenApiDocumentBuilder.WithJsonOptions, NOT the MVC options above. Configure the
+        // same named Http options so the generated schema matches runtime serialization — otherwise
+        // enums render as bare integers and the generated client diverges from the API.
+        builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(
+            Constants.ManagementApi.ApiName,
+            options => ConfigureManagementApiJson(options.SerializerOptions));
+
         return builder;
+    }
+
+    private static void ConfigureManagementApiJson(JsonSerializerOptions options)
+    {
+        options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+        options.WriteIndented = false;
+
+        options.TypeInfoResolver = new DefaultJsonTypeInfoResolver
+        {
+            Modifiers = { AlphabetizeProperties() },
+        };
+
+        options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new JsonStringTypeConverter());
     }
 
     private static Action<JsonTypeInfo> AlphabetizeProperties() =>
