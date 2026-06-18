@@ -104,6 +104,44 @@ public class SettingsBindingResolverTests
         settings.Message.ShouldBe("HELLO WORLD");
     }
 
+    [Fact]
+    public void ResolveBindings_ResolvesBindingsInListItems()
+    {
+        var settings = new MarkedListSettings
+        {
+            Columns = ["HELLO ${ trigger.name }", "no binding here", "${ trigger.key }"],
+        };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.Columns.ShouldBe(["HELLO Hello World", "no binding here", "abc-123"]);
+    }
+
+    [Fact]
+    public void ResolveBindings_SkipsUnmarkedListProperty()
+    {
+        var settings = new MixedListSettings
+        {
+            Marked = ["${ trigger.name }"],
+            Unmarked = ["${ trigger.name }"],
+        };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.Marked.ShouldBe(["Hello World"]);
+        settings.Unmarked.ShouldBe(["${ trigger.name }"]);
+    }
+
+    [Fact]
+    public void ResolveBindings_SkipsNullOrEmptyListItems()
+    {
+        var settings = new MarkedListSettings { Columns = [null!, string.Empty, "${ trigger.name }"] };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.Columns.ShouldBe([null!, string.Empty, "Hello World"]);
+    }
+
     // --- Test settings POCOs ---
 
     private sealed class MarkedSettings
@@ -130,5 +168,20 @@ public class SettingsBindingResolverTests
     private sealed class NoAttributeSettings
     {
         public string Value { get; set; } = string.Empty;
+    }
+
+    private sealed class MarkedListSettings
+    {
+        [Field(SupportsBindings = true)]
+        public List<string> Columns { get; set; } = [];
+    }
+
+    private sealed class MixedListSettings
+    {
+        [Field(SupportsBindings = true)]
+        public List<string> Marked { get; set; } = [];
+
+        [Field]
+        public List<string> Unmarked { get; set; } = [];
     }
 }
