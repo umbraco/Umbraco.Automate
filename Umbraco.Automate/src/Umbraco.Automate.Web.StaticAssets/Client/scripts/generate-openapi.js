@@ -48,11 +48,8 @@ fetch(swaggerUrl)
                 "@hey-api/client-fetch",
                 {
                     name: "@hey-api/sdk",
-                    operations: {
-                        strategy: "byTags",
-                        container: "class",
-                        containerName: "{{name}}Service",
-                    },
+                    asClass: true,
+                    classNameBuilder: "{{name}}Service",
                 },
             ],
         });
