@@ -142,6 +142,21 @@ public class SettingsBindingResolverTests
         settings.Columns.ShouldBe([null!, string.Empty, "Hello World"]);
     }
 
+    [Fact]
+    public void ResolveBindings_ResolvesBindingsInArrayItems()
+    {
+        // Proves the fix is generic over any IList<string> — not specific to List<string> —
+        // by exercising a plain string[] through the same code path.
+        var settings = new MarkedArraySettings
+        {
+            Columns = ["HELLO ${ trigger.name }", "no binding here", "${ trigger.key }"],
+        };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.Columns.ShouldBe(["HELLO Hello World", "no binding here", "abc-123"]);
+    }
+
     // --- Test settings POCOs ---
 
     private sealed class MarkedSettings
@@ -183,5 +198,11 @@ public class SettingsBindingResolverTests
 
         [Field]
         public List<string> Unmarked { get; set; } = [];
+    }
+
+    private sealed class MarkedArraySettings
+    {
+        [Field(SupportsBindings = true)]
+        public string[] Columns { get; set; } = [];
     }
 }
