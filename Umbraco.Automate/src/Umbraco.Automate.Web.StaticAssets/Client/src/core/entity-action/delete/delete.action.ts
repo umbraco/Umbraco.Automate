@@ -41,7 +41,7 @@ export abstract class UaDeleteActionBase extends UmbEntityActionBase<never> {
             const detail = apiError.problemDetails?.detail ?? apiError.detail;
             await umbPeekError(this, {
                 headline: title ?? "Error",
-                message: detail ?? title ?? "The item could not be deleted.",
+                message: detail ?? "The item could not be deleted.",
             });
             throw error;
         }
