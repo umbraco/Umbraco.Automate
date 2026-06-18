@@ -89,7 +89,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         services.AddSingleton(middlewareCollection);
         var controlFlow = new ControlFlowCollection(Enumerable.Empty<IControlFlow>);
         services.AddSingleton(controlFlow);
-        services.AddSingleton(new BindingEvaluator(Array.Empty<IBindingFilter>()));
+        services.AddSingleton(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
         services.AddSingleton<SettingsBindingResolver>();
         services.AddSingleton<ConditionEvaluator>();
         services.AddSingleton<ActionMiddlewarePipeline>();

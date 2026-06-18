@@ -80,7 +80,8 @@ public static partial class UmbracoBuilderExtensions
             .Add<HmacSha256WebhookAuthenticator>();
         builder.AutomateTriggerDispatchAuthorizers()
             .Add<NodeScopedTriggerDispatchAuthorizer>();
-        builder.AutomateBindingFilters();
+        builder.AutomateBindingFilters()
+            .Add(() => builder.TypeLoader.GetTypes<IBindingFilter>());
         builder.AutomateVersionableEntityAdapters()
             .Add<AutomationVersionableEntityAdapter>()
             .Add<WorkspaceVersionableEntityAdapter>()

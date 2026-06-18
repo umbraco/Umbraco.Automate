@@ -8,13 +8,25 @@ namespace Umbraco.Automate.Tests.Unit.Bindings;
 public class BindingEvaluatorTests
 {
     private readonly BindingEvaluator _evaluator = new(
-    [
-        new TruncateFilter(),
-        new LowercaseFilter(),
-        new UppercaseFilter(),
-        new FallbackFilter(),
-        new StripHtmlFilter(),
-    ]);
+        new BindingFilterCollection(() =>
+        [
+            new TruncateFilter(),
+            new LowercaseFilter(),
+            new UppercaseFilter(),
+            new FallbackFilter(),
+            new StripHtmlFilter(),
+        ]));
+
+    [Fact]
+    public void Constructor_Throws_WhenTwoFiltersShareAnAlias()
+    {
+        // Filters are auto-discovered across all assemblies, so a colliding alias must
+        // fail fast (and name both types) rather than silently shadow one filter.
+        var act = () => new BindingEvaluator(
+            new BindingFilterCollection(() => [new StripHtmlFilter(), new StripHtmlFilter()]));
+
+        act.ShouldThrow<InvalidOperationException>().Message.ShouldContain("stripHtml");
+    }
 
     private readonly Dictionary<string, object?> _data = new()
     {

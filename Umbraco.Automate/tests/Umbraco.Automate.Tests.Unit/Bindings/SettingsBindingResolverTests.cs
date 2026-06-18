@@ -8,7 +8,7 @@ namespace Umbraco.Automate.Tests.Unit.Bindings;
 public class SettingsBindingResolverTests
 {
     private readonly SettingsBindingResolver _resolver = new(
-        new BindingEvaluator([new UppercaseFilter()]));
+        new BindingEvaluator(new BindingFilterCollection(() => [new UppercaseFilter()])));
 
     private readonly Dictionary<string, object?> _data = new()
     {
