@@ -58,7 +58,7 @@ Provider credentials are configured via `appsettings.json`:
 
 - Umbraco.Automate.Core
 - Umbraco.Automate.OpenIddict
-- OpenIddict.Client.WebIntegration 7.2.x
+- OpenIddict.Client.WebIntegration 7.5.x
 
 ## Commit Scopes
 
