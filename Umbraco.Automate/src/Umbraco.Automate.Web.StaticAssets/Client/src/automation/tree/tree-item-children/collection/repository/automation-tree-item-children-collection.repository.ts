@@ -21,17 +21,12 @@ export class UaAutomationTreeItemChildrenCollectionRepository
 
         const parent: UmbEntityModel = { entityType, unique };
 
+        const paging = { skip: filter.skip ?? 0, take: filter.take ?? 100 };
+
         if (parent.unique === null) {
-            return this.#treeRepository.requestTreeRootItems({
-                skip: filter.skip,
-                take: filter.take,
-            });
+            return this.#treeRepository.requestTreeRootItems({ paging });
         } else {
-            return this.#treeRepository.requestTreeItemsOf({
-                parent,
-                skip: filter.skip,
-                take: filter.take,
-            });
+            return this.#treeRepository.requestTreeItemsOf({ parent, paging });
         }
     }
 }

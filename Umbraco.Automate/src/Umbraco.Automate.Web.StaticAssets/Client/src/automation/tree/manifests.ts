@@ -4,7 +4,6 @@ import {
     UA_AUTOMATION_PENDING_CHANGES_FLAG,
     UA_AUTOMATION_TREE_ALIAS,
     UA_AUTOMATION_TREE_REPOSITORY_ALIAS,
-    UA_AUTOMATION_TREE_STORE_ALIAS,
 } from "./constants.js";
 import { UA_AUTOMATION_ENTITY_TYPE, UA_AUTOMATION_GROUP_ENTITY_TYPE } from "../entity.js";
 import { UA_AUTOMATION_GROUP_WORKSPACE_ALIAS } from "../workspace/constants.js";
@@ -39,12 +38,6 @@ export const automationTreeManifests: Array<UmbExtensionManifest> = [
         alias: UA_AUTOMATION_TREE_REPOSITORY_ALIAS,
         name: "Automation Tree Repository",
         api: () => import("./automation-tree.repository.js"),
-    },
-    {
-        type: "store",
-        alias: UA_AUTOMATION_TREE_STORE_ALIAS,
-        name: "Automation Tree Store",
-        api: () => import("./automation-tree.store.js"),
     },
     {
         type: "tree",

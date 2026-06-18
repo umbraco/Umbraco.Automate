@@ -38,6 +38,8 @@ export class UaWorkspaceMgmtTreeServerDataSource
         return {
             data: {
                 total: data.total,
+                totalBefore: 0,
+                totalAfter: 0,
                 items: data.items.map((item) => this.#mapItem(item)),
             },
         };
@@ -48,6 +50,8 @@ export class UaWorkspaceMgmtTreeServerDataSource
         return {
             data: {
                 total: 0,
+                totalBefore: 0,
+                totalAfter: 0,
                 items: [] as UaWorkspaceMgmtTreeItemModel[],
             },
         };
