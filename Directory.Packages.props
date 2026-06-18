@@ -15,21 +15,26 @@
   </ItemGroup>
 
   <!-- Umbraco CMS -->
+  <!-- Tracking 18.0.0-rc2 during development; flip the floor to 18.0.0 before the release branch is cut. -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Cms.Core" Version="[17.4.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="[17.4.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[17.4.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[17.4.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[17.4.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="[17.4.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[17.4.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Core" Version="[18.0.0-rc2, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="[18.0.0-rc2, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[18.0.0-rc2, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[18.0.0-rc2, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[18.0.0-rc2, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="[18.0.0-rc2, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="[18.0.0-rc2, 18.999.999)" />
+  </ItemGroup>
+
+  <!-- OpenAPI (replaces Swashbuckle, which CMS v18 no longer ships transitively) -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[10.0.7, 10.999.999)" />
   </ItemGroup>
 
   <!-- Inter-product (Umbraco.Automate) -->
-  <!-- Prerelease lower bound so the 17.0.0-beta packages satisfy each other's ranges -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[17.0.0-beta, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[17.0.0-beta, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.0.0, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[18.0.0, 18.999.999)" />
   </ItemGroup>
 
   <!-- WorkflowCore (automation engine) -->
@@ -49,20 +54,21 @@
 
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
-    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.4.0, 7.999.999)" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.4.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.5.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.5.0, 7.999.999)" />
   </ItemGroup>
 
 <!-- Shared dependencies -->
+  <!-- 10.0.7 floor matches the .NET runtime libraries Umbraco.Cms 18.0.0-rc2 bundles; keep in lockstep with the host CMS. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.6, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.6, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.6, 10.999.999)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.7, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.7, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.7, 10.999.999)" />
   </ItemGroup>
 
   <!-- Test dependencies -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="[10.0.2, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="[10.0.7, 10.999.999)" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Shouldly" Version="4.2.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
