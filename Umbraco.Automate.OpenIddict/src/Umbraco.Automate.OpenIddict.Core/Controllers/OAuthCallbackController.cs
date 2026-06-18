@@ -51,6 +51,12 @@ public sealed class OAuthCallbackController : ControllerBase
             return Content(BuildPopupHtml(success: false, error: "No access token received."), "text/html");
         }
 
+        // The {provider} route segment is the lowercased convention used for the callback URL
+        // (see OpenIddictClientCredentialsConfigurator), not the registration's actual ProviderName.
+        // Use the original-case value OpenIddict round-tripped through the authentication
+        // properties so RefreshAccessTokenAsync's later case-sensitive registration lookup succeeds.
+        var resolvedProvider = result.Properties?.GetString(Properties.ProviderName) ?? provider;
+
         // Extract optional well-known properties that providers may set via event handlers.
         string? userAccessToken = null, accountLabel = null, scopes = null;
         var items = result.Properties?.Items;
@@ -60,7 +66,7 @@ public sealed class OAuthCallbackController : ControllerBase
 
         var credential = new OAuthCredentials
         {
-            Provider = provider,
+            Provider = resolvedProvider,
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             UserAccessToken = !string.IsNullOrEmpty(userAccessToken) ? userAccessToken : null,
