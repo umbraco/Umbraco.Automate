@@ -202,9 +202,6 @@ public static partial class UmbracoBuilderExtensions
         // [Flags] enums (e.g. NotifyOn) -> string enum of member names instead of a bare `string`.
         options.AddSchemaTransformer<FlagsEnumSchemaTransformer>();
 
-        // Custom-converter-backed properties (UTC DateTime, System.Type) -> string / date-time instead of `unknown`.
-        options.AddSchemaTransformer<ConverterBackedPropertySchemaTransformer>();
-
         // Numeric `["integer"/"number","string"]` widening -> plain numeric (`number`, not `number | string`).
         options.AddSchemaTransformer<NumericStringUnionSchemaTransformer>();
     }
@@ -260,14 +257,21 @@ public static partial class UmbracoBuilderExtensions
             {
                 ConfigureManagementApiJson(options.JsonSerializerOptions);
 
-                // Runtime-only: alphabetise the JSON payload. Deliberately NOT applied to the schema-generation
-                // options so the OpenAPI document preserves v17's declaration property order — Swashbuckle did
-                // not honour this modifier, and reordering every model would churn the generated client without
-                // changing any of its types.
+                // Runtime-only settings, deliberately NOT applied to the schema-generation options so the v18
+                // OpenAPI document stays equivalent to v17 (and the generated client doesn't churn):
+                //  - AlphabetizeProperties reorders the JSON payload, but v17's Swashbuckle schema used
+                //    declaration order; applying it to schema generation would reorder every model.
+                //  - The UTC DateTime converters only force UTC on the wire — they don't change the JSON *type*
+                //    (still a date-time string). Including them in schema generation, however, makes the
+                //    generator emit an untyped schema (`unknown`) for every DateTime property AND query
+                //    parameter. Leaving them out lets DateTime map to string/date-time natively, which both
+                //    matches the v17 output and stays correct for query parameters (e.g. metrics from/to).
                 options.JsonSerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver
                 {
                     Modifiers = { AlphabetizeProperties() },
                 };
+                options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
+                options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeJsonConverter());
             });
 
         // OpenAPI schema generation reads the *Http* JSON options selected via
@@ -289,8 +293,6 @@ public static partial class UmbracoBuilderExtensions
 
         options.Converters.Add(new JsonStringEnumConverter());
         options.Converters.Add(new JsonStringTypeConverter());
-        options.Converters.Add(new UtcDateTimeJsonConverter());
-        options.Converters.Add(new UtcNullableDateTimeJsonConverter());
     }
 
     private static Action<JsonTypeInfo> AlphabetizeProperties() =>

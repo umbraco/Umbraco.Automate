@@ -1550,8 +1550,8 @@ export type GetMetricsData = {
     path?: never;
     query?: {
         workspaceId?: string;
-        from?: unknown;
-        to?: unknown;
+        from?: string;
+        to?: string;
     };
     url: '/umbraco/automate/management/api/v1/metrics';
 };
@@ -1577,8 +1577,8 @@ export type GetMetricsByAutomationData = {
     path?: never;
     query?: {
         workspaceId?: string;
-        from?: unknown;
-        to?: unknown;
+        from?: string;
+        to?: string;
         take?: number;
     };
     url: '/umbraco/automate/management/api/v1/metrics/by-automation';
