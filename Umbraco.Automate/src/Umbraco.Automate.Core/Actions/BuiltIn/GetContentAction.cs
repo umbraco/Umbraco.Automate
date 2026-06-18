@@ -7,6 +7,7 @@ using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Core.Services.Navigation;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 
@@ -39,6 +40,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IContentValueNormaliser _normaliser;
     private readonly IAutomationActionAuthorizer _authorizer;
+    private readonly IDocumentNavigationQueryService _navigationQueryService;
     private readonly ILogger<GetContentAction> _logger;
 
     /// <summary>
@@ -52,6 +54,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         IUserIdKeyResolver userIdKeyResolver,
         IContentValueNormaliser normaliser,
         IAutomationActionAuthorizer authorizer,
+        IDocumentNavigationQueryService navigationQueryService,
         ILogger<GetContentAction> logger)
         : base(infrastructure)
     {
@@ -61,6 +64,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         _userIdKeyResolver = userIdKeyResolver;
         _normaliser = normaliser;
         _authorizer = authorizer;
+        _navigationQueryService = navigationQueryService;
         _logger = logger;
     }
 
@@ -116,6 +120,12 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         return attempt.Success ? attempt.Result : null;
     }
 
+    // v18 removed the IPublishedContent.Parent property in favour of navigation-service lookups.
+    // We only need the parent key, so query the navigation structure directly rather than
+    // materialising the parent content item.
+    private Guid? ResolveParentKey(IPublishedContent content)
+        => _navigationQueryService.TryGetParentKey(content.Key, out Guid? parentKey) ? parentKey : null;
+
     private static string? NormaliseCulture(string? requested, IPublishedContent content)
     {
         if (!content.ContentType.VariesByCulture())
@@ -135,7 +145,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
             Name = ResolveName(content, culture),
             ContentTypeAlias = content.ContentType.Alias,
             ContentTypeKey = content.ContentType.Key,
-            ParentKey = content.Parent?.Key,
+            ParentKey = ResolveParentKey(content),
             Level = content.Level,
             Path = content.Path,
             SortOrder = content.SortOrder,
