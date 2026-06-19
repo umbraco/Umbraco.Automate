@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Client.AspNetCore;
+using Umbraco.Automate.OpenIddict.Providers;
 using Umbraco.Cms.Api.Common.Attributes;
 
 namespace Umbraco.Automate.OpenIddict.Controllers;
@@ -16,6 +17,16 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 [ApiExplorerSettings(GroupName = "OAuth")]
 public sealed class OAuthChallengeController : ControllerBase
 {
+    private readonly IOAuthProviderConfigurationSource _configurationSource;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OAuthChallengeController"/> class.
+    /// </summary>
+    public OAuthChallengeController(IOAuthProviderConfigurationSource configurationSource)
+    {
+        _configurationSource = configurationSource;
+    }
+
     /// <summary>
     /// Initiates an OAuth authorization code flow for the specified provider.
     /// Opens in a popup — the callback will close the popup when complete.
@@ -24,6 +35,18 @@ public sealed class OAuthChallengeController : ControllerBase
     [HttpGet("challenge/{provider}")]
     public IActionResult Challenge(string provider)
     {
+        // The OAuth Provider Status endpoint lets the UI warn before this is ever called, but
+        // guard here too — OpenIddict throws an unhandled InvalidOperationException rather than
+        // a friendly result if the client ID is missing when the challenge is dispatched.
+        var configuration = _configurationSource.GetConfiguration(provider);
+        if (string.IsNullOrWhiteSpace(configuration?.ClientId) || string.IsNullOrWhiteSpace(configuration?.ClientSecret))
+        {
+            return Content(
+                BuildPopupHtml($"{provider} is not configured. Add a client ID and secret under " +
+                    $"Umbraco:Automate:Providers:{provider} in appsettings.json."),
+                "text/html");
+        }
+
         var properties = new AuthenticationProperties
         {
             RedirectUri = Url.Action(
@@ -35,5 +58,28 @@ public sealed class OAuthChallengeController : ControllerBase
         properties.SetString(OpenIddictClientAspNetCoreConstants.Properties.ProviderName, provider);
 
         return Challenge(properties, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    // Mirrors OAuthCallbackController's popup-close pattern so a misconfigured provider closes
+    // the popup with a friendly notification instead of leaving an unhandled exception page open.
+    private static string BuildPopupHtml(string error)
+    {
+        var messagePayload = $$"""{ "type": "oauth-complete", "success": false, "error": "{{error}}" }""";
+
+        return $$"""
+            <!DOCTYPE html>
+            <html>
+            <head><title>OAuth Complete</title></head>
+            <body>
+                <p>Authentication failed: {{error}}</p>
+                <script>
+                    if (window.opener) {
+                        window.opener.postMessage({{messagePayload}}, window.location.origin);
+                    }
+                    window.close();
+                </script>
+            </body>
+            </html>
+            """;
     }
 }
