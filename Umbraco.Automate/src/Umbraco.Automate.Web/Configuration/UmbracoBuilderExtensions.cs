@@ -204,6 +204,12 @@ public static partial class UmbracoBuilderExtensions
 
         // Numeric `["integer"/"number","string"]` widening -> plain numeric (`number`, not `number | string`).
         options.AddSchemaTransformer<NumericStringUnionSchemaTransformer>();
+
+        // Re-close object schemas (`additionalProperties: false`), which v18 leaves open.
+        options.AddSchemaTransformer<ClosedObjectSchemaTransformer>();
+
+        // Restore `minLength: 1` on required (non-nullable) string properties, which v18 drops.
+        options.AddSchemaTransformer<RequiredStringMinLengthSchemaTransformer>();
     }
 
     private static IUmbracoBuilder AddUmbracoAutomateWebhookRateLimiting(this IUmbracoBuilder builder)
