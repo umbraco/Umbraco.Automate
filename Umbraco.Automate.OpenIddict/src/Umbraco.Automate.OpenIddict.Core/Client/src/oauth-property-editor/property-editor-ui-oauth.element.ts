@@ -18,6 +18,7 @@ interface OAuthCompleteMessage {
 
 interface OAuthProviderStatusResponse {
     isConfigured: boolean;
+    setupDocsUrl?: string;
 }
 
 const elementName = "umb-automate-property-editor-ui-oauth";
@@ -42,6 +43,9 @@ export class UmbAutomatePropertyEditorUIOAuthElement
     /** undefined while the status check is in flight (or hasn't started yet). */
     @state()
     private _isProviderConfigured: boolean | undefined;
+
+    @state()
+    private _setupDocsUrl: string | undefined;
 
     #popup: Window | null = null;
     #popupPollTimer?: ReturnType<typeof setInterval>;
@@ -83,6 +87,7 @@ export class UmbAutomatePropertyEditorUIOAuthElement
 
             const data = (await response.json()) as OAuthProviderStatusResponse;
             this._isProviderConfigured = data.isConfigured;
+            this._setupDocsUrl = data.setupDocsUrl;
         } catch {
             // Network/parse failure — leave undefined rather than risk a false warning.
             this._isProviderConfigured = undefined;
@@ -241,9 +246,22 @@ export class UmbAutomatePropertyEditorUIOAuthElement
             <div class="not-configured-warning">
                 <uui-icon name="icon-alert"></uui-icon>
                 <span>
-                    ${providerLabel} is not configured. Add a client ID and secret under
-                    <code>Umbraco:Automate:Providers:${this._provider}</code> in appsettings.json
-                    before authenticating.
+                    <span>
+                        ${providerLabel} is not configured. Add a client ID and secret under
+                        <code>Umbraco:Automate:Providers:${this._provider}</code> in appsettings.json
+                        before authenticating.
+                        ${this._setupDocsUrl
+                            ? html`
+                                  <a href=${this._setupDocsUrl} target="_blank" rel="noopener noreferrer">
+                                      Get ${providerLabel} credentials
+                                  </a>
+                              `
+                            : nothing}
+                    </span>
+                    <span class="secrets-tip">
+                        Keep the client secret out of source control. Use environment variables,
+                        user secrets, or a key vault to inject it at deployment time.
+                    </span>
                 </span>
             </div>
         `;
@@ -280,6 +298,12 @@ export class UmbAutomatePropertyEditorUIOAuthElement
             color: var(--uui-color-warning-standalone, var(--uui-color-warning));
         }
 
+        .not-configured-warning > span {
+            display: flex;
+            flex-direction: column;
+            gap: var(--uui-size-space-1);
+        }
+
         .not-configured-warning uui-icon {
             flex-shrink: 0;
             margin-top: 2px;
@@ -287,6 +311,11 @@ export class UmbAutomatePropertyEditorUIOAuthElement
 
         .not-configured-warning code {
             font-size: 0.9em;
+        }
+
+        .not-configured-warning .secrets-tip {
+            font-size: 0.85em;
+            color: var(--uui-color-text-alt);
         }
     `;
 }
