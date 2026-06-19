@@ -244,25 +244,37 @@ export class UmbAutomatePropertyEditorUIOAuthElement
     #renderNotConfiguredWarning(providerLabel: string) {
         return html`
             <div class="not-configured-warning">
-                <uui-icon name="icon-alert"></uui-icon>
-                <span>
-                    <span>
-                        ${providerLabel} is not configured. Add a client ID and secret under
-                        <code>Umbraco:Automate:Providers:${this._provider}</code> in appsettings.json
-                        before authenticating.
-                        ${this._setupDocsUrl
-                            ? html`
-                                  <a href=${this._setupDocsUrl} target="_blank" rel="noopener noreferrer">
-                                      Get ${providerLabel} credentials
-                                  </a>
-                              `
-                            : nothing}
-                    </span>
-                    <span class="secrets-tip">
-                        Keep the client secret out of source control. Use environment variables,
-                        user secrets, or a key vault to inject it at deployment time.
-                    </span>
-                </span>
+                <div class="heading">
+                    <uui-icon name="icon-alert"></uui-icon>
+                    <strong>${providerLabel} is not configured</strong>
+                </div>
+                <p>
+                    Add a client ID and secret under
+                    <code>Umbraco:Automate:Providers:${this._provider}</code> in appsettings.json
+                    before authenticating.
+                </p>
+                ${this._setupDocsUrl
+                    ? html`
+                          <uui-button
+                              class="docs-link"
+                              look="outline"
+                              color="warning"
+                              compact
+                              href=${this._setupDocsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              label=${`Get ${providerLabel} credentials`}
+                          >
+                              <uui-icon name="icon-out"></uui-icon>
+                              Get ${providerLabel} credentials
+                          </uui-button>
+                      `
+                    : nothing}
+                <p class="secrets-tip">
+                    <uui-icon name="icon-lock"></uui-icon>
+                    Keep the client secret out of source control. Use environment variables,
+                    user secrets, or a key vault to inject it at deployment time.
+                </p>
             </div>
         `;
     }
@@ -292,30 +304,53 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         }
 
         .not-configured-warning {
-            display: flex;
-            align-items: flex-start;
-            gap: var(--uui-size-space-3);
-            color: var(--uui-color-warning-standalone, var(--uui-color-warning));
-        }
-
-        .not-configured-warning > span {
+            align-self: stretch;
             display: flex;
             flex-direction: column;
-            gap: var(--uui-size-space-1);
+            gap: var(--uui-size-space-2);
+            padding: var(--uui-size-space-4) var(--uui-size-space-5);
+            border-radius: var(--uui-border-radius);
+            background: var(--uui-color-warning);
+            border-left: 3px solid var(--uui-color-warning-standalone);
         }
 
-        .not-configured-warning uui-icon {
+        .not-configured-warning .heading {
+            display: flex;
+            align-items: center;
+            gap: var(--uui-size-space-2);
+            color: var(--uui-color-warning-standalone);
+        }
+
+        .not-configured-warning .heading uui-icon {
             flex-shrink: 0;
-            margin-top: 2px;
+        }
+
+        .not-configured-warning p {
+            margin: 0;
+            color: var(--uui-color-warning-contrast);
         }
 
         .not-configured-warning code {
             font-size: 0.9em;
         }
 
+        .not-configured-warning .docs-link {
+            align-self: flex-start;
+        }
+
         .not-configured-warning .secrets-tip {
+            display: flex;
+            align-items: center;
+            gap: var(--uui-size-space-2);
+            margin-top: var(--uui-size-space-2);
+            padding-top: var(--uui-size-space-3);
+            border-top: 1px solid var(--uui-color-warning-emphasis, var(--uui-color-warning-standalone));
             font-size: 0.85em;
-            color: var(--uui-color-text-alt);
+            color: var(--uui-color-warning-contrast);
+        }
+
+        .not-configured-warning .secrets-tip uui-icon {
+            flex-shrink: 0;
         }
     `;
 }
