@@ -252,12 +252,18 @@ export class UmbAutomatePropertyEditorUIOAuthElement
                     Add a client ID and secret under
                     <code>Umbraco:Automate:Providers:${this._provider}</code> in appsettings.json
                     before authenticating.
+                    <br/>
+                    <small>
+
+                        Keep the client secret out of source control. Use environment variables,
+                        user secrets, or a key vault to inject it at deployment time.
+                    </small>
                 </p>
                 ${this._setupDocsUrl
                     ? html`
                           <uui-button
                               class="docs-link"
-                              look="outline"
+                              look="secondary"
                               color="warning"
                               compact
                               href=${this._setupDocsUrl}
@@ -270,11 +276,6 @@ export class UmbAutomatePropertyEditorUIOAuthElement
                           </uui-button>
                       `
                     : nothing}
-                <p class="secrets-tip">
-                    <uui-icon name="icon-lock"></uui-icon>
-                    Keep the client secret out of source control. Use environment variables,
-                    user secrets, or a key vault to inject it at deployment time.
-                </p>
             </div>
         `;
     }
@@ -304,53 +305,19 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         }
 
         .not-configured-warning {
-            align-self: stretch;
-            display: flex;
-            flex-direction: column;
-            gap: var(--uui-size-space-2);
             padding: var(--uui-size-space-4) var(--uui-size-space-5);
             border-radius: var(--uui-border-radius);
-            background: var(--uui-color-warning);
             border-left: 3px solid var(--uui-color-warning-standalone);
-        }
-
-        .not-configured-warning .heading {
-            display: flex;
-            align-items: center;
-            gap: var(--uui-size-space-2);
-            color: var(--uui-color-warning-standalone);
-        }
-
-        .not-configured-warning .heading uui-icon {
-            flex-shrink: 0;
+            background-color: var(--uui-color-warning);
+            color: var(--uui-color-warning-contrast);
         }
 
         .not-configured-warning p {
-            margin: 0;
-            color: var(--uui-color-warning-contrast);
+            margin-top: 0;
         }
 
         .not-configured-warning code {
             font-size: 0.9em;
-        }
-
-        .not-configured-warning .docs-link {
-            align-self: flex-start;
-        }
-
-        .not-configured-warning .secrets-tip {
-            display: flex;
-            align-items: center;
-            gap: var(--uui-size-space-2);
-            margin-top: var(--uui-size-space-2);
-            padding-top: var(--uui-size-space-3);
-            border-top: 1px solid var(--uui-color-warning-emphasis, var(--uui-color-warning-standalone));
-            font-size: 0.85em;
-            color: var(--uui-color-warning-contrast);
-        }
-
-        .not-configured-warning .secrets-tip uui-icon {
-            flex-shrink: 0;
         }
     `;
 }
