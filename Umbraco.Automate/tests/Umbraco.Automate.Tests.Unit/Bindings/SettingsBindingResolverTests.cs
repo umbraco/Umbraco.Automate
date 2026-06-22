@@ -157,6 +157,23 @@ public class SettingsBindingResolverTests
         settings.Columns.ShouldBe(["HELLO Hello World", "no binding here", "abc-123"]);
     }
 
+    [Fact]
+    public void ResolveBindings_SkipsReadOnlyList()
+    {
+        // ReadOnlyCollection<string> implements IList<string> but its indexer setter throws
+        // NotSupportedException — the resolver must skip it rather than crash.
+        var settings = new ReadOnlyListSettings
+        {
+            Columns = new System.Collections.ObjectModel.ReadOnlyCollection<string>(
+                ["${ trigger.name }", "literal"]),
+        };
+
+        var act = () => _resolver.ResolveBindings(settings, _data);
+
+        act.ShouldNotThrow();
+        settings.Columns.ShouldBe(["${ trigger.name }", "literal"]);
+    }
+
     // --- Test settings POCOs ---
 
     private sealed class MarkedSettings
@@ -204,5 +221,12 @@ public class SettingsBindingResolverTests
     {
         [Field(SupportsBindings = true)]
         public string[] Columns { get; set; } = [];
+    }
+
+    private sealed class ReadOnlyListSettings
+    {
+        [Field(SupportsBindings = true)]
+        public System.Collections.ObjectModel.ReadOnlyCollection<string> Columns { get; set; } =
+            new([]);
     }
 }

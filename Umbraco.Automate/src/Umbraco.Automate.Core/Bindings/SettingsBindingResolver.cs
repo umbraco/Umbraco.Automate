@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Reflection;
 using Umbraco.Automate.Core.Settings;
 
@@ -56,6 +57,14 @@ internal sealed class SettingsBindingResolver
 
     private void ResolveListBindings(IList<string> list, IReadOnlyDictionary<string, object?> bindingData)
     {
+        // ICollection<T>.IsReadOnly is true for arrays (fixed-size) even though element assignment
+        // works; the non-generic IList.IsReadOnly correctly returns false for arrays and true for
+        // ReadOnlyCollection<string>, ImmutableList<string>, etc.
+        if (list is IList nonGenericList && nonGenericList.IsReadOnly)
+        {
+            return;
+        }
+
         for (var i = 0; i < list.Count; i++)
         {
             if (!string.IsNullOrEmpty(list[i]))
