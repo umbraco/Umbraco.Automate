@@ -1,6 +1,6 @@
 {
     "name": "@umbraco-automate/core",
-    "version": "1.0.0",
+    "version": "18.0.0",
     "type": "module",
     "scripts": {
         "watch": "tsc && vite build --watch",
@@ -8,7 +8,7 @@
         "generate-client": "node scripts/generate-openapi.js https://localhost:44380/umbraco/openapi/automate-management.json"
     },
     "dependencies": {
-        "@umbraco-cms/backoffice": "^18.0.0-rc2",
+        "@umbraco-cms/backoffice": "^18.0.0",
         "@xyflow/react": "^12.10.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4"
