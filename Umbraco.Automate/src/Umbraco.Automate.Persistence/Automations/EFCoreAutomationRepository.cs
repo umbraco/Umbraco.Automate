@@ -78,7 +78,10 @@ internal sealed class EFCoreAutomationRepository : IAutomationRepository
 
         if (!string.IsNullOrWhiteSpace(filter))
         {
-            query = query.Where(a => a.Name.Contains(filter) || a.Alias.Contains(filter));
+            // Lower-case both sides so matching is case-insensitive across providers. On SQLite,
+            // string.Contains translates to a case-sensitive instr(); comparing lower() forms avoids that.
+            var loweredFilter = filter.ToLower();
+            query = query.Where(a => a.Name.ToLower().Contains(loweredFilter) || a.Alias.ToLower().Contains(loweredFilter));
         }
 
         var total = await query.CountAsync(cancellationToken);
