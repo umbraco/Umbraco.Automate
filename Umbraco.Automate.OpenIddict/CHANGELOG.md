@@ -5,6 +5,13 @@ All notable changes to Umbraco.Automate.OpenIddict will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.0.0-beta.1](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@17.0.0-beta...Umbraco.Automate.OpenIddict@17.0.0-beta.1) (2026-06-24)
+
+### fix
+
+* **core,openiddict:** Resolve connection string at runtime, not composition ([fbeb0f6](https://github.com/umbraco/Umbraco.Automate/commit/fbeb0f60eebe66d369805ee4c7b0176e36520353))
+* **oauth:** Persist original-case provider name from OAuth properties ([3319917](https://github.com/umbraco/Umbraco.Automate/commit/3319917e144b9f050c62b374dd65fd29d6b93f35))
+
 ## [17.0.0-beta](https://github.com/umbraco/Umbraco.Automate/releases/tag/Umbraco.Automate.OpenIddict@17.0.0-beta) (2026-06-09)
 
 ### feat

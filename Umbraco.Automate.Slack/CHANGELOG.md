@@ -5,6 +5,12 @@ All notable changes to Umbraco.Automate.Slack will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.0.0-beta.1](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@17.0.0-beta...Umbraco.Automate.Slack@17.0.0-beta.1) (2026-06-24)
+
+### fix
+
+* **slack:** Copy generated appsettings schema to consuming sites via buildTransitive ([9a95dba](https://github.com/umbraco/Umbraco.Automate/commit/9a95dbaa747720e0c0170d5e78b2764038702b4e))
+
 ## [17.0.0-beta](https://github.com/umbraco/Umbraco.Automate/releases/tag/Umbraco.Automate.Slack@17.0.0-beta) (2026-06-09)
 
 ### feat
