@@ -198,5 +198,36 @@ public class WorkspacePersistenceTests : IDisposable
         items.Count().ShouldBe(2);
     }
 
+    [Theory]
+    [InlineData("alpha")]
+    [InlineData("ALPHA")]
+    [InlineData("Alpha")]
+    [InlineData("aLpHa")]
+    public async Task GetPaged_MatchesNameCaseInsensitively(string filter)
+    {
+        Workspace ws = new WorkspaceBuilder().WithName("Alpha Workspace").WithAlias("distinct-alias-no-match").Build();
+        await _repository.SaveAsync(ws);
+
+        var (items, total) = await _repository.GetPagedAsync(filter, skip: 0, take: 10);
+
+        total.ShouldBe(1);
+        items.Single().Name.ShouldBe("Alpha Workspace");
+    }
+
+    [Theory]
+    [InlineData("betaalias")]
+    [InlineData("BETAALIAS")]
+    [InlineData("BetaAlias")]
+    public async Task GetPaged_MatchesAliasCaseInsensitively(string filter)
+    {
+        Workspace ws = new WorkspaceBuilder().WithName("Distinct name no match").WithAlias("BetaAlias").Build();
+        await _repository.SaveAsync(ws);
+
+        var (items, total) = await _repository.GetPagedAsync(filter, skip: 0, take: 10);
+
+        total.ShouldBe(1);
+        items.Single().Alias.ShouldBe("BetaAlias");
+    }
+
     public void Dispose() => _fixture.Dispose();
 }
