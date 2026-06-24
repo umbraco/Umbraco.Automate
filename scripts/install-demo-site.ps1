@@ -19,6 +19,32 @@ Write-Host "=== Umbraco.Automate Demo Site Setup ===" -ForegroundColor Cyan
 Write-Host "Working directory: $RepoRoot" -ForegroundColor Gray
 Write-Host ""
 
+# Toolchain check — required Node version comes from package.json's engines.node, so this
+# stays in lockstep with the npm-side enforcement and the .nvmrc.
+$packageJson = Get-Content (Join-Path $RepoRoot "package.json") -Raw | ConvertFrom-Json
+$requiredNodeRange = $packageJson.engines.node
+if ($requiredNodeRange -match '(\d+)') {
+    $requiredNodeMajor = [int]$matches[1]
+} else {
+    Write-Host "ERROR: Could not parse engines.node ('$requiredNodeRange') from package.json." -ForegroundColor Red
+    exit 1
+}
+
+$nodeVersionRaw = (node --version 2>$null) -replace '^v', ''
+if (-not $nodeVersionRaw) {
+    Write-Host "ERROR: Node.js is not installed or not on PATH. package.json requires '$requiredNodeRange'." -ForegroundColor Red
+    Write-Host "Install Node $requiredNodeMajor+ (e.g. 'nvm install $requiredNodeMajor && nvm use $requiredNodeMajor') and re-run." -ForegroundColor Yellow
+    exit 1
+}
+$nodeMajor = [int]($nodeVersionRaw -split '\.')[0]
+if ($nodeMajor -lt $requiredNodeMajor) {
+    Write-Host "ERROR: Node $nodeVersionRaw detected; package.json requires '$requiredNodeRange'." -ForegroundColor Red
+    Write-Host "Run 'nvm install $requiredNodeMajor && nvm use $requiredNodeMajor' (or equivalent) before re-running this script." -ForegroundColor Yellow
+    exit 1
+}
+Write-Host "Node $nodeVersionRaw detected (satisfies '$requiredNodeRange')." -ForegroundColor Gray
+Write-Host ""
+
 # Check if demo already exists
 if ((Test-Path "demo") -and -not $Force) {
     Write-Host "Demo folder already exists. Use -Force to recreate." -ForegroundColor Yellow
@@ -39,7 +65,22 @@ if ($Force -and (Test-Path "Umbraco.Automate.local.slnx")) {
 # Step 1: Install Umbraco templates
 if (-not $SkipTemplateInstall) {
     Write-Host "Installing Umbraco templates..." -ForegroundColor Green
-    dotnet new install Umbraco.Templates --force
+
+    # Uninstall any existing version to avoid conflicts
+    Write-Host "Removing any existing Umbraco.Templates installations..." -ForegroundColor Gray
+    $installedTemplates = dotnet new uninstall 2>&1 | Out-String
+    if ($installedTemplates -match "Umbraco\.Templates") {
+        try {
+            dotnet new uninstall Umbraco.Templates 2>&1 | Out-Null
+        } catch {
+            # Ignore errors during uninstall
+        }
+    }
+
+    # Pin to 18.0.0-rc2 to match the Umbraco.Cms.Core minimum in Directory.Packages.props. v18 ships
+    # via the umbracoprereleases MyGet feed for now — drop the explicit pin (or move it forward) once
+    # v18 stable lands on nuget.org. Bump in lockstep when the CMS floor moves.
+    dotnet new install Umbraco.Templates::18.0.0-rc2 --force
 }
 
 # Step 2: Create demo folder with build overrides
@@ -63,7 +104,8 @@ Pop-Location
 # Step 3.1: Install Clean starter kit
 Write-Host "Installing Clean starter kit..." -ForegroundColor Green
 Push-Location "demo\Umbraco.Automate.DemoSite"
-dotnet add package Clean
+# --prerelease: the CMS-v18-compatible Clean (8.0.0-rc1) is still prerelease.
+dotnet add package Clean --prerelease
 Pop-Location
 
 # Step 3.2: Set fixed port for consistent development

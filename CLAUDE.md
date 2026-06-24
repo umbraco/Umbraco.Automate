@@ -170,7 +170,7 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 ## Target Framework
 
 - .NET 10.0 (`net10.0`)
-- Umbraco CMS 17.x (`[17.4.0, 17.999.999)`)
+- Umbraco CMS 18.x (`[18.0.0-rc2, 18.999.999)`)
 - WorkflowCore 3.9.0
 - EF Core 10.x
 - Central Package Management via `Directory.Packages.props`

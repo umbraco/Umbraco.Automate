@@ -44,6 +44,8 @@ export class UaWorkspaceTreeServerDataSource
         return {
             data: {
                 total: data.total,
+                totalBefore: 0,
+                totalAfter: 0,
                 items: data.items.map((item) => this.#mapWorkspaceItem(item)),
             },
         };
@@ -54,6 +56,8 @@ export class UaWorkspaceTreeServerDataSource
             return {
                 data: {
                     total: 0,
+                    totalBefore: 0,
+                    totalAfter: 0,
                     items: [] as UaWorkspaceTreeItemModel[],
                 },
             };
@@ -72,6 +76,8 @@ export class UaWorkspaceTreeServerDataSource
         return {
             data: {
                 total: 0,
+                totalBefore: 0,
+                totalAfter: 0,
                 items: [] as UaWorkspaceTreeItemModel[],
             },
         };
@@ -114,6 +120,8 @@ export class UaWorkspaceTreeServerDataSource
         return {
             data: {
                 total,
+                totalBefore: 0,
+                totalAfter: 0,
                 items,
             },
         };
@@ -126,6 +134,8 @@ export class UaWorkspaceTreeServerDataSource
             return {
                 data: {
                     total: 0,
+                    totalBefore: 0,
+                    totalAfter: 0,
                     items: [] as UaWorkspaceTreeItemModel[],
                 },
             };
@@ -164,6 +174,8 @@ export class UaWorkspaceTreeServerDataSource
         return {
             data: {
                 total,
+                totalBefore: 0,
+                totalAfter: 0,
                 items,
             },
         };

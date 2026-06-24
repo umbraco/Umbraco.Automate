@@ -64,9 +64,9 @@ Umbraco.Automate.OpenIddict provides reusable OAuth connection infrastructure fo
 
 ## Dependencies
 
-- Umbraco CMS 17.x
+- Umbraco CMS 18.x
 - Umbraco.Automate.Core
-- OpenIddict.Client.WebIntegration 7.2.x
+- OpenIddict.Client.WebIntegration 7.5.x
 
 ## Commit Scopes
 

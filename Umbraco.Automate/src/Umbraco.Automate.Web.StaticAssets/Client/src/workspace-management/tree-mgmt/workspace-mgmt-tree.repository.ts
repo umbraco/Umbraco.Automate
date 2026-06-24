@@ -2,7 +2,6 @@ import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { UmbTreeRepositoryBase } from "@umbraco-cms/backoffice/tree";
 import type { UmbApi } from "@umbraco-cms/backoffice/extension-api";
 import { UaWorkspaceMgmtTreeServerDataSource } from "./workspace-mgmt-tree.server.data-source.js";
-import { UA_WORKSPACE_MGMT_TREE_STORE_CONTEXT } from "./workspace-mgmt-tree.store.js";
 import { UA_WORKSPACE_MGMT_ROOT_ENTITY_TYPE } from "../entity.js";
 import type { UaWorkspaceMgmtTreeItemModel, UaWorkspaceMgmtTreeRootModel } from "./types.js";
 
@@ -11,7 +10,7 @@ export class UaWorkspaceMgmtTreeRepository
     implements UmbApi
 {
     constructor(host: UmbControllerHost) {
-        super(host, UaWorkspaceMgmtTreeServerDataSource, UA_WORKSPACE_MGMT_TREE_STORE_CONTEXT);
+        super(host, UaWorkspaceMgmtTreeServerDataSource);
     }
 
     async requestTreeRoot() {
