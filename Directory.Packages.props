@@ -28,9 +28,10 @@
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[10.0.7, 10.999.999)" />
   </ItemGroup>
   <!-- Inter-product (Umbraco.Automate) -->
+  <!-- Prerelease lower bound so the 18.0.0-beta packages satisfy each other's ranges -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.0.0, 18.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[18.0.0, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.0.0-beta, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[18.0.0-beta, 18.999.999)" />
   </ItemGroup>
   <!-- WorkflowCore (automation engine) -->
   <ItemGroup>

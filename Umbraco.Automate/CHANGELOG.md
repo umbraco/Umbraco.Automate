@@ -5,6 +5,35 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.0.0-beta](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.0.0-beta...Umbraco.Automate@18.0.0-beta) (2026-06-24)
+
+> This release targets **Umbraco CMS 18**. It migrates the backoffice to the v18 API, the Management API off Swashbuckle, and the toolchain to Node 24.
+
+### feat
+
+* **frontend:** Add automations to global backoffice search ([d533c18](https://github.com/umbraco/Umbraco.Automate/commit/d533c18e407a3027d834e02a32c8b77962436633))
+* **ui:** Grow switch node width with case count ([3a5f743](https://github.com/umbraco/Umbraco.Automate/commit/3a5f743f3f53f5cea9a9bbf69f72c9d6bcbde90c))
+
+### fix
+
+* **action:** Make Find Content Contains match mode produce a valid Examine query ([790f12c](https://github.com/umbraco/Umbraco.Automate/commit/790f12c19283e30a774dfd6346c3b39f71f14bba)), closes [#90](https://github.com/umbraco/Umbraco.Automate/issues/90) [#52](https://github.com/umbraco/Umbraco.Automate/issues/52)
+* **action:** Resolve parent key via navigation service for v18 ([f2d4d72](https://github.com/umbraco/Umbraco.Automate/commit/f2d4d722a897f740126523747e8ade1cd6c27d6a))
+* **api:** Align v18 OpenAPI schema generation with runtime serialization ([1131257](https://github.com/umbraco/Umbraco.Automate/commit/11312570b3287bc768d24c7969e304e4b607f2f4))
+* **api:** Make automation search case-insensitive ([66bad67](https://github.com/umbraco/Umbraco.Automate/commit/66bad6764cbe25d6157b08507bf65340373756d6))
+* **api:** Make connection and workspace search case-insensitive ([b0a410e](https://github.com/umbraco/Umbraco.Automate/commit/b0a410e26e4ffc78f8507a07b9d6bd118c5b099a))
+* **api:** Map DateTime natively in schema generation to cover query params ([7f185b9](https://github.com/umbraco/Umbraco.Automate/commit/7f185b926aa07d7c499428ceb9870d369721643b))
+* **api:** Restore v17 additionalProperties and minLength in OpenAPI schema ([99e2e6e](https://github.com/umbraco/Umbraco.Automate/commit/99e2e6eb30982c7b4801bbc08c490f660fb97c2b))
+* **core,openiddict:** Resolve connection string at runtime, not composition ([fbeb0f6](https://github.com/umbraco/Umbraco.Automate/commit/fbeb0f60eebe66d369805ee4c7b0176e36520353))
+* **core:** Fail fast with a clear error on duplicate binding-filter alias ([677c378](https://github.com/umbraco/Umbraco.Automate/commit/677c378739559eda511baf821491bea144571acb))
+* **core:** Generalize binding resolution to any IList<string>, not just List<string> ([37dd1dc](https://github.com/umbraco/Umbraco.Automate/commit/37dd1dc4a5d14c7a7bd73d0652a37205424a12cf))
+* **core:** Guard ResolveListBindings against read-only IList<string> implementations ([c5c74a4](https://github.com/umbraco/Umbraco.Automate/commit/c5c74a41472074668649375201d6ca5ee9428ac3))
+* **core:** Register binding filters so pipe filters are applied ([050a72d](https://github.com/umbraco/Umbraco.Automate/commit/050a72d580bf6f838792a0034af9f03390f38e3f)), closes [#94](https://github.com/umbraco/Umbraco.Automate/issues/94)
+* **core:** Resolve ${ } bindings inside List<string> settings fields ([5491b09](https://github.com/umbraco/Umbraco.Automate/commit/5491b09bd883e452ed94410a0fb50f39405182ad)), closes [#100](https://github.com/umbraco/Umbraco.Automate/issues/100)
+* **settings:** Validate required fields in node and trigger settings modals ([339081c](https://github.com/umbraco/Umbraco.Automate/commit/339081c2f0145900cbcc76c2056dfc3ba5681d50))
+* **trigger:** Skip login-only saves in Member Saved trigger ([053dbdf](https://github.com/umbraco/Umbraco.Automate/commit/053dbdf3e21be9fe10eb28f8ccf28ba70e977fc9))
+* **ui:** Render all switch case branches on the canvas node ([0e11c2d](https://github.com/umbraco/Umbraco.Automate/commit/0e11c2d0160a260a277d26fc97cf00ee058f84a1)), closes [#76](https://github.com/umbraco/Umbraco.Automate/issues/76)
+* **ui:** Show server error message when deleting non-empty workspace ([def124e](https://github.com/umbraco/Umbraco.Automate/commit/def124e66bfd349d87aa2aabc569fff019017b4d)), closes [#74](https://github.com/umbraco/Umbraco.Automate/issues/74)
+
 ## [17.0.0-beta](https://github.com/umbraco/Umbraco.Automate/releases/tag/Umbraco.Automate@17.0.0-beta) (2026-06-09)
 
 * Don't expose the content name ([578376d](https://github.com/umbraco/Umbraco.Automate/commit/578376d886ac5c58ec1bcd67edfe76521363d18f))
