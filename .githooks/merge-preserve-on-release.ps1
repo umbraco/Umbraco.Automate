@@ -19,7 +19,7 @@ param(
 $currentBranch = git rev-parse --abbrev-ref HEAD 2>$null
 
 # If on release or hotfix branch, keep our version
-if ($currentBranch -match '^(release|hotfix)/') {
+if ($currentBranch -match '^v\d+/(release|hotfix)/') {
     # Keep our version by doing nothing - it's already in place
     exit 0
 }

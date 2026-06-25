@@ -2,7 +2,7 @@
 # WorktreeCreate hook for Claude Code
 #
 # Replaces the default git worktree creation to:
-#   1. Use feature/<name> branch naming (gitflow convention)
+#   1. Use vN/feature/<name> branch naming (version-prefixed convention)
 #   2. Copy files specified in .worktreeinclude to the new worktree
 #
 # Input (JSON on stdin): { "name": "<slug>", "cwd": "<project-root>", ... }
@@ -56,7 +56,22 @@ fi
 
 WORKTREE_DIR="$GIT_ROOT/.claude/worktrees"
 WORKTREE_PATH="$WORKTREE_DIR/$NAME"
-BRANCH_NAME="feature/$NAME"
+
+# --- Determine the version-line prefix (vN) ---
+# All branches are version-prefixed (e.g. v18/dev). Worktrees inherit the prefix of the
+# current line so generated branches satisfy the vN/feature/<name> convention.
+CURRENT_BRANCH=$(git -C "$GIT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+PREFIX=""
+if [[ "$CURRENT_BRANCH" =~ ^(v[0-9]+)/ ]]; then
+  PREFIX="${BASH_REMATCH[1]}"
+else
+  # Fall back to the highest vN/dev on origin
+  PREFIX=$(git -C "$GIT_ROOT" for-each-ref --format='%(refname:lstrip=3)' 'refs/remotes/origin/v*/dev' 2>/dev/null \
+    | sed -n 's@/dev$@@p' | sort -V | tail -n1)
+fi
+PREFIX="${PREFIX:-v18}"
+
+BRANCH_NAME="$PREFIX/feature/$NAME"
 
 # --- Ensure .claude/worktrees is in .gitignore ---
 if ! grep -qF '.claude/worktrees' "$GIT_ROOT/.gitignore" 2>/dev/null; then
@@ -69,15 +84,15 @@ if ! grep -qF '.claude/worktrees' "$GIT_ROOT/.gitignore" 2>/dev/null; then
 fi
 
 # --- Determine base branch ---
-# Prefer origin/dev when it exists (gitflow convention), then fall back to origin/HEAD,
+# Prefer this line's vN/dev when it exists, then fall back to origin/HEAD,
 # then probe common branch names.
 DEFAULT_BRANCH=""
-if git show-ref --verify --quiet "refs/remotes/origin/dev" 2>/dev/null; then
-  DEFAULT_BRANCH="dev"
+if git show-ref --verify --quiet "refs/remotes/origin/$PREFIX/dev" 2>/dev/null; then
+  DEFAULT_BRANCH="$PREFIX/dev"
 else
   DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@') || true
   if [[ -z "$DEFAULT_BRANCH" ]]; then
-    for candidate in main master; do
+    for candidate in "$PREFIX/main" main master; do
       if git show-ref --verify --quiet "refs/remotes/origin/$candidate" 2>/dev/null; then
         DEFAULT_BRANCH="$candidate"
         break
@@ -85,7 +100,7 @@ else
     done
   fi
 fi
-DEFAULT_BRANCH="${DEFAULT_BRANCH:-dev}"
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-$PREFIX/dev}"
 
 # --- Create worktree ---
 mkdir -p "$WORKTREE_DIR"

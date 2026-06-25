@@ -26,17 +26,17 @@ parameters:
 trigger:
     branches:
         include:
-            - main
-            - dev
-            - release/*
-            - hotfix/*
-            - feature/*
+            - v*/main
+            - v*/dev
+            - v*/release/*
+            - v*/hotfix/*
+            - v*/feature/*
 
 pr:
     branches:
         include:
-            - main
-            - dev
+            - v*/main
+            - v*/dev
 
 variables:
     - group: dependency-track
@@ -102,7 +102,7 @@ stages:
                       publishLocation: pipeline
 
     # ============================================================
-    # Generate & Upload SBOMs - Only runs on push to main/dev/hotfix/release
+    # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
     # Generates per-product SBOMs and uploads to Dependency-Track
     # ============================================================
     - stage: GenerateSBOM
@@ -265,8 +265,8 @@ stages:
             succeeded(),
             ne(variables['Build.Reason'], 'PullRequest'),
             or(
-              startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'),
-              startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/')
+              contains(variables['Build.SourceBranch'], '/release/'),
+              contains(variables['Build.SourceBranch'], '/hotfix/')
             )
           )
       jobs:
@@ -286,7 +286,7 @@ stages:
                       failOnStderr: false
 
     # ============================================================
-    # Pack Stage - Only runs on push to main/dev/hotfix/release branches
+    # Pack Stage - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
     # Uses dynamic change detection to only pack products that changed
     # Runs in parallel with GenerateSBOM after Build (through ValidateChangelogs dependency)
     # ============================================================
@@ -295,18 +295,18 @@ stages:
       dependsOn:
           - Build
           - ValidateChangelogs
-      # Only pack on push (not PR) to main/dev/hotfix/release branches
-      # ValidateChangelogs may be skipped (on main/dev branches), which is OK
+      # Only pack on push (not PR) to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
+      # ValidateChangelogs may be skipped (on vN/main, vN/dev branches), which is OK
       condition: |
           and(
             in(dependencies.Build.result, 'Succeeded'),
             in(dependencies.ValidateChangelogs.result, 'Succeeded', 'Skipped'),
             ne(variables['Build.Reason'], 'PullRequest'),
             or(
-              startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/'),
-              startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'),
-              eq(variables['Build.SourceBranch'], 'refs/heads/main'),
-              eq(variables['Build.SourceBranch'], 'refs/heads/dev')
+              contains(variables['Build.SourceBranch'], '/hotfix/'),
+              contains(variables['Build.SourceBranch'], '/release/'),
+              endsWith(variables['Build.SourceBranch'], '/main'),
+              endsWith(variables['Build.SourceBranch'], '/dev')
             )
           )
       jobs:
@@ -413,8 +413,8 @@ stages:
                 - template: .azure-pipelines/templates/pack-product.yml
                   parameters:
                       product: Umbraco.Automate
-                      # Use project references on dev (preview releases), NuGet packages on release/hotfix/main (validate ranges)
-                      useProjectReferences: ${{ eq(variables['Build.SourceBranchName'], 'dev') }}
+                      # Use project references on vN/dev (preview releases), NuGet packages on vN/release, vN/hotfix, vN/main (validate ranges)
+                      useProjectReferences: ${{ endsWith(variables['Build.SourceBranch'], '/dev') }}
 
                 - template: .azure-pipelines/templates/upload-packages.yml
                   parameters:
@@ -464,8 +464,8 @@ stages:
                 - template: .azure-pipelines/templates/pack-product.yml
                   parameters:
                       product: $(product)
-                      # Use project references on dev (preview releases), NuGet packages on release/hotfix/main (validate ranges)
-                      useProjectReferences: ${{ eq(variables['Build.SourceBranchName'], 'dev') }}
+                      # Use project references on vN/dev (preview releases), NuGet packages on vN/release, vN/hotfix, vN/main (validate ranges)
+                      useProjectReferences: ${{ endsWith(variables['Build.SourceBranch'], '/dev') }}
                       condition: eq(variables['check.shouldPack'], 'true')
 
                 - template: .azure-pipelines/templates/upload-packages.yml
@@ -521,8 +521,8 @@ stages:
                 - template: .azure-pipelines/templates/pack-product.yml
                   parameters:
                       product: $(product)
-                      # Use project references on dev (preview releases), NuGet packages on release/hotfix/main (validate ranges)
-                      useProjectReferences: ${{ eq(variables['Build.SourceBranchName'], 'dev') }}
+                      # Use project references on vN/dev (preview releases), NuGet packages on vN/release, vN/hotfix, vN/main (validate ranges)
+                      useProjectReferences: ${{ endsWith(variables['Build.SourceBranch'], '/dev') }}
                       condition: eq(variables['check.shouldPack'], 'true')
 
                 - template: .azure-pipelines/templates/upload-packages.yml

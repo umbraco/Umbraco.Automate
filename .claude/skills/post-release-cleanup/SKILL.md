@@ -1,6 +1,6 @@
 ---
 name: post-release-cleanup
-description: Merges a release or hotfix branch back into main and dev, bumps version.json on dev so nightly builds produce versions higher than the released version, and optionally deletes the release branch. Use after a release has been deployed and tagged.
+description: Merges a release or hotfix branch back into its version line's vN/main and vN/dev, bumps version.json on vN/dev so nightly builds produce versions higher than the released version, and optionally deletes the release branch. Creates the next major's vN+1 line and updates the GitHub default branch on a major-version cutover. Use after a release has been deployed and tagged.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
 ---
 
@@ -20,11 +20,21 @@ Without the version bump on `dev`, NBGV + `Umbraco.GitVersioning.Extensions` pro
 
 ### Phase 1: Detect Release Context
 
-1. **Check current branch** — verify it is `release/*` or `hotfix/*`:
+1. **Check current branch** — verify it is `vN/release/*` or `vN/hotfix/*`:
    ```bash
    git branch --show-current
    ```
    If not on a release/hotfix branch, ask the user to specify which branch to process.
+
+   **Extract the version prefix** from the branch — every long-term branch is version-prefixed:
+   ```bash
+   # e.g. v18/release/2026.06.5 → prefix=v18, major=18
+   #      v17/hotfix/2026.06.1  → prefix=v17, major=17
+   release_branch=$(git branch --show-current)
+   prefix=$(echo "$release_branch" | grep -oE '^v[0-9]+')
+   major=$(echo "$prefix" | grep -oE '[0-9]+')
+   ```
+   If the branch does not start with `vN/`, ask the user which version line to target.
 
 2. **Fetch latest tags and remote state:**
    ```bash
@@ -33,8 +43,8 @@ Without the version bump on `dev`, NBGV + `Umbraco.GitVersioning.Extensions` pro
 
 3. **Find product version tags on this branch** that are not yet on `main`:
    ```bash
-   # Get the merge-base between the release branch and main
-   merge_base=$(git merge-base origin/main HEAD)
+   # Get the merge-base between the release branch and this line's main
+   merge_base=$(git merge-base origin/$prefix/main HEAD)
 
    # Get all commits on the release branch since the merge-base
    commits=$(git rev-list $merge_base..HEAD)
@@ -74,21 +84,18 @@ Without the version bump on `dev`, NBGV + `Umbraco.GitVersioning.Extensions` pro
 
 1. **Confirm with user** before merging.
 
-2. **Store the release branch name** for later:
-   ```bash
-   release_branch=$(git branch --show-current)
-   ```
+2. The release branch name and `$prefix` were captured in Phase 1.
 
-3. **Checkout and merge:**
+3. **Checkout and merge** into this line's main:
    ```bash
-   git checkout main
-   git pull origin main
-   git merge origin/$release_branch --no-ff -m "Merge $release_branch into main"
+   git checkout $prefix/main
+   git pull origin $prefix/main
+   git merge origin/$release_branch --no-ff -m "Merge $release_branch into $prefix/main"
    ```
 
 4. **Push main:**
    ```bash
-   git push origin main
+   git push origin $prefix/main
    ```
 
    The post-merge hook will auto-delete `release-manifest.json` if present and commit the cleanup.
@@ -96,9 +103,9 @@ Without the version bump on `dev`, NBGV + `Umbraco.GitVersioning.Extensions` pro
 ### Phase 3: Merge Main to Dev
 
 1. ```bash
-   git checkout dev
-   git pull origin dev
-   git merge main --no-ff -m "Merge main into dev"
+   git checkout $prefix/dev
+   git pull origin $prefix/dev
+   git merge $prefix/main --no-ff -m "Merge $prefix/main into $prefix/dev"
    ```
 
 2. **Handle merge conflicts** — if conflicts occur (likely in `version.json` or `CHANGELOG.md`):
@@ -109,7 +116,7 @@ Without the version bump on `dev`, NBGV + `Umbraco.GitVersioning.Extensions` pro
 
 3. **Push dev:**
    ```bash
-   git push origin dev
+   git push origin $prefix/dev
    ```
 
    The post-merge hook will auto-delete `release-manifest.json` if present and commit the cleanup.
@@ -138,10 +145,43 @@ For each released product detected in Phase 1:
 
    Co-Authored-By: Claude <noreply@anthropic.com>"
 
-   git push origin dev
+   git push origin $prefix/dev
    ```
 
-### Phase 5: Cleanup (Optional)
+### Phase 5: Major Version Cutover (only on a new major)
+
+Run this **only** when the released major is greater than the major of the current GitHub default branch — i.e. this release ships a brand-new CMS major and the `v(N+1)/dev` line does not yet exist.
+
+1. **Get the current default branch major:**
+   ```bash
+   gh api repos/umbraco/Umbraco.Automate --jq '.default_branch'   # e.g. "v18/dev" → 18
+   ```
+
+2. **Compare** with the released `major` from Phase 1. If `major` ≤ default major, **skip this phase**.
+
+3. **Check whether the new line already exists:**
+   ```bash
+   new_prefix="v$major"
+   git ls-remote origin "refs/heads/$new_prefix/dev" "refs/heads/$new_prefix/main"
+   ```
+
+4. **Create the missing branches** from the just-released line:
+   ```bash
+   git push origin $prefix/main:refs/heads/$new_prefix/main
+   git push origin $prefix/dev:refs/heads/$new_prefix/dev
+   ```
+
+5. **Update the GitHub default branch:**
+   ```bash
+   gh api repos/umbraco/Umbraco.Automate -X PATCH -f default_branch=$new_prefix/dev --jq '.default_branch'
+   ```
+
+6. **Tell the developer** to switch lines:
+   ```bash
+   git fetch origin && git checkout $new_prefix/dev
+   ```
+
+### Phase 6: Cleanup (Optional)
 
 1. **Ask the user** if they want to delete the release/hotfix branch (local + remote):
    ```
@@ -159,10 +199,10 @@ For each released product detected in Phase 1:
 
 3. **Return to dev branch:**
    ```bash
-   git checkout dev
+   git checkout $prefix/dev
    ```
 
-### Phase 6: Summary
+### Phase 7: Summary
 
 Present a summary of everything that was done:
 
@@ -170,8 +210,8 @@ Present a summary of everything that was done:
 ✅ Post-release cleanup complete!
 
 Merged:
-- $release_branch → main
-- main → dev
+- $release_branch → $prefix/main
+- $prefix/main → $prefix/dev
 
 Version bumps on dev:
 - Umbraco.Automate: 0.2.0 → 0.2.1
@@ -204,7 +244,7 @@ Increment the numeric portion of the pre-release identifier:
 - **Use `--no-ff` merges** — preserves the merge commit for clear history
 - **Post-merge hooks handle `release-manifest.json` cleanup** — don't manually delete it
 - **version.json only has a `"version"` field** — update only that field, preserve all other properties
-- **Both `release/*` and `hotfix/*` branches are supported** — the workflow is identical
+- **Both `vN/release/*` and `vN/hotfix/*` branches are supported** — the workflow is identical; everything targets the same `vN` line the release branch belongs to
 - **If no tags are found**, the user can still proceed with merge-only (skip Phase 4)
 
 ## Error Recovery
