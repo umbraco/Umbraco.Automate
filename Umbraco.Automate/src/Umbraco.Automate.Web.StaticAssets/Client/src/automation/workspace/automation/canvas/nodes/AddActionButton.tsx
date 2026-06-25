@@ -7,11 +7,13 @@ interface AddActionButtonProps {
     sourceHandle?: string | null;
     /** Absolute positioning override applied to the wrapper. */
     style?: React.CSSProperties;
+    /** Extra class names appended to the button (e.g. a positioning modifier). */
+    className?: string;
 }
 
 const NEW_NODE_OFFSET_Y = 180;
 
-export default function AddActionButton({ nodeId, sourceHandle, style }: AddActionButtonProps) {
+export default function AddActionButton({ nodeId, sourceHandle, style, className }: AddActionButtonProps) {
     const { getNode } = useReactFlow();
 
     const onClick = useCallback(
@@ -35,7 +37,7 @@ export default function AddActionButton({ nodeId, sourceHandle, style }: AddActi
     return (
         <button
             type="button"
-            className="ua-node__add-action"
+            className={className ? `ua-node__add-action ${className}` : "ua-node__add-action"}
             style={style}
             onClick={onClick}
             title={sourceHandle ? `Add action — ${sourceHandle}` : "Add action"}

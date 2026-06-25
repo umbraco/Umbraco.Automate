@@ -33,10 +33,15 @@ export abstract class UaDeleteActionBase extends UmbEntityActionBase<never> {
         const { error } = await repository.delete(this.args.unique);
 
         if (error) {
-            const problemDetails = error as { title?: string; detail?: string };
+            // The error returned by tryExecute is a UmbApiError whose server-provided
+            // title/detail live on the nested `problemDetails` object. Older/plain
+            // errors may carry title/detail directly, so fall back to those too.
+            const apiError = error as { title?: string; detail?: string; problemDetails?: { title?: string; detail?: string } };
+            const title = apiError.problemDetails?.title ?? apiError.title;
+            const detail = apiError.problemDetails?.detail ?? apiError.detail;
             await umbPeekError(this, {
-                headline: problemDetails.title,
-                message: problemDetails.detail ?? problemDetails.title ?? "The item could not be deleted.",
+                headline: title ?? "Error",
+                message: detail ?? "The item could not be deleted.",
             });
             throw error;
         }

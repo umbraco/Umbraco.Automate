@@ -115,7 +115,7 @@ export class UmbAutomatePropertyEditorUIOAuthElement
 
         this._authenticating = true;
 
-        const url = `/umbraco/automate/oauth/challenge/${encodeURIComponent(this._provider.toLowerCase())}`;
+        const url = `/umbraco/automate/oauth/challenge/${encodeURIComponent(this._provider)}`;
         const width = 600;
         const height = 700;
         const left = window.screenX + (window.outerWidth - width) / 2;

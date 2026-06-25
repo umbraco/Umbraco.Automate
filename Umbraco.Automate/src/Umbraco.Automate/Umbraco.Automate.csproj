@@ -19,12 +19,19 @@
       <ProjectReference Include="..\Umbraco.Automate.Web.StaticAssets\Umbraco.Automate.Web.StaticAssets.csproj" />
     </ItemGroup>
 
+    <!-- Ship buildTransitive props so consuming sites' CopyUmbracoJsonSchemaFiles target
+         (from Umbraco.Cms.Targets) discovers the schema and copies it into the project. -->
+    <ItemGroup>
+        <Content Include="buildTransitive\**" PackagePath="buildTransitive" />
+    </ItemGroup>
+
     <!-- Add JSON schema file to package output -->
     <PropertyGroup>
         <_UmbracoAutomateJsonSchemaReference>appsettings-schema.Umbraco.Automate.json</_UmbracoAutomateJsonSchemaReference>
     </PropertyGroup>
     <ItemGroup>
         <Content Include="$(_UmbracoAutomateJsonSchemaReference)" PackagePath="" Visible="false" />
+        <Clean Include="$(_UmbracoAutomateJsonSchemaReference)" />
     </ItemGroup>
 
     <!-- Generate JSON schema on build (and before copying to project) -->

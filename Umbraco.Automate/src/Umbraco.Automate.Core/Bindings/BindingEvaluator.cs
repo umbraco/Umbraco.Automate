@@ -14,9 +14,27 @@ public sealed class BindingEvaluator
     /// Initializes a new instance of the <see cref="BindingEvaluator"/> class.
     /// </summary>
     /// <param name="filters">The available binding filters.</param>
-    public BindingEvaluator(IEnumerable<IBindingFilter> filters)
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when two filters declare the same (case-insensitive) alias. Filters are
+    /// auto-discovered across all loaded assemblies, so a fail-fast with both type names
+    /// is clearer than the opaque duplicate-key error from <see cref="Enumerable.ToDictionary{TSource,TKey}(IEnumerable{TSource},Func{TSource,TKey},IEqualityComparer{TKey}?)"/>,
+    /// and avoids silently shadowing one filter with another in non-deterministic discovery order.
+    /// </exception>
+    public BindingEvaluator(BindingFilterCollection filters)
     {
-        _filters = filters.ToDictionary(f => f.Alias, StringComparer.OrdinalIgnoreCase);
+        var byAlias = new Dictionary<string, IBindingFilter>(StringComparer.OrdinalIgnoreCase);
+        foreach (var filter in filters)
+        {
+            if (!byAlias.TryAdd(filter.Alias, filter))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate binding filter alias '{filter.Alias}' declared by " +
+                    $"'{byAlias[filter.Alias].GetType().FullName}' and '{filter.GetType().FullName}'. " +
+                    "Each binding filter must have a unique alias.");
+            }
+        }
+
+        _filters = byAlias;
     }
 
     /// <summary>

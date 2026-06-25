@@ -1,8 +1,12 @@
 {
     "name": "umbraco-automate-monorepo",
-    "version": "1.0.0",
+    "version": "18.0.0-beta",
     "private": true,
     "description": "Root package for Umbraco.Automate frontend development",
+    "engines": {
+        "node": ">=24.13",
+        "npm": ">=11"
+    },
     "workspaces": [
         "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Client",
         "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/Client"

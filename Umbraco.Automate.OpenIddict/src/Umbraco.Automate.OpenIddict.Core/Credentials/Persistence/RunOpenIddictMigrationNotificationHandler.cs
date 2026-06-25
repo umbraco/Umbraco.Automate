@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
 
@@ -13,9 +15,15 @@ internal sealed class RunOpenIddictMigrationNotificationHandler
     : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     private readonly IConfiguration _configuration;
+    private readonly IOptionsMonitor<ConnectionStrings> _connectionStrings;
 
-    public RunOpenIddictMigrationNotificationHandler(IConfiguration configuration)
-        => _configuration = configuration;
+    public RunOpenIddictMigrationNotificationHandler(
+        IConfiguration configuration,
+        IOptionsMonitor<ConnectionStrings> connectionStrings)
+    {
+        _configuration = configuration;
+        _connectionStrings = connectionStrings;
+    }
 
     /// <inheritdoc />
     public async Task HandleAsync(
@@ -28,7 +36,7 @@ internal sealed class RunOpenIddictMigrationNotificationHandler
         // NullReferenceException in SqliteDatabaseCreator.Exists() when the ProfiledDbConnection's
         // inner connection is disposed. Creating the context directly avoids the pooled factory.
         // See: https://github.com/umbraco/Umbraco-CMS/issues/22124
-        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(_configuration);
+        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(_connectionStrings, _configuration);
         var optionsBuilder = new DbContextOptionsBuilder<OpenIddictDbContext>();
         OpenIddictDbContext.ConfigureProvider(optionsBuilder, connectionString, providerName);
 

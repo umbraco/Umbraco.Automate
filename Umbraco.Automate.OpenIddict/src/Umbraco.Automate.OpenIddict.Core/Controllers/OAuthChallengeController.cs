@@ -32,6 +32,8 @@ public sealed class OAuthChallengeController : ControllerBase
                 new { provider }),
         };
 
+        properties.SetString(OpenIddictClientAspNetCoreConstants.Properties.ProviderName, provider);
+
         return Challenge(properties, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
     }
 }

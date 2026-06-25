@@ -11,6 +11,7 @@ using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Core.Services.Navigation;
 using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
@@ -23,6 +24,7 @@ public class GetContentActionTests
     private readonly Mock<IUserIdKeyResolver> _userIdKeyResolver = new();
     private readonly Mock<IContentValueNormaliser> _normaliser = new();
     private readonly Mock<IAutomationActionAuthorizer> _authorizer = new();
+    private readonly Mock<IDocumentNavigationQueryService> _navigationQueryService = new();
     private readonly GetContentAction _action;
 
     public GetContentActionTests()
@@ -54,6 +56,7 @@ public class GetContentActionTests
             _userIdKeyResolver.Object,
             _normaliser.Object,
             _authorizer.Object,
+            _navigationQueryService.Object,
             Mock.Of<ILogger<GetContentAction>>());
     }
 

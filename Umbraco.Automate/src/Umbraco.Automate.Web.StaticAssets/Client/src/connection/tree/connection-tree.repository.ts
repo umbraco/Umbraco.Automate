@@ -2,7 +2,6 @@ import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { UmbTreeRepositoryBase } from "@umbraco-cms/backoffice/tree";
 import type { UmbApi } from "@umbraco-cms/backoffice/extension-api";
 import { UaConnectionTreeServerDataSource } from "./connection-tree.server.data-source.js";
-import { UA_CONNECTION_TREE_STORE_CONTEXT } from "./connection-tree.store.js";
 import { UA_CONNECTION_ROOT_ENTITY_TYPE } from "../entity.js";
 import type { UaConnectionTreeItemModel, UaConnectionTreeRootModel } from "./types.js";
 
@@ -11,7 +10,7 @@ export class UaConnectionTreeRepository
     implements UmbApi
 {
     constructor(host: UmbControllerHost) {
-        super(host, UaConnectionTreeServerDataSource, UA_CONNECTION_TREE_STORE_CONTEXT);
+        super(host, UaConnectionTreeServerDataSource);
     }
 
     async requestTreeRoot() {

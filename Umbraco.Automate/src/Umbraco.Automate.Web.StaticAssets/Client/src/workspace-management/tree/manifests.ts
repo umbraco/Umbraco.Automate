@@ -1,7 +1,6 @@
 import {
     UA_WORKSPACE_TREE_ALIAS,
     UA_WORKSPACE_TREE_REPOSITORY_ALIAS,
-    UA_WORKSPACE_TREE_STORE_ALIAS,
 } from "./constants.js";
 import { UA_WORKSPACE_ENTITY_TYPE } from "../entity.js";
 
@@ -11,12 +10,6 @@ export const workspaceManagementTreeManifests: Array<UmbExtensionManifest> = [
         alias: UA_WORKSPACE_TREE_REPOSITORY_ALIAS,
         name: "Workspace Tree Repository",
         api: () => import("./workspace-tree.repository.js"),
-    },
-    {
-        type: "store",
-        alias: UA_WORKSPACE_TREE_STORE_ALIAS,
-        name: "Workspace Tree Store",
-        api: () => import("./workspace-tree.store.js"),
     },
     {
         type: "tree",

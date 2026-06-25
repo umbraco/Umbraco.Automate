@@ -1,13 +1,14 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi;
 using OpenIddict.Client;
-using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.OpenIddict;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Automate.OpenIddict.Credentials.Persistence;
 using Umbraco.Automate.OpenIddict.Providers;
+using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Persistence.EFCore;
@@ -35,21 +36,16 @@ public static class UmbracoBuilderExtensions
         // Persistence
         AddPersistence(builder);
 
-        // OAuth API swagger doc
-        builder.Services.Configure<SwaggerGenOptions>(options =>
-        {
-            if (options.SwaggerGeneratorOptions.SwaggerDocs.ContainsKey(Constants.OAuthApi.ApiName))
-                return;
-
-            options.SwaggerDoc(
-                Constants.OAuthApi.ApiName,
-                new OpenApiInfo
-                {
-                    Title = Constants.OAuthApi.ApiTitle,
-                    Version = "Latest",
-                    Description = "OAuth endpoints for Umbraco Automate provider connections.",
-                });
-        });
+        // OAuth API OpenAPI document — public (no backoffice authentication requirements), matching v17.
+        // The challenge/callback endpoints expose no custom model types, so no schema-ID preservation is needed.
+        builder.AddBackOfficeOpenApiDocument(Constants.OAuthApi.ApiName, document => document
+            .WithTitle(Constants.OAuthApi.ApiTitle)
+            .ConfigureOpenApiOptions(options => options.AddDocumentTransformer((openApiDocument, _, _) =>
+            {
+                openApiDocument.Info.Description = "OAuth endpoints for Umbraco Automate provider connections.";
+                openApiDocument.Info.Version = "Latest";
+                return Task.CompletedTask;
+            })));
 
         // Services
         builder.Services.AddSingleton<IOAuthProviderConfigurationSource, ConfigurationOAuthProviderConfigurationSource>();
@@ -85,10 +81,14 @@ public static class UmbracoBuilderExtensions
 
     private static void AddPersistence(IUmbracoBuilder builder)
     {
-        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(builder.Config);
-
-        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>((_, options, _, _) =>
+        // Resolve the connection string lazily inside the factory (run time), not here at
+        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
+        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
+        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>((serviceProvider, options, _, _) =>
         {
+            var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                serviceProvider.GetRequiredService<IConfiguration>());
             OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
         });
 

@@ -47,6 +47,8 @@ export class UaAutomationTreeServerDataSource
         return {
             data: {
                 total: data.total,
+                totalBefore: 0,
+                totalAfter: 0,
                 items: data.items.map((item) => this.#mapAutomationItem(item, null, UA_AUTOMATION_ROOT_ENTITY_TYPE)),
             },
         };
@@ -57,6 +59,8 @@ export class UaAutomationTreeServerDataSource
             return {
                 data: {
                     total: 0,
+                    totalBefore: 0,
+                    totalAfter: 0,
                     items: [] as UaAutomationTreeItemModel[],
                 },
             };
@@ -70,6 +74,8 @@ export class UaAutomationTreeServerDataSource
         return {
             data: {
                 total: 0,
+                totalBefore: 0,
+                totalAfter: 0,
                 items: [] as UaAutomationTreeItemModel[],
             },
         };
@@ -90,6 +96,8 @@ export class UaAutomationTreeServerDataSource
         return {
             data: {
                 total: data.total,
+                totalBefore: 0,
+                totalAfter: 0,
                 items: data.items.map((a) => this.#mapAutomationItem(a, groupId, UA_AUTOMATION_GROUP_ENTITY_TYPE)),
             },
         };

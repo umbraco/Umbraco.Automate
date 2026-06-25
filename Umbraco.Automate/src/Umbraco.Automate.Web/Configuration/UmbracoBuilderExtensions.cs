@@ -5,12 +5,12 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
-using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Web.Authorization;
@@ -27,6 +27,7 @@ using Umbraco.Automate.Web.Api.Management.Workspace.Group.Mapping;
 using Umbraco.Automate.Web.Api.Management.Workspace.Mapping;
 using Umbraco.Cms.Api.Common.DependencyInjection;
 using Umbraco.Cms.Api.Common.OpenApi;
+using Umbraco.Cms.Api.Management.OpenApi;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Mapping;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
@@ -94,15 +95,14 @@ public static partial class UmbracoBuilderExtensions
     private static IUmbracoBuilder AddUmbracoAutomateAuthorization(this IUmbracoBuilder builder)
     {
         builder.Services.AddSingleton<IAuthorizationHandler, WorkspaceAccessHandler>();
+        builder.Services.AddSingleton<IAuthorizationHandler, AutomateSectionAuthorizationHandler>();
 
         builder.Services.AddAuthorization(o =>
         {
             o.AddPolicy(AutomateAuthorizationPolicies.SectionAccessAutomate, policy =>
             {
                 policy.AuthenticationSchemes.Add(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
-#pragma warning disable CS0618 // Type or member is obsolete
-                policy.RequireClaim(Umbraco.Cms.Core.Constants.Security.AllowedApplicationsClaimType, Core.Constants.Sections.Automate);
-#pragma warning restore CS0618 // Type or member is obsolete
+                policy.Requirements.Add(new AutomateSectionRequirement());
             });
 
             o.AddPolicy(AutomateAuthorizationPolicies.WorkspaceAccess, policy =>
@@ -117,54 +117,99 @@ public static partial class UmbracoBuilderExtensions
 
     private static IUmbracoBuilder AddUmbracoAutomateManagementApi(this IUmbracoBuilder builder)
     {
-        builder.Services.Configure<SwaggerGenOptions>(options =>
-        {
-            if (options.SwaggerGeneratorOptions.SwaggerDocs.ContainsKey(Constants.ManagementApi.ApiName))
-                return;
-
-            options.SwaggerDoc(
-                Constants.ManagementApi.ApiName,
-                new OpenApiInfo
-                {
-                    Title = Constants.ManagementApi.ApiTitle,
-                    Version = "Latest",
-                    Description = $"Describes the {Constants.ManagementApi.ApiTitle} available for managing automations, triggers, actions, and runs when authenticated as a backoffice user.",
-                });
-
-            options.OperationFilter<UmbracoAutomateManagementApiBackOfficeSecurityRequirementsOperationFilter>(Constants.ManagementApi.ApiName);
-
-            // Map System.Type to string in OpenAPI schema (JsonStringTypeConverter handles serialization)
-            options.MapType<Type>(() => new OpenApiSchema { Type = JsonSchemaType.String });
-        });
-
-        builder.Services.AddSingleton<IOperationIdHandler, UmbracoAutomateApiOperationIdHandler>();
-        builder.Services.AddSingleton<ISchemaIdHandler, UmbracoAutomateApiSchemaIdHandler>();
-
         builder.AddUmbracoAutomateJsonOptions();
+
+        // Authenticated backoffice document. WithJsonOptions aligns schema generation with the
+        // named serializer options registered in AddUmbracoAutomateJsonOptions (camelCase, custom
+        // converters, alphabetised properties) so the generated client matches runtime serialisation.
+        builder.AddBackOfficeOpenApiDocument(Constants.ManagementApi.ApiName, document => document
+            .WithTitle(Constants.ManagementApi.ApiTitle)
+            .WithBackOfficeAuthentication()
+            .WithJsonOptions(Constants.ManagementApi.ApiName)
+            .ConfigureOpenApiOptions(options =>
+            {
+                ConfigureDocumentInfo(
+                    options,
+                    $"Describes the {Constants.ManagementApi.ApiTitle} available for managing automations, triggers, actions, and runs when authenticated as a backoffice user.");
+                PreserveAutomateSchemaIds(options);
+                AddAutomateSchemaTransformers(options);
+            }));
 
         return builder;
     }
 
     private static IUmbracoBuilder AddUmbracoAutomateWebhookApi(this IUmbracoBuilder builder)
     {
-        builder.Services.Configure<SwaggerGenOptions>(options =>
-        {
-            if (options.SwaggerGeneratorOptions.SwaggerDocs.ContainsKey(Constants.WebhookApi.ApiName))
-                return;
-
-            options.SwaggerDoc(
-                Constants.WebhookApi.ApiName,
-                new OpenApiInfo
-                {
-                    Title = Constants.WebhookApi.ApiTitle,
-                    Version = "Latest",
-                    Description = "Public webhook endpoints for triggering automations from external systems. No authentication required.",
-                });
-        });
+        // Public document — no backoffice authentication. Webhook callers authenticate via signature.
+        builder.AddBackOfficeOpenApiDocument(Constants.WebhookApi.ApiName, document => document
+            .WithTitle(Constants.WebhookApi.ApiTitle)
+            .ConfigureOpenApiOptions(options =>
+            {
+                ConfigureDocumentInfo(
+                    options,
+                    "Public webhook endpoints for triggering automations from external systems. No authentication required.");
+                PreserveAutomateSchemaIds(options);
+                AddAutomateSchemaTransformers(options);
+            }));
 
         builder.AddUmbracoAutomateWebhookRateLimiting();
 
         return builder;
+    }
+
+    /// <summary>
+    /// Sets the OpenAPI document description and version via a document transformer, matching the
+    /// metadata Swashbuckle produced prior to the v18 OpenAPI migration.
+    /// </summary>
+    private static void ConfigureDocumentInfo(OpenApiOptions options, string description)
+        => options.AddDocumentTransformer((document, _, _) =>
+        {
+            document.Info.Description = description;
+            document.Info.Version = "Latest";
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// Applies Umbraco's schema-ID naming convention to types in the Umbraco.Automate namespace.
+    /// </summary>
+    /// <remarks>
+    /// The default delegate set by <c>AddBackOfficeOpenApiDocument</c> only applies the convention to
+    /// <c>Umbraco.Cms.*</c> types; ours fall through to the framework default, which yields different
+    /// names than the v17 <c>UmbracoAutomateApiSchemaIdHandler</c>. Overriding here keeps generated
+    /// TypeScript client type names stable across the v17 -> v18 migration.
+    /// </remarks>
+    private static void PreserveAutomateSchemaIds(OpenApiOptions options)
+    {
+        Func<JsonTypeInfo, string?> inheritedSchemaReferenceId = options.CreateSchemaReferenceId;
+        options.CreateSchemaReferenceId = jsonTypeInfo =>
+            IsAutomateType(jsonTypeInfo)
+                ? UmbracoSchemaIdGenerator.Generate(Nullable.GetUnderlyingType(jsonTypeInfo.Type) ?? jsonTypeInfo.Type)
+                : inheritedSchemaReferenceId(jsonTypeInfo);
+    }
+
+    private static bool IsAutomateType(JsonTypeInfo jsonTypeInfo)
+    {
+        Type targetType = Nullable.GetUnderlyingType(jsonTypeInfo.Type) ?? jsonTypeInfo.Type;
+        return targetType.Namespace?.StartsWith(Constants.AppNamespaceRoot) is true;
+    }
+
+    /// <summary>
+    /// Registers the schema transformers that keep the v18 OpenAPI document — and the client generated from it —
+    /// shaped like the v17 (Swashbuckle) output, so no downstream UI changes are required.
+    /// </summary>
+    private static void AddAutomateSchemaTransformers(OpenApiOptions options)
+    {
+        // [Flags] enums (e.g. NotifyOn) -> string enum of member names instead of a bare `string`.
+        options.AddSchemaTransformer<FlagsEnumSchemaTransformer>();
+
+        // Numeric `["integer"/"number","string"]` widening -> plain numeric (`number`, not `number | string`).
+        options.AddSchemaTransformer<NumericStringUnionSchemaTransformer>();
+
+        // Re-close object schemas (`additionalProperties: false`), which v18 leaves open.
+        options.AddSchemaTransformer<ClosedObjectSchemaTransformer>();
+
+        // Restore `minLength: 1` on required (non-nullable) string properties, which v18 drops.
+        options.AddSchemaTransformer<RequiredStringMinLengthSchemaTransformer>();
     }
 
     private static IUmbracoBuilder AddUmbracoAutomateWebhookRateLimiting(this IUmbracoBuilder builder)
@@ -212,25 +257,48 @@ public static partial class UmbracoBuilderExtensions
 
     private static IUmbracoBuilder AddUmbracoAutomateJsonOptions(this IUmbracoBuilder builder)
     {
+        // Runtime serialization for controllers tagged [JsonOptionsName(ApiName)] (MVC JSON options).
         builder.Services.AddControllers()
             .AddJsonOptions(Constants.ManagementApi.ApiName, options =>
             {
-                options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-                options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
-                options.JsonSerializerOptions.WriteIndented = false;
+                ConfigureManagementApiJson(options.JsonSerializerOptions);
 
+                // Runtime-only settings, deliberately NOT applied to the schema-generation options so the v18
+                // OpenAPI document stays equivalent to v17 (and the generated client doesn't churn):
+                //  - AlphabetizeProperties reorders the JSON payload, but v17's Swashbuckle schema used
+                //    declaration order; applying it to schema generation would reorder every model.
+                //  - The UTC DateTime converters only force UTC on the wire — they don't change the JSON *type*
+                //    (still a date-time string). Including them in schema generation, however, makes the
+                //    generator emit an untyped schema (`unknown`) for every DateTime property AND query
+                //    parameter. Leaving them out lets DateTime map to string/date-time natively, which both
+                //    matches the v17 output and stays correct for query parameters (e.g. metrics from/to).
                 options.JsonSerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver
                 {
                     Modifiers = { AlphabetizeProperties() },
                 };
-
-                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-                options.JsonSerializerOptions.Converters.Add(new JsonStringTypeConverter());
                 options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
                 options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeJsonConverter());
             });
 
+        // OpenAPI schema generation reads the *Http* JSON options selected via
+        // BackOfficeOpenApiDocumentBuilder.WithJsonOptions, NOT the MVC options above. Configure the
+        // same named Http options so the generated schema matches runtime serialization — otherwise
+        // enums render as bare integers and the generated client diverges from the API.
+        builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(
+            Constants.ManagementApi.ApiName,
+            options => ConfigureManagementApiJson(options.SerializerOptions));
+
         return builder;
+    }
+
+    private static void ConfigureManagementApiJson(JsonSerializerOptions options)
+    {
+        options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+        options.WriteIndented = false;
+
+        options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new JsonStringTypeConverter());
     }
 
     private static Action<JsonTypeInfo> AlphabetizeProperties() =>

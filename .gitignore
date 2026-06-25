@@ -96,3 +96,7 @@ refs/
 .auto-claude/
 
 .playwright-mcp/
+
+# Generated appsettings JSON schemas (build artifacts produced by the
+# GenerateAppsettingsSchema target — never committed so they can't go stale)
+appsettings-schema.Umbraco.Automate*.json

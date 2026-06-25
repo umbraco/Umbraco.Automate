@@ -34,8 +34,17 @@ Guide users through the complete release preparation process:
 
 2. **For each product**, detect changes since last release:
     ```bash
-    # Find the most recent release tag for this product
-    git tag --list "Umbraco.Automate@*" --sort=-version:refname | head -n1
+    # Find the most recent release tag for this product that is REACHABLE from HEAD.
+    # Use git describe (reachability-based), NOT `git tag --list --sort=-version:refname`
+    # (version-sorted). On parallel support lines (e.g. support/17.x alongside an 18.x
+    # line on dev/main), a version sort would pick the highest tag across ALL branches —
+    # so a 17.x release run would wrongly grab an 18.x tag as its base. git describe walks
+    # back from HEAD and only sees tags on this line's history. This matches CI's
+    # detect-changes.ps1 (`git describe --tags --abbrev=0 --match=...`), so the skill and
+    # CI agree on each product's base tag.
+    git describe --tags --abbrev=0 --match="<Product>@*"   # e.g. --match="Umbraco.Automate@*"
+    # Exit code != 0 means no matching tag is reachable (first release on this line) —
+    # fall back to merge-base with main (see Error Handling).
 
     # Get commits affecting this product since that tag
     git log <tag>..HEAD --oneline -- <ProductFolder>/
@@ -776,7 +785,7 @@ You show summary and next steps
 ## Error Handling
 
 - **No changes detected**: Ask user if they want to proceed anyway (manual version bump)
-- **Git tag not found**: Fall back to comparing with main branch
+- **Git tag not found** (`git describe` exits non-zero — no reachable product tag on this line): Fall back to `git merge-base origin/main HEAD` and compare against that, mirroring CI's detect-changes.ps1 fallback. Do NOT fall back to a version-sorted `git tag --list` lookup — that reintroduces the parallel-line bug described in Phase 1.
 - **Invalid version.json**: Report error and ask user to fix manually
 - **Changelog generation fails**: Report error but continue with other products
 - **Dependency conflict**: Warn user but allow them to proceed

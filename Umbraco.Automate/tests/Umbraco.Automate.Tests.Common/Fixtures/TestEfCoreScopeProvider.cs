@@ -18,26 +18,26 @@ public class TestEfCoreScopeProvider : IEFCoreScopeProvider<UmbracoAutomateDbCon
         _contextFactory = contextFactory;
     }
 
-    public IEfCoreScope<UmbracoAutomateDbContext> CreateScope(
+    public IEFCoreScope<UmbracoAutomateDbContext> CreateScope(
         RepositoryCacheMode repositoryCacheMode = RepositoryCacheMode.Unspecified,
         bool? scopeFileSystems = null)
     {
         return new TestEfCoreScope(_contextFactory());
     }
 
-    public IEfCoreScope<UmbracoAutomateDbContext> CreateDetachedScope(
+    public IEFCoreScope<UmbracoAutomateDbContext> CreateDetachedScope(
         RepositoryCacheMode repositoryCacheMode = RepositoryCacheMode.Unspecified,
         bool? scopeFileSystems = null)
     {
         return CreateScope(repositoryCacheMode, scopeFileSystems);
     }
 
-    public void AttachScope(IEfCoreScope<UmbracoAutomateDbContext> other)
+    public void AttachScope(IEFCoreScope<UmbracoAutomateDbContext> other)
     {
         // No-op for tests
     }
 
-    public IEfCoreScope<UmbracoAutomateDbContext> DetachScope()
+    public IEFCoreScope<UmbracoAutomateDbContext> DetachScope()
     {
         throw new NotSupportedException("DetachScope is not supported in test scope provider.");
     }
@@ -46,9 +46,9 @@ public class TestEfCoreScopeProvider : IEFCoreScopeProvider<UmbracoAutomateDbCon
 }
 
 /// <summary>
-/// Test implementation of <see cref="IEfCoreScope{TDbContext}"/> for integration testing.
+/// Test implementation of <see cref="IEFCoreScope{TDbContext}"/> for integration testing.
 /// </summary>
-public class TestEfCoreScope : IEfCoreScope<UmbracoAutomateDbContext>
+public class TestEfCoreScope : IEFCoreScope<UmbracoAutomateDbContext>
 {
     private readonly UmbracoAutomateDbContext _context;
     private bool _completed;

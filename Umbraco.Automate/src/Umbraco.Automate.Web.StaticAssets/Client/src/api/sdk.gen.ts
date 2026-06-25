@@ -49,14 +49,14 @@ export class AutomationsService {
         });
     }
     
-    public static postAutomations<ThrowOnError extends boolean = false>(options?: Options<PostAutomationsData, ThrowOnError>) {
-        return (options?.client ?? client).post<PostAutomationsResponses, PostAutomationsErrors, ThrowOnError>({
+    public static postAutomations<ThrowOnError extends boolean = false>(options: Options<PostAutomationsData, ThrowOnError>) {
+        return (options.client ?? client).post<PostAutomationsResponses, PostAutomationsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations',
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
@@ -165,26 +165,26 @@ export class AutomationsService {
         });
     }
     
-    public static postAutomationsImport<ThrowOnError extends boolean = false>(options?: Options<PostAutomationsImportData, ThrowOnError>) {
-        return (options?.client ?? client).post<PostAutomationsImportResponses, PostAutomationsImportErrors, ThrowOnError>({
+    public static postAutomationsImport<ThrowOnError extends boolean = false>(options: Options<PostAutomationsImportData, ThrowOnError>) {
+        return (options.client ?? client).post<PostAutomationsImportResponses, PostAutomationsImportErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/import',
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
     
-    public static postAutomationsImportValidate<ThrowOnError extends boolean = false>(options?: Options<PostAutomationsImportValidateData, ThrowOnError>) {
-        return (options?.client ?? client).post<PostAutomationsImportValidateResponses, PostAutomationsImportValidateErrors, ThrowOnError>({
+    public static postAutomationsImportValidate<ThrowOnError extends boolean = false>(options: Options<PostAutomationsImportValidateData, ThrowOnError>) {
+        return (options.client ?? client).post<PostAutomationsImportValidateResponses, PostAutomationsImportValidateErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/import/validate',
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
@@ -269,14 +269,14 @@ export class ConnectionsService {
         });
     }
     
-    public static postConnections<ThrowOnError extends boolean = false>(options?: Options<PostConnectionsData, ThrowOnError>) {
-        return (options?.client ?? client).post<PostConnectionsResponses, PostConnectionsErrors, ThrowOnError>({
+    public static postConnections<ThrowOnError extends boolean = false>(options: Options<PostConnectionsData, ThrowOnError>) {
+        return (options.client ?? client).post<PostConnectionsResponses, PostConnectionsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/connections',
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
@@ -429,14 +429,14 @@ export class WorkspacesService {
         });
     }
     
-    public static postWorkspaces<ThrowOnError extends boolean = false>(options?: Options<PostWorkspacesData, ThrowOnError>) {
-        return (options?.client ?? client).post<PostWorkspacesResponses, PostWorkspacesErrors, ThrowOnError>({
+    public static postWorkspaces<ThrowOnError extends boolean = false>(options: Options<PostWorkspacesData, ThrowOnError>) {
+        return (options.client ?? client).post<PostWorkspacesResponses, PostWorkspacesErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/workspaces',
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
