@@ -71,17 +71,47 @@ fi
 echo "Node $NODE_VERSION_RAW detected (satisfies '$REQUIRED_NODE_RANGE')."
 echo ""
 
+# Detect template version and major from Directory.Packages.props.
+# The Umbraco.Cms.Core version (lower bound if a range, or the fixed version) is the right
+# template version to scaffold the demo site against.
+PACKAGES_PROPS_PATH="$REPO_ROOT/Directory.Packages.props"
+if [ ! -f "$PACKAGES_PROPS_PATH" ]; then
+    echo "ERROR: Could not find $PACKAGES_PROPS_PATH" >&2
+    exit 1
+fi
+# Try range format first: Version="[18.0.0,...)"
+TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="\[[^,\]]+' "$PACKAGES_PROPS_PATH" | grep -oE '\[[^,\]]+' | tr -d '[')
+if [ -z "$TEMPLATE_VERSION" ]; then
+    # Try fixed version format: Version="18.0.0"
+    TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="[^"\[]*"' "$PACKAGES_PROPS_PATH" | grep -oE '"[^"\[]*"$' | tr -d '"')
+fi
+if [ -z "$TEMPLATE_VERSION" ]; then
+    echo "ERROR: Could not find Umbraco.Cms.Core version in $PACKAGES_PROPS_PATH" >&2
+    exit 1
+fi
+VERSION_MAJOR=$(echo "$TEMPLATE_VERSION" | cut -d. -f1)
+IS_TEMPLATE_PRERELEASE=false
+if echo "$TEMPLATE_VERSION" | grep -q '-'; then
+    IS_TEMPLATE_PRERELEASE=true
+fi
+echo "Target Umbraco.Cms template version: $TEMPLATE_VERSION (v$VERSION_MAJOR)"
+echo ""
+
+# Versioned demo directory: demos/vN/
+DEMO_DIR="demos/v${VERSION_MAJOR}"
+DEMO_SITE_DIR="${DEMO_DIR}/Umbraco.Automate.DemoSite"
+
 # Check if demo already exists
-if [ -d "demo" ] && [ "$FORCE" = false ]; then
-    echo "Demo folder already exists. Use --force to recreate."
+if [ -d "$DEMO_DIR" ] && [ "$FORCE" = false ]; then
+    echo "Demo folder '$DEMO_DIR' already exists. Use --force to recreate."
     echo "Or open the existing Umbraco.Automate.local.slnx"
     exit 0
 fi
 
 # Clean up existing demo if Force
-if [ "$FORCE" = true ] && [ -d "demo" ]; then
-    echo "Removing existing demo folder..."
-    rm -rf "demo"
+if [ "$FORCE" = true ] && [ -d "$DEMO_DIR" ]; then
+    echo "Removing existing demo folder '$DEMO_DIR'..."
+    rm -rf "$DEMO_DIR"
 fi
 
 if [ "$FORCE" = true ] && [ -f "Umbraco.Automate.local.slnx" ]; then
@@ -90,50 +120,52 @@ fi
 
 # Step 1: Install Umbraco templates
 if [ "$SKIP_TEMPLATE_INSTALL" = false ]; then
-    echo "Installing Umbraco templates..."
+    echo "Installing Umbraco templates ($TEMPLATE_VERSION)..."
     # Uninstall any existing version to avoid conflicts
     echo "Removing any existing Umbraco.Templates installations..."
     if dotnet new uninstall 2>&1 | grep -q "Umbraco\.Templates"; then
         dotnet new uninstall Umbraco.Templates 2>/dev/null || true
     fi
-    # Pin to 18.0.0-rc2 to match the Umbraco.Cms.Core minimum in Directory.Packages.props. v18 ships
-    # via the umbracoprereleases MyGet feed for now — drop the explicit pin (or move it forward) once
-    # v18 stable lands on nuget.org. Bump in lockstep when the CMS floor moves.
-    dotnet new install Umbraco.Templates::18.0.0-rc2 --force
+    if [ "$IS_TEMPLATE_PRERELEASE" = true ]; then
+        # Prerelease templates require the umbracoprereleases MyGet feed to be configured.
+        # If not yet configured: dotnet nuget add source https://www.myget.org/F/umbracoprereleases/api/v3/index.json --name UmbracoPreReleases
+        echo "NOTE: Prerelease template ($TEMPLATE_VERSION) requires the umbracoprereleases MyGet source."
+    fi
+    dotnet new install "Umbraco.Templates::${TEMPLATE_VERSION}" --force
 fi
 
 # Step 2: Create demo folder with build overrides
-echo "Creating demo folder..."
-mkdir -p "demo"
+echo "Creating demo folder '$DEMO_DIR'..."
+mkdir -p "$DEMO_DIR"
 
 # Disable package validation for demo folder
-cp "$SCRIPT_DIR/templates/Directory.Build.props" "demo/Directory.Build.props"
+cp "$SCRIPT_DIR/templates/Directory.Build.props" "$DEMO_DIR/Directory.Build.props"
 
 # Disable central package management for demo folder
-cp "$SCRIPT_DIR/templates/Directory.Packages.props" "demo/Directory.Packages.props"
+cp "$SCRIPT_DIR/templates/Directory.Packages.props" "$DEMO_DIR/Directory.Packages.props"
 
 # Step 3: Create the Umbraco demo site
 echo "Creating Umbraco demo site..."
-pushd "demo" > /dev/null
+pushd "$DEMO_DIR" > /dev/null
 dotnet new umbraco --force -n "Umbraco.Automate.DemoSite" --friendly-name "Administrator" --email "admin@example.com" --password "password1234" --development-database-type SQLite
 popd > /dev/null
 
 # Step 3.1: Install Clean starter kit
 echo "Installing Clean starter kit..."
-pushd "demo/Umbraco.Automate.DemoSite" > /dev/null
+pushd "$DEMO_SITE_DIR" > /dev/null
 # --prerelease: the CMS-v18-compatible Clean (8.0.0-rc1) is still prerelease.
 dotnet add package Clean --prerelease
 popd > /dev/null
 
 # Step 3.2: Set fixed port for consistent development
 echo "Configuring fixed port (44380)..."
-mkdir -p "demo/Umbraco.Automate.DemoSite/Properties"
-cp "$SCRIPT_DIR/templates/launchSettings.json" "demo/Umbraco.Automate.DemoSite/Properties/launchSettings.json"
+mkdir -p "$DEMO_SITE_DIR/Properties"
+cp "$SCRIPT_DIR/templates/launchSettings.json" "$DEMO_SITE_DIR/Properties/launchSettings.json"
 
 # Step 3.3: Add NamedPipeListenerComposer for HTTP over named pipes
 echo "Adding NamedPipeListenerComposer for HTTP over named pipes..."
-mkdir -p "demo/Umbraco.Automate.DemoSite/Composers"
-cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "demo/Umbraco.Automate.DemoSite/Composers/NamedPipeListenerComposer.cs"
+mkdir -p "$DEMO_SITE_DIR/Composers"
+cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "$DEMO_SITE_DIR/Composers/NamedPipeListenerComposer.cs"
 
 # Step 4: Create unified solution
 echo "Creating unified solution..."
@@ -173,11 +205,11 @@ add_product_projects "Umbraco.Automate.Slack" "Slack"
 
 # Step 8: Add demo site to solution
 echo "Adding demo site to solution..."
-dotnet sln "Umbraco.Automate.local.slnx" add "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+dotnet sln "Umbraco.Automate.local.slnx" add "$DEMO_SITE_DIR/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
 
 # Step 7: Add project references to demo site
 echo "Adding project references to demo site..."
-DEMO_PROJECT="demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj"
+DEMO_PROJECT="$DEMO_SITE_DIR/Umbraco.Automate.DemoSite.csproj"
 
 # Core references (Startup + Web.StaticAssets)
 dotnet add "$DEMO_PROJECT" reference "Umbraco.Automate/src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj"
@@ -199,7 +231,7 @@ echo "Setup Complete!"
 echo "========================================="
 echo ""
 echo "Solution: Umbraco.Automate.local.slnx"
-echo "Demo site: demo/Umbraco.Automate.DemoSite"
+echo "Demo site: $DEMO_SITE_DIR"
 echo ""
 echo "Credentials:"
 echo "  Email: admin@example.com"

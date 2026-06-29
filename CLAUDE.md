@@ -31,7 +31,7 @@ Each product has its own solution file, CLAUDE.md, and can be built independentl
 
 ### Demo Site
 
-A demo Umbraco site is available at `demo/Umbraco.Automate.DemoSite/` for manual testing. Use the `/demo-site-management` skill to start/stop it.
+A demo Umbraco site is available at `demos/vN/Umbraco.Automate.DemoSite/` (N = major from `Umbraco.Cms.Core` version in `Directory.Packages.props`) for manual testing. Use the `/demo-site-management` skill to start/stop it.
 
 ## Build Commands
 

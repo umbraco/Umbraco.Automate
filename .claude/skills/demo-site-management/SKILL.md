@@ -35,10 +35,13 @@ Execute the requested demo site operation.
     - Try querying site address endpoint via named pipe (see "Query site address via named pipe" section)
     - Check if background tasks exist with "DemoSite" in description
     - If running, report and exit
-2. If not running, start in background: `cd demo/Umbraco.Automate.DemoSite && dotnet run --launch-profile DemoSite-Claude`
-3. Wait 15-20 seconds for startup
-4. Query site address endpoint via named pipe to get port and pipe name (see "Query site address via named pipe" section)
-5. Report:
+2. Detect demo site path:
+    - Read `Directory.Packages.props` and extract the major from the `Umbraco.Cms.Core` version (range lower bound or fixed, e.g. `[18.0.0, …)` or `18.0.0` → `18`)
+    - Demo site path: `demos/v{major}/Umbraco.Automate.DemoSite`
+3. If not running, start in background: `cd demos/v{major}/Umbraco.Automate.DemoSite && dotnet run --launch-profile DemoSite-Claude`
+4. Wait 15-20 seconds for startup
+5. Query site address endpoint via named pipe to get port and pipe name (see "Query site address via named pipe" section)
+6. Report:
     - Task ID for later stopping (save this for future commands)
     - Port number (from site address endpoint)
     - Pipe name (format: umbraco.demosite.{branch-or-worktree})
@@ -175,7 +178,7 @@ The demo site uses HTTP over named pipes for automatic port discovery:
     - No git: `default`
 - **Site address endpoint**: `/site-address` (returns HTTPS address as plain text)
 - **HTTP transport**: Kestrel listens on both named pipe and HTTP/HTTPS
-- **Implementation**: `demo/Umbraco.Automate.DemoSite/Composers/NamedPipeListenerComposer.cs`
+- **Implementation**: `demos/v{major}/Umbraco.Automate.DemoSite/Composers/NamedPipeListenerComposer.cs`
 
 ## Common Issues
 
