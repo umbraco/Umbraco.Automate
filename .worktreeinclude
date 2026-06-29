@@ -12,7 +12,7 @@ appsettings.Local.json
 !.env.template
 
 # Demo site
-demo/
+demos/v18/
 *.local.slnx
 
 # Exclude non-source directories that contain pattern matches
