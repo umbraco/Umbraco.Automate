@@ -11,7 +11,7 @@ appsettings.Local.json
 .env*
 !.env.template
 
-# Demo site
+# Demo sites
 demos/v18/
 *.local.slnx
 

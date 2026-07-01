@@ -130,10 +130,23 @@ dotnet new umbraco --force -n "Umbraco.Automate.DemoSite" --friendly-name "Admin
 Pop-Location
 
 # Step 3.1: Install Clean starter kit
+# Clean's major version does not match the CMS major — map explicitly and add
+# new entries as majors are released. Floating patterns keep multi-version installs correct:
+#   17 -> 7.*   (stable)
+#   18 -> 8.*-* (the CMS-v18-compatible Clean, e.g. 8.0.0-rc1, is still prerelease)
+$cleanVersionMap = @{
+    "17" = "7.*"
+    "18" = "8.*-*"
+}
+$cleanVersion = $cleanVersionMap["$VersionMajor"]
 Write-Host "Installing Clean starter kit..." -ForegroundColor Green
 Push-Location $DemoSiteDir
-# --prerelease: the CMS-v18-compatible Clean (8.0.0-rc1) is still prerelease.
-dotnet add package Clean --prerelease
+if ($cleanVersion) {
+    dotnet add package Clean --version $cleanVersion
+} else {
+    Write-Host "Warning: No Clean version mapping for v$VersionMajor, using latest stable." -ForegroundColor Yellow
+    dotnet add package Clean
+}
 Pop-Location
 
 # Step 3.2: Set fixed port for consistent development
