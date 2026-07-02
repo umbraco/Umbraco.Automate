@@ -15,7 +15,14 @@ public sealed class LogMessageSettings
 
     /// <summary>
     /// Gets or sets the log level. Defaults to "Information".
+    /// Rendered as a dropdown; the available values mirror those recognised by
+    /// <see cref="LogMessageAction.ParseLogLevel"/> (anything else falls back to Information).
     /// </summary>
-    [Field(Label = "Log Level", Description = "The severity level (Debug, Information, Warning, Error).", SortOrder = 1)]
+    [Field(
+        Label = "Log Level",
+        Description = "The severity level used when writing the message to the log.",
+        SortOrder = 1,
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorConfig = """[{ "alias": "items", "value": ["Debug", "Information", "Warning", "Error"] }]""")]
     public string LogLevel { get; set; } = "Information";
 }

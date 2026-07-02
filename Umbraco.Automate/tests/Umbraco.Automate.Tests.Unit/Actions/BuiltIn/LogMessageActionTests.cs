@@ -58,4 +58,32 @@ public class LogMessageActionTests
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
         result.Status.ShouldBe(ActionResultStatus.Success);
     }
+
+    [Fact]
+    public void DefaultLogLevel_IsInformation()
+        => new LogMessageSettings().LogLevel.ShouldBe("Information");
+
+    // The Log Level setting is rendered as a dropdown (see LogMessageSettings).
+    // Each offered option must execute successfully so the picker never lets the
+    // user select a value the action cannot handle.
+    [Theory]
+    [InlineData("Debug")]
+    [InlineData("Information")]
+    [InlineData("Warning")]
+    [InlineData("Error")]
+    public async Task ExecuteAsync_WithDropdownLogLevel_Succeeds(string logLevel)
+    {
+        var context = new ActionContext
+        {
+            AutomationId = Guid.NewGuid(),
+            RunId = Guid.NewGuid(),
+            StepId = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.logMessage",
+            Settings = new LogMessageSettings { Message = "Hello", LogLevel = logLevel },
+        };
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
 }
