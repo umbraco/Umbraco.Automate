@@ -4,7 +4,7 @@
     Validates that CHANGELOGs are present and up-to-date for release branches.
 
 .DESCRIPTION
-    This script runs on release/* branches to ensure:
+    This script runs on vN/release/* branches to ensure:
     1. Each product in release-manifest.json has a CHANGELOG.md
     2. The CHANGELOG.md was updated in recent commits
     3. The version in CHANGELOG.md matches version.json
