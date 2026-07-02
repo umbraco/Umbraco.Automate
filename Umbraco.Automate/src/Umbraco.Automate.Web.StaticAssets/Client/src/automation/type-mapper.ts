@@ -68,6 +68,7 @@ export const UaAutomationTypeMapper = {
             alias: model.alias,
             name: model.name,
             description: model.description,
+            groupId: model.groupId,
             trigger: model.trigger,
             steps: model.steps,
             connections: model.connections,
