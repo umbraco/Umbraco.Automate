@@ -99,6 +99,30 @@ public class PendingApprovalsControllerTests
         models[0].Prompt.ShouldBe("Please approve the release");
     }
 
+    [Fact]
+    public async Task GetPendingApprovals_MultipleRunsOfSameAutomation_LooksUpAutomationOnce()
+    {
+        var workspace = Guid.NewGuid();
+        var automation = new AutomationBuilder().WithWorkspaceId(workspace).WithName("A").Build();
+        var runA = new AutomationRunBuilder().WithAutomationId(automation.Id).WithWorkspaceId(workspace).Build();
+        var runB = new AutomationRunBuilder().WithAutomationId(automation.Id).WithWorkspaceId(workspace).Build();
+
+        _runService
+            .Setup(s => s.GetStepRunsByStatusAsync(
+                RequestApprovalAction.ApprovalActionAlias, StepRunStatus.WaitingForInput, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([(runA, StepFor(runA)), (runB, StepFor(runB))]);
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+        SetupUser(CreateUser(isAdmin: true));
+
+        var models = await GetModels();
+
+        models.Count.ShouldBe(2);
+        _automationService.Verify(
+            s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private async Task<List<PendingApprovalResponseModel>> GetModels()
     {
         var result = await _controller.GetPendingApprovals(CancellationToken.None);
