@@ -74,14 +74,15 @@ public class PendingApprovalsControllerTests
         var workspace = Guid.NewGuid();
         var automation = new AutomationBuilder().WithWorkspaceId(workspace).WithName("A").Build();
         var run = new AutomationRunBuilder().WithAutomationId(automation.Id).WithWorkspaceId(workspace).Build();
+        var stepId = Guid.NewGuid();
         var stepRun = new StepRun
         {
             RunId = run.Id,
-            StepId = Guid.NewGuid(),
+            StepId = stepId,
             ActionAlias = RequestApprovalAction.ApprovalActionAlias,
             Status = StepRunStatus.WaitingForInput,
             StartedUtc = DateTime.UtcNow,
-            OutputData = """{"prompt":"Please approve the release","runId":"x"}""",
+            OutputData = $$"""{"prompt":"Please approve the release","runId":"{{run.Id}}","stepId":"{{stepId}}","automationId":"{{automation.Id}}","requestedUtc":"2026-07-03T00:00:00Z"}""",
         };
 
         _runService

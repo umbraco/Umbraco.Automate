@@ -104,10 +104,9 @@ public sealed class PendingApprovalsController : ApprovalControllerBase
 
         try
         {
-            using var document = JsonDocument.Parse(outputData);
-            return document.RootElement.TryGetProperty("prompt", out var prompt) && prompt.ValueKind == JsonValueKind.String
-                ? prompt.GetString()
-                : null;
+            var output = JsonSerializer.Deserialize<ApprovalRequestOutput>(
+                outputData, Umbraco.Automate.Core.Dispatch.JsonOptions.Default);
+            return output?.Prompt;
         }
         catch (JsonException)
         {
