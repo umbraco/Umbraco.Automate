@@ -47,15 +47,15 @@ public sealed class PendingApprovalsController : ApprovalControllerBase
     public async Task<ActionResult<IEnumerable<PendingApprovalResponseModel>>> GetPendingApprovals(
         CancellationToken cancellationToken)
     {
-        // Admins see all pending approvals; non-admins see only those in their workspaces.
-        IReadOnlySet<Guid>? accessibleWorkspaceIds = null;
-
         var user = _authorizationHelper.GetUmbracoUser(User);
-        if (!user.IsAdmin())
-        {
-            var userGroupKeys = user.Groups.Select(g => g.Key).ToList();
-            accessibleWorkspaceIds = await _workspaceService.GetAccessibleWorkspaceIdsAsync(userGroupKeys, cancellationToken);
-        }
+        var isAdmin = user.IsAdmin();
+
+        // Admins can approve anything, so skip the workspace lookup entirely;
+        // non-admins are limited to the workspaces their groups can access.
+        IReadOnlySet<Guid>? accessibleWorkspaceIds = isAdmin
+            ? null
+            : await _workspaceService.GetAccessibleWorkspaceIdsAsync(
+                user.Groups.Select(g => g.Key).ToList(), cancellationToken);
 
         var pendingSteps = await _runService.GetStepRunsByStatusAsync(
             RequestApprovalAction.ApprovalActionAlias,
@@ -63,17 +63,25 @@ public sealed class PendingApprovalsController : ApprovalControllerBase
             cancellationToken);
 
         var results = new List<PendingApprovalResponseModel>();
+        var automationCache = new Dictionary<Guid, Core.Automations.Automation?>();
 
         foreach (var (run, stepRun) in pendingSteps)
         {
-            var automation = await _automationService.GetAutomationAsync(run.AutomationId, cancellationToken);
+            if (!automationCache.TryGetValue(run.AutomationId, out var automation))
+            {
+                automation = await _automationService.GetAutomationAsync(run.AutomationId, cancellationToken);
+                automationCache[run.AutomationId] = automation;
+            }
+
             if (automation is null)
             {
                 continue;
             }
 
-            // Filter out approvals in workspaces the user cannot access.
-            if (accessibleWorkspaceIds is not null && !accessibleWorkspaceIds.Contains(automation.WorkspaceId))
+            // Authorize against the automation's current workspace rather than run.WorkspaceId
+            // (the execution-time snapshot) so the list matches what SubmitApprovalController
+            // allows the user to act on. Admins can approve anything.
+            if (!isAdmin && !accessibleWorkspaceIds!.Contains(automation.WorkspaceId))
             {
                 continue;
             }
