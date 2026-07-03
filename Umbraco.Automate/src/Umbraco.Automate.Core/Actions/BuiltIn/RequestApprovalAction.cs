@@ -35,14 +35,14 @@ public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings>
 
         var eventKey = $"{context.RunId}:{context.StepId}";
 
-        var output = new
+        var output = new ApprovalRequestOutput
         {
             Prompt = settings.Prompt ?? "Approval required to continue.",
-            context.RunId,
-            context.StepId,
-            context.AutomationId,
+            RunId = context.RunId,
+            StepId = context.StepId,
+            AutomationId = context.AutomationId,
             RequestedUtc = DateTime.UtcNow,
-            settings.TimeoutHours,
+            TimeoutHours = settings.TimeoutHours,
         };
 
         return Task.FromResult(ActionResult.WaitForInput(ApprovalEventName, eventKey, output));
