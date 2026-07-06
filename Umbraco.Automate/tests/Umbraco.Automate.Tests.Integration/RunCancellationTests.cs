@@ -16,6 +16,7 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
@@ -123,6 +124,7 @@ public class RunCancellationTests : IAsyncLifetime
         services.AddSingleton<IRateLimitService, RateLimitService>();
 
         services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
+        services.AddSingleton<ForEachCollectionCache>();
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
         services.AddSingleton<IEventAggregator>(Mock.Of<IEventAggregator>());
