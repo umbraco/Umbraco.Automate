@@ -31,6 +31,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     private readonly ControlFlowCollection _controlFlows;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly ForEachCollectionCache _collectionCache;
     private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
@@ -45,6 +46,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         ControlFlowCollection controlFlows,
         ActionMiddlewarePipeline pipeline,
         BindingEvaluator bindingEvaluator,
+        ForEachCollectionCache collectionCache,
         SettingsBindingResolver settingsBindingResolver,
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
@@ -58,6 +60,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         _controlFlows = controlFlows;
         _pipeline = pipeline;
         _bindingEvaluator = bindingEvaluator;
+        _collectionCache = collectionCache;
         _settingsBindingResolver = settingsBindingResolver;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
@@ -183,6 +186,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 action,
                 _pipeline,
                 _bindingEvaluator,
+                _collectionCache,
                 _settingsBindingResolver,
                 _runRepository,
                 _connectionService,
@@ -232,19 +236,19 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             {
                 var settings = ResolveSettings<ForEachControlFlowSettings>(stepConfig, controlFlow) ?? new ForEachControlFlowSettings();
                 return new ControlFlowWorkflowStep(new ForEachContainerStepBody(
-                    stepConfig, settings, _bindingEvaluator, _conditionEvaluator, _runRepository, branchEdges));
+                    stepConfig, settings, _collectionCache, _conditionEvaluator, _runRepository, branchEdges));
             }
 
             case WhileControlFlow:
             {
                 var settings = ResolveSettings<WhileControlFlowSettings>(stepConfig, controlFlow) ?? new WhileControlFlowSettings();
                 return new ControlFlowWorkflowStep(new WhileContainerStepBody(
-                    stepConfig, settings, _conditionEvaluator, _runRepository, branchEdges));
+                    stepConfig, settings, _collectionCache, _conditionEvaluator, _runRepository, branchEdges));
             }
 
             case ParallelControlFlow:
             {
-                return new ControlFlowWorkflowStep(new ParallelContainerStepBody(stepConfig, _conditionEvaluator, branchEdges));
+                return new ControlFlowWorkflowStep(new ParallelContainerStepBody(stepConfig, _collectionCache, _conditionEvaluator, branchEdges));
             }
 
             default:

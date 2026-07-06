@@ -15,6 +15,7 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
@@ -90,6 +91,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         var controlFlow = new ControlFlowCollection(Enumerable.Empty<IControlFlow>);
         services.AddSingleton(controlFlow);
         services.AddSingleton(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        services.AddSingleton<ForEachCollectionCache>();
         services.AddSingleton<SettingsBindingResolver>();
         services.AddSingleton<ConditionEvaluator>();
         services.AddSingleton<ActionMiddlewarePipeline>();

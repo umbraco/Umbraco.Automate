@@ -15,12 +15,14 @@ namespace Umbraco.Automate.Tests.Unit.Execution.ControlFlow;
 public class ForEachContainerStepBodyTests
 {
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly ForEachCollectionCache _collectionCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
 
     public ForEachContainerStepBodyTests()
     {
         _bindingEvaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
+        _collectionCache = new ForEachCollectionCache(_bindingEvaluator);
         _conditionEvaluator = new ConditionEvaluator(_bindingEvaluator);
         _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
@@ -77,7 +79,6 @@ public class ForEachContainerStepBodyTests
 
         var iteration = (ForEachIterationContext)result.BranchValues[0];
         iteration.Index.ShouldBe(0);
-        iteration.Item.ShouldBe("a");
     }
 
     [Fact]
@@ -90,7 +91,6 @@ public class ForEachContainerStepBodyTests
         result.BranchValues.ShouldNotBeNull();
         var iteration = (ForEachIterationContext)result.BranchValues[0];
         iteration.Index.ShouldBe(2);
-        iteration.Item.ShouldBe("c");
     }
 
     [Fact]
@@ -170,7 +170,6 @@ public class ForEachContainerStepBodyTests
         result.BranchValues.ShouldNotBeNull();
         var iteration = (ForEachIterationContext)result.BranchValues[0];
         iteration.Index.ShouldBe(1);
-        iteration.Item.ShouldBe("b");
 
         var persistence = result.PersistenceData as IteratorPersistenceData;
         persistence.ShouldNotBeNull();
@@ -216,7 +215,6 @@ public class ForEachContainerStepBodyTests
 
         var iteration = (ForEachIterationContext)result.BranchValues![0];
         iteration.Index.ShouldBe(2);
-        iteration.Item.ShouldBe("c");
     }
 
     [Fact]
@@ -245,6 +243,145 @@ public class ForEachContainerStepBodyTests
         result.BranchValues.ShouldNotBeNull();
         result.BranchValues.Count.ShouldBe(1);
         ((ForEachIterationContext)result.BranchValues[0]).Index.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Run_Sequential_BranchValue_CarriesNoItem()
+    {
+        // Branch values are persisted into every body-step pointer by WorkflowCore, so the
+        // context must carry only the index — items are resolved at binding time from the
+        // per-run collection cache.
+        var body = CreateBody(new ForEachControlFlowSettings { Collection = "a, b, c", RunParallel = false });
+        var result = body.Run(CreateContext());
+
+        var iteration = (ForEachIterationContext)result.BranchValues![0];
+        iteration.Index.ShouldBe(0);
+        iteration.Item.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Run_Parallel_BranchValues_CarryNoItems()
+    {
+        var body = CreateBody(new ForEachControlFlowSettings { Collection = "a, b", RunParallel = true });
+        var result = body.Run(CreateContext());
+
+        result.BranchValues!.Cast<ForEachIterationContext>()
+            .ShouldAllBe(iteration => iteration.Item == null);
+    }
+
+    [Fact]
+    public void Run_FirstEntry_StashesCollectionExpression()
+    {
+        // The expression (not the materialised items) is persisted with the workflow data
+        // so item resolution can re-materialise the collection after a process restart.
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
+        var data = CreateData();
+
+        var body = CreateBody(new ForEachControlFlowSettings { Collection = "${trigger.items}" }, stepConfig: stepConfig);
+        body.Run(CreateContext(data));
+
+        data.ContainerCollections[stepConfig.Id].ShouldBe("${trigger.items}");
+    }
+
+    [Fact]
+    public void Run_Sequential_ReEntry_ReusesMaterialisedCollection()
+    {
+        // The collection is materialised once per run and reused on every sequential
+        // re-entry. Mutating the underlying trigger data between iterations must not
+        // change the in-flight collection (previously it was re-parsed every iteration).
+        var data = CreateData();
+        data.TriggerOutput["items"] = "[\"x\",\"y\",\"z\"]";
+
+        var body = CreateBody(new ForEachControlFlowSettings { Collection = "${trigger.items}", RunParallel = false });
+        var first = body.Run(CreateContext(data));
+        ((ForEachIterationContext)first.BranchValues![0]).Index.ShouldBe(0);
+
+        data.TriggerOutput["items"] = "[]";
+
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 0 };
+        var second = body.Run(CreateContext(data, persistence));
+
+        second.BranchValues.ShouldNotBeEmpty();
+        ((ForEachIterationContext)second.BranchValues![0]).Index.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Run_Sequential_ReEntry_PrunesCompletedIterationScope()
+    {
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
+        var bodyStepId = Guid.NewGuid();
+        var completedScope = $"{stepConfig.Id:N}:0";
+        var nestedScope = $"{completedScope}/{Guid.NewGuid():N}:2";
+        var siblingContainerScope = $"{Guid.NewGuid():N}:0";
+
+        var data = CreateData();
+        data.IterationStepOutputs[completedScope] = new() { [bodyStepId] = new() { ["message"] = "iter-0" } };
+        data.IterationStepOutputs[nestedScope] = new() { [bodyStepId] = new() { ["message"] = "nested" } };
+        data.IterationStepOutputs[siblingContainerScope] = new() { [bodyStepId] = new() { ["message"] = "other" } };
+        data.IterationLastCompletedStepId[completedScope] = bodyStepId;
+        data.IterationLastCompletedStepId[nestedScope] = bodyStepId;
+
+        var body = CreateBody(new ForEachControlFlowSettings { Collection = "a, b, c" }, stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 0 };
+        var result = body.Run(CreateContext(data, persistence));
+
+        ((ForEachIterationContext)result.BranchValues![0]).Index.ShouldBe(1);
+
+        // The drained iteration's scope — including descendant scopes from nested
+        // containers — must be gone; unrelated scopes must survive.
+        data.IterationStepOutputs.ShouldNotContainKey(completedScope);
+        data.IterationStepOutputs.ShouldNotContainKey(nestedScope);
+        data.IterationStepOutputs.ShouldContainKey(siblingContainerScope);
+        data.IterationLastCompletedStepId.ShouldNotContainKey(completedScope);
+        data.IterationLastCompletedStepId.ShouldNotContainKey(nestedScope);
+    }
+
+    [Fact]
+    public void Run_Sequential_Completion_PrunesFinalIterationScope()
+    {
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
+        var finalScope = $"{stepConfig.Id:N}:1";
+
+        var data = CreateData();
+        data.IterationStepOutputs[finalScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-1" } };
+        data.IterationLastCompletedStepId[finalScope] = Guid.NewGuid();
+
+        var body = CreateBody(new ForEachControlFlowSettings { Collection = "a, b" }, stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
+        var result = body.Run(CreateContext(data, persistence));
+
+        result.Proceed.ShouldBeTrue();
+        data.IterationStepOutputs.ShouldBeEmpty();
+        data.IterationLastCompletedStepId.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_Parallel_Completion_PrunesAllIterationScopes()
+    {
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
+        var scope0 = $"{stepConfig.Id:N}:0";
+        var scope2 = $"{stepConfig.Id:N}:2";
+        var nestedScope = $"{scope2}/{Guid.NewGuid():N}:0";
+
+        var data = CreateData();
+        data.IterationStepOutputs[scope0] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-0" } };
+        data.IterationStepOutputs[scope2] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-2" } };
+        data.IterationStepOutputs[nestedScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "nested" } };
+        data.IterationLastCompletedStepId[scope0] = Guid.NewGuid();
+
+        var body = CreateBody(
+            new ForEachControlFlowSettings { Collection = "a, b, c", RunParallel = true },
+            stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true };
+        var result = body.Run(CreateContext(data, persistence));
+
+        result.Proceed.ShouldBeTrue();
+        data.IterationStepOutputs.ShouldBeEmpty();
+        data.IterationLastCompletedStepId.ShouldBeEmpty();
     }
 
     private static ConditionSet SingleFilter(string left, ConditionOperator op, string right)
@@ -276,29 +413,32 @@ public class ForEachContainerStepBodyTests
 
     private ForEachContainerStepBody CreateBody(
         ForEachControlFlowSettings settings,
-        IReadOnlyList<ContainerBranchEdge>? branchEdges = null)
+        IReadOnlyList<ContainerBranchEdge>? branchEdges = null,
+        StepConfiguration? stepConfig = null)
     {
-        StepConfiguration stepConfig = new StepConfigurationBuilder()
+        stepConfig ??= new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.forEach").WithName("ForEach");
         return new ForEachContainerStepBody(
             stepConfig,
             settings,
-            _bindingEvaluator,
+            _collectionCache,
             _conditionEvaluator,
             _runRepo.Object,
             branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
+    private static AutomationWorkflowData CreateData() => new()
+    {
+        RunId = Guid.NewGuid(),
+        AutomationId = Guid.NewGuid(),
+        TriggerOutput = [],
+    };
+
     private static IStepExecutionContext CreateContext(
         AutomationWorkflowData? data = null,
         object? persistenceData = null)
     {
-        data ??= new AutomationWorkflowData
-        {
-            RunId = Guid.NewGuid(),
-            AutomationId = Guid.NewGuid(),
-            TriggerOutput = [],
-        };
+        data ??= CreateData();
         var context = new Mock<IStepExecutionContext>();
         var workflow = new Mock<WorkflowInstance>();
         workflow.Object.Data = data;

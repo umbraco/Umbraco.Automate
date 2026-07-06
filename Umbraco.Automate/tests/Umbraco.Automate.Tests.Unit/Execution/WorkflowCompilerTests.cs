@@ -60,6 +60,7 @@ public class WorkflowCompilerTests
             controlFlows,
             pipeline,
             evaluator,
+            new ForEachCollectionCache(evaluator),
             new SettingsBindingResolver(evaluator),
             conditionEvaluator,
             Mock.Of<IAutomationRunRepository>(),

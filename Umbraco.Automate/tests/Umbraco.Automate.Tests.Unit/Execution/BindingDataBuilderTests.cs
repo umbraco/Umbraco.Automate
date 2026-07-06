@@ -1,4 +1,5 @@
 using Shouldly;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
 
@@ -151,6 +152,75 @@ public class BindingDataBuilderTests
         var loop = result["loop"].ShouldBeOfType<Dictionary<string, object?>>();
         var item = loop["item"].ShouldBeOfType<Dictionary<string, object?>>();
         item["name"].ShouldBe("Already Parsed");
+    }
+
+    // --- Index-only iteration context (collection cache) tests ---
+
+    [Fact]
+    public void Build_ItemlessIterationContext_ResolvesLoopItemFromCache()
+    {
+        var containerId = Guid.NewGuid();
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            ContainerCollections = new Dictionary<Guid, string> { [containerId] = "alpha, beta, gamma" },
+        };
+
+        var iteration = new ForEachIterationContext(null, 2, containerId);
+        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var result = BindingDataBuilder.Build(data, iteration, cache);
+
+        var loop = result["loop"].ShouldBeOfType<Dictionary<string, object?>>();
+        loop["item"].ShouldBe("gamma");
+        loop["index"].ShouldBe(2);
+    }
+
+    [Fact]
+    public void Build_ItemlessIterationContext_StructuredItemsUnwrapLikeEmbedded()
+    {
+        // Cache-resolved items must go through the same JSON-string unwrap as embedded
+        // items so loop.item.<path> traversal behaves identically.
+        var containerId = Guid.NewGuid();
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            TriggerOutput = new Dictionary<string, object?>
+            {
+                ["records"] = "[{\"name\":\"Acme\"}]",
+            },
+            ContainerCollections = new Dictionary<Guid, string> { [containerId] = "${trigger.records}" },
+        };
+
+        var iteration = new ForEachIterationContext(null, 0, containerId);
+        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var result = BindingDataBuilder.Build(data, iteration, cache);
+
+        var loop = result["loop"].ShouldBeOfType<Dictionary<string, object?>>();
+        var item = loop["item"].ShouldBeOfType<Dictionary<string, object?>>();
+        item["name"].ShouldBe("Acme");
+    }
+
+    [Fact]
+    public void Build_EmbeddedItem_TakesPrecedenceOverCache()
+    {
+        // Contexts persisted by older versions embed the item — it must win over the
+        // cache so in-flight runs resume with the exact item they were branched with.
+        var containerId = Guid.NewGuid();
+        var data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            ContainerCollections = new Dictionary<Guid, string> { [containerId] = "alpha, beta" },
+        };
+
+        var iteration = new ForEachIterationContext("legacy-item", 0, containerId);
+        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var result = BindingDataBuilder.Build(data, iteration, cache);
+
+        var loop = result["loop"].ShouldBeOfType<Dictionary<string, object?>>();
+        loop["item"].ShouldBe("legacy-item");
     }
 
     // --- Step alias tests ---
