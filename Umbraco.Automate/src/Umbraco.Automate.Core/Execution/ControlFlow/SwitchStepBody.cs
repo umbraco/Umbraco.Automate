@@ -18,24 +18,27 @@ internal sealed class SwitchStepBody : StepBody
     private readonly StepConfiguration _stepConfig;
     private readonly SwitchControlFlowSettings _settings;
     private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly IAutomationRunRepository _runRepository;
 
     public SwitchStepBody(
         StepConfiguration stepConfig,
         SwitchControlFlowSettings settings,
         ConditionEvaluator conditionEvaluator,
+        StepOutputHydrationCache hydrationCache,
         IAutomationRunRepository runRepository)
     {
         _stepConfig = stepConfig;
         _settings = settings;
         _conditionEvaluator = conditionEvaluator;
+        _hydrationCache = hydrationCache;
         _runRepository = runRepository;
     }
 
     public override ExecutionResult Run(IStepExecutionContext context)
     {
         var data = (AutomationWorkflowData)context.Workflow.Data;
-        var bindingData = BindingDataBuilder.Build(data);
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: _hydrationCache);
 
         string outcome = "default";
         foreach (var switchCase in _settings.Cases)

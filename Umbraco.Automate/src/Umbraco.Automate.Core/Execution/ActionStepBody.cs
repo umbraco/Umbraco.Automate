@@ -29,6 +29,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly BindingEvaluator _bindingEvaluator;
     private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
@@ -44,6 +45,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         ActionMiddlewarePipeline pipeline,
         BindingEvaluator bindingEvaluator,
         ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
@@ -58,6 +60,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _pipeline = pipeline;
         _bindingEvaluator = bindingEvaluator;
         _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
@@ -98,7 +101,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     {
         // Build binding data context: trigger output + all prior step outputs + loop iteration.
         var iterationContext = context.Item as ForEachIterationContext;
-        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache);
+        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache, _hydrationCache);
 
         // Setup phase — resolve inputs, settings, bindings, and connections before we
         // invoke the middleware pipeline. These operations can throw on misconfiguration
@@ -500,10 +503,15 @@ internal sealed class ActionStepBody : StepBodyAsync
         var outputJson = JsonSerializer.Serialize(outputData, Dispatch.JsonOptions.Default);
         stepRun.OutputData = outputJson;
 
-        // Deserialize to a case-insensitive dictionary with plain .NET types (not JsonElement)
-        // so values survive the WorkflowCore Newtonsoft.Json persistence round-trip and are
-        // accessible to BindingEvaluator.ResolvePath.
-        var unwrapped = Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
+        // Small outputs are deserialized to a case-insensitive dictionary with plain .NET
+        // types (not JsonElement) so values survive the WorkflowCore Newtonsoft.Json
+        // persistence round-trip and are accessible to BindingEvaluator.ResolvePath.
+        // Large outputs would be re-serialized into the workflow instance blob on every
+        // execution pass, so only a marker referencing the step run (whose OutputData above
+        // is written once) goes into the workflow data — binding evaluation hydrates it on
+        // demand via StepOutputHydrationCache.
+        var unwrapped = StepOutputReference.CreateInlineOrMarker(
+            outputJson, stepRun.Id, _executionOptions.Value.MaxInlineOutputBytes);
 
         // Write to the run-global table so steps after the loop (and external observers)
         // can still read the most recent value. Inside an iteration the global entry is

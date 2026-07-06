@@ -167,6 +167,15 @@ public sealed class ExecutionOptions
     public int MaxChainDepth { get; set; } = 5;
 
     /// <summary>
+    /// Gets or sets the maximum size, in UTF-8 encoded bytes, of a step's serialized output
+    /// that is inlined into the WorkflowCore workflow data (which is re-serialized on every
+    /// execution pass). Larger outputs are stored only on the step run record — written once —
+    /// and referenced from the workflow data, hydrated on demand when a binding reads them.
+    /// Default: 16 KB.
+    /// </summary>
+    public int MaxInlineOutputBytes { get; set; } = 16_384;
+
+    /// <summary>
     /// Gets or sets the execution mode for workflow processing.
     /// </summary>
     /// <remarks>

@@ -110,7 +110,7 @@ public class IfStepBodyTests
     {
         StepConfiguration stepConfig = new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.if").WithName("If");
-        return new IfStepBody(stepConfig, settings, _conditionEvaluator, _runRepo.Object);
+        return new IfStepBody(stepConfig, settings, _conditionEvaluator, new StepOutputHydrationCache(_runRepo.Object), _runRepo.Object);
     }
 
     private static IStepExecutionContext CreateContext()

@@ -17,24 +17,27 @@ internal sealed class IfStepBody : StepBody
     private readonly StepConfiguration _stepConfig;
     private readonly IfControlFlowSettings _settings;
     private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly IAutomationRunRepository _runRepository;
 
     public IfStepBody(
         StepConfiguration stepConfig,
         IfControlFlowSettings settings,
         ConditionEvaluator conditionEvaluator,
+        StepOutputHydrationCache hydrationCache,
         IAutomationRunRepository runRepository)
     {
         _stepConfig = stepConfig;
         _settings = settings;
         _conditionEvaluator = conditionEvaluator;
+        _hydrationCache = hydrationCache;
         _runRepository = runRepository;
     }
 
     public override ExecutionResult Run(IStepExecutionContext context)
     {
         var data = (AutomationWorkflowData)context.Workflow.Data;
-        var bindingData = BindingDataBuilder.Build(data);
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: _hydrationCache);
         var result = _conditionEvaluator.Evaluate(_settings.Conditions, bindingData);
         var outcome = result ? "true" : "false";
 
