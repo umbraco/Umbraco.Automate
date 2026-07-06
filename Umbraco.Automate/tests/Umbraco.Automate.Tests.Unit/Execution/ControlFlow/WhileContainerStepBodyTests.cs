@@ -167,6 +167,55 @@ public class WhileContainerStepBodyTests
         data.IterationLastCompletedStepId.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Run_ReEntry_MaxIterationsReached_PrunesFinalIterationScope()
+    {
+        // Pruning of the just-drained iteration happens before the MaxIterations check,
+        // so the final iteration's scope must not survive loop termination either.
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.while").WithName("While");
+        var completedScope = $"{stepConfig.Id:N}:0";
+
+        var data = CreateData();
+        data.IterationStepOutputs[completedScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-0" } };
+        data.IterationLastCompletedStepId[completedScope] = Guid.NewGuid();
+
+        var settings = AlwaysTrueSettings();
+        settings.MaxIterations = 1;
+
+        var body = CreateBody(settings, stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
+        var result = body.Run(CreateContext(persistenceData: persistence, data: data));
+
+        result.BranchValues.ShouldBeEmpty();
+        result.Proceed.ShouldBeTrue();
+        data.IterationStepOutputs.ShouldNotContainKey(completedScope);
+        data.IterationLastCompletedStepId.ShouldNotContainKey(completedScope);
+    }
+
+    [Fact]
+    public void Run_ReEntry_ConditionBecomesFalse_PrunesFinalIterationScope()
+    {
+        // Same pruning-before-termination guarantee, but reached via the condition
+        // evaluating false rather than the MaxIterations guard.
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.while").WithName("While");
+        var completedScope = $"{stepConfig.Id:N}:0";
+
+        var data = CreateData();
+        data.IterationStepOutputs[completedScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-0" } };
+        data.IterationLastCompletedStepId[completedScope] = Guid.NewGuid();
+
+        var body = CreateBody(AlwaysFalseSettings(), stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
+        var result = body.Run(CreateContext(persistenceData: persistence, data: data));
+
+        result.BranchValues.ShouldBeEmpty();
+        result.Proceed.ShouldBeTrue();
+        data.IterationStepOutputs.ShouldNotContainKey(completedScope);
+        data.IterationLastCompletedStepId.ShouldNotContainKey(completedScope);
+    }
+
     private WhileContainerStepBody CreateBody(
         WhileControlFlowSettings settings,
         IReadOnlyList<ContainerBranchEdge>? branchEdges = null,

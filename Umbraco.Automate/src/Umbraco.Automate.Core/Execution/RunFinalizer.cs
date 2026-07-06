@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Diagnostics;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Cms.Core.Events;
@@ -22,6 +23,7 @@ internal sealed class RunFinalizer
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
     private readonly AutomateMetrics _metrics;
+    private readonly ForEachCollectionCache _collectionCache;
     private readonly ILogger<RunFinalizer> _logger;
 
     public RunFinalizer(
@@ -29,12 +31,14 @@ internal sealed class RunFinalizer
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory,
         AutomateMetrics metrics,
+        ForEachCollectionCache collectionCache,
         ILogger<RunFinalizer> logger)
     {
         _runRepository = runRepository;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
         _metrics = metrics;
+        _collectionCache = collectionCache;
         _logger = logger;
     }
 
@@ -58,6 +62,12 @@ internal sealed class RunFinalizer
             switch (workflow.Status)
             {
                 case WorkflowStatus.Complete or WorkflowStatus.Terminated:
+                    // Sweep any ForEach/While collections still cached for this run — e.g. a
+                    // loop terminated mid-iteration never reaches its own eviction point in
+                    // ForEachContainerStepBody. Runs unconditionally, ahead of the early-return
+                    // guard below, so it fires even when another path (e.g. user cancellation)
+                    // already finalized the run row.
+                    _collectionCache.EvictRun(data.RunId);
                     await FinalizeTerminalAsync(workflow, data, cancellationToken);
                     break;
 
