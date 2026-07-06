@@ -2,6 +2,8 @@ import { UmbWorkspaceActionBase } from "@umbraco-cms/backoffice/workspace";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import { UmbLocalizationController } from "@umbraco-cms/backoffice/localization-api";
 import { AutomationsService } from "../../../../api/sdk.gen.js";
+import { UaAutomationRunsChangedEvent } from "../../../events/automation-runs-changed.event.js";
+import { dispatchActionEvent } from "../../../../core/utils/event.utils.js";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
 export class UaAutomationRunNowAction extends UmbWorkspaceActionBase {
@@ -35,6 +37,9 @@ export class UaAutomationRunNowAction extends UmbWorkspaceActionBase {
             });
             return;
         }
+
+        // Let the runs view refresh now the run has been triggered.
+        dispatchActionEvent(this, new UaAutomationRunsChangedEvent(unique));
 
         notifications?.peek("positive", {
             data: {
