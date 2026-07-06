@@ -125,6 +125,7 @@ public class RunCancellationTests : IAsyncLifetime
 
         services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         services.AddSingleton<ForEachCollectionCache>();
+        services.AddSingleton<StepOutputHydrationCache>();
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
         services.AddSingleton<IEventAggregator>(Mock.Of<IEventAggregator>());
