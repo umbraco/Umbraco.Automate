@@ -36,9 +36,9 @@ public sealed class ContentSavedTriggerOutput : IContentScopedTriggerOutput
     public bool IsNew { get; init; }
 
     /// <summary>
-    /// Gets the cultures whose variant data changed in this save.
-    /// Null for invariant content; an empty array indicates a variant content
-    /// save where no culture variants were dirty (rare, but possible).
+    /// Gets the cultures edited in this save. Null for invariant content.
+    /// Reports the cultures that changed where that is determinable, and falls back to all
+    /// available cultures otherwise (e.g. a cloned instance).
     /// </summary>
     public string[]? Cultures { get; init; }
 

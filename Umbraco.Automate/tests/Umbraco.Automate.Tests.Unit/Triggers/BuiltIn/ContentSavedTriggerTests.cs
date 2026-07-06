@@ -156,9 +156,11 @@ public class ContentSavedTriggerTests
     }
 
     [Fact]
-    public void MapEvent_VariantContent_CulturesContainsDirtyCultureInfos()
+    public void MapEvent_VariantContent_CulturesContainsChangedCultures()
     {
-        // Only "en-US" was edited in this save; "fr-FR" already existed unchanged.
+        // On a live instance the edited cultures surface: "en-US" was just edited (dirty),
+        // "fr-FR" was unchanged. (When the instance is a clone, dirty state is lost and the
+        // helper falls back to all available — see ContentCultureCloneRegressionTests.)
         var cultureInfos = ContentPublishedTriggerTests.BuildCultureInfos(
             dirty: new[] { "en-US" },
             clean: new[] { "fr-FR" });
