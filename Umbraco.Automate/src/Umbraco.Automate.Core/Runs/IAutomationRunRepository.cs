@@ -47,10 +47,14 @@ internal interface IAutomationRunRepository
 
     /// <summary>
     /// Gets the serialized output data of a single step run, or <c>null</c> when the step run
-    /// no longer exists (e.g. removed by retention cleanup) or produced no output. Lightweight
-    /// single-column primary-key read used to hydrate offloaded step outputs at binding time.
+    /// no longer exists (e.g. removed by retention cleanup), does not belong to the given run,
+    /// or produced no output. Lightweight single-column primary-key read used to hydrate
+    /// offloaded step outputs at binding time. The <paramref name="runId"/> filter is
+    /// defence-in-depth alongside the <see cref="Umbraco.Automate.Core.Execution.StepOutputHydrationCache"/>'s
+    /// <c>(RunId, StepRunId)</c> cache key — <paramref name="stepRunId"/> is always
+    /// server-generated, never user-derived, so this never changes observable behaviour today.
     /// </summary>
-    Task<string?> GetStepRunOutputAsync(Guid stepRunId, CancellationToken cancellationToken = default);
+    Task<string?> GetStepRunOutputAsync(Guid stepRunId, Guid runId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes all runs for an automation (cascade deletes step runs).

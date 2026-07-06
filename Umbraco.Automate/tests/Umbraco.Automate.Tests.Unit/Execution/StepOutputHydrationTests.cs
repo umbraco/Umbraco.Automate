@@ -21,7 +21,7 @@ public class StepOutputHydrationTests
 
     private void SetupStepRunOutput(Guid stepRunId, string? outputJson)
         => _runRepository
-            .Setup(r => r.GetStepRunOutputAsync(stepRunId, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetStepRunOutputAsync(stepRunId, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(outputJson);
 
     private static AutomationWorkflowData CreateData(Guid stepId, Dictionary<string, object?> outputs, string alias = "offloaded")
@@ -70,7 +70,7 @@ public class StepOutputHydrationTests
         _evaluator.Evaluate("${ steps.inline.message }", bindingData).ShouldBe("small");
 
         _runRepository.Verify(
-            r => r.GetStepRunOutputAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            r => r.GetStepRunOutputAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -91,7 +91,7 @@ public class StepOutputHydrationTests
         _evaluator.Evaluate("${ steps.offloaded.message }", laterBindingData).ShouldBe("memoised");
 
         _runRepository.Verify(
-            r => r.GetStepRunOutputAsync(stepRunId, It.IsAny<CancellationToken>()),
+            r => r.GetStepRunOutputAsync(stepRunId, RunId, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -181,7 +181,7 @@ public class StepOutputHydrationTests
 
         _evaluator.Evaluate("${ steps.offloaded.message }", bindingData).ShouldBe("plain-inline");
         _runRepository.Verify(
-            r => r.GetStepRunOutputAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            r => r.GetStepRunOutputAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -209,7 +209,7 @@ public class StepOutputHydrationTests
         cache.GetOutput(RunId, stepRunId).ShouldBeEmpty();
 
         _runRepository.Verify(
-            r => r.GetStepRunOutputAsync(stepRunId, It.IsAny<CancellationToken>()),
+            r => r.GetStepRunOutputAsync(stepRunId, RunId, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -231,7 +231,72 @@ public class StepOutputHydrationTests
         cache.GetOutput(RunId, stepRunA);
         cache.GetOutput(otherRunId, stepRunB);
 
-        _runRepository.Verify(r => r.GetStepRunOutputAsync(stepRunA, It.IsAny<CancellationToken>()), Times.Exactly(2));
-        _runRepository.Verify(r => r.GetStepRunOutputAsync(stepRunB, It.IsAny<CancellationToken>()), Times.Once);
+        _runRepository.Verify(r => r.GetStepRunOutputAsync(stepRunA, RunId, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _runRepository.Verify(r => r.GetStepRunOutputAsync(stepRunB, otherRunId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void Cache_OverCapacity_EvictsOnlyLeastRecentlyUsedEntry()
+    {
+        // A still-active run's entry must survive eviction as long as it keeps being
+        // touched, even once the cache fills — only the true LRU entry is dropped.
+        var cache = CreateCache();
+        var activeRunId = Guid.NewGuid();
+        var activeStepRunId = Guid.NewGuid();
+        SetupStepRunOutput(activeStepRunId, """{"value":"still-active"}""");
+
+        // Prime the active run's entry first, then keep it warm by re-reading it between
+        // every filler insertion so it's never the least-recently-used entry.
+        cache.GetOutput(activeRunId, activeStepRunId);
+
+        for (var i = 0; i < StepOutputHydrationCache.MaxEntries; i++)
+        {
+            var fillerStepRunId = Guid.NewGuid();
+            var fillerRunId = Guid.NewGuid();
+            SetupStepRunOutput(fillerStepRunId, $$"""{"value":"filler-{{i}}"}""");
+            cache.GetOutput(fillerRunId, fillerStepRunId);
+            cache.GetOutput(activeRunId, activeStepRunId);
+        }
+
+        cache.GetOutput(activeRunId, activeStepRunId);
+
+        _runRepository.Verify(
+            r => r.GetStepRunOutputAsync(activeStepRunId, activeRunId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public void Cache_OverCapacity_EvictsOldestEntryButKeepsTheRest()
+    {
+        // Filling the cache one entry past capacity should push out only the oldest
+        // (least-recently-used) entry — every other entry, including the most recently
+        // added one, must remain memoised rather than the whole cache being cleared.
+        var cache = CreateCache();
+        var oldestRunId = Guid.NewGuid();
+        var oldestStepRunId = Guid.NewGuid();
+        SetupStepRunOutput(oldestStepRunId, """{"value":"oldest"}""");
+        cache.GetOutput(oldestRunId, oldestStepRunId);
+
+        Guid newestRunId = default;
+        Guid newestStepRunId = default;
+        for (var i = 0; i < StepOutputHydrationCache.MaxEntries; i++)
+        {
+            newestStepRunId = Guid.NewGuid();
+            newestRunId = Guid.NewGuid();
+            SetupStepRunOutput(newestStepRunId, $$"""{"value":"filler-{{i}}"}""");
+            cache.GetOutput(newestRunId, newestStepRunId);
+        }
+
+        // The oldest entry was pushed out by the LRU bound and must be re-hydrated...
+        cache.GetOutput(oldestRunId, oldestStepRunId);
+        _runRepository.Verify(
+            r => r.GetStepRunOutputAsync(oldestStepRunId, oldestRunId, It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+
+        // ...but the most recently added filler entry is still memoised.
+        cache.GetOutput(newestRunId, newestStepRunId);
+        _runRepository.Verify(
+            r => r.GetStepRunOutputAsync(newestStepRunId, newestRunId, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }

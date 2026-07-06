@@ -14,9 +14,9 @@ internal sealed class OffloadedStepOutput : IReadOnlyDictionary<string, object?>
 {
     private readonly Lazy<IReadOnlyDictionary<string, object?>> _outputs;
 
-    public OffloadedStepOutput(StepOutputHydrationCache hydrationCache, Guid runId, Guid stepRunId)
+    public OffloadedStepOutput(StepOutputHydrationCache hydrationCache, Guid runId, Guid stepRunId, CancellationToken cancellationToken = default)
     {
-        _outputs = new Lazy<IReadOnlyDictionary<string, object?>>(() => hydrationCache.GetOutput(runId, stepRunId));
+        _outputs = new Lazy<IReadOnlyDictionary<string, object?>>(() => hydrationCache.GetOutput(runId, stepRunId, cancellationToken));
     }
 
     public object? this[string key] => _outputs.Value[key];

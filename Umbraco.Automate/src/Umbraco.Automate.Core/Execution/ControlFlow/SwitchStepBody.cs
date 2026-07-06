@@ -38,7 +38,7 @@ internal sealed class SwitchStepBody : StepBody
     public override ExecutionResult Run(IStepExecutionContext context)
     {
         var data = (AutomationWorkflowData)context.Workflow.Data;
-        var bindingData = BindingDataBuilder.Build(data, hydrationCache: _hydrationCache);
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: _hydrationCache, cancellationToken: context.CancellationToken);
 
         string outcome = "default";
         foreach (var switchCase in _settings.Cases)

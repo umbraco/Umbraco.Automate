@@ -75,7 +75,7 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
             return ExecutionResult.Next();
         }
 
-        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache, context.CancellationToken);
 
         // Evaluate While's own conditions.
         if (!_conditionEvaluator.Evaluate(_settings.Conditions, bindingData))
