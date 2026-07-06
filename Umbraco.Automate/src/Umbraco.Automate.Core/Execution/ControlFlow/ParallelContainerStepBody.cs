@@ -66,7 +66,7 @@ internal sealed class ParallelContainerStepBody : ContainerStepBody
         // edge has a filter and they all fail, suppress the branch entirely. (We cannot
         // skip individual children selectively because WorkflowCore cross-products
         // BranchValues × step.Children when spawning child pointers.)
-        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache, context.CancellationToken);
 
         if (!ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData))
         {

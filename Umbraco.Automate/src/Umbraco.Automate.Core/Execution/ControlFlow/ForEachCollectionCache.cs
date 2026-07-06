@@ -46,7 +46,8 @@ internal sealed class ForEachCollectionCache
         AutomationWorkflowData data,
         Guid containerStepId,
         ForEachIterationContext? parentIteration,
-        string collectionExpression)
+        string collectionExpression,
+        CancellationToken cancellationToken = default)
     {
         var key = new CollectionKey(data.RunId, containerStepId, parentIteration?.ScopePath);
         if (_collections.TryGetValue(key, out var items))
@@ -57,7 +58,7 @@ internal sealed class ForEachCollectionCache
         // Evaluate against the enclosing iteration's binding data — for nested loops the
         // expression may reference the parent's loop.item, which recurses through this
         // cache and terminates at the outermost loop.
-        var bindingData = BindingDataBuilder.Build(data, parentIteration, this, _hydrationCache);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, this, _hydrationCache, cancellationToken);
         items = MaterializeCollection(_bindingEvaluator.Evaluate(collectionExpression, bindingData));
         return _collections.GetOrAdd(key, items);
     }
@@ -66,14 +67,14 @@ internal sealed class ForEachCollectionCache
     /// Resolves the item an iteration context points at, or <c>null</c> when the container
     /// exposes no collection (While and Parallel containers, whose iterations carry no item).
     /// </summary>
-    public object? ResolveItem(AutomationWorkflowData data, ForEachIterationContext iterationContext)
+    public object? ResolveItem(AutomationWorkflowData data, ForEachIterationContext iterationContext, CancellationToken cancellationToken = default)
     {
         if (!data.ContainerCollections.TryGetValue(iterationContext.ContainerStepId, out var collectionExpression))
         {
             return null;
         }
 
-        var items = GetOrMaterializeCollection(data, iterationContext.ContainerStepId, iterationContext.Parent, collectionExpression);
+        var items = GetOrMaterializeCollection(data, iterationContext.ContainerStepId, iterationContext.Parent, collectionExpression, cancellationToken);
         return iterationContext.Index >= 0 && iterationContext.Index < items.Count
             ? items[iterationContext.Index]
             : null;

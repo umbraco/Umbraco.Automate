@@ -101,7 +101,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     {
         // Build binding data context: trigger output + all prior step outputs + loop iteration.
         var iterationContext = context.Item as ForEachIterationContext;
-        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache, _hydrationCache);
+        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache, _hydrationCache, cancellationToken);
 
         // Setup phase — resolve inputs, settings, bindings, and connections before we
         // invoke the middleware pipeline. These operations can throw on misconfiguration

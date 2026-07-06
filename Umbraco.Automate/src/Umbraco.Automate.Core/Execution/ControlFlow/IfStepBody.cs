@@ -37,7 +37,7 @@ internal sealed class IfStepBody : StepBody
     public override ExecutionResult Run(IStepExecutionContext context)
     {
         var data = (AutomationWorkflowData)context.Workflow.Data;
-        var bindingData = BindingDataBuilder.Build(data, hydrationCache: _hydrationCache);
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: _hydrationCache, cancellationToken: context.CancellationToken);
         var result = _conditionEvaluator.Evaluate(_settings.Conditions, bindingData);
         var outcome = result ? "true" : "false";
 

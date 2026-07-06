@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Umbraco.Automate.Core.Runs;
 
 namespace Umbraco.Automate.Core.Execution;
@@ -11,14 +10,32 @@ namespace Umbraco.Automate.Core.Execution;
 /// don't hammer the database. Misses (step run deleted by retention cleanup, or no output)
 /// are memoised as empty so the path resolves like an unknown step instead of throwing.
 /// Entries are evicted when their run reaches a terminal state (see <c>RunFinalizer</c>);
-/// entries for runs abandoned mid-flight are flushed by the <see cref="MaxEntries"/> backstop.
+/// entries for runs abandoned mid-flight are bounded by the <see cref="MaxEntries"/> LRU
+/// eviction below, which only ever drops the least-recently-touched entry rather than the
+/// whole cache — several concurrently-running automations can each keep a hot entry without
+/// evicting one another.
 /// </summary>
+/// <remarks>
+/// Hydration is sync-over-async (<c>GetAwaiter().GetResult()</c>) because
+/// <see cref="OffloadedStepOutput"/> — the lazy stand-in this cache backs — implements the
+/// synchronous <see cref="IReadOnlyDictionary{TKey,TValue}"/> contract that the generic,
+/// non-async binding path-traversal engine (<c>BindingEvaluator.ResolvePath</c>) requires.
+/// That engine, and its caller <c>BindingDataBuilder.Build</c>, are invoked from dozens of
+/// synchronous call sites across the codebase (every action's settings resolution via
+/// <c>SettingsBindingResolver</c>, <c>ConditionEvaluator</c>, <c>WorkflowCompiler</c>'s
+/// <c>Func&lt;AutomationWorkflowData, object&gt;</c> outcome lambdas, and more) — turning
+/// hydration fully async would mean making that whole traversal engine async and touching
+/// every one of those call sites, several of which (e.g. the WorkflowCore outcome lambda
+/// delegate shape) cannot accept a <see cref="Task"/> at all. That refactor was judged too
+/// broad and risky to fold into this change; a <see cref="CancellationToken"/> is still
+/// threaded through so the blocking read can at least be cancelled.
+/// </remarks>
 internal sealed class StepOutputHydrationCache
 {
     /// <summary>
-    /// Backstop bound: hydrated outputs are large by definition (they exceeded the inline
-    /// threshold), so rather than tracking recency we flush the whole cache when it fills —
-    /// subsequent binds simply re-hydrate from the database.
+    /// Bound on the number of memoised outputs. Hydrated outputs are large by definition
+    /// (they exceeded the inline threshold), so the cache tracks access recency and evicts
+    /// only the least-recently-used entry once it fills, rather than flushing everything.
     /// </summary>
     internal const int MaxEntries = 64;
 
@@ -26,7 +43,9 @@ internal sealed class StepOutputHydrationCache
         new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
     private readonly IAutomationRunRepository _runRepository;
-    private readonly ConcurrentDictionary<(Guid RunId, Guid StepRunId), IReadOnlyDictionary<string, object?>> _outputs = new();
+    private readonly object _lock = new();
+    private readonly Dictionary<(Guid RunId, Guid StepRunId), LinkedListNode<CacheEntry>> _index = new();
+    private readonly LinkedList<CacheEntry> _lruOrder = new();
 
     public StepOutputHydrationCache(IAutomationRunRepository runRepository)
     {
@@ -37,27 +56,53 @@ internal sealed class StepOutputHydrationCache
     /// Gets the hydrated output dictionary for a step run, fetching and memoising it on first
     /// access. Returns an empty dictionary when the step run row is gone or has no output.
     /// </summary>
-    public IReadOnlyDictionary<string, object?> GetOutput(Guid runId, Guid stepRunId)
+    public IReadOnlyDictionary<string, object?> GetOutput(Guid runId, Guid stepRunId, CancellationToken cancellationToken = default)
     {
         var key = (runId, stepRunId);
-        if (_outputs.TryGetValue(key, out var cached))
+
+        lock (_lock)
         {
-            return cached;
+            if (_index.TryGetValue(key, out var existingNode))
+            {
+                Touch(existingNode);
+                return existingNode.Value.Outputs;
+            }
         }
 
         // Sync-over-async: hydration happens inside synchronous binding-path traversal.
-        // Precedent: ForEachContainerStepBody.TrackStepRun.
-        var outputJson = _runRepository.GetStepRunOutputAsync(stepRunId).GetAwaiter().GetResult();
+        // See the class remarks for why this remains sync-over-async rather than a fully
+        // async call chain. Precedent: ForEachContainerStepBody.TrackStepRun.
+        var outputJson = _runRepository.GetStepRunOutputAsync(stepRunId, runId, cancellationToken).GetAwaiter().GetResult();
         var outputs = outputJson is null
             ? EmptyOutputs
             : Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
 
-        if (_outputs.Count >= MaxEntries)
+        lock (_lock)
         {
-            _outputs.Clear();
+            // Another thread may have hydrated and inserted the same key while this thread
+            // was awaiting the database — prefer the existing entry over adding a duplicate.
+            if (_index.TryGetValue(key, out var racedNode))
+            {
+                Touch(racedNode);
+                return racedNode.Value.Outputs;
+            }
+
+            if (_index.Count >= MaxEntries)
+            {
+                var leastRecentlyUsed = _lruOrder.Last;
+                if (leastRecentlyUsed is not null)
+                {
+                    _lruOrder.RemoveLast();
+                    _index.Remove(leastRecentlyUsed.Value.Key);
+                }
+            }
+
+            var node = new LinkedListNode<CacheEntry>(new CacheEntry(key, outputs));
+            _lruOrder.AddFirst(node);
+            _index[key] = node;
         }
 
-        return _outputs.GetOrAdd(key, outputs);
+        return outputs;
     }
 
     /// <summary>
@@ -65,9 +110,27 @@ internal sealed class StepOutputHydrationCache
     /// </summary>
     public void EvictRun(Guid runId)
     {
-        foreach (var key in _outputs.Keys.Where(k => k.RunId == runId))
+        lock (_lock)
         {
-            _outputs.TryRemove(key, out _);
+            foreach (var key in _index.Keys.Where(k => k.RunId == runId).ToList())
+            {
+                if (_index.Remove(key, out var node))
+                {
+                    _lruOrder.Remove(node);
+                }
+            }
         }
     }
+
+    /// <summary>
+    /// Moves a node to the most-recently-used end of the order list. Callers must hold
+    /// <see cref="_lock"/>.
+    /// </summary>
+    private void Touch(LinkedListNode<CacheEntry> node)
+    {
+        _lruOrder.Remove(node);
+        _lruOrder.AddFirst(node);
+    }
+
+    private readonly record struct CacheEntry((Guid RunId, Guid StepRunId) Key, IReadOnlyDictionary<string, object?> Outputs);
 }
