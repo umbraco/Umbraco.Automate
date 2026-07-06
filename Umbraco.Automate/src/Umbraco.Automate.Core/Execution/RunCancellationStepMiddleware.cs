@@ -22,6 +22,18 @@ namespace Umbraco.Automate.Core.Execution;
 /// overwritten by the executing node's state snapshot.
 /// </para>
 /// <para>
+/// WorkflowCore's native cooperative-cancel primitive — <c>.CancelCondition(...)</c>, evaluated
+/// before every step by its <c>CancellationProcessor</c> — was considered and does not fit here.
+/// It compiles the condition against the in-memory <c>workflow.Data</c> snapshot, so it cannot
+/// observe a cancel raised out-of-band via the management API or on another node (that updates
+/// the durable run row, never this node's in-memory data); and it only cancels the step's
+/// execution pointers and descendant scope, never setting <see cref="WorkflowStatus"/>, so the
+/// run would not end <see cref="WorkflowStatus.Terminated"/>. This middleware reads the run row
+/// (the cross-node source of truth) and sets the terminal status, which the native primitive
+/// cannot do. <c>IWorkflowStepMiddleware</c> is itself WorkflowCore's documented per-step
+/// extension point, so the reuse stays within the engine's model.
+/// </para>
+/// <para>
 /// The status check is cached per run for a short TTL (see <see cref="StatusCacheDuration"/>)
 /// because this middleware wraps every step of every run, including every re-entry of
 /// ForEach/While/If/Switch containers and every loop iteration — without a cache, a tight loop
