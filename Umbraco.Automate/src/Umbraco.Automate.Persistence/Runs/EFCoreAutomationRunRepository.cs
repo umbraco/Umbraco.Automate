@@ -69,6 +69,46 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         return (runs, total);
     }
 
+    public async Task<(IReadOnlyList<AutomationRunListItem> Items, int Total)> GetPagedAsync(
+        IReadOnlySet<Guid>? workspaceIds,
+        int skip = 0,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // Join to the automation so results can be scoped by (and labelled with) the
+        // automation's current workspace/name rather than the run's execution-time snapshot.
+        var query =
+            from r in db.AutomationRuns
+            join a in db.Automations on r.AutomationId equals a.Id
+            where workspaceIds == null || workspaceIds.Contains(a.WorkspaceId)
+            select new { Run = r, a.Name };
+
+        var total = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(x => x.Run.StartedUtc)
+            .Skip(skip)
+            .Take(take)
+            .Select(x => new AutomationRunListItem
+            {
+                Id = x.Run.Id,
+                AutomationId = x.Run.AutomationId,
+                AutomationName = x.Name,
+                AutomationVersion = x.Run.AutomationVersion,
+                Status = (AutomationRunStatus)x.Run.Status,
+                StartedUtc = x.Run.StartedUtc,
+                CompletedUtc = x.Run.CompletedUtc,
+                InitiatedBy = x.Run.InitiatedBy,
+                CorrelationId = x.Run.CorrelationId,
+                Error = x.Run.Error,
+            })
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
     public async Task<AutomationRun> SaveAsync(AutomationRun run, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
