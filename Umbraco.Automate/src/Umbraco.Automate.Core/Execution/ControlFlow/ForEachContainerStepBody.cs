@@ -20,6 +20,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
     private readonly StepConfiguration _stepConfig;
     private readonly ForEachControlFlowSettings _settings;
     private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
@@ -28,6 +29,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         StepConfiguration stepConfig,
         ForEachControlFlowSettings settings,
         ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
@@ -35,6 +37,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         _stepConfig = stepConfig;
         _settings = settings;
         _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
         _branchEdges = branchEdges;
@@ -77,8 +80,8 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
                 new ForEachIterationContext(null, persistence.Index, _stepConfig.Id, parentIteration).ScopePath);
 
             // Sequential: advance to the next passing index.
-            var items = _collectionCache.GetOrMaterializeCollection(data, _stepConfig.Id, parentIteration, _settings.Collection);
-            var nextIndex = FindNextPassingIndex(data, items, persistence.Index + 1, parentIteration);
+            var items = _collectionCache.GetOrMaterializeCollection(data, _stepConfig.Id, parentIteration, _settings.Collection, context.CancellationToken);
+            var nextIndex = FindNextPassingIndex(data, items, persistence.Index + 1, parentIteration, context.CancellationToken);
             if (nextIndex < 0)
             {
                 _collectionCache.EvictCollection(data.RunId, _stepConfig.Id, parentIteration?.ScopePath);
@@ -91,7 +94,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         }
 
         // First entry — materialise the collection and branch.
-        var initialItems = _collectionCache.GetOrMaterializeCollection(data, _stepConfig.Id, parentIteration, _settings.Collection);
+        var initialItems = _collectionCache.GetOrMaterializeCollection(data, _stepConfig.Id, parentIteration, _settings.Collection, context.CancellationToken);
 
         if (initialItems.Count == 0)
         {
@@ -108,7 +111,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
             // common single-entry case this is the natural "skip this item" behaviour.
             var passing = initialItems
                 .Select((item, index) => (Item: item, Index: index))
-                .Where(t => AnyEdgePassesForItem(data, t.Item, t.Index, parentIteration))
+                .Where(t => AnyEdgePassesForItem(data, t.Item, t.Index, parentIteration, context.CancellationToken))
                 .ToList();
 
             TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: initialItems.Count);
@@ -126,7 +129,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         }
 
         // Sequential — branch the first passing item.
-        var firstIndex = FindNextPassingIndex(data, initialItems, 0, parentIteration);
+        var firstIndex = FindNextPassingIndex(data, initialItems, 0, parentIteration, context.CancellationToken);
         if (firstIndex < 0)
         {
             _collectionCache.EvictCollection(data.RunId, _stepConfig.Id, parentIteration?.ScopePath);
@@ -140,11 +143,11 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
             new IteratorPersistenceData { ChildrenActive = true, Index = firstIndex });
     }
 
-    private int FindNextPassingIndex(AutomationWorkflowData data, IReadOnlyList<object?> items, int from, ForEachIterationContext? parent)
+    private int FindNextPassingIndex(AutomationWorkflowData data, IReadOnlyList<object?> items, int from, ForEachIterationContext? parent, CancellationToken cancellationToken)
     {
         for (var i = from; i < items.Count; i++)
         {
-            if (AnyEdgePassesForItem(data, items[i], i, parent))
+            if (AnyEdgePassesForItem(data, items[i], i, parent, cancellationToken))
             {
                 return i;
             }
@@ -152,7 +155,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         return -1;
     }
 
-    private bool AnyEdgePassesForItem(AutomationWorkflowData data, object? item, int index, ForEachIterationContext? parent)
+    private bool AnyEdgePassesForItem(AutomationWorkflowData data, object? item, int index, ForEachIterationContext? parent, CancellationToken cancellationToken)
     {
         // Skip per-item binding-data construction when no edge gates the branch.
         if (_branchEdges.Count == 0 || !ContainerBranchEdge.AnyHaveFilter(_branchEdges))
@@ -163,7 +166,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         // Transient context carrying the in-hand item — never branched, so the item is
         // not persisted anywhere.
         var iterationContext = new ForEachIterationContext(item, index, _stepConfig.Id, parent);
-        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache);
+        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache, _hydrationCache, cancellationToken);
         return ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData);
     }
 

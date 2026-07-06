@@ -17,9 +17,10 @@ public class ParallelContainerStepBodyTests
     {
         var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
         var conditionEvaluator = new ConditionEvaluator(evaluator);
+        var hydrationCache = new StepOutputHydrationCache(Mock.Of<Umbraco.Automate.Core.Runs.IAutomationRunRepository>());
         stepConfig ??= new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.parallel").WithName("Parallel");
-        return new ParallelContainerStepBody(stepConfig, new ForEachCollectionCache(evaluator), conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
+        return new ParallelContainerStepBody(stepConfig, new ForEachCollectionCache(evaluator, hydrationCache), hydrationCache, conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
     [Fact]

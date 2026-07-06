@@ -19,6 +19,7 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
     private readonly StepConfiguration _stepConfig;
     private readonly WhileControlFlowSettings _settings;
     private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
@@ -27,6 +28,7 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
         StepConfiguration stepConfig,
         WhileControlFlowSettings settings,
         ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
@@ -34,6 +36,7 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
         _stepConfig = stepConfig;
         _settings = settings;
         _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
         _branchEdges = branchEdges;
@@ -72,7 +75,7 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
             return ExecutionResult.Next();
         }
 
-        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache, context.CancellationToken);
 
         // Evaluate While's own conditions.
         if (!_conditionEvaluator.Evaluate(_settings.Conditions, bindingData))

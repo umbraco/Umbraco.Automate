@@ -46,6 +46,7 @@ public class RunFinalizerTests
 
         _finalizer = new RunFinalizer(
             _runRepo.Object,
+            new StepOutputHydrationCache(_runRepo.Object),
             scopeProvider.Object,
             eventMessagesFactory.Object,
             metrics,

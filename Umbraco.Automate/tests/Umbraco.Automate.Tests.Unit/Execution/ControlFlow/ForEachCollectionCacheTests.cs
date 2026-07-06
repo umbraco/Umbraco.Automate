@@ -9,7 +9,8 @@ public class ForEachCollectionCacheTests
 {
     private readonly BindingEvaluator _bindingEvaluator = new(new BindingFilterCollection(Array.Empty<IBindingFilter>));
 
-    private ForEachCollectionCache CreateCache() => new(_bindingEvaluator);
+    private ForEachCollectionCache CreateCache()
+        => new(_bindingEvaluator, new StepOutputHydrationCache(Mock.Of<Umbraco.Automate.Core.Runs.IAutomationRunRepository>()));
 
     private static AutomationWorkflowData CreateData() => new()
     {

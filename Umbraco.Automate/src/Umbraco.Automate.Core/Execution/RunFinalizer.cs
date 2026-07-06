@@ -20,6 +20,7 @@ namespace Umbraco.Automate.Core.Execution;
 internal sealed class RunFinalizer
 {
     private readonly IAutomationRunRepository _runRepository;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
     private readonly AutomateMetrics _metrics;
@@ -28,6 +29,7 @@ internal sealed class RunFinalizer
 
     public RunFinalizer(
         IAutomationRunRepository runRepository,
+        StepOutputHydrationCache hydrationCache,
         ICoreScopeProvider scopeProvider,
         IEventMessagesFactory eventMessagesFactory,
         AutomateMetrics metrics,
@@ -35,6 +37,7 @@ internal sealed class RunFinalizer
         ILogger<RunFinalizer> logger)
     {
         _runRepository = runRepository;
+        _hydrationCache = hydrationCache;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
         _metrics = metrics;
@@ -87,6 +90,9 @@ internal sealed class RunFinalizer
         AutomationWorkflowData data,
         CancellationToken cancellationToken)
     {
+        // The run can never bind again — drop any step outputs hydrated for it.
+        _hydrationCache.EvictRun(data.RunId);
+
         var run = await _runRepository.GetAsync(data.RunId, cancellationToken);
         if (run is null || run.Status is AutomationRunStatus.Completed or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
         {
