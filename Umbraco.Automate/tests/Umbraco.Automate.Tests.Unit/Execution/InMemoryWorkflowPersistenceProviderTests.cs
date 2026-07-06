@@ -24,7 +24,7 @@ public class InMemoryWorkflowPersistenceProviderTests
             .Returns(new Meter("test"));
 
         var metrics = new AutomateMetrics(meterFactory.Object);
-        var collectionCache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var collectionCache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)), new StepOutputHydrationCache(Mock.Of<IAutomationRunRepository>()));
         var finalizer = new RunFinalizer(
             Mock.Of<IAutomationRunRepository>(),
             new StepOutputHydrationCache(Mock.Of<IAutomationRunRepository>()),
