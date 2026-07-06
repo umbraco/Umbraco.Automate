@@ -103,10 +103,12 @@ public class ContentPublishedTriggerTests
     }
 
     [Fact]
-    public void MapEvent_VariantContent_CulturesContainsDirtyPublishedCultures()
+    public void MapEvent_VariantContent_CulturesContainsChangedPublishedCultures()
     {
-        // Only "en-US" was just published; "fr-FR" was already published earlier
-        // and is not dirty in this event — so only en-US should surface.
+        // On a live instance the changed cultures surface: "en-US" was just published (dirty),
+        // "fr-FR" was already published and unchanged. (When the instance is a clone, dirty
+        // state is lost and the helper falls back to all published — see
+        // ContentCultureCloneRegressionTests.)
         var publishCultureInfos = BuildCultureInfos(dirty: new[] { "en-US" }, clean: new[] { "fr-FR" });
         var content = CreateContent(
             Guid.NewGuid(),
@@ -148,10 +150,13 @@ public class ContentPublishedTriggerTests
     }
 
     /// <summary>
-    /// Builds a <see cref="ContentCultureInfosCollection"/> mimicking the post-commit state:
-    /// entries in <paramref name="dirty"/> have a Name set then <c>ResetDirtyProperties(true)</c>
-    /// called, so their <c>WasDirty()</c> is true (= the culture changed in this event);
-    /// entries in <paramref name="clean"/> are untouched, so <c>WasDirty()</c> is false.
+    /// Builds a <see cref="ContentCultureInfosCollection"/> mimicking a live post-commit
+    /// instance: entries in <paramref name="dirty"/> have a Name set then
+    /// <c>ResetDirtyProperties(true)</c> called (so <c>WasDirty()</c> is true = changed in this
+    /// event); entries in <paramref name="clean"/> are untouched (so <c>WasDirty()</c> is false).
+    /// The published helper reports the changed cultures on a live instance; on a cloned
+    /// instance dirty state is lost and it falls back to all published (see issue #113 and
+    /// <c>ContentCultureCloneRegressionTests</c>).
     /// </summary>
     internal static ContentCultureInfosCollection BuildCultureInfos(
         IEnumerable<string>? dirty = null,
