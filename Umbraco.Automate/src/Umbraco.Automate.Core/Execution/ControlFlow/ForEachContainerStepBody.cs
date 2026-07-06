@@ -20,6 +20,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
     private readonly StepConfiguration _stepConfig;
     private readonly ForEachControlFlowSettings _settings;
     private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
@@ -28,6 +29,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         StepConfiguration stepConfig,
         ForEachControlFlowSettings settings,
         ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
@@ -35,6 +37,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         _stepConfig = stepConfig;
         _settings = settings;
         _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
         _branchEdges = branchEdges;
@@ -163,7 +166,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         // Transient context carrying the in-hand item — never branched, so the item is
         // not persisted anywhere.
         var iterationContext = new ForEachIterationContext(item, index, _stepConfig.Id, parent);
-        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache);
+        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache, _hydrationCache);
         return ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData);
     }
 

@@ -27,6 +27,7 @@ public class InMemoryWorkflowPersistenceProviderTests
         var collectionCache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
         var finalizer = new RunFinalizer(
             Mock.Of<IAutomationRunRepository>(),
+            new StepOutputHydrationCache(Mock.Of<IAutomationRunRepository>()),
             Mock.Of<ICoreScopeProvider>(),
             Mock.Of<IEventMessagesFactory>(),
             metrics,

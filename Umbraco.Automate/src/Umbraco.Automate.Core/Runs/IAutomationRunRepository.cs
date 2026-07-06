@@ -46,6 +46,13 @@ internal interface IAutomationRunRepository
     Task<StepRun> SaveStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the serialized output data of a single step run, or <c>null</c> when the step run
+    /// no longer exists (e.g. removed by retention cleanup) or produced no output. Lightweight
+    /// single-column primary-key read used to hydrate offloaded step outputs at binding time.
+    /// </summary>
+    Task<string?> GetStepRunOutputAsync(Guid stepRunId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes all runs for an automation (cascade deletes step runs).
     /// </summary>
     Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default);

@@ -15,18 +15,21 @@ internal static class BindingDataBuilder
     /// <param name="data">The workflow data carrying per-run state.</param>
     /// <param name="iterationContext">Optional ForEach iteration context for child steps inside a loop.</param>
     /// <param name="collectionCache">Optional cache used to resolve <c>loop.item</c> for index-only iteration contexts.</param>
+    /// <param name="hydrationCache">Optional cache used to lazily hydrate offloaded step outputs
+    /// (see <see cref="StepOutputReference"/>). Without it markers resolve as missing paths.</param>
     /// <returns>A dictionary suitable for binding evaluation.</returns>
     public static Dictionary<string, object?> Build(
         AutomationWorkflowData data,
         ForEachIterationContext? iterationContext = null,
-        ForEachCollectionCache? collectionCache = null)
+        ForEachCollectionCache? collectionCache = null,
+        StepOutputHydrationCache? hydrationCache = null)
     {
         var stepsDict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
         // Layer 1 — global step outputs (steps outside any iteration scope).
         foreach (var (stepId, outputs) in data.StepOutputs)
         {
-            AddStepEntry(stepsDict, data, stepId, outputs);
+            AddStepEntry(stepsDict, data, stepId, outputs, hydrationCache);
         }
 
         // Layer 2 — iteration-scoped outputs from this iteration and its ancestors.
@@ -41,7 +44,7 @@ internal static class BindingDataBuilder
 
             foreach (var (stepId, outputs) in iterOutputs)
             {
-                AddStepEntry(stepsDict, data, stepId, outputs);
+                AddStepEntry(stepsDict, data, stepId, outputs, hydrationCache);
             }
         }
 
@@ -85,14 +88,24 @@ internal static class BindingDataBuilder
         Dictionary<string, object?> stepsDict,
         AutomationWorkflowData data,
         Guid stepId,
-        object? outputs)
+        Dictionary<string, object?> outputs,
+        StepOutputHydrationCache? hydrationCache)
     {
-        stepsDict[stepId.ToString()] = outputs;
+        // Offloaded output — substitute a lazy stand-in that hydrates from the StepRun table
+        // on first bind. The marker itself stays in the workflow data; the stand-in only ever
+        // lives in this per-call binding dictionary, so it is never persisted.
+        object? entry = outputs;
+        if (hydrationCache is not null && StepOutputReference.TryGetStepRunId(outputs, out var stepRunId))
+        {
+            entry = new OffloadedStepOutput(hydrationCache, data.RunId, stepRunId);
+        }
+
+        stepsDict[stepId.ToString()] = entry;
 
         // Also register by alias so both ${steps.GUID.field} and ${steps.alias.field} work.
         if (data.StepAliases.TryGetValue(stepId, out var alias))
         {
-            stepsDict[alias] = outputs;
+            stepsDict[alias] = entry;
         }
     }
 

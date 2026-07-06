@@ -168,7 +168,7 @@ public class BindingDataBuilderTests
         };
 
         var iteration = new ForEachIterationContext(null, 2, containerId);
-        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)), new StepOutputHydrationCache(Mock.Of<Umbraco.Automate.Core.Runs.IAutomationRunRepository>()));
         var result = BindingDataBuilder.Build(data, iteration, cache);
 
         var loop = result["loop"].ShouldBeOfType<Dictionary<string, object?>>();
@@ -194,7 +194,7 @@ public class BindingDataBuilderTests
         };
 
         var iteration = new ForEachIterationContext(null, 0, containerId);
-        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)), new StepOutputHydrationCache(Mock.Of<Umbraco.Automate.Core.Runs.IAutomationRunRepository>()));
         var result = BindingDataBuilder.Build(data, iteration, cache);
 
         var loop = result["loop"].ShouldBeOfType<Dictionary<string, object?>>();
@@ -216,7 +216,7 @@ public class BindingDataBuilderTests
         };
 
         var iteration = new ForEachIterationContext("legacy-item", 0, containerId);
-        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var cache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)), new StepOutputHydrationCache(Mock.Of<Umbraco.Automate.Core.Runs.IAutomationRunRepository>()));
         var result = BindingDataBuilder.Build(data, iteration, cache);
 
         var loop = result["loop"].ShouldBeOfType<Dictionary<string, object?>>();

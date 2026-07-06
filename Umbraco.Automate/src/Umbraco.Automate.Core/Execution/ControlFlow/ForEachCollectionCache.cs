@@ -22,11 +22,13 @@ namespace Umbraco.Automate.Core.Execution.ControlFlow;
 internal sealed class ForEachCollectionCache
 {
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConcurrentDictionary<CollectionKey, IReadOnlyList<object?>> _collections = new();
 
-    public ForEachCollectionCache(BindingEvaluator bindingEvaluator)
+    public ForEachCollectionCache(BindingEvaluator bindingEvaluator, StepOutputHydrationCache hydrationCache)
     {
         _bindingEvaluator = bindingEvaluator;
+        _hydrationCache = hydrationCache;
     }
 
     /// <summary>
@@ -55,7 +57,7 @@ internal sealed class ForEachCollectionCache
         // Evaluate against the enclosing iteration's binding data — for nested loops the
         // expression may reference the parent's loop.item, which recurses through this
         // cache and terminates at the outermost loop.
-        var bindingData = BindingDataBuilder.Build(data, parentIteration, this);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, this, _hydrationCache);
         items = MaterializeCollection(_bindingEvaluator.Evaluate(collectionExpression, bindingData));
         return _collections.GetOrAdd(key, items);
     }
