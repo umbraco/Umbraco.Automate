@@ -176,6 +176,13 @@ public sealed class ExecutionOptions
     public int MaxInlineOutputBytes { get; set; } = 16_384;
 
     /// <summary>
+    /// Gets or sets the maximum HTTP response body size, in bytes, accepted by the built-in
+    /// HTTP Request action. Responses exceeding the limit fail the step with an actionable
+    /// error instead of flooding run storage with megabytes of payload. Default: 10 MB.
+    /// </summary>
+    public long MaxHttpResponseBodyBytes { get; set; } = 10_485_760;
+
+    /// <summary>
     /// Gets or sets the execution mode for workflow processing.
     /// </summary>
     /// <remarks>
