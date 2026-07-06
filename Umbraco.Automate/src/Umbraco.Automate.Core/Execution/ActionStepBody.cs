@@ -28,6 +28,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly IAction _action;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly ForEachCollectionCache _collectionCache;
     private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
@@ -42,6 +43,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         IAction action,
         ActionMiddlewarePipeline pipeline,
         BindingEvaluator bindingEvaluator,
+        ForEachCollectionCache collectionCache,
         SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
@@ -55,6 +57,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         _action = action;
         _pipeline = pipeline;
         _bindingEvaluator = bindingEvaluator;
+        _collectionCache = collectionCache;
         _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
@@ -95,7 +98,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     {
         // Build binding data context: trigger output + all prior step outputs + loop iteration.
         var iterationContext = context.Item as ForEachIterationContext;
-        var bindingData = BindingDataBuilder.Build(data, iterationContext);
+        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache);
 
         // Setup phase — resolve inputs, settings, bindings, and connections before we
         // invoke the middleware pipeline. These operations can throw on misconfiguration

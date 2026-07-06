@@ -14,8 +14,12 @@ internal static class BindingDataBuilder
     /// </summary>
     /// <param name="data">The workflow data carrying per-run state.</param>
     /// <param name="iterationContext">Optional ForEach iteration context for child steps inside a loop.</param>
+    /// <param name="collectionCache">Optional cache used to resolve <c>loop.item</c> for index-only iteration contexts.</param>
     /// <returns>A dictionary suitable for binding evaluation.</returns>
-    public static Dictionary<string, object?> Build(AutomationWorkflowData data, ForEachIterationContext? iterationContext = null)
+    public static Dictionary<string, object?> Build(
+        AutomationWorkflowData data,
+        ForEachIterationContext? iterationContext = null,
+        ForEachCollectionCache? collectionCache = null)
     {
         var stepsDict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
@@ -63,9 +67,13 @@ internal static class BindingDataBuilder
 
         if (iterationContext is not null)
         {
+            // Contexts persisted by older versions embed the item — prefer it so in-flight
+            // runs keep resolving. New contexts carry only the index; look the item up in
+            // the per-run materialised collection.
+            var item = iterationContext.Item ?? collectionCache?.ResolveItem(data, iterationContext);
             bindingData["loop"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
-                ["item"] = ResolveIterationItem(iterationContext.Item),
+                ["item"] = ResolveIterationItem(item),
                 ["index"] = iterationContext.Index,
             };
         }

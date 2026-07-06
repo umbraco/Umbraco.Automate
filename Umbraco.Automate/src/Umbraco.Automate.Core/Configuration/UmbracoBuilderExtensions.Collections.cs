@@ -200,6 +200,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationOriginAccessor, AutomationOriginAccessor>();
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IExecutionNodeEligibility, ExecutionNodeEligibility>();
+        builder.Services.AddSingleton<Umbraco.Automate.Core.Execution.ControlFlow.ForEachCollectionCache>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
         builder.Services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();

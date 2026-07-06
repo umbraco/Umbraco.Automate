@@ -11,13 +11,15 @@ namespace Umbraco.Automate.Tests.Unit.Execution.ControlFlow;
 
 public class ParallelContainerStepBodyTests
 {
-    private static ParallelContainerStepBody CreateBody(IReadOnlyList<ContainerBranchEdge>? branchEdges = null)
+    private static ParallelContainerStepBody CreateBody(
+        IReadOnlyList<ContainerBranchEdge>? branchEdges = null,
+        StepConfiguration? stepConfig = null)
     {
         var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
         var conditionEvaluator = new ConditionEvaluator(evaluator);
-        StepConfiguration stepConfig = new StepConfigurationBuilder()
+        stepConfig ??= new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.parallel").WithName("Parallel");
-        return new ParallelContainerStepBody(stepConfig, conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
+        return new ParallelContainerStepBody(stepConfig, new ForEachCollectionCache(evaluator), conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
     [Fact]
@@ -111,7 +113,36 @@ public class ParallelContainerStepBodyTests
         result.BranchValues.ShouldBeEmpty();
     }
 
-    private static IStepExecutionContext CreateContext(int childCount, object? persistenceData = null)
+    [Fact]
+    public void Run_ReentryWithChildrenComplete_PrunesIterationScopes()
+    {
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.parallel").WithName("Parallel");
+        var scope0 = $"{stepConfig.Id:N}:0";
+        var scope1 = $"{stepConfig.Id:N}:1";
+
+        var data = CreateData();
+        data.IterationStepOutputs[scope0] = new() { [Guid.NewGuid()] = new() { ["message"] = "branch-0" } };
+        data.IterationStepOutputs[scope1] = new() { [Guid.NewGuid()] = new() { ["message"] = "branch-1" } };
+        data.IterationLastCompletedStepId[scope0] = Guid.NewGuid();
+
+        var body = CreateBody(stepConfig: stepConfig);
+        var context = CreateContext(childCount: 2, persistenceData: new ControlPersistenceData { ChildrenActive = true }, data: data);
+        var result = body.Run(context);
+
+        result.Proceed.ShouldBeTrue();
+        data.IterationStepOutputs.ShouldBeEmpty();
+        data.IterationLastCompletedStepId.ShouldBeEmpty();
+    }
+
+    private static AutomationWorkflowData CreateData() => new()
+    {
+        RunId = Guid.NewGuid(),
+        AutomationId = Guid.NewGuid(),
+        TriggerOutput = [],
+    };
+
+    private static IStepExecutionContext CreateContext(int childCount, object? persistenceData = null, AutomationWorkflowData? data = null)
     {
         var step = new WorkflowStep<ParallelContainerStepBody> { Id = 0 };
         for (var i = 0; i < childCount; i++)
@@ -121,12 +152,7 @@ public class ParallelContainerStepBodyTests
 
         var context = new Mock<IStepExecutionContext>();
         var workflow = new Mock<WorkflowInstance>();
-        workflow.Object.Data = new AutomationWorkflowData
-        {
-            RunId = Guid.NewGuid(),
-            AutomationId = Guid.NewGuid(),
-            TriggerOutput = [],
-        };
+        workflow.Object.Data = data ?? CreateData();
         context.Setup(c => c.Workflow).Returns(workflow.Object);
         context.Setup(c => c.Step).Returns(step);
         context.Setup(c => c.PersistenceData).Returns(persistenceData!);
