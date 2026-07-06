@@ -179,7 +179,18 @@ internal sealed class AutomationRunService : IAutomationRunService
         run.Error ??= "Workflow terminated by user";
         await _runRepository.SaveAsync(run, cancellationToken);
 
-        await _workflowHost.TerminateWorkflow(run.WorkflowInstanceId);
+        // TerminateWorkflow is best-effort: it makes a single attempt to acquire the
+        // per-workflow lock and returns false if the executor is mid-pass (the common
+        // case for an actively executing run). RunCancellationStepMiddleware observes
+        // the Cancelled run row and stops the workflow at the next step boundary.
+        var terminated = await _workflowHost.TerminateWorkflow(run.WorkflowInstanceId);
+        if (!terminated)
+        {
+            _logger.LogInformation(
+                "Engine terminate for run {RunId} was locked out by an in-flight execution pass; " +
+                "cooperative cancellation will stop it at the next step boundary",
+                runId);
+        }
 
         _logger.LogInformation("Run {RunId} terminated via lifecycle API", runId);
         return RunLifecycleResult.Success;
