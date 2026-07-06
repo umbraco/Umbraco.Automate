@@ -86,6 +86,15 @@ internal sealed class RunCancellationStepMiddleware : IWorkflowStepMiddleware
             data.RunId,
             context.Workflow.Id);
 
+        // Two benign timing quirks, both bounded and safe to leave as-is:
+        // - A cancel landing in the sub-ms window while a DelayAction tick is being processed
+        //   defers the stop until the delay elapses (the step returns SleepFor before this
+        //   check runs again). A cancel during the sleep itself — the common case — hits a
+        //   free lock and stops immediately.
+        // - The run row is stamped Cancelled/CompletedUtc up front by TerminateRunAsync, so up
+        //   to one cache TTL of further iterations may append Completed StepRuns timestamped
+        //   after the run's CompletedUtc. A harmless ordering artefact, not lost work.
+
         context.Workflow.Status = WorkflowStatus.Terminated;
         context.Workflow.CompleteTime = DateTime.UtcNow;
 
@@ -108,16 +117,29 @@ internal sealed class RunCancellationStepMiddleware : IWorkflowStepMiddleware
             return cachedStatus;
         }
 
+        AutomationRunStatus? status;
         try
         {
-            var status = await _runRepository.GetRunStatusAsync(runId, cancellationToken);
-            _cache.Set(cacheKey, status, StatusCacheDuration);
-            return status;
+            status = await _runRepository.GetRunStatusAsync(runId, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to read status for run {RunId}; assuming not cancelled", runId);
             return null;
         }
+
+        // Cache the result outside the read's try/catch: a Set failure (e.g. a size-limited
+        // cache rejecting an entry with no Size) must never discard an already-read status,
+        // or a Cancelled read would be swallowed and cancellation would silently stop working.
+        try
+        {
+            _cache.Set(cacheKey, status, StatusCacheDuration);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to cache status for run {RunId}; continuing uncached", runId);
+        }
+
+        return status;
     }
 }
