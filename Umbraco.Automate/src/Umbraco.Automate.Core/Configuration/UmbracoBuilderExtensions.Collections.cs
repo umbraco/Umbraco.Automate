@@ -211,6 +211,12 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
         builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
         builder.Services.AddWorkflow();
+        // Per-step cooperative cancellation: TerminateWorkflow alone races the executor's
+        // workflow lock and silently fails while a run is actively executing. AddMemoryCache
+        // is idempotent (TryAdd) — this backs the short-TTL run-status cache the middleware
+        // uses to avoid a DB read on every step of every run.
+        builder.Services.AddMemoryCache();
+        builder.Services.AddWorkflowStepMiddleware<RunCancellationStepMiddleware>();
         builder.Services.AddSingleton<WorkflowDefinitionRecovery>();
         builder.Services.AddHostedService<WorkflowHostLifecycle>();
 
