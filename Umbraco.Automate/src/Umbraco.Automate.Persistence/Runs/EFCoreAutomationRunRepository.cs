@@ -41,12 +41,10 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var status = await db.AutomationRuns
+        return await db.AutomationRuns
             .Where(r => r.Id == id)
-            .Select(r => (int?)r.Status)
+            .Select(r => (AutomationRunStatus?)r.Status)
             .FirstOrDefaultAsync(cancellationToken);
-
-        return status.HasValue ? (AutomationRunStatus)status.Value : null;
     }
 
     public async Task<(IEnumerable<AutomationRun> Items, int Total)> GetPagedByAutomationAsync(

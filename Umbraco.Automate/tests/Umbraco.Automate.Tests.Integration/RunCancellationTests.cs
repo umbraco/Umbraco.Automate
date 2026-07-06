@@ -85,6 +85,8 @@ public class RunCancellationTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddDebug());
         services.AddWorkflow();
+        // Backs RunCancellationStepMiddleware's short-TTL run-status cache.
+        services.AddMemoryCache();
         services.AddWorkflowStepMiddleware<RunCancellationStepMiddleware>();
 
         _runRepository = new EFCoreAutomationRunRepository(dbContextFactory);
