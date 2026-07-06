@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Runs;
 using WorkflowCore.Interface;
@@ -20,17 +21,35 @@ namespace Umbraco.Automate.Core.Execution;
 /// also stops runs cancelled from another node, where an engine-level terminate can be
 /// overwritten by the executing node's state snapshot.
 /// </para>
+/// <para>
+/// The status check is cached per run for a short TTL (see <see cref="StatusCacheDuration"/>)
+/// because this middleware wraps every step of every run, including every re-entry of
+/// ForEach/While/If/Switch containers and every loop iteration — without a cache, a tight loop
+/// would issue a DB round-trip per iteration purely to detect a rare cancellation. The check
+/// also fails open (treats DB errors as "not cancelled") so a transient DB blip doesn't fail
+/// the current step of every active workflow; cancellation is simply detected on a later step.
+/// </para>
 /// </summary>
 internal sealed class RunCancellationStepMiddleware : IWorkflowStepMiddleware
 {
+    // Balances DB load against how quickly cancellation is noticed: short enough that a
+    // cancelled run stops within a fraction of a second, long enough to collapse the many
+    // status checks a tight ForEach/While loop would otherwise issue per iteration.
+    private static readonly TimeSpan StatusCacheDuration = TimeSpan.FromMilliseconds(250);
+
+    private const string CacheKeyPrefix = "Umbraco.Automate.RunCancellation:";
+
     private readonly IAutomationRunRepository _runRepository;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<RunCancellationStepMiddleware> _logger;
 
     public RunCancellationStepMiddleware(
         IAutomationRunRepository runRepository,
+        IMemoryCache cache,
         ILogger<RunCancellationStepMiddleware> logger)
     {
         _runRepository = runRepository;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -44,7 +63,7 @@ internal sealed class RunCancellationStepMiddleware : IWorkflowStepMiddleware
             return await next();
         }
 
-        var status = await _runRepository.GetRunStatusAsync(data.RunId, context.CancellationToken);
+        var status = await GetRunStatusAsync(data.RunId, context.CancellationToken);
         if (status is not AutomationRunStatus.Cancelled)
         {
             return await next();
@@ -62,5 +81,31 @@ internal sealed class RunCancellationStepMiddleware : IWorkflowStepMiddleware
         // leaves pointers dangling); advancing it could complete the final pointer and
         // let the executor overwrite Terminated with Complete.
         return ExecutionResult.Persist(context.PersistenceData);
+    }
+
+    /// <summary>
+    /// Gets the run status, served from a short-TTL cache when available. Fails open — any
+    /// exception from the DB read is logged and treated as "not cancelled" so a transient
+    /// failure doesn't fail the step currently executing.
+    /// </summary>
+    private async Task<AutomationRunStatus?> GetRunStatusAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        var cacheKey = CacheKeyPrefix + runId;
+        if (_cache.TryGetValue(cacheKey, out AutomationRunStatus? cachedStatus))
+        {
+            return cachedStatus;
+        }
+
+        try
+        {
+            var status = await _runRepository.GetRunStatusAsync(runId, cancellationToken);
+            _cache.Set(cacheKey, status, StatusCacheDuration);
+            return status;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to read status for run {RunId}; assuming not cancelled", runId);
+            return null;
+        }
     }
 }
