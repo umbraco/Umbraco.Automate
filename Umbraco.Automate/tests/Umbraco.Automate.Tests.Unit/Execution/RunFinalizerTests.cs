@@ -42,10 +42,11 @@ public class RunFinalizerTests
         var eventMessagesFactory = new Mock<IEventMessagesFactory>();
         eventMessagesFactory.Setup(f => f.Get()).Returns(new EventMessages());
 
-        var collectionCache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        var collectionCache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)), new StepOutputHydrationCache(_runRepo.Object));
 
         _finalizer = new RunFinalizer(
             _runRepo.Object,
+            new StepOutputHydrationCache(_runRepo.Object),
             scopeProvider.Object,
             eventMessagesFactory.Object,
             metrics,

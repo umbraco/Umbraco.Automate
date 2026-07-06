@@ -123,6 +123,16 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         return stepRun;
     }
 
+    public async Task<string?> GetStepRunOutputAsync(Guid stepRunId, Guid runId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.StepRuns
+            .Where(s => s.Id == stepRunId && s.RunId == runId)
+            .Select(s => s.OutputData)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);

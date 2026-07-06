@@ -15,17 +15,20 @@ internal sealed class ParallelContainerStepBody : ContainerStepBody
 {
     private readonly StepConfiguration _stepConfig;
     private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
 
     public ParallelContainerStepBody(
         StepConfiguration stepConfig,
         ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         ConditionEvaluator conditionEvaluator,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         _stepConfig = stepConfig;
         _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _conditionEvaluator = conditionEvaluator;
         _branchEdges = branchEdges;
     }
@@ -63,7 +66,7 @@ internal sealed class ParallelContainerStepBody : ContainerStepBody
         // edge has a filter and they all fail, suppress the branch entirely. (We cannot
         // skip individual children selectively because WorkflowCore cross-products
         // BranchValues × step.Children when spawning child pointers.)
-        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache, context.CancellationToken);
 
         if (!ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData))
         {

@@ -124,7 +124,7 @@ public class SwitchStepBodyTests
     {
         StepConfiguration stepConfig = new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.switch").WithName("Switch");
-        return new SwitchStepBody(stepConfig, settings, _conditionEvaluator, _runRepo.Object);
+        return new SwitchStepBody(stepConfig, settings, _conditionEvaluator, new StepOutputHydrationCache(_runRepo.Object), _runRepo.Object);
     }
 
     private static IStepExecutionContext CreateContext()

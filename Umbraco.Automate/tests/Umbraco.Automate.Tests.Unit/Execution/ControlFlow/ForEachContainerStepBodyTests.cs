@@ -15,6 +15,7 @@ namespace Umbraco.Automate.Tests.Unit.Execution.ControlFlow;
 public class ForEachContainerStepBodyTests
 {
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ForEachCollectionCache _collectionCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
@@ -22,7 +23,8 @@ public class ForEachContainerStepBodyTests
     public ForEachContainerStepBodyTests()
     {
         _bindingEvaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
-        _collectionCache = new ForEachCollectionCache(_bindingEvaluator);
+        _hydrationCache = new StepOutputHydrationCache(_runRepo.Object);
+        _collectionCache = new ForEachCollectionCache(_bindingEvaluator, _hydrationCache);
         _conditionEvaluator = new ConditionEvaluator(_bindingEvaluator);
         _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
@@ -422,6 +424,7 @@ public class ForEachContainerStepBodyTests
             stepConfig,
             settings,
             _collectionCache,
+            _hydrationCache,
             _conditionEvaluator,
             _runRepo.Object,
             branchEdges ?? Array.Empty<ContainerBranchEdge>());

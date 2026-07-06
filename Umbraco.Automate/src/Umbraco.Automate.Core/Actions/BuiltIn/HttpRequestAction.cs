@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Configuration;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
@@ -14,14 +16,19 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequestOutput>
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IOptions<ExecutionOptions> _executionOptions;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HttpRequestAction"/> class.
     /// </summary>
-    public HttpRequestAction(ActionInfrastructure infrastructure, IHttpClientFactory httpClientFactory)
+    public HttpRequestAction(
+        ActionInfrastructure infrastructure,
+        IHttpClientFactory httpClientFactory,
+        IOptions<ExecutionOptions> executionOptions)
         : base(infrastructure)
     {
         _httpClientFactory = httpClientFactory;
+        _executionOptions = executionOptions;
     }
 
     /// <inheritdoc />
@@ -55,8 +62,23 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
 
         ApplyHeaders(request, settings.Headers);
 
-        var response = await client.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        var maxBodyBytes = _executionOptions.Value.MaxHttpResponseBodyBytes;
+
+        // Stream the response so an oversized body can be rejected from the Content-Length
+        // header — or while reading when the server doesn't declare one — without ever
+        // buffering the whole payload first.
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        if (response.Content.Headers.ContentLength is { } declaredLength && declaredLength > maxBodyBytes)
+        {
+            return ResponseTooLarge(settings.Url, declaredLength, maxBodyBytes);
+        }
+
+        var body = await ReadBodyCappedAsync(response.Content, maxBodyBytes, cancellationToken);
+        if (body is null)
+        {
+            return ResponseTooLarge(settings.Url, actualBytes: null, maxBodyBytes);
+        }
 
         var output = new HttpRequestOutput
         {
@@ -70,6 +92,62 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
             : ActionResult.Failed(
                 new HttpRequestException($"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}"),
                 StepRunErrorCategory.InvalidResponse);
+    }
+
+    /// <summary>
+    /// Reads the response body up to <paramref name="maxBytes"/>, returning <c>null</c> when
+    /// the body turns out to be larger (cap enforced while streaming, so at most one chunk
+    /// past the limit is ever buffered).
+    /// </summary>
+    private static async Task<string?> ReadBodyCappedAsync(HttpContent content, long maxBytes, CancellationToken cancellationToken)
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81920];
+        int read;
+        while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
+        {
+            if (buffer.Length + read > maxBytes)
+            {
+                return null;
+            }
+
+            buffer.Write(chunk, 0, read);
+        }
+
+        return ResolveEncoding(content.Headers.ContentType?.CharSet).GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+    }
+
+    private static Encoding ResolveEncoding(string? charset)
+    {
+        if (string.IsNullOrWhiteSpace(charset))
+        {
+            return Encoding.UTF8;
+        }
+
+        try
+        {
+            return Encoding.GetEncoding(charset.Trim('"'));
+        }
+        catch (ArgumentException)
+        {
+            return Encoding.UTF8;
+        }
+    }
+
+    private static ActionResult ResponseTooLarge(string? url, long? actualBytes, long maxBytes)
+    {
+        var size = actualBytes is { } bytes ? $"is {bytes} bytes, which exceeds" : "exceeds";
+
+        // ConfigurationError rather than InvalidResponse: the outcome is deterministic (the
+        // endpoint returns the same oversized payload every time), so the terminal category
+        // stops WorkflowCore re-downloading megabytes on every retry attempt.
+        return ActionResult.Failed(
+            new HttpRequestException(
+                $"The HTTP response from '{url}' {size} the maximum allowed response body size of {maxBytes} bytes. " +
+                "Filter or paginate the request so it returns less data, or increase the " +
+                "'Umbraco:Automate:Execution:MaxHttpResponseBodyBytes' setting if the automation genuinely needs a larger response."),
+            StepRunErrorCategory.ConfigurationError);
     }
 
     private static HttpMethod ParseMethod(string? method)

@@ -98,6 +98,7 @@ public class ForEachIterationStateTests : IAsyncLifetime
         services.AddSingleton(middlewareCollection);
         services.AddSingleton(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
         services.AddSingleton<ForEachCollectionCache>();
+        services.AddSingleton<StepOutputHydrationCache>();
         services.AddSingleton<SettingsBindingResolver>();
         services.AddSingleton<ConditionEvaluator>();
         services.AddSingleton<ActionMiddlewarePipeline>();
