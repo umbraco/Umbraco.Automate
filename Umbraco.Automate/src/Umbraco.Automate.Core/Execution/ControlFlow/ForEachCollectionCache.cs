@@ -13,8 +13,11 @@ namespace Umbraco.Automate.Core.Execution.ControlFlow;
 /// stashed in <see cref="AutomationWorkflowData.ContainerCollections"/> is re-evaluated
 /// against the enclosing iteration's binding data, which is the same evaluation the container
 /// performed on every sequential re-entry before this cache existed.
-/// Entries are evicted when their container completes; entries for runs abandoned mid-loop
-/// leak for the process lifetime, bounded at one materialised list per active loop.
+/// Entries are evicted when their container completes, and <see cref="EvictRun"/> sweeps any
+/// stragglers when the run reaches a terminal WorkflowCore status (see
+/// <see cref="Umbraco.Automate.Core.Execution.RunFinalizer"/>), so entries for runs
+/// abandoned mid-loop are bounded to the remaining lifetime of that run rather than the
+/// process.
 /// </summary>
 internal sealed class ForEachCollectionCache
 {
@@ -30,6 +33,13 @@ internal sealed class ForEachCollectionCache
     /// Gets the materialised collection for a container within the given enclosing iteration,
     /// evaluating and materialising the collection expression on first access.
     /// </summary>
+    /// <remarks>
+    /// Behaviour change: the collection is evaluated once per run and reused for every
+    /// sequential re-entry (previously it was re-evaluated against live data on every
+    /// re-entry). If the collection expression reads data that the loop body itself
+    /// mutates, later iterations will keep seeing the value captured on first access, not
+    /// the mutation.
+    /// </remarks>
     public IReadOnlyList<object?> GetOrMaterializeCollection(
         AutomationWorkflowData data,
         Guid containerStepId,
@@ -72,6 +82,20 @@ internal sealed class ForEachCollectionCache
     /// </summary>
     public void EvictCollection(Guid runId, Guid containerStepId, string? parentScopePath)
         => _collections.TryRemove(new CollectionKey(runId, containerStepId, parentScopePath), out _);
+
+    /// <summary>
+    /// Evicts every cached collection for a run, regardless of container or iteration scope.
+    /// Called once a run reaches a terminal WorkflowCore status, so entries for loops that
+    /// never reached their own natural pruning point (abandoned or terminated mid-loop) don't
+    /// leak for the lifetime of the process.
+    /// </summary>
+    public void EvictRun(Guid runId)
+    {
+        foreach (var key in _collections.Keys.Where(k => k.RunId == runId))
+        {
+            _collections.TryRemove(key, out _);
+        }
+    }
 
     /// <summary>
     /// Materialises an evaluated collection value: a JSON array is deep-converted to plain

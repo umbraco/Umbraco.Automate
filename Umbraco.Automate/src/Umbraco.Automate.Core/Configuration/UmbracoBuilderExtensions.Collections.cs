@@ -10,6 +10,7 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.HealthChecks;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Conditions;
@@ -200,7 +201,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationOriginAccessor, AutomationOriginAccessor>();
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IExecutionNodeEligibility, ExecutionNodeEligibility>();
-        builder.Services.AddSingleton<Umbraco.Automate.Core.Execution.ControlFlow.ForEachCollectionCache>();
+        builder.Services.AddSingleton<ForEachCollectionCache>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
         builder.Services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
