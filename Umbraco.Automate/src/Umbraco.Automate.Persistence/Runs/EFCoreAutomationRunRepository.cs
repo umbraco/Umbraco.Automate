@@ -37,6 +37,16 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         return AutomationRunFactory.BuildDomain(runEntity, stepRuns);
     }
 
+    public async Task<AutomationRunStatus?> GetRunStatusAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.AutomationRuns
+            .Where(r => r.Id == id)
+            .Select(r => (AutomationRunStatus?)r.Status)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<(IEnumerable<AutomationRun> Items, int Total)> GetPagedByAutomationAsync(
         Guid automationId,
         int skip = 0,

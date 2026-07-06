@@ -11,6 +11,12 @@ internal interface IAutomationRunRepository
     Task<AutomationRun?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets only the status of a run. Lightweight status probe used on the execution
+    /// hot path (per-step cancellation checks) where loading step runs would be wasteful.
+    /// </summary>
+    Task<AutomationRunStatus?> GetRunStatusAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets paged runs for a specific automation.
     /// </summary>
     Task<(IEnumerable<AutomationRun> Items, int Total)> GetPagedByAutomationAsync(
