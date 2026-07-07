@@ -321,19 +321,20 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     }
 
     public async Task<Dictionary<AutomationRunStatus, int>> GetRunCountsByStatusAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        IQueryable<AutomationRunEntity> query = db.AutomationRuns;
-
-        if (workspaceId.HasValue)
-        {
-            query = query.Where(r => r.WorkspaceId == workspaceId.Value);
-        }
+        // Scope by the automation's current workspace (join) rather than the run's snapshot,
+        // so counts stay consistent with the runs list. Null workspaceIds = all (admin).
+        IQueryable<AutomationRunEntity> query =
+            from r in db.AutomationRuns
+            join a in db.Automations on r.AutomationId equals a.Id
+            where workspaceIds == null || workspaceIds.Contains(a.WorkspaceId)
+            select r;
 
         if (from.HasValue)
         {
@@ -356,7 +357,7 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     }
 
     public async Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         int take = 10,
@@ -364,12 +365,13 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        IQueryable<AutomationRunEntity> query = db.AutomationRuns;
-
-        if (workspaceId.HasValue)
-        {
-            query = query.Where(r => r.WorkspaceId == workspaceId.Value);
-        }
+        // Scope by the automation's current workspace (join) rather than the run's snapshot.
+        // Null workspaceIds = all (admin).
+        IQueryable<AutomationRunEntity> query =
+            from r in db.AutomationRuns
+            join a in db.Automations on r.AutomationId equals a.Id
+            where workspaceIds == null || workspaceIds.Contains(a.WorkspaceId)
+            select r;
 
         if (from.HasValue)
         {

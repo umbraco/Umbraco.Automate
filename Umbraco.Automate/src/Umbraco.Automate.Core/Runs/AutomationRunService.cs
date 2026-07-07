@@ -64,12 +64,12 @@ internal sealed class AutomationRunService : IAutomationRunService
         => _runRepository.GetStepRunsByActionAndStatusAsync(actionAlias, status, cancellationToken);
 
     public async Task<RunSummary> GetRunSummaryAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         CancellationToken cancellationToken = default)
     {
-        var byStatus = await _runRepository.GetRunCountsByStatusAsync(workspaceId, from, to, cancellationToken);
+        var byStatus = await _runRepository.GetRunCountsByStatusAsync(workspaceIds, from, to, cancellationToken);
         var totalRuns = byStatus.Values.Sum();
 
         byStatus.TryGetValue(AutomationRunStatus.Completed, out var completedCount);
@@ -87,12 +87,12 @@ internal sealed class AutomationRunService : IAutomationRunService
     }
 
     public Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         int take = 10,
         CancellationToken cancellationToken = default)
-        => _runRepository.GetRunCountsByAutomationAsync(workspaceId, from, to, take, cancellationToken);
+        => _runRepository.GetRunCountsByAutomationAsync(workspaceIds, from, to, take, cancellationToken);
 
     public async Task<RunLifecycleResult> SuspendRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
