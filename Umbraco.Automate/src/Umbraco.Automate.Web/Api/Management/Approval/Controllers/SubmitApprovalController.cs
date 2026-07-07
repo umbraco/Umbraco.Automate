@@ -56,7 +56,6 @@ public sealed class SubmitApprovalController : ApprovalControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> SubmitDecision(
         Guid runId,
         Guid stepId,
