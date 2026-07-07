@@ -28,6 +28,11 @@ export interface UaRunsRefreshControllerArgs {
  *
  * Best-effort: capped at ~7.5s (6 × 1500ms), after which a still-running run keeps showing
  * "Running" until the next reload.
+ *
+ * The stop condition watches the whole reloaded list, so on the cross-automation dashboard
+ * (no {@link UaRunsRefreshControllerArgs.shouldHandle} filter) any unrelated in-flight run
+ * keeps it polling for the full cap. That bounded cost is accepted rather than threading the
+ * specific changed run's id through the event, which only carries an automation id.
  */
 export class UaRunsRefreshController extends UmbControllerBase {
     #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
@@ -86,6 +91,9 @@ export class UaRunsRefreshController extends UmbControllerBase {
                 );
                 if (attempt > 0 && !inFlight) break;
             }
+        } catch {
+            // Best-effort refresh — #onRunsChanged calls this fire-and-forget, so swallow a
+            // failed reload rather than letting it become an unhandled promise rejection.
         } finally {
             this.#refreshing = false;
         }
