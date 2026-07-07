@@ -92,6 +92,55 @@ public class RunSummaryMetricsControllerTests
     }
 
     [Fact]
+    public async Task GetRunSummary_AdminWithWorkspaceFilter_ScopesToRequestedWorkspace()
+    {
+        var requested = Guid.NewGuid();
+        _runService
+            .Setup(s => s.GetRunSummaryAsync(It.IsAny<IReadOnlySet<Guid>?>(), null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RunSummary());
+        SetupUser(CreateUser(isAdmin: true));
+
+        await _controller.GetRunSummary(workspaceId: requested, cancellationToken: CancellationToken.None);
+
+        // Admin is otherwise unscoped, but an explicit filter still narrows to that workspace.
+        _workspaceService.Verify(
+            s => s.GetAccessibleWorkspaceIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _runService.Verify(
+            s => s.GetRunSummaryAsync(
+                It.Is<IReadOnlySet<Guid>?>(w => w != null && w.Count == 1 && w.Contains(requested)),
+                null,
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetRunSummary_NonAdminWithAccessibleWorkspaceFilter_ScopesToRequestedWorkspace()
+    {
+        var accessible = Guid.NewGuid();
+        var alsoAccessible = Guid.NewGuid();
+        _runService
+            .Setup(s => s.GetRunSummaryAsync(It.IsAny<IReadOnlySet<Guid>?>(), null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RunSummary());
+        SetupUser(CreateUser(isAdmin: false, groupKeys: [Guid.NewGuid()]));
+        _workspaceService
+            .Setup(s => s.GetAccessibleWorkspaceIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<Guid> { accessible, alsoAccessible });
+
+        // Request a workspace the user can access -> intersection yields just that one.
+        await _controller.GetRunSummary(workspaceId: accessible, cancellationToken: CancellationToken.None);
+
+        _runService.Verify(
+            s => s.GetRunSummaryAsync(
+                It.Is<IReadOnlySet<Guid>?>(w => w != null && w.Count == 1 && w.Contains(accessible)),
+                null,
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task GetRunCountsByAutomation_NonAdmin_ScopesToAccessibleWorkspaces()
     {
         var accessible = new HashSet<Guid> { Guid.NewGuid() };
