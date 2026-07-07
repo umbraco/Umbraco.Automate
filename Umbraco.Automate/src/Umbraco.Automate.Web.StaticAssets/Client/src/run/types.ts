@@ -41,3 +41,8 @@ export interface UaRunItemModel {
     durationMs: number | null;
     error: string | null;
 }
+
+export interface UaRunSummary {
+    totalRuns: number;
+    byStatus: Record<string, number>;
+}
