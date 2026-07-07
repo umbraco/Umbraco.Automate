@@ -69,6 +69,10 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
 
         // Join to the automation so results can be scoped by (and labelled with) the
         // automation's current workspace/name rather than the run's execution-time snapshot.
+        // The inner join relies on the invariant that a run always has a live parent
+        // automation: AutomationService.DeleteAutomationAsync deletes a run's rows before
+        // the automation itself. If run retention-after-delete is ever introduced, orphaned
+        // runs would silently drop out of this list and would need a left join instead.
         var query =
             from r in db.AutomationRuns
             join a in db.Automations on r.AutomationId equals a.Id
@@ -78,7 +82,9 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         var total = await query.CountAsync(cancellationToken);
 
         var items = await query
+            // Id is the tiebreaker so paging stays stable across runs sharing a StartedUtc.
             .OrderByDescending(x => x.Run.StartedUtc)
+            .ThenByDescending(x => x.Run.Id)
             .Skip(skip)
             .Take(take)
             .Select(x => new AutomationRunListItem
