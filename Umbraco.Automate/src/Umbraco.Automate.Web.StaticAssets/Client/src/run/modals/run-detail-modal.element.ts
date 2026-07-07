@@ -170,6 +170,13 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                 return;
             }
 
+            // Let the runs view refresh so the underlying list reflects the new status.
+            // The modal stays open (unlike replay), so this fires alongside the in-modal
+            // reload rather than before a submit(). Dispatched via an awaited getContext for
+            // consistency with #onReplay.
+            const eventContext = await this.getContext(UMB_ACTION_EVENT_CONTEXT);
+            eventContext?.dispatchEvent(new UaAutomationRunsChangedEvent(this._run.automationId));
+
             // Reload the run so the user sees the updated status without closing the modal.
             await this.#loadRun(this._run.unique);
         } catch {
