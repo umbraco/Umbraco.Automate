@@ -62,19 +62,23 @@ public interface IAutomationRunService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a summary of run statistics.
+    /// Gets a summary of run statistics, scoped to the given workspaces (matched on each run's
+    /// automation's current workspace). Pass <c>null</c> for <paramref name="workspaceIds"/> to
+    /// summarise across all workspaces.
     /// </summary>
     Task<RunSummary> GetRunSummaryAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets run counts grouped by automation, ordered by total runs descending.
+    /// Gets run counts grouped by automation, ordered by total runs descending, scoped to the
+    /// given workspaces (matched on each run's automation's current workspace). Pass <c>null</c>
+    /// for <paramref name="workspaceIds"/> to count across all workspaces.
     /// </summary>
     Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         int take = 10,

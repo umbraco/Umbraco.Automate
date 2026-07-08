@@ -2,12 +2,12 @@ import { css, customElement, html, state } from "@umbraco-cms/backoffice/externa
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UaAutomationCollectionServerDataSource } from "../../automation/repository/collection/automation-collection.server.data-source.js";
-import { UaRunCollectionServerDataSource } from "../../run/repository/collection/run-collection.server.data-source.js";
+import { UaRunListCollectionServerDataSource } from "../../run/repository/collection/run-list-collection.server.data-source.js";
+import { UaRunMetricsServerDataSource } from "../../run/repository/metrics/run-metrics.server.data-source.js";
 import { UaWorkspaceCollectionServerDataSource } from "../../workspace-management/repository/collection/workspace-collection.server.data-source.js";
 import { UA_CREATE_WORKSPACE_MGMT_WORKSPACE_PATH_PATTERN } from "../../workspace-management/workspace/workspace-mgmt/paths.js";
 import type { UaStatusCardData } from "./components/status-cards.element.js";
 import type { UaActivityItem } from "./components/activity-list.element.js";
-import type { UaRunItemModel } from "../../run/types.js";
 import "./components/status-cards.element.js";
 import "./components/activity-list.element.js";
 
@@ -16,7 +16,8 @@ type WelcomeState = "none" | "no-workspaces" | "no-automations";
 @customElement("ua-automate-dashboard")
 export class UaAutomateDashboardElement extends UmbLitElement {
     #automationSource = new UaAutomationCollectionServerDataSource(this);
-    #runSource = new UaRunCollectionServerDataSource(this);
+    #runListSource = new UaRunListCollectionServerDataSource(this);
+    #metricsSource = new UaRunMetricsServerDataSource(this);
     #workspaceSource = new UaWorkspaceCollectionServerDataSource(this);
 
     @state()
@@ -59,33 +60,17 @@ export class UaAutomateDashboardElement extends UmbLitElement {
         const draft = automationsData.items.filter((a) => a.status === "Draft").length;
         const unpublished = automationsData.items.filter((a) => a.status === "Unpublished").length;
 
-        // Load recent runs from all automations
-        const allRuns: (UaRunItemModel & { automationName: string })[] = [];
-        const runPromises = automationsData.items.map(async (a) => {
-            const { data } = await this.#runSource.getCollection({ automationId: a.unique, skip: 0, take: 10 });
-            if (data) {
-                return data.items.map((r) => ({
-                    ...r,
-                    automationName: a.name,
-                }));
-            }
-            return [];
-        });
+        // Recent activity comes from the cross-automation runs endpoint (already sorted, each row
+        // carrying its automation name); the status counts come from the scoped metrics summary
+        // (accurate totals). Both are workspace-scoped server-side — no per-automation fan-out.
+        const [{ data: runsData }, { data: summary }] = await Promise.all([
+            this.#runListSource.getCollection({ skip: 0, take: 15 }),
+            this.#metricsSource.getSummary(),
+        ]);
 
-        const results = await Promise.all(runPromises);
-        for (const runs of results) {
-            allRuns.push(...runs);
-        }
-
-        // Sort by started date descending
-        allRuns.sort((a, b) => {
-            const aTime = a.startedUtc ? new Date(a.startedUtc).getTime() : 0;
-            const bTime = b.startedUtc ? new Date(b.startedUtc).getTime() : 0;
-            return bTime - aTime;
-        });
-
-        const failedRuns = allRuns.filter((r) => r.status === "Failed").length;
-        const runningRuns = allRuns.filter((r) => r.status === "Running" || r.status === "Suspended").length;
+        // Keys are normalised to lower-case by the metrics data source.
+        const failedRuns = summary?.byStatus["failed"] ?? 0;
+        const runningRuns = (summary?.byStatus["running"] ?? 0) + (summary?.byStatus["suspended"] ?? 0);
 
         this._cards = [
             { label: "Published", count: published, color: "positive", icon: "icon-check" },
@@ -95,9 +80,9 @@ export class UaAutomateDashboardElement extends UmbLitElement {
             { label: "In Progress", count: runningRuns, color: "warning", icon: "icon-nodes" },
         ];
 
-        this._activity = allRuns.slice(0, 15).map((r) => ({
+        this._activity = (runsData?.items ?? []).map((r) => ({
             runId: r.unique,
-            automationName: r.automationName,
+            automationName: r.automationName ?? "",
             status: r.status,
             startedUtc: r.startedUtc,
         }));
