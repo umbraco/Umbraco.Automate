@@ -112,6 +112,6 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
             CompletedUtc = DateTime.UtcNow,
             IterationTotal = totalIterations,
         };
-        _runRepository.SaveStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
+        _runRepository.AddStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
     }
 }

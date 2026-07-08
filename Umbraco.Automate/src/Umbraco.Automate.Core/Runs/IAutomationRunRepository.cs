@@ -41,9 +41,18 @@ internal interface IAutomationRunRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Saves a step run (insert or update).
+    /// Inserts a new step run. Callers know when a step run is new (the first write of a
+    /// freshly-created <see cref="StepRun"/>), so this skips the existence check a blind upsert
+    /// would need — a single INSERT round-trip.
     /// </summary>
-    Task<StepRun> SaveStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
+    Task<StepRun> AddStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing step run. Writes all columns in a single UPDATE round-trip without a
+    /// preceding read; the caller is expected to hold a step run that was already inserted (or
+    /// loaded from the database).
+    /// </summary>
+    Task<StepRun> UpdateStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the serialized output data of a single step run, or <c>null</c> when the step run

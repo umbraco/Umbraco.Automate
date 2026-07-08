@@ -86,7 +86,7 @@ public class IfStepBodyTests
     public void Run_CreatesStepRunWithBranchOutcome()
     {
         StepRun? savedStepRun = null;
-        _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
+        _runRepo.Setup(r => r.AddStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .Callback<StepRun, CancellationToken>((sr, _) => savedStepRun = sr)
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
 
