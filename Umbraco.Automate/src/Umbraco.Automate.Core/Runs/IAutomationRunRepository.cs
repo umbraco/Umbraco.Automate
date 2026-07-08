@@ -26,6 +26,18 @@ internal interface IAutomationRunRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets paged runs across all automations, newest first, optionally scoped to the given
+    /// workspaces. Scoping is matched on each run's automation's <em>current</em> workspace
+    /// (not the run's execution-time snapshot). Pass <c>null</c> for
+    /// <paramref name="workspaceIds"/> to return runs from all workspaces.
+    /// </summary>
+    Task<(IReadOnlyList<AutomationRunListItem> Items, int Total)> GetPagedAsync(
+        IReadOnlySet<Guid>? workspaceIds,
+        int skip = 0,
+        int take = 100,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Saves a run (insert or update). Does not cascade to step runs.
     /// </summary>
     Task<AutomationRun> SaveAsync(AutomationRun run, CancellationToken cancellationToken = default);
@@ -41,9 +53,18 @@ internal interface IAutomationRunRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Saves a step run (insert or update).
+    /// Inserts a new step run. Callers know when a step run is new (the first write of a
+    /// freshly-created <see cref="StepRun"/>), so this skips the existence check a blind upsert
+    /// would need — a single INSERT round-trip.
     /// </summary>
-    Task<StepRun> SaveStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
+    Task<StepRun> AddStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing step run. Writes all columns in a single UPDATE round-trip without a
+    /// preceding read; the caller is expected to hold a step run that was already inserted (or
+    /// loaded from the database).
+    /// </summary>
+    Task<StepRun> UpdateStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the serialized output data of a single step run, or <c>null</c> when the step run
@@ -105,19 +126,23 @@ internal interface IAutomationRunRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets run counts grouped by status within the specified filters.
+    /// Gets run counts grouped by status, scoped to the given workspaces (matched on each run's
+    /// automation's current workspace). Pass <c>null</c> for <paramref name="workspaceIds"/> to
+    /// count across all workspaces.
     /// </summary>
     Task<Dictionary<AutomationRunStatus, int>> GetRunCountsByStatusAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets run counts grouped by automation within the specified filters.
+    /// Gets run counts grouped by automation, scoped to the given workspaces (matched on each run's
+    /// automation's current workspace). Pass <c>null</c> for <paramref name="workspaceIds"/> to
+    /// count across all workspaces.
     /// </summary>
     Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         int take = 10,

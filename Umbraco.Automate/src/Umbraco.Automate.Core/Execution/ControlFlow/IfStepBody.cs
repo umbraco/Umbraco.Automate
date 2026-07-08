@@ -53,7 +53,7 @@ internal sealed class IfStepBody : StepBody
             CompletedUtc = DateTime.UtcNow,
             BranchOutcome = outcome,
         };
-        _runRepository.SaveStepRunAsync(stepRun, context.CancellationToken).GetAwaiter().GetResult();
+        _runRepository.AddStepRunAsync(stepRun, context.CancellationToken).GetAwaiter().GetResult();
 
         return ExecutionResult.Outcome(outcome);
     }

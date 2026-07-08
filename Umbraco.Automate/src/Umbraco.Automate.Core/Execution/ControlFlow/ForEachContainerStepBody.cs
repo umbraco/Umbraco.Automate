@@ -184,6 +184,6 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
             IterationIndex = iterationIndex,
             IterationTotal = iterationTotal,
         };
-        _runRepository.SaveStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
+        _runRepository.AddStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
     }
 }
