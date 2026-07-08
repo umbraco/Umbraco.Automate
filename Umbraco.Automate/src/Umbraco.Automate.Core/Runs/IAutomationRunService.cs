@@ -20,6 +20,17 @@ public interface IAutomationRunService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets paged runs across all automations, newest first, optionally scoped to the given
+    /// workspaces (matched on each run's automation's current workspace). Pass <c>null</c>
+    /// for <paramref name="workspaceIds"/> to return runs from all workspaces.
+    /// </summary>
+    Task<(IReadOnlyList<AutomationRunListItem> Items, int Total)> GetRunsPagedAsync(
+        IReadOnlySet<Guid>? workspaceIds,
+        int skip = 0,
+        int take = 100,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the status of the most recent terminal run before the specified run for the same automation.
     /// Used to determine recovery notifications.
     /// </summary>
@@ -51,19 +62,23 @@ public interface IAutomationRunService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets a summary of run statistics.
+    /// Gets a summary of run statistics, scoped to the given workspaces (matched on each run's
+    /// automation's current workspace). Pass <c>null</c> for <paramref name="workspaceIds"/> to
+    /// summarise across all workspaces.
     /// </summary>
     Task<RunSummary> GetRunSummaryAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets run counts grouped by automation, ordered by total runs descending.
+    /// Gets run counts grouped by automation, ordered by total runs descending, scoped to the
+    /// given workspaces (matched on each run's automation's current workspace). Pass <c>null</c>
+    /// for <paramref name="workspaceIds"/> to count across all workspaces.
     /// </summary>
     Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         int take = 10,

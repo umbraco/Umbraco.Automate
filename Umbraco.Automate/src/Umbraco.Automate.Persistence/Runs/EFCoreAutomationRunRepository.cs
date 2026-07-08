@@ -69,6 +69,52 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         return (runs, total);
     }
 
+    public async Task<(IReadOnlyList<AutomationRunListItem> Items, int Total)> GetPagedAsync(
+        IReadOnlySet<Guid>? workspaceIds,
+        int skip = 0,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // Join to the automation so results can be scoped by (and labelled with) the
+        // automation's current workspace/name rather than the run's execution-time snapshot.
+        // The inner join relies on the invariant that a run always has a live parent
+        // automation: AutomationService.DeleteAutomationAsync deletes a run's rows before
+        // the automation itself. If run retention-after-delete is ever introduced, orphaned
+        // runs would silently drop out of this list and would need a left join instead.
+        var query =
+            from r in db.AutomationRuns
+            join a in db.Automations on r.AutomationId equals a.Id
+            where workspaceIds == null || workspaceIds.Contains(a.WorkspaceId)
+            select new { Run = r, a.Name };
+
+        var total = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            // Id is the tiebreaker so paging stays stable across runs sharing a StartedUtc.
+            .OrderByDescending(x => x.Run.StartedUtc)
+            .ThenByDescending(x => x.Run.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(x => new AutomationRunListItem
+            {
+                Id = x.Run.Id,
+                AutomationId = x.Run.AutomationId,
+                AutomationName = x.Name,
+                AutomationVersion = x.Run.AutomationVersion,
+                Status = (AutomationRunStatus)x.Run.Status,
+                StartedUtc = x.Run.StartedUtc,
+                CompletedUtc = x.Run.CompletedUtc,
+                InitiatedBy = x.Run.InitiatedBy,
+                CorrelationId = x.Run.CorrelationId,
+                Error = x.Run.Error,
+            })
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
     public async Task<AutomationRun> SaveAsync(AutomationRun run, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -302,19 +348,20 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     }
 
     public async Task<Dictionary<AutomationRunStatus, int>> GetRunCountsByStatusAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        IQueryable<AutomationRunEntity> query = db.AutomationRuns;
-
-        if (workspaceId.HasValue)
-        {
-            query = query.Where(r => r.WorkspaceId == workspaceId.Value);
-        }
+        // Scope by the automation's current workspace (join) rather than the run's snapshot,
+        // so counts stay consistent with the runs list. Null workspaceIds = all (admin).
+        IQueryable<AutomationRunEntity> query =
+            from r in db.AutomationRuns
+            join a in db.Automations on r.AutomationId equals a.Id
+            where workspaceIds == null || workspaceIds.Contains(a.WorkspaceId)
+            select r;
 
         if (from.HasValue)
         {
@@ -337,7 +384,7 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     }
 
     public async Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         int take = 10,
@@ -345,12 +392,13 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        IQueryable<AutomationRunEntity> query = db.AutomationRuns;
-
-        if (workspaceId.HasValue)
-        {
-            query = query.Where(r => r.WorkspaceId == workspaceId.Value);
-        }
+        // Scope by the automation's current workspace (join) rather than the run's snapshot.
+        // Null workspaceIds = all (admin).
+        IQueryable<AutomationRunEntity> query =
+            from r in db.AutomationRuns
+            join a in db.Automations on r.AutomationId equals a.Id
+            where workspaceIds == null || workspaceIds.Contains(a.WorkspaceId)
+            select r;
 
         if (from.HasValue)
         {
