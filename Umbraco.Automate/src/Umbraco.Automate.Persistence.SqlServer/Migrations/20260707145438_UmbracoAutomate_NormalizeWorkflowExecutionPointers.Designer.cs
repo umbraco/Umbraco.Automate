@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Persistence;
 
@@ -11,9 +12,11 @@ using Umbraco.Automate.Persistence;
 namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 {
     [DbContext(typeof(UmbracoAutomateDbContext))]
-    partial class UmbracoAutomateDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260707145438_UmbracoAutomate_NormalizeWorkflowExecutionPointers")]
+    partial class UmbracoAutomate_NormalizeWorkflowExecutionPointers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -589,9 +592,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 
                     b.HasIndex("WorkflowInstanceId", "Active");
 
-                    b.HasIndex("WorkflowInstanceId", "PointerId")
-                        .IsUnique();
-
                     b.ToTable("umbracoAutomateWorkflowExecutionPointer", (string)null);
                 });
 
@@ -647,26 +647,6 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.HasIndex("Status", "NextExecution");
 
                     b.ToTable("umbracoAutomateWorkflowInstance", (string)null);
-                });
-
-            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowLockEntity", b =>
-                {
-                    b.Property<string>("LockId")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("AcquiredUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ExpiresUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("OwnerToken")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("LockId");
-
-                    b.ToTable("umbracoAutomateWorkflowLock", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
