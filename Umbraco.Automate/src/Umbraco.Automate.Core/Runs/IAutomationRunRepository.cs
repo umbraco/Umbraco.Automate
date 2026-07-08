@@ -26,6 +26,18 @@ internal interface IAutomationRunRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets paged runs across all automations, newest first, optionally scoped to the given
+    /// workspaces. Scoping is matched on each run's automation's <em>current</em> workspace
+    /// (not the run's execution-time snapshot). Pass <c>null</c> for
+    /// <paramref name="workspaceIds"/> to return runs from all workspaces.
+    /// </summary>
+    Task<(IReadOnlyList<AutomationRunListItem> Items, int Total)> GetPagedAsync(
+        IReadOnlySet<Guid>? workspaceIds,
+        int skip = 0,
+        int take = 100,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Saves a run (insert or update). Does not cascade to step runs.
     /// </summary>
     Task<AutomationRun> SaveAsync(AutomationRun run, CancellationToken cancellationToken = default);

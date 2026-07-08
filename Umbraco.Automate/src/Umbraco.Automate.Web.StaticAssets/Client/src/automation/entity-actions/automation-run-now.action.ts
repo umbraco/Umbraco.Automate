@@ -3,6 +3,8 @@ import { UmbEntityActionBase, type UmbEntityActionArgs } from "@umbraco-cms/back
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import { UmbLocalizationController } from "@umbraco-cms/backoffice/localization-api";
 import { AutomationsService } from "../../api/sdk.gen.js";
+import { UaAutomationRunsChangedEvent } from "../events/automation-runs-changed.event.js";
+import { dispatchActionEvent } from "../../core/utils/event.utils.js";
 
 /**
  * Entity action that triggers a manual-trigger automation run.
@@ -41,6 +43,9 @@ export class UaAutomationRunNowEntityAction extends UmbEntityActionBase<never> {
             });
             return;
         }
+
+        // Let the runs view refresh now the run has been triggered.
+        dispatchActionEvent(this, new UaAutomationRunsChangedEvent(unique));
 
         notifications?.peek("positive", {
             data: {

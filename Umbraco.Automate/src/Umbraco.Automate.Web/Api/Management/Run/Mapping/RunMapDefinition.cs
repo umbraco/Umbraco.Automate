@@ -14,6 +14,22 @@ public class RunMapDefinition : IMapDefinition
     {
         mapper.Define<AutomationRun, AutomationRunResponseModel>((_, _) => new AutomationRunResponseModel(), MapToResponse);
         mapper.Define<StepRun, StepRunResponseModel>((_, _) => new StepRunResponseModel(), MapToStepRunResponse);
+        mapper.Define<AutomationRunListItem, AutomationRunListItemResponseModel>((_, _) => new AutomationRunListItemResponseModel(), MapToListItemResponse);
+    }
+
+    // Umbraco.Code.MapAll
+    private static void MapToListItemResponse(AutomationRunListItem source, AutomationRunListItemResponseModel target, MapperContext context)
+    {
+        target.Id = source.Id;
+        target.AutomationId = source.AutomationId;
+        target.AutomationName = source.AutomationName;
+        target.AutomationVersion = source.AutomationVersion;
+        target.Status = source.Status;
+        target.StartedUtc = source.StartedUtc;
+        target.CompletedUtc = source.CompletedUtc;
+        target.InitiatedBy = source.InitiatedBy;
+        target.CorrelationId = source.CorrelationId;
+        target.Error = source.Error;
     }
 
     // Umbraco.Code.MapAll
