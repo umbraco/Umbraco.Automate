@@ -27,6 +27,8 @@ public class UmbracoAutomateDbContext : DbContext
 
     internal DbSet<WorkflowInstanceEntity> WorkflowInstances { get; set; } = null!;
 
+    internal DbSet<WorkflowExecutionPointerEntity> WorkflowExecutionPointers { get; set; } = null!;
+
     internal DbSet<EventSubscriptionEntity> EventSubscriptions { get; set; } = null!;
 
     internal DbSet<EventEntity> Events { get; set; } = null!;
@@ -191,11 +193,39 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.Reference).HasMaxLength(200);
             entity.Property(e => e.CreateTime).IsRequired();
+            entity.Property(e => e.SchemaVersion).IsRequired().HasDefaultValue(0);
             entity.Property(e => e.Data).IsRequired();
 
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.NextExecution);
             entity.HasIndex(e => new { e.Status, e.NextExecution });
+
+            entity.HasMany(e => e.ExecutionPointers)
+                .WithOne()
+                .HasForeignKey(e => e.WorkflowInstanceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkflowExecutionPointerEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkflowExecutionPointer");
+            entity.HasKey(e => e.PersistenceId);
+
+            entity.Property(e => e.PersistenceId).ValueGeneratedOnAdd();
+            entity.Property(e => e.WorkflowInstanceId).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.PointerId).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.StepId).IsRequired();
+            entity.Property(e => e.Active).IsRequired();
+            entity.Property(e => e.RetryCount).IsRequired().HasDefaultValue(0);
+            entity.Property(e => e.PredecessorId).HasMaxLength(100);
+            entity.Property(e => e.EventName).HasMaxLength(100);
+            entity.Property(e => e.EventKey).HasMaxLength(100);
+            entity.Property(e => e.EventPublished).IsRequired();
+            entity.Property(e => e.StepName).HasMaxLength(100);
+            entity.Property(e => e.Status).IsRequired();
+
+            entity.HasIndex(e => e.WorkflowInstanceId);
+            entity.HasIndex(e => new { e.WorkflowInstanceId, e.Active });
         });
 
         modelBuilder.Entity<EventSubscriptionEntity>(entity =>
