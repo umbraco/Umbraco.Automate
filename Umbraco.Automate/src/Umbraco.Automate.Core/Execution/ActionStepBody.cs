@@ -178,7 +178,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             StartedUtc = DateTime.UtcNow,
         };
 
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
 
         // Execute through the middleware pipeline with the timeout-linked token.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
@@ -189,7 +189,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             case ActionSuspension.WaitForEvent wait:
                 stepRun.Status = StepRunStatus.WaitingForInput;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
-                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+                await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
                 _logger.LogInformation(
                     "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
@@ -200,7 +200,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             case ActionSuspension.Sleep sleep:
                 stepRun.Status = StepRunStatus.Sleeping;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
-                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+                await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
                 _logger.LogInformation(
                     "Step {StepId} is sleeping for {Duration}",
@@ -245,7 +245,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
         }
 
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
         // Pipeline-caught failures: decide retry/terminate/skip based on the configured
         // ErrorBehavior (applied via WorkflowCore on the WorkflowStep) and the classifier.
@@ -359,7 +359,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ErrorCategory = category,
         };
 
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
         _metrics.StepFailed(_action.Alias);
 
         return DecideFailureOutcome(exception, category, context);
@@ -436,7 +436,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         if (decision?.Outcome == ApprovalOutcome.Approved)
         {
             stepRun.Status = StepRunStatus.Completed;
-            await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+            await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
             _metrics.StepExecuted(_action.Alias);
             return ExecutionResult.Next();
         }
@@ -448,7 +448,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ? $"Approval rejected: {decision.Comment ?? "No reason provided"}"
             : "Approval step resumed without a valid decision";
         stepRun.ErrorCategory = StepRunErrorCategory.Cancelled;
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
         if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
         {
@@ -484,7 +484,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         }
 
         _metrics.StepExecuted(_action.Alias);
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
         return ExecutionResult.Next();
     }
