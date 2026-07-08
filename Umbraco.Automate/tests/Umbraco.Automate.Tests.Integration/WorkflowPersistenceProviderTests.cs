@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
 using Umbraco.Automate.Core.Bindings;
@@ -6,6 +7,7 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Persistence;
 using Umbraco.Automate.Persistence.Workflows;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
@@ -32,6 +34,7 @@ public class WorkflowPersistenceProviderTests : IDisposable
 
     private readonly EfCoreTestFixture _fixture;
     private readonly EFCoreWorkflowPersistenceProvider _provider;
+    private readonly RunFinalizer _finalizer;
 
     public WorkflowPersistenceProviderTests()
     {
@@ -47,7 +50,7 @@ public class WorkflowPersistenceProviderTests : IDisposable
             new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)),
             hydrationCache);
 
-        var finalizer = new RunFinalizer(
+        _finalizer = new RunFinalizer(
             Mock.Of<IAutomationRunRepository>(),
             hydrationCache,
             Mock.Of<ICoreScopeProvider>(),
@@ -57,7 +60,7 @@ public class WorkflowPersistenceProviderTests : IDisposable
             NullLogger<RunFinalizer>.Instance);
 
         _provider = new EFCoreWorkflowPersistenceProvider(
-            dbContextFactory, finalizer, NullLogger<EFCoreWorkflowPersistenceProvider>.Instance);
+            dbContextFactory, _finalizer, NullLogger<EFCoreWorkflowPersistenceProvider>.Instance);
     }
 
     public void Dispose()
@@ -179,6 +182,95 @@ public class WorkflowPersistenceProviderTests : IDisposable
         first.Active.ShouldBeFalse();
         first.EndTime.ShouldBe(end);
         reloaded.ExecutionPointers.Single(p => p.Id == "ptr-2").Active.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task WorkflowExecutionPointers_UniqueIndex_RejectsDuplicatePointerIdForSameInstance()
+    {
+        var workflow = NewWorkflow();
+        await _provider.CreateNewWorkflow(workflow, CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        db.WorkflowExecutionPointers.Add(new WorkflowExecutionPointerEntity
+        {
+            WorkflowInstanceId = workflow.Id,
+            PointerId = "dup-ptr",
+        });
+        await db.SaveChangesAsync();
+
+        db.WorkflowExecutionPointers.Add(new WorkflowExecutionPointerEntity
+        {
+            WorkflowInstanceId = workflow.Id,
+            PointerId = "dup-ptr",
+        });
+
+        await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task PersistWorkflow_ConcurrentPointerCollision_DiscardsLoserInsteadOfThrowing()
+    {
+        var workflow = NewWorkflow();
+        await _provider.CreateNewWorkflow(workflow, CancellationToken.None);
+        workflow.ExecutionPointers.Add(new ExecutionPointer { Id = "race-ptr", StepId = 1 });
+
+        // Deterministically reproduce the race window the unique index (and this catch) guards:
+        // between the provider's own LoadTrackedAsync (which finds no "race-ptr" pointer yet)
+        // and its SaveChangesAsync actually issuing the INSERT, a *different* writer commits a
+        // pointer row with the same (WorkflowInstanceId, PointerId) first. EF Core's
+        // DbContext.SavingChanges event fires synchronously right before that INSERT is
+        // executed, so it's used here (test-side only) to inject the other writer's commit into
+        // that exact gap - true OS-thread concurrency over an in-memory SQLite database isn't
+        // reliably interleaved by Task.WhenAll, since both the query and the write complete
+        // near-instantly with no real I/O wait to yield on.
+        var racingFactory = new HookingDbContextFactory(_fixture.CreateContext, () =>
+        {
+            using var other = _fixture.CreateContext();
+            other.WorkflowExecutionPointers.Add(new WorkflowExecutionPointerEntity
+            {
+                WorkflowInstanceId = workflow.Id,
+                PointerId = "race-ptr",
+                StepId = 99,
+            });
+            other.SaveChanges();
+        });
+        var racingProvider = new EFCoreWorkflowPersistenceProvider(
+            racingFactory, _finalizer, NullLogger<EFCoreWorkflowPersistenceProvider>.Instance);
+
+        // The provider must not surface the other writer's DbUpdateException to its caller.
+        await Should.NotThrowAsync(() => racingProvider.PersistWorkflow(workflow, CancellationToken.None));
+
+        // The unique index prevents a duplicate row from ever landing: the other writer's row
+        // survives, and this call's insert was silently discarded rather than retried or thrown.
+        await using var verify = _fixture.CreateContext();
+        var rows = verify.WorkflowExecutionPointers
+            .Where(p => p.WorkflowInstanceId == workflow.Id && p.PointerId == "race-ptr")
+            .ToList();
+        rows.Count.ShouldBe(1);
+        rows.Single().StepId.ShouldBe(99);
+    }
+
+    // Wraps context creation so a one-shot callback fires on DbContext.SavingChanges - the
+    // synchronous event EF Core raises immediately before a save's DB commands execute -
+    // letting a test inject another writer's commit into the exact load-then-save gap the
+    // provider's DbUpdateException catch defends against.
+    private sealed class HookingDbContextFactory : IDbContextFactory<UmbracoAutomateDbContext>
+    {
+        private readonly Func<UmbracoAutomateDbContext> _inner;
+        private readonly Action _onSavingChanges;
+
+        public HookingDbContextFactory(Func<UmbracoAutomateDbContext> inner, Action onSavingChanges)
+        {
+            _inner = inner;
+            _onSavingChanges = onSavingChanges;
+        }
+
+        public UmbracoAutomateDbContext CreateDbContext()
+        {
+            var context = _inner();
+            context.SavingChanges += (_, _) => _onSavingChanges();
+            return context;
+        }
     }
 
     [Fact]
