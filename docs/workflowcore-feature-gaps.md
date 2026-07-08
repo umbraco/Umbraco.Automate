@@ -28,7 +28,7 @@ Outstanding WorkflowCore capabilities not yet surfaced in Umbraco.Automate. Item
 
 ### 2. ForEach (Collection Iteration) ✅ Implemented
 
-> **Implemented** as `ForEachContainerStepBody` (custom — see [control-flow-architecture.md](control-flow-architecture.md)). Performance of this body was subsequently hardened in PR #133 (collection materialised once per loop; iteration state kept out of the persisted blob). Original gap analysis retained below for context.
+> **Implemented** as `ForEachContainerStepBody` (custom — see [control-flow-architecture.md](control-flow-architecture.md)). Performance of this body was subsequently hardened in PR #133 (collection materialised once per loop; iteration state kept out of the persisted blob) and again by normalising WorkflowCore execution pointers into their own table — one delta-written row per pointer instead of re-serialising the entire (unboundedly growing) instance as a single JSON blob every execution pass. That removed the O(n²) persistence cost that dominated large loops; see the persistence section of [engineering-spec.md](engineering-spec.md). Original gap analysis retained below for context.
 
 **WorkflowCore:** `ForEach()` — execute a block of steps for each item in a collection (parallel by default).
 

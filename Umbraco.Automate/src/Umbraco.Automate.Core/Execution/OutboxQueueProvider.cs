@@ -34,6 +34,17 @@ internal sealed class OutboxQueueProvider : IQueueProvider
     /// <inheritdoc />
     public async Task QueueWork(string id, QueueType queue)
     {
+        // WorkflowConsumer unconditionally queues QueueType.Index after every processing pass,
+        // regardless of whether indexing is configured. Nothing in this codebase implements
+        // ISearchIndex, so WorkflowCore's own NullSearchIndex — a genuine no-op — is what would
+        // consume it even if routed correctly. Dropping it here avoids the alternative: falling
+        // through to EventQueueTopic, where EventConsumer would treat the workflow instance id as
+        // an event id and fail with "Event '{id}' not found" on every single pass.
+        if (queue == QueueType.Index)
+        {
+            return;
+        }
+
         var topic = queue == QueueType.Workflow ? WorkflowQueueTopic : EventQueueTopic;
 
         _logger.LogTrace("Queuing work {Id} to {Queue}", id, queue);

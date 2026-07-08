@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Triggers.Scheduling;
@@ -65,6 +66,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ISubscriptionRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
         builder.Services.AddSingleton<IEventRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
         builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
+        builder.Services.AddSingleton<IWorkflowLockStore, EFCoreWorkflowLockStore>();
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
         builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
 
