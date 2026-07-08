@@ -103,22 +103,23 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
                 cancellationToken);
     }
 
-    public async Task<StepRun> SaveStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default)
+    public async Task<StepRun> AddStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        StepRunEntity? existing = await db.StepRuns.FindAsync([stepRun.Id], cancellationToken);
+        db.StepRuns.Add(StepRunFactory.BuildEntity(stepRun));
+        await db.SaveChangesAsync(cancellationToken);
+        return stepRun;
+    }
 
-        if (existing is null)
-        {
-            StepRunEntity newEntity = StepRunFactory.BuildEntity(stepRun);
-            db.StepRuns.Add(newEntity);
-        }
-        else
-        {
-            StepRunFactory.UpdateEntity(existing, stepRun);
-        }
+    public async Task<StepRun> UpdateStepRunAsync(StepRun stepRun, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        // Attach as Modified and write all columns without a preceding read. The row is expected
+        // to exist (it was inserted on the step run's first write, or loaded from the database);
+        // if it does not, EF surfaces a DbUpdateConcurrencyException rather than silently no-op.
+        db.StepRuns.Update(StepRunFactory.BuildEntity(stepRun));
         await db.SaveChangesAsync(cancellationToken);
         return stepRun;
     }
