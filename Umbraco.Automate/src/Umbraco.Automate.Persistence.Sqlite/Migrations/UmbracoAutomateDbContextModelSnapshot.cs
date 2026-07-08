@@ -578,6 +578,9 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
 
                     b.HasIndex("WorkflowInstanceId", "Active");
 
+                    b.HasIndex("WorkflowInstanceId", "PointerId")
+                        .IsUnique();
+
                     b.ToTable("umbracoAutomateWorkflowExecutionPointer", (string)null);
                 });
 
@@ -633,6 +636,26 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.HasIndex("Status", "NextExecution");
 
                     b.ToTable("umbracoAutomateWorkflowInstance", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowLockEntity", b =>
+                {
+                    b.Property<string>("LockId")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("AcquiredUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OwnerToken")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("LockId");
+
+                    b.ToTable("umbracoAutomateWorkflowLock", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>

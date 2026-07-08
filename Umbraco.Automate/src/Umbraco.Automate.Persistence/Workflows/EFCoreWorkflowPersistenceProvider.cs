@@ -84,8 +84,18 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         var entity = await LoadTrackedAsync(db, workflow.Id, cancellationToken);
         if (entity is not null)
         {
-            ApplyToEntity(entity, workflow);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                ApplyToEntity(entity, workflow);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "PersistWorkflow {Id}: A concurrent writer already committed a pointer update for this workflow instance. Discarding this pass's write instead of retrying.",
+                    workflow.Id);
+            }
         }
 
         await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
@@ -111,7 +121,17 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
             db.EventSubscriptions.Add(ToEntity(sub));
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "PersistWorkflow {Id}: A concurrent writer already committed a pointer update for this workflow instance. Discarding this pass's write instead of retrying.",
+                workflow.Id);
+        }
 
         await _runFinalizer.TryFinalizeAsync(workflow, cancellationToken);
     }
