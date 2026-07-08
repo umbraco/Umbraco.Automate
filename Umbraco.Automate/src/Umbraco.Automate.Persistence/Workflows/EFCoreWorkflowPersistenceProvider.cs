@@ -23,6 +23,12 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
         ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
     };
 
+    // Storage format for the WorkflowInstance.Data column. Version 0 (legacy) stored the whole
+    // serialized WorkflowInstance in Data with pointers inlined; version 1 stores only the
+    // workflow Data payload and normalizes pointers into their own table. Rows are read via the
+    // matching decoder and always rewritten as the current version on the next persist.
+    private const int SchemaVersionNormalized = 1;
+
     public EFCoreWorkflowPersistenceProvider(
         IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
         RunFinalizer runFinalizer,
@@ -58,7 +64,14 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        db.WorkflowInstances.Add(ToEntity(workflow));
+        var entity = new WorkflowInstanceEntity
+        {
+            Id = workflow.Id,
+            WorkflowDefinitionId = workflow.WorkflowDefinitionId,
+            Data = string.Empty,
+        };
+        ApplyToEntity(entity, workflow);
+        db.WorkflowInstances.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
 
         return workflow.Id;
@@ -68,10 +81,10 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
+        var entity = await LoadTrackedAsync(db, workflow.Id, cancellationToken);
         if (entity is not null)
         {
-            UpdateEntity(entity, workflow);
+            ApplyToEntity(entity, workflow);
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -82,10 +95,10 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var entity = await db.WorkflowInstances.FindAsync([workflow.Id], cancellationToken);
+        var entity = await LoadTrackedAsync(db, workflow.Id, cancellationToken);
         if (entity is not null)
         {
-            UpdateEntity(entity, workflow);
+            ApplyToEntity(entity, workflow);
         }
 
         foreach (var sub in subscriptions)
@@ -109,6 +122,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
         var entity = await db.WorkflowInstances
             .AsNoTracking()
+            .Include(e => e.ExecutionPointers)
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
         if (entity is null)
@@ -128,6 +142,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
         var entities = await db.WorkflowInstances
             .AsNoTracking()
+            .Include(e => e.ExecutionPointers)
             .Where(e => idList.Contains(e.Id))
             .ToListAsync(cancellationToken);
 
@@ -139,7 +154,9 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync();
 
-        IQueryable<WorkflowInstanceEntity> query = db.WorkflowInstances.AsNoTracking();
+        IQueryable<WorkflowInstanceEntity> query = db.WorkflowInstances
+            .AsNoTracking()
+            .Include(e => e.ExecutionPointers);
 
         if (status.HasValue)
         {
@@ -421,31 +438,157 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 
     // === Entity mapping ===
 
-    private static WorkflowInstanceEntity ToEntity(WorkflowInstance workflow) => new()
-    {
-        Id = workflow.Id,
-        WorkflowDefinitionId = workflow.WorkflowDefinitionId,
-        Version = workflow.Version,
-        Status = (int)workflow.Status,
-        Description = workflow.Description,
-        Reference = workflow.Reference,
-        CreateTime = workflow.CreateTime,
-        NextExecution = workflow.NextExecution,
-        CompleteTime = workflow.CompleteTime,
-        Data = JsonConvert.SerializeObject(workflow, JsonSettings),
-    };
+    // Loads the instance with its pointer rows for change tracking, so SaveChanges writes only
+    // the pointers that actually changed this pass (rather than rewriting the whole collection).
+    private static Task<WorkflowInstanceEntity?> LoadTrackedAsync(
+        UmbracoAutomateDbContext db, string id, CancellationToken cancellationToken) =>
+        db.WorkflowInstances
+            .Include(e => e.ExecutionPointers)
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
-    private static void UpdateEntity(WorkflowInstanceEntity entity, WorkflowInstance workflow)
+    // Maps a domain WorkflowInstance onto a (possibly tracked) entity: scalars, the workflow
+    // Data payload, and an upsert of each pointer by PointerId. Always writes the normalized
+    // format (SchemaVersion 1). Mirrors WorkflowCore's own EF provider ToPersistable(existing).
+    private static void ApplyToEntity(WorkflowInstanceEntity entity, WorkflowInstance workflow)
     {
+        entity.WorkflowDefinitionId = workflow.WorkflowDefinitionId;
+        entity.Version = workflow.Version;
         entity.Status = (int)workflow.Status;
         entity.Description = workflow.Description;
+        entity.Reference = workflow.Reference;
+        entity.CreateTime = workflow.CreateTime;
         entity.NextExecution = workflow.NextExecution;
         entity.CompleteTime = workflow.CompleteTime;
-        entity.Data = JsonConvert.SerializeObject(workflow, JsonSettings);
+        entity.SchemaVersion = SchemaVersionNormalized;
+        entity.Data = JsonConvert.SerializeObject(workflow.Data, JsonSettings);
+
+        foreach (var ep in workflow.ExecutionPointers)
+        {
+            var pe = entity.ExecutionPointers.FirstOrDefault(p => p.PointerId == ep.Id);
+            if (pe is null)
+            {
+                pe = new WorkflowExecutionPointerEntity
+                {
+                    WorkflowInstanceId = entity.Id,
+                    PointerId = ep.Id ?? Guid.NewGuid().ToString(),
+                };
+                entity.ExecutionPointers.Add(pe);
+            }
+
+            MapPointerToEntity(pe, ep);
+        }
+    }
+
+    private static void MapPointerToEntity(WorkflowExecutionPointerEntity pe, ExecutionPointer ep)
+    {
+        pe.StepId = ep.StepId;
+        pe.Active = ep.Active;
+        pe.SleepUntil = ep.SleepUntil;
+        pe.StartTime = ep.StartTime;
+        pe.EndTime = ep.EndTime;
+        pe.RetryCount = ep.RetryCount;
+        pe.PredecessorId = ep.PredecessorId;
+        pe.EventName = ep.EventName;
+        pe.EventKey = ep.EventKey;
+        pe.EventPublished = ep.EventPublished;
+        pe.StepName = ep.StepName;
+        pe.Status = (int)ep.Status;
+        pe.Children = ep.Children.Count > 0 ? string.Join(';', ep.Children) : null;
+        pe.Scope = ep.Scope.Count > 0 ? string.Join(';', ep.Scope) : null;
+        pe.PersistenceData = SerializeField(ep.PersistenceData);
+        pe.ContextItem = SerializeField(ep.ContextItem);
+        pe.EventData = SerializeField(ep.EventData);
+        pe.Outcome = SerializeField(ep.Outcome);
+        pe.ExtensionAttributes = ep.ExtensionAttributes.Count > 0
+            ? JsonConvert.SerializeObject(ep.ExtensionAttributes, JsonSettings)
+            : null;
     }
 
     private static WorkflowInstance ToDomain(WorkflowInstanceEntity entity) =>
+        entity.SchemaVersion == 0 ? LegacyToDomain(entity) : NormalizedToDomain(entity);
+
+    // Legacy (SchemaVersion 0): the whole WorkflowInstance was serialized into Data with its
+    // pointers inlined. Retained as a read-only fallback for rows written before pointer
+    // normalization; they are rewritten as SchemaVersion 1 on their next persist. Removable in a
+    // future major once no SchemaVersion 0 rows remain.
+    private static WorkflowInstance LegacyToDomain(WorkflowInstanceEntity entity) =>
         JsonConvert.DeserializeObject<WorkflowInstance>(entity.Data, JsonSettings)!;
+
+    private static WorkflowInstance NormalizedToDomain(WorkflowInstanceEntity entity)
+    {
+        var workflow = new WorkflowInstance
+        {
+            Id = entity.Id,
+            WorkflowDefinitionId = entity.WorkflowDefinitionId,
+            Version = entity.Version,
+            Status = (WorkflowStatus)entity.Status,
+            Description = entity.Description,
+            Reference = entity.Reference,
+            CreateTime = entity.CreateTime,
+            NextExecution = entity.NextExecution,
+            CompleteTime = entity.CompleteTime,
+            Data = DeserializeField(entity.Data)!,
+            ExecutionPointers = new ExecutionPointerCollection(entity.ExecutionPointers.Count + 8),
+        };
+
+        foreach (var pe in entity.ExecutionPointers)
+        {
+            workflow.ExecutionPointers.Add(MapPointerToDomain(pe));
+        }
+
+        return workflow;
+    }
+
+    private static ExecutionPointer MapPointerToDomain(WorkflowExecutionPointerEntity pe)
+    {
+        var ep = new ExecutionPointer
+        {
+            Id = pe.PointerId,
+            StepId = pe.StepId,
+            Active = pe.Active,
+            SleepUntil = pe.SleepUntil,
+            StartTime = pe.StartTime,
+            EndTime = pe.EndTime,
+            RetryCount = pe.RetryCount,
+            PredecessorId = pe.PredecessorId,
+            EventName = pe.EventName,
+            EventKey = pe.EventKey,
+            EventPublished = pe.EventPublished,
+            StepName = pe.StepName,
+            Status = (PointerStatus)pe.Status,
+            PersistenceData = DeserializeField(pe.PersistenceData),
+            ContextItem = DeserializeField(pe.ContextItem),
+            EventData = DeserializeField(pe.EventData),
+            Outcome = DeserializeField(pe.Outcome),
+        };
+
+        if (!string.IsNullOrEmpty(pe.Children))
+        {
+            ep.Children = pe.Children.Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(pe.Scope))
+        {
+            ep.Scope = pe.Scope.Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(pe.ExtensionAttributes))
+        {
+            var attributes = JsonConvert.DeserializeObject<Dictionary<string, object>>(pe.ExtensionAttributes, JsonSettings);
+            if (attributes is not null)
+            {
+                ep.ExtensionAttributes = attributes;
+            }
+        }
+
+        return ep;
+    }
+
+    private static string? SerializeField(object? value) =>
+        value is null ? null : JsonConvert.SerializeObject(value, JsonSettings);
+
+    private static object? DeserializeField(string? json) =>
+        string.IsNullOrEmpty(json) ? null : JsonConvert.DeserializeObject(json, JsonSettings);
 
     private static EventSubscriptionEntity ToEntity(EventSubscription sub) => new()
     {
