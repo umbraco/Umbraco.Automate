@@ -25,7 +25,7 @@ public class WhileContainerStepBodyTests
         _hydrationCache = new StepOutputHydrationCache(_runRepo.Object);
         _collectionCache = new ForEachCollectionCache(evaluator, _hydrationCache);
         _conditionEvaluator = new ConditionEvaluator(evaluator);
-        _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
+        _runRepo.Setup(r => r.AddStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
     }
 
@@ -134,7 +134,7 @@ public class WhileContainerStepBodyTests
     public void Run_TracksStepRunOnExit()
     {
         StepRun? saved = null;
-        _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
+        _runRepo.Setup(r => r.AddStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .Callback<StepRun, CancellationToken>((sr, _) => saved = sr)
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
 
