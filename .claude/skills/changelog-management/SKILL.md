@@ -17,7 +17,7 @@ Generate or update `CHANGELOG.md` files for products using the changelog generat
 - Each product has a `CHANGELOG.md` at its root
 - Auto-generated from git history using [Conventional Commits](https://www.conventionalcommits.org/)
 - Each product has a `changelog.config.json` defining its commit scopes
-- CI validates changelogs on `release/*` and `hotfix/*` branches
+- CI validates changelogs on `vN/release/*` and `vN/hotfix/*` branches
 
 ## Available Commands
 

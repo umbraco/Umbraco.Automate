@@ -37,6 +37,13 @@ internal sealed class AutomationRunService : IAutomationRunService
         CancellationToken cancellationToken = default)
         => _runRepository.GetPagedByAutomationAsync(automationId, skip, take, cancellationToken);
 
+    public Task<(IReadOnlyList<AutomationRunListItem> Items, int Total)> GetRunsPagedAsync(
+        IReadOnlySet<Guid>? workspaceIds,
+        int skip = 0,
+        int take = 100,
+        CancellationToken cancellationToken = default)
+        => _runRepository.GetPagedAsync(workspaceIds, skip, take, cancellationToken);
+
     public Task<AutomationRunStatus?> GetPreviousTerminalRunStatusAsync(
         Guid automationId,
         Guid currentRunId,
@@ -57,12 +64,12 @@ internal sealed class AutomationRunService : IAutomationRunService
         => _runRepository.GetStepRunsByActionAndStatusAsync(actionAlias, status, cancellationToken);
 
     public async Task<RunSummary> GetRunSummaryAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         CancellationToken cancellationToken = default)
     {
-        var byStatus = await _runRepository.GetRunCountsByStatusAsync(workspaceId, from, to, cancellationToken);
+        var byStatus = await _runRepository.GetRunCountsByStatusAsync(workspaceIds, from, to, cancellationToken);
         var totalRuns = byStatus.Values.Sum();
 
         byStatus.TryGetValue(AutomationRunStatus.Completed, out var completedCount);
@@ -80,12 +87,12 @@ internal sealed class AutomationRunService : IAutomationRunService
     }
 
     public Task<IReadOnlyList<AutomationRunCount>> GetRunCountsByAutomationAsync(
-        Guid? workspaceId = null,
+        IReadOnlySet<Guid>? workspaceIds = null,
         DateTime? from = null,
         DateTime? to = null,
         int take = 10,
         CancellationToken cancellationToken = default)
-        => _runRepository.GetRunCountsByAutomationAsync(workspaceId, from, to, take, cancellationToken);
+        => _runRepository.GetRunCountsByAutomationAsync(workspaceIds, from, to, take, cancellationToken);
 
     public async Task<RunLifecycleResult> SuspendRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
@@ -179,7 +186,18 @@ internal sealed class AutomationRunService : IAutomationRunService
         run.Error ??= "Workflow terminated by user";
         await _runRepository.SaveAsync(run, cancellationToken);
 
-        await _workflowHost.TerminateWorkflow(run.WorkflowInstanceId);
+        // TerminateWorkflow is best-effort: it makes a single attempt to acquire the
+        // per-workflow lock and returns false if the executor is mid-pass (the common
+        // case for an actively executing run). RunCancellationStepMiddleware observes
+        // the Cancelled run row and stops the workflow at the next step boundary.
+        var terminated = await _workflowHost.TerminateWorkflow(run.WorkflowInstanceId);
+        if (!terminated)
+        {
+            _logger.LogInformation(
+                "Engine terminate for run {RunId} was locked out by an in-flight execution pass; " +
+                "cooperative cancellation will stop it at the next step boundary",
+                runId);
+        }
 
         _logger.LogInformation("Run {RunId} terminated via lifecycle API", runId);
         return RunLifecycleResult.Success;

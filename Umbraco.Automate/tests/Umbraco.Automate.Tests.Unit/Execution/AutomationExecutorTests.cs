@@ -9,6 +9,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
@@ -58,6 +59,8 @@ public class AutomationExecutorTests
             controlFlow,
             pipeline,
             evaluator,
+            new ForEachCollectionCache(evaluator, new StepOutputHydrationCache(_runRepo.Object)),
+            new StepOutputHydrationCache(_runRepo.Object),
             new SettingsBindingResolver(evaluator),
             conditionEvaluator,
             _runRepo.Object,

@@ -1,10 +1,13 @@
 import { css, html, customElement, state, nothing, repeat, when } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
+import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import { UaRunDetailServerDataSource } from "../repository/detail/run-detail.server.data-source.js";
 import { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repository.js";
+import { UaAutomationRunsChangedEvent } from "../../automation/events/automation-runs-changed.event.js";
 import { formatDateTime } from "../../core/index.js";
-import { client } from "../../api/client.gen.js";
+import { RunsService } from "../../api/sdk.gen.js";
 import type { UaRunDetailModel, UaStepRunModel } from "../types.js";
 import type { UaRunDetailModalData } from "./run-detail-modal.token.js";
 
@@ -94,14 +97,46 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
     async #onReplay() {
         if (!this._run) return;
         this._replaying = true;
+
+        const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+
         try {
-            await client.post({
-                url: `/umbraco/automate/management/api/v1/runs/${this._run.unique}/replay`,
-                security: [{ scheme: "bearer", type: "http" }],
+            const { error } = await RunsService.postRunsByIdReplay({ path: { id: this._run.unique } });
+
+            if (error) {
+                const detail =
+                    (error as { detail?: string } | undefined)?.detail ??
+                    this.localize.term("uaRun_replayFailed");
+                notifications?.peek("danger", {
+                    data: {
+                        headline: this.localize.term("uaRun_replayFailed"),
+                        message: detail,
+                    },
+                });
+                return;
+            }
+
+            // Let the runs view refresh to pick up the replayed run. Dispatched via an
+            // awaited getContext (rather than the fire-and-forget dispatchActionEvent
+            // helper) so the event is guaranteed to fire before submit() closes the modal.
+            const eventContext = await this.getContext(UMB_ACTION_EVENT_CONTEXT);
+            eventContext?.dispatchEvent(new UaAutomationRunsChangedEvent(this._run.automationId));
+
+            notifications?.peek("positive", {
+                data: {
+                    headline: this.localize.term("uaRun_replayStarted"),
+                    message: "",
+                },
             });
+
             this.modalContext?.submit();
         } catch {
-            // Replay failed — stay on modal
+            notifications?.peek("danger", {
+                data: {
+                    headline: this.localize.term("uaRun_replayFailed"),
+                    message: "",
+                },
+            });
         } finally {
             this._replaying = false;
         }
@@ -110,15 +145,47 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
     async #callLifecycle(action: "suspend" | "resume" | "terminate") {
         if (!this._run) return;
         this._lifecycleBusy = true;
+
+        const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+
         try {
-            await client.post({
-                url: `/umbraco/automate/management/api/v1/runs/${this._run.unique}/${action}`,
-                security: [{ scheme: "bearer", type: "http" }],
-            });
+            const call =
+                action === "suspend"
+                    ? RunsService.postRunsByIdSuspend
+                    : action === "resume"
+                      ? RunsService.postRunsByIdResume
+                      : RunsService.postRunsByIdTerminate;
+            const { error } = await call({ path: { id: this._run.unique } });
+
+            if (error) {
+                const detail =
+                    (error as { detail?: string } | undefined)?.detail ??
+                    this.localize.term("uaRun_lifecycleFailed");
+                notifications?.peek("danger", {
+                    data: {
+                        headline: this.localize.term("uaRun_lifecycleFailed"),
+                        message: detail,
+                    },
+                });
+                return;
+            }
+
+            // Let the runs view refresh so the underlying list reflects the new status.
+            // The modal stays open (unlike replay), so this fires alongside the in-modal
+            // reload rather than before a submit(). Dispatched via an awaited getContext for
+            // consistency with #onReplay.
+            const eventContext = await this.getContext(UMB_ACTION_EVENT_CONTEXT);
+            eventContext?.dispatchEvent(new UaAutomationRunsChangedEvent(this._run.automationId));
+
             // Reload the run so the user sees the updated status without closing the modal.
             await this.#loadRun(this._run.unique);
         } catch {
-            // Lifecycle call failed — stay on modal with current state.
+            notifications?.peek("danger", {
+                data: {
+                    headline: this.localize.term("uaRun_lifecycleFailed"),
+                    message: "",
+                },
+            });
         } finally {
             this._lifecycleBusy = false;
         }

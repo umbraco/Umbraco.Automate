@@ -28,9 +28,8 @@ public sealed class ContentUnpublishedTriggerOutput : IContentScopedTriggerOutpu
     public string? ContentTypeAlias { get; init; }
 
     /// <summary>
-    /// Gets the cultures that were unpublished in this event.
-    /// Null for invariant content (the whole item was unpublished); an empty array
-    /// indicates a variant content unpublish where no cultures were removed (rare).
+    /// Gets the cultures that were published before the item was unpublished.
+    /// Null for invariant content (the whole item was unpublished).
     /// </summary>
     public string[]? Cultures { get; init; }
 

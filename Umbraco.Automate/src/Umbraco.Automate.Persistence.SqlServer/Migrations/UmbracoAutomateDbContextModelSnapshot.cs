@@ -17,7 +17,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -502,6 +502,99 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.ToTable("umbracoAutomateScheduledCommand", (string)null);
                 });
 
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowExecutionPointerEntity", b =>
+                {
+                    b.Property<long>("PersistenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PersistenceId"));
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Children")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContextItem")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EventData")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EventKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("EventName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("EventPublished")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ExtensionAttributes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Outcome")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PersistenceData")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PointerId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PredecessorId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Scope")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SleepUntil")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("StartTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StepId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StepName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("WorkflowInstanceId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("PersistenceId");
+
+                    b.HasIndex("WorkflowInstanceId");
+
+                    b.HasIndex("WorkflowInstanceId", "Active");
+
+                    b.HasIndex("WorkflowInstanceId", "PointerId")
+                        .IsUnique();
+
+                    b.ToTable("umbracoAutomateWorkflowExecutionPointer", (string)null);
+                });
+
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowInstanceEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -529,6 +622,11 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int>("SchemaVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -549,6 +647,26 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.HasIndex("Status", "NextExecution");
 
                     b.ToTable("umbracoAutomateWorkflowInstance", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowLockEntity", b =>
+                {
+                    b.Property<string>("LockId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("AcquiredUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OwnerToken")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("LockId");
+
+                    b.ToTable("umbracoAutomateWorkflowLock", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
@@ -651,6 +769,15 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.ToTable("umbracoAutomateWorkspaceUserGroup", (string)null);
                 });
 
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowExecutionPointerEntity", b =>
+                {
+                    b.HasOne("Umbraco.Automate.Persistence.Workflows.WorkflowInstanceEntity", null)
+                        .WithMany("ExecutionPointers")
+                        .HasForeignKey("WorkflowInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
                 {
                     b.HasOne("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", null)
@@ -667,6 +794,11 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowInstanceEntity", b =>
+                {
+                    b.Navigation("ExecutionPointers");
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceEntity", b =>

@@ -53,13 +53,13 @@ No .NET open-source CMS has a built-in automation engine. Umbraco users currentl
 
 **Risk**: Single-maintainer project. Mitigation: we depend on the stable 3.x API surface. If maintenance stalls, the library is small enough to fork/vendor. Elsa Workflows exists as a fallback but has a much larger footprint. See Appendix A for the full comparison.
 
-**NuGet dependency**: We reference only the `WorkflowCore` core package (`netstandard2.0`), **not** any `WorkflowCore.Persistence.*` packages. This avoids the EF Core version conflict (WorkflowCore's EF provider uses EF 9.x; Umbraco 17 uses EF 10.x) and the Newtonsoft.Json dependency stays isolated to the engine layer.
+**NuGet dependency**: We reference only the `WorkflowCore` core package, **not** any `WorkflowCore.Persistence.*` packages. This avoids the EF Core version conflict — WorkflowCore's EF persistence packages target `netstandard2.1`/`net6.0` and pin EF Core to 7.x at most, incompatible with Umbraco CMS 18 on EF Core 10.x — and keeps the Newtonsoft.Json dependency isolated to the persistence-serialization layer.
 
 ### Persistence: Custom IPersistenceProvider
 
-We implement WorkflowCore's `IPersistenceProvider` interface directly, using Umbraco's `IEFCoreScopeProvider` for database access. This bypasses WorkflowCore's own EF provider entirely.
+We implement WorkflowCore's `IPersistenceProvider` interface directly against our own `UmbracoAutomateDbContext` (via `IDbContextFactory<UmbracoAutomateDbContext>`). This bypasses WorkflowCore's own EF provider entirely while adopting its **normalized schema**.
 
-**Why**: WorkflowCore's EF provider targets net8.0 with EF Core 9.x — incompatible with Umbraco 17 on .NET 10 / EF Core 10.x. A custom implementation avoids the version clash, integrates with Umbraco's migration and scope infrastructure, and uses the `UmbracoAutomate_` migration prefix convention.
+**Why custom**: WorkflowCore's EF persistence packages target `netstandard2.1`/`net6.0` and pin EF Core to ≤7.x — incompatible with Umbraco CMS 18 on .NET 10 / EF Core 10.x. A custom implementation avoids the version clash, integrates with our `UmbracoAutomateDbContext` and migrations, and uses the `UmbracoAutomate_` migration prefix. The version constraint forces only *writing our own EF-10 provider*; the storage *shape* mirrors WorkflowCore's native provider (see below) rather than deviating from it.
 
 **Interface surface** (25 members across 4 sub-interfaces):
 
@@ -72,18 +72,20 @@ We implement WorkflowCore's `IPersistenceProvider` interface directly, using Umb
 | `IPersistenceProvider` (direct) | 2 | `ExecutionError` + `EnsureStoreExists()` |
 
 **Implementation approach**:
-- ~400 lines, modelled on WorkflowCore's `EntityFrameworkPersistenceProvider` (~350 lines) and `MemoryPersistenceProvider` (~225 lines) as references
-- Define our own `Persisted*` entity types (5-6 models) with EF Core configuration under Umbraco's `DbContext`
-- Each method creates and completes its own `IEFCoreScopeProvider` scope
-- `object`-typed properties (`Data`, `PersistenceData`, `EventData`, etc.) serialized via Newtonsoft.Json with `TypeNameHandling` matching WorkflowCore's expectations — this is the one place Newtonsoft.Json is required
-- Registered in DI, replacing WorkflowCore's default in-memory provider
+- Modelled on WorkflowCore's `EntityFrameworkPersistenceProvider`, including its **normalized schema**: execution pointers are stored one row per pointer in `umbracoAutomateWorkflowExecutionPointer`, and a persist pass writes only the pointers that changed (EF change-tracking delta) rather than re-serializing the whole instance.
+- Our own entity types (`WorkflowInstanceEntity`, `WorkflowExecutionPointerEntity`, …) configured on `UmbracoAutomateDbContext`.
+- Each method creates a `DbContext` per operation via `IDbContextFactory<UmbracoAutomateDbContext>`.
+- Only `object`-typed sub-fields — `WorkflowInstance.Data`, and each pointer's `PersistenceData`, `ContextItem`, `EventData`, `Outcome`, `ExtensionAttributes` — are Newtonsoft-serialized with `TypeNameHandling.All`; this is the one place Newtonsoft.Json is required. Because these are small per-pointer values, the previous whole-instance JSON blob (and its O(n²) re-serialize-per-pass cost on large `ForEach`/`While` loops) is gone.
+- Registered in DI, replacing WorkflowCore's default in-memory provider.
+
+**Storage-format migration**: a `SchemaVersion` column on `umbracoAutomateWorkflowInstance` discriminates the legacy whole-instance blob (`0`) from the normalized format (`1`). Earlier versions serialized the entire `WorkflowInstance` — execution pointers inlined — into the `Data` column as a single JSON blob; that is version 0. Legacy rows are read via a retained fallback decoder and rewritten as version 1 on their next persist, so in-flight runs upgrade seamlessly with no data-migration script. The fallback decoder is removable in a future major once no version-0 rows remain.
 
 **Two persistence layers**:
 
 | Layer | What it stores | Implementation |
 |-------|---------------|----------------|
-| **WorkflowCore engine state** | Workflow instances, execution pointers, events, subscriptions, scheduled commands | Custom `IPersistenceProvider` via Umbraco's EF scope |
-| **Automation run audit** | `AutomationRun`, `StepRun` (richer schema with input/output data, error categories, duration) | Our own repositories via Umbraco's EF scope |
+| **WorkflowCore engine state** | Workflow instances, execution pointers (normalized `umbracoAutomateWorkflowExecutionPointer` table), events, subscriptions, scheduled commands | Custom `IPersistenceProvider` on `UmbracoAutomateDbContext` |
+| **Automation run audit** | `AutomationRun`, `StepRun` (richer schema with input/output data, error categories, duration) | Our own repositories on `UmbracoAutomateDbContext` |
 
 The engine state layer is WorkflowCore's internal bookkeeping. The audit layer is our governance/observability data with a richer schema purpose-built for the Run Explorer.
 
@@ -2240,7 +2242,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | # | Decision | Options | Recommendation |
 |---|----------|---------|----------------|
 | 1 | **Visual editor library** | Rete.js (Lit-native) vs React Flow (wrapped) | ✅ **Decided: React Flow** — most polished/configurable, ~500KB tree-shaken, wrapped in custom element |
-| 2 | **WorkflowCore persistence** | Use WorkflowCore's own EF tables vs our own tables | ✅ **Decided: Custom `IPersistenceProvider`** — implements WorkflowCore's interface but uses Umbraco's `IEFCoreScopeProvider` for engine state. Our own tables for runs/audit (richer schema). Bypasses WorkflowCore's EF package entirely, avoiding the EF Core version mismatch (WC targets EF 9.x, Umbraco 17 uses EF 10.x). |
+| 2 | **WorkflowCore persistence** | Use WorkflowCore's own EF tables vs our own tables | ✅ **Decided: Custom `IPersistenceProvider`** — implements WorkflowCore's interface on our own `UmbracoAutomateDbContext` (via `IDbContextFactory`), adopting WorkflowCore's normalized pointer schema. Our own tables for runs/audit (richer schema). Bypasses WorkflowCore's EF package entirely, avoiding the EF Core version mismatch (WC pins EF ≤7.x, Umbraco CMS 18 uses EF 10.x). |
 | 3 | **Workflow definition storage** | Code-compiled vs JSON/YAML DSL | ✅ **Decided: JSON in DB, compiled to WorkflowCore at runtime.** Enables user-defined automations via the canvas editor. |
 | 4 | **Settings UI generation** | Auto-generate from POCO attributes vs hand-crafted per action | ✅ **Decided: `[Field]` attribute + `EditableModelSchemaBuilder`** — mirrors Umbraco.AI's `[AIField]` pattern exactly |
 | 5 | **Messaging infrastructure** | Direct dispatch vs message bus vs custom outbox | ✅ **Decided: Custom database-backed outbox.** Single `umbracoAutomateOutbox` EF Core table handles both trigger dispatch and WorkflowCore queue. Zero external dependencies. Optimistic concurrency for multi-instance safety. Exponential backoff retry + dead-lettering. Initially used DotNetCore.CAP but replaced — CAP's timing constraints, sealed APIs, and startup ordering issues added more friction than value. The outbox is an internal implementation detail behind `ITriggerDispatcher`. |
@@ -2328,7 +2330,7 @@ Elsa has better sustainability fundamentals (company, funding, release cadence).
 | **Use as pure engine** | **Yes** — designed as an embeddable engine | **No** — designed as a semi-autonomous subsystem |
 | **What we'd bypass** | Persistence providers, JSON DSL | API, UI, auth, persistence, background jobs, clustering — the majority |
 
-**WorkflowCore stays out of the way.** We own DI (`IComposer`), API (Management API), persistence (`IEFCoreScopeProvider`), and UI (React Flow). WorkflowCore is just the step execution engine underneath.
+**WorkflowCore stays out of the way.** We own DI (`IComposer`), API (Management API), persistence (`UmbracoAutomateDbContext` via a custom `IPersistenceProvider`), and UI (React Flow). WorkflowCore is just the step execution engine underneath.
 
 **Elsa fights us.** We'd spend significant effort suppressing or working around Elsa's opinions about API, auth, persistence, and background processing — all things Umbraco already handles. We'd be paying for 43+ dependencies while using a fraction of the features.
 

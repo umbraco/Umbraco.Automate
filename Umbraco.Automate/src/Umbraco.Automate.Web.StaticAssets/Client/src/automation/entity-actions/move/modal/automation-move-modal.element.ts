@@ -88,8 +88,12 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
 
         // Re-fetch to get latest state (may have changed since modal opened).
         const { data: freshData } = await this.#detailRepository.requestByUnique(this.data.unique);
-        const automation = freshData ?? this.#automationData;
-        if (!automation) return;
+        const source = freshData ?? this.#automationData;
+        if (!source) return;
+
+        // The store returns a frozen (read-only) model, so work on a shallow copy
+        // before mutating the parent association.
+        const automation = { ...source };
 
         if (isWorkspace) {
             automation.groupId = null;

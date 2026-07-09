@@ -18,6 +18,8 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
 {
     private readonly StepConfiguration _stepConfig;
     private readonly WhileControlFlowSettings _settings;
+    private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
@@ -25,12 +27,16 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
     public WhileContainerStepBody(
         StepConfiguration stepConfig,
         WhileControlFlowSettings settings,
+        ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         _stepConfig = stepConfig;
         _settings = settings;
+        _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
         _branchEdges = branchEdges;
@@ -52,6 +58,15 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
                 return ExecutionResult.Persist(persistence);
             }
             iteration = persistence.Index;
+
+            // The just-drained iteration's scoped outputs are dead — prune before
+            // deciding whether to loop again.
+            if (iteration > 0)
+            {
+                IterationScopePruner.PruneIterationScope(
+                    data,
+                    new ForEachIterationContext(null, iteration - 1, _stepConfig.Id, parentIteration).ScopePath);
+            }
         }
 
         if (iteration >= _settings.MaxIterations)
@@ -60,7 +75,7 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
             return ExecutionResult.Next();
         }
 
-        var bindingData = BindingDataBuilder.Build(data, parentIteration);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache, context.CancellationToken);
 
         // Evaluate While's own conditions.
         if (!_conditionEvaluator.Evaluate(_settings.Conditions, bindingData))
@@ -97,6 +112,6 @@ internal sealed class WhileContainerStepBody : ContainerStepBody
             CompletedUtc = DateTime.UtcNow,
             IterationTotal = totalIterations,
         };
-        _runRepository.SaveStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
+        _runRepository.AddStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
     }
 }

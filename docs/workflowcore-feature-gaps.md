@@ -2,11 +2,19 @@
 
 Outstanding WorkflowCore capabilities not yet surfaced in Umbraco.Automate. Items are grouped by theme and ordered by priority within each group.
 
+> **Note:** "surfaced" does not always mean "used natively". The control-flow items below
+> (ForEach, While, Parallel, and the If/Switch conditionals) shipped as **custom container
+> step bodies** rather than via WorkflowCore's fluent builder, for reasons recorded in
+> [control-flow-architecture.md](control-flow-architecture.md). Entries marked
+> **✅ Implemented** are done; the rest are still open.
+
 ---
 
 ## Control Flow
 
-### 1. Parallel Execution
+### 1. Parallel Execution ✅ Implemented
+
+> **Implemented** as `ParallelContainerStepBody` (custom — see [control-flow-architecture.md](control-flow-architecture.md)). Original gap analysis retained below for context.
 
 **WorkflowCore:** `Parallel()` + `.Join()` — run multiple branches concurrently and wait for all to complete before continuing.
 
@@ -18,7 +26,9 @@ Outstanding WorkflowCore capabilities not yet surfaced in Umbraco.Automate. Item
 
 ---
 
-### 2. ForEach (Collection Iteration)
+### 2. ForEach (Collection Iteration) ✅ Implemented
+
+> **Implemented** as `ForEachContainerStepBody` (custom — see [control-flow-architecture.md](control-flow-architecture.md)). Performance of this body was subsequently hardened in PR #133 (collection materialised once per loop; iteration state kept out of the persisted blob) and again by normalising WorkflowCore execution pointers into their own table — one delta-written row per pointer instead of re-serialising the entire (unboundedly growing) instance as a single JSON blob every execution pass. That removed the O(n²) persistence cost that dominated large loops; see the persistence section of [engineering-spec.md](engineering-spec.md). Original gap analysis retained below for context.
 
 **WorkflowCore:** `ForEach()` — execute a block of steps for each item in a collection (parallel by default).
 
@@ -30,7 +40,9 @@ Outstanding WorkflowCore capabilities not yet surfaced in Umbraco.Automate. Item
 
 ---
 
-### 3. While (Conditional Loop)
+### 3. While (Conditional Loop) ✅ Implemented
+
+> **Implemented** as `WhileContainerStepBody` (custom — see [control-flow-architecture.md](control-flow-architecture.md)), including the max-iteration safety guard noted below. Original gap analysis retained below for context.
 
 **WorkflowCore:** `While()` — repeat a block of steps as long as a condition is true.
 
@@ -94,7 +106,18 @@ Outstanding WorkflowCore capabilities not yet surfaced in Umbraco.Automate. Item
 
 ## Execution Control
 
-### 8. CancelCondition
+### 8. CancelCondition ⚠️ Partially addressed
+
+> **External run cancellation** (the "cancelled by a user" motivation below) is now handled by
+> `RunCancellationStepMiddleware` (PR #132) — cooperatively, before every step. That path
+> deliberately does **not** use native `.CancelCondition`, because the cancel signal lives in
+> the durable run row (set by the API / another node) and native `CancelCondition` only sees the
+> in-memory `workflow.Data` snapshot; see the middleware's class doc for the full rationale.
+>
+> **Still open:** the user-facing *per-step* "cancel if [data condition]" / timeout feature.
+> That variant *is* a condition over workflow data, so native `.CancelCondition` **should be
+> evaluated first** here — it is the right tool for a data-driven step-level cancel, unlike the
+> external-state run cancel above.
 
 **WorkflowCore:** `.CancelCondition(data => expression, continueAfterCancellation)` — cancel a running step if a condition becomes true.
 
@@ -120,7 +143,11 @@ Outstanding WorkflowCore capabilities not yet surfaced in Umbraco.Automate. Item
 
 ---
 
-### 10. Suspend / Resume / Terminate Workflow
+### 10. Suspend / Resume / Terminate Workflow ⚠️ Partially addressed
+
+> **Terminate** now works mid-execution: PR #132 observes `TerminateWorkflow`'s result (it
+> returns `false` and no-ops when the executor holds the per-workflow lock) and falls back to
+> cooperative termination via `RunCancellationStepMiddleware`. **Suspend / Resume remain open.**
 
 **WorkflowCore:** `SuspendWorkflow()`, `ResumeWorkflow()`, `TerminateWorkflow()` — programmatic control over workflow lifecycle.
 
@@ -158,14 +185,14 @@ A pragmatic ordering based on user value vs complexity:
 
 | Phase | Feature | Rationale |
 |-------|---------|-----------|
-| **1** | Suspend/Resume/Terminate (#10) | Low effort, high operational value, pure WorkflowCore wiring |
+| ✅ | ~~ForEach (#2)~~ | **Done** (custom `ForEachContainerStepBody`; perf hardened in #133) |
+| ✅ | ~~Parallel execution (#1)~~ | **Done** (custom `ParallelContainerStepBody`) |
+| ✅ | ~~While loops (#3)~~ | **Done** (custom `WhileContainerStepBody`) |
+| ⚠️ | Terminate (part of #10) | **Done** via cooperative cancel (#132); Suspend/Resume still open |
+| ⚠️ | CancelCondition (#8) | External run cancel done (#132); per-step "cancel if" still open |
 | **1** | Suspend error mode (#7) | Low effort, completes existing error handling |
 | **1** | Workflow-level middleware (#11) | Low effort; good for `PreWorkflow` setup. Narrower than first thought — `PostWorkflow` only fires on success, so it's not a fit for failure-driven governance (the circuit breaker no longer needs it; see #11 caveat) |
-| **2** | CancelCondition (#8) | Medium effort, important for production robustness |
-| **2** | ForEach (#2) | High effort but highest user demand — iteration is a core automation pattern |
-| **3** | Parallel execution (#1) | High effort, high value, but many automations work without it |
 | **3** | Saga/Compensation (#6) | High effort, critical for multi-system reliability |
-| **4** | While loops (#3) | Medium effort, niche but needed for polling patterns |
 | **4** | Schedule (#4) | Medium effort, enables background fork patterns |
 | **4** | Recur (#5) | Medium effort, niche — mostly useful for in-run monitoring |
 | **4** | Activity workers (#9) | Medium effort, enables external processing delegation |

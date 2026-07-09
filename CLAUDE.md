@@ -31,7 +31,10 @@ Each product has its own solution file, CLAUDE.md, and can be built independentl
 
 ### Demo Site
 
-A demo Umbraco site is available at `demo/Umbraco.Automate.DemoSite/` for manual testing. Use the `/demo-site-management` skill to start/stop it.
+A demo Umbraco site is available at `demos/vN/Umbraco.Automate.DemoSite/` (N = major from `Umbraco.Cms.Core` version in `Directory.Packages.props`) for manual testing. Use the `/demo-site-management` skill to start/stop it.
+
+- **Path convention:** demo sites live under `demos/vN/` — one directory per CMS major version line (e.g. `demos/v18/`, `demos/v17/`). Never the old top-level `demo/`. The whole `demos/` tree is gitignored and generated per-developer.
+- **If `demos/vN/` doesn't exist**, generate it with `scripts/install-demo-site.{sh,ps1}` (auto-detects the version from your branch) or run `/repo-setup`. Do not create demo files by hand.
 
 ## Build Commands
 
@@ -174,6 +177,14 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 - WorkflowCore 3.9.0
 - EF Core 10.x
 - Central Package Management via `Directory.Packages.props`
+
+## Multi-Version Support
+
+Umbraco.Automate major versions track Umbraco CMS major versions, and multiple version lines may be in active support simultaneously (following the [Umbraco CMS LTS/EOL policy](https://umbraco.com/products/knowledge-center/long-term-support-and-end-of-life/)). All branches are version-prefixed (`vN/dev`, `vN/main`, `vN/feature|release|hotfix/*`); `claude/*` is exempt. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full branch model, active version lines, support policy, and backport workflow.
+
+### Keep Active Versions in Sync
+
+A bug fix or feature is developed against one version line but usually applies to every version still in an active phase. **Before treating any fix or feature as done, ask whether it should be ported to the other active version(s) and confirm with the user.** This applies in both directions — a fix on `v18/dev` may need backporting to `v17/dev`, and a fix on `v17/dev` may need porting up to `v18/dev`. Respect each version's phase: security phase → security patches only; EOL → skip unless explicitly requested. Version lines are maintained independently (no forward-merge), so port each one via the Backport Workflow in CONTRIBUTING.md.
 
 ## Coding Standards
 

@@ -14,21 +14,30 @@ namespace Umbraco.Automate.Core.Execution.ControlFlow;
 internal sealed class ParallelContainerStepBody : ContainerStepBody
 {
     private readonly StepConfiguration _stepConfig;
+    private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
 
     public ParallelContainerStepBody(
         StepConfiguration stepConfig,
+        ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         ConditionEvaluator conditionEvaluator,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         _stepConfig = stepConfig;
+        _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _conditionEvaluator = conditionEvaluator;
         _branchEdges = branchEdges;
     }
 
     public override ExecutionResult Run(IStepExecutionContext context)
     {
+        var data = (AutomationWorkflowData)context.Workflow.Data;
+        var parentIteration = context.Item as ForEachIterationContext;
+
         // Re-entry: wait for the parallel branches to drain before converging.
         if (context.PersistenceData is ControlPersistenceData persistence && persistence.ChildrenActive)
         {
@@ -36,6 +45,10 @@ internal sealed class ParallelContainerStepBody : ContainerStepBody
             {
                 return ExecutionResult.Persist(persistence);
             }
+
+            // All branches drained together — their scoped outputs can never be
+            // read again, so prune them to stop the persisted blob growing.
+            IterationScopePruner.PruneContainerScopes(data, _stepConfig.Id, parentIteration);
             return ExecutionResult.Next();
         }
 
@@ -53,9 +66,7 @@ internal sealed class ParallelContainerStepBody : ContainerStepBody
         // edge has a filter and they all fail, suppress the branch entirely. (We cannot
         // skip individual children selectively because WorkflowCore cross-products
         // BranchValues × step.Children when spawning child pointers.)
-        var data = (AutomationWorkflowData)context.Workflow.Data;
-        var parentIteration = context.Item as ForEachIterationContext;
-        var bindingData = BindingDataBuilder.Build(data, parentIteration);
+        var bindingData = BindingDataBuilder.Build(data, parentIteration, _collectionCache, _hydrationCache, context.CancellationToken);
 
         if (!ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData))
         {

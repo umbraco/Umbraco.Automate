@@ -63,6 +63,14 @@ public sealed class AutomationWorkflowData
     public Dictionary<string, Guid?> IterationLastCompletedStepId { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets each ForEach container's collection binding expression, keyed by container
+    /// step id. Stashed by the container on entry so binding-time item resolution can
+    /// re-materialise the collection on a cache miss (e.g. resuming after a process restart) —
+    /// iteration contexts carry only an index, not the item itself.
+    /// </summary>
+    public Dictionary<Guid, string> ContainerCollections { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets the execution context carrying the service account identity and workspace info.
     /// </summary>
     public AutomationExecutionContext? ExecutionContext { get; set; }

@@ -60,6 +60,8 @@ public class WorkflowCompilerTests
             controlFlows,
             pipeline,
             evaluator,
+            new ForEachCollectionCache(evaluator, new StepOutputHydrationCache(Mock.Of<IAutomationRunRepository>())),
+            new StepOutputHydrationCache(Mock.Of<IAutomationRunRepository>()),
             new SettingsBindingResolver(evaluator),
             conditionEvaluator,
             Mock.Of<IAutomationRunRepository>(),

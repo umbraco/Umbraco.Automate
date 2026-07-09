@@ -12,7 +12,7 @@
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
 # If on release or hotfix branch, keep our version (exit 0 = successful merge, no changes)
-if echo "$current_branch" | grep -qE '^(release|hotfix)/'; then
+if echo "$current_branch" | grep -qE '^v[0-9]+/(release|hotfix)/'; then
     # Keep our version (%A) by doing nothing - it's already in place
     exit 0
 fi

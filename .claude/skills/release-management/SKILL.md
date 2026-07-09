@@ -17,7 +17,7 @@ Guide users through the complete release preparation process:
 3. **Cascade forced bumps** to every dependent of a product undergoing minor/major/downplayed-breaking changes
 4. **Confirm versions** with the user (including cascaded products)
 5. **Update Directory.Packages.props** inter-product dependency ranges (with user approval)
-6. **Create release branch** (e.g., `release/2026.02.1`) and switch to it
+6. **Create release branch** (e.g., `v18/release/2026.02.1`) and switch to it
 7. **Dependency validation** - Check for cross-product conflicts using the graph built in cascade analysis
 8. **Update version.json** files for each product
 9. **Generate release-manifest.json** via `/release-manifest-management`
@@ -44,7 +44,7 @@ Guide users through the complete release preparation process:
     # CI agree on each product's base tag.
     git describe --tags --abbrev=0 --match="<Product>@*"   # e.g. --match="Umbraco.Automate@*"
     # Exit code != 0 means no matching tag is reachable (first release on this line) —
-    # fall back to merge-base with main (see Error Handling).
+    # fall back to merge-base with this line's vN/main (see Error Handling).
 
     # Get commits affecting this product since that tag
     git log <tag>..HEAD --oneline -- <ProductFolder>/
@@ -323,14 +323,21 @@ After confirming versions, update `Directory.Packages.props` so the dependency r
 
 **Branch Naming Convention:**
 
-Per CONTRIBUTING.md, the **recommended** convention is calendar-based with incrementing numbers:
-- `release/YYYY.MM.N` - Year, month, and incrementing release number
-- Example: `release/2026.02.1` for the first February 2026 release
-- Example: `release/2026.02.2` for the second February 2026 release
+Per CONTRIBUTING.md, every branch is version-prefixed and release branches are calendar-based:
+- `vN/release/YYYY.MM.N` - Version line, year, month, and incrementing release number
+- Example: `v18/release/2026.02.1` for the first February 2026 release on the v18 line
+- Example: `v18/release/2026.02.2` for the second February 2026 release on the v18 line
 
-This is independent from product version numbers (which follow semantic versioning). A single release branch like `release/2026.02.1` can contain multiple products at different versions (e.g., Core@0.3.0, OpenIddict@0.1.1, Slack@0.2.2).
+This is independent from product version numbers (which follow semantic versioning). A single release branch like `v18/release/2026.02.1` can contain multiple products at different versions (e.g., Core@0.3.0, OpenIddict@0.1.1, Slack@0.2.2).
 
 **Workflow:**
+
+0. **Determine the version-line prefix** from the current branch — the release branch must stay on the same line:
+   ```bash
+   # e.g. on v18/dev → prefix=v18 ; on v17/dev → prefix=v17
+   prefix=$(git branch --show-current | grep -oE '^v[0-9]+')
+   ```
+   If the current branch is not version-prefixed, ask the user which line to release.
 
 1. **Determine current date** - Get current year and month for default branch name:
    ```bash
@@ -359,22 +366,22 @@ This is independent from product version numbers (which follow semantic versioni
    Create release branch using recommended calendar naming?
 
    Latest release tag for February 2026: 2026.02.2
-   Suggested branch name: release/2026.02.3 (next release in February 2026)
+   Suggested branch name: v18/release/2026.02.3 (next release in February 2026)
 
    Options:
-   - Use suggested name (release/2026.02.3)
-   - Enter custom name (e.g., release/v0.3.0 for version-based)
+   - Use suggested name (v18/release/2026.02.3)
+   - Enter custom name (e.g., v18/release/v0.3.0 for version-based)
    - Cancel
    ```
 
-4. **Create and checkout branch**:
+4. **Create and checkout branch** (on the current line's prefix):
     ```bash
-    git checkout -b release/<name>
+    git checkout -b $prefix/release/<name>
     ```
 
 5. **Confirm branch creation**:
     ```
-    ✓ Created and switched to branch: release/2026.02.1
+    ✓ Created and switched to branch: v18/release/2026.02.1
 
     All subsequent changes will be made on this branch.
 
@@ -643,7 +650,7 @@ Verify all files are consistent:
 
 3. **Show summary**:
     ```
-    ✓ Release branch created: release/2026.02.1
+    ✓ Release branch created: v18/release/2026.02.1
     ✓ Updated 3 products:
       - Umbraco.Automate: 0.2.1 → 0.3.0
       - Umbraco.Automate.OpenIddict: 0.1.0 → 0.1.1
@@ -653,7 +660,7 @@ Verify all files are consistent:
 
     Next steps:
     - Review the changes: git show HEAD
-    - Push to remote: git push -u origin release/2026.02.1
+    - Push to remote: git push -u origin $prefix/release/2026.02.1
     - Create PR to merge into main
     - CI will validate and build packages
     ```
@@ -661,11 +668,12 @@ Verify all files are consistent:
 ## Important Notes
 
 - Always run from repository root
-- **Branch naming**: Use calendar-based naming `release/YYYY.MM.N` (recommended per CONTRIBUTING.md)
+- **Branch naming**: Use version-prefixed calendar naming `vN/release/YYYY.MM.N` (per CONTRIBUTING.md)
+  - The `vN` prefix matches the line you are releasing from (e.g. `v18/dev` → `v18/release/...`)
   - Independent from product versions (multiple products = different versions in one release)
   - N is an incrementing number for each release in that month (1, 2, 3, etc.)
-  - Example: `release/2026.02.1` can contain Core@0.3.0, OpenIddict@0.1.1, Slack@0.2.2
-  - Version-based naming like `release/v0.3.0` is valid but not recommended
+  - Example: `v18/release/2026.02.1` can contain Core@0.3.0, OpenIddict@0.1.1, Slack@0.2.2
+  - Version-based naming like `v18/release/v0.3.0` is valid but not recommended
 - Use conventional commit analysis for version recommendations
 - Validate cross-product dependencies
 - This skill orchestrates `/release-manifest-management` and `/changelog-management`
@@ -785,7 +793,7 @@ You show summary and next steps
 ## Error Handling
 
 - **No changes detected**: Ask user if they want to proceed anyway (manual version bump)
-- **Git tag not found** (`git describe` exits non-zero — no reachable product tag on this line): Fall back to `git merge-base origin/main HEAD` and compare against that, mirroring CI's detect-changes.ps1 fallback. Do NOT fall back to a version-sorted `git tag --list` lookup — that reintroduces the parallel-line bug described in Phase 1.
+- **Git tag not found** (`git describe` exits non-zero — no reachable product tag on this line): Fall back to `git merge-base origin/$prefix/main HEAD` (the current line's main, e.g. `origin/v18/main`) and compare against that, mirroring CI's detect-changes.ps1 fallback. Do NOT fall back to a version-sorted `git tag --list` lookup, and do NOT use bare `origin/main` — both reintroduce the parallel-line bug described in Phase 1.
 - **Invalid version.json**: Report error and ask user to fix manually
 - **Changelog generation fails**: Report error but continue with other products
 - **Dependency conflict**: Warn user but allow them to proceed

@@ -1,6 +1,4 @@
-using System.Text.Json;
 using Umbraco.Automate.Core.Automations;
-using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.ControlFlow.BuiltIn;
 using Umbraco.Automate.Core.Runs;
@@ -21,7 +19,8 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
 {
     private readonly StepConfiguration _stepConfig;
     private readonly ForEachControlFlowSettings _settings;
-    private readonly BindingEvaluator _bindingEvaluator;
+    private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IReadOnlyList<ContainerBranchEdge> _branchEdges;
@@ -29,14 +28,16 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
     public ForEachContainerStepBody(
         StepConfiguration stepConfig,
         ForEachControlFlowSettings settings,
-        BindingEvaluator bindingEvaluator,
+        ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         _stepConfig = stepConfig;
         _settings = settings;
-        _bindingEvaluator = bindingEvaluator;
+        _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
         _branchEdges = branchEdges;
@@ -46,6 +47,10 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
     {
         var data = (AutomationWorkflowData)context.Workflow.Data;
         var parentIteration = context.Item as ForEachIterationContext;
+
+        // Stash the collection expression so binding-time item resolution can re-materialise
+        // the collection on a cache miss (iteration contexts carry only an index).
+        data.ContainerCollections[_stepConfig.Id] = _settings.Collection;
 
         // Re-entry path. WorkflowCore re-invokes the container after spawning children;
         // wait for the entire body branch (including outcome-chain successors, which
@@ -62,31 +67,38 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
 
             if (_settings.RunParallel)
             {
+                // All iterations drained together — their scoped outputs can never be
+                // read again, so prune them to stop the persisted blob growing.
+                IterationScopePruner.PruneContainerScopes(data, _stepConfig.Id, parentIteration);
+                _collectionCache.EvictCollection(data.RunId, _stepConfig.Id, parentIteration?.ScopePath);
                 return ExecutionResult.Next();
             }
+
+            // The just-drained iteration's scoped outputs are dead — prune before moving on.
+            IterationScopePruner.PruneIterationScope(
+                data,
+                new ForEachIterationContext(null, persistence.Index, _stepConfig.Id, parentIteration).ScopePath);
 
             // Sequential: advance to the next passing index.
-            var bindingData = BindingDataBuilder.Build(data, parentIteration);
-            var items = ResolveCollection(_bindingEvaluator.Evaluate(_settings.Collection, bindingData));
-            var nextIndex = FindNextPassingIndex(data, items, persistence.Index + 1, parentIteration);
+            var items = _collectionCache.GetOrMaterializeCollection(data, _stepConfig.Id, parentIteration, _settings.Collection, context.CancellationToken);
+            var nextIndex = FindNextPassingIndex(data, items, persistence.Index + 1, parentIteration, context.CancellationToken);
             if (nextIndex < 0)
             {
+                _collectionCache.EvictCollection(data.RunId, _stepConfig.Id, parentIteration?.ScopePath);
                 return ExecutionResult.Next();
             }
 
-            var nextItem = new ForEachIterationContext(items[nextIndex], nextIndex, _stepConfig.Id, parentIteration);
             return ExecutionResult.Branch(
-                [nextItem],
+                [new ForEachIterationContext(null, nextIndex, _stepConfig.Id, parentIteration)],
                 new IteratorPersistenceData { ChildrenActive = true, Index = nextIndex });
         }
 
-        // First entry — evaluate the collection and branch.
-        var initialBindingData = BindingDataBuilder.Build(data, parentIteration);
-        var collectionValue = _bindingEvaluator.Evaluate(_settings.Collection, initialBindingData);
-        var initialItems = ResolveCollection(collectionValue);
+        // First entry — materialise the collection and branch.
+        var initialItems = _collectionCache.GetOrMaterializeCollection(data, _stepConfig.Id, parentIteration, _settings.Collection, context.CancellationToken);
 
         if (initialItems.Count == 0)
         {
+            _collectionCache.EvictCollection(data.RunId, _stepConfig.Id, parentIteration?.ScopePath);
             TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: 0);
             return ExecutionResult.Next();
         }
@@ -99,42 +111,43 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
             // common single-entry case this is the natural "skip this item" behaviour.
             var passing = initialItems
                 .Select((item, index) => (Item: item, Index: index))
-                .Where(t => AnyEdgePassesForItem(data, t.Item, t.Index, parentIteration))
+                .Where(t => AnyEdgePassesForItem(data, t.Item, t.Index, parentIteration, context.CancellationToken))
                 .ToList();
 
             TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: initialItems.Count);
 
             if (passing.Count == 0)
             {
+                _collectionCache.EvictCollection(data.RunId, _stepConfig.Id, parentIteration?.ScopePath);
                 return ExecutionResult.Next();
             }
 
             var branches = passing
-                .Select(t => (object)new ForEachIterationContext(t.Item, t.Index, _stepConfig.Id, parentIteration))
+                .Select(t => (object)new ForEachIterationContext(null, t.Index, _stepConfig.Id, parentIteration))
                 .ToList();
             return ExecutionResult.Branch(branches, new IteratorPersistenceData { ChildrenActive = true });
         }
 
         // Sequential — branch the first passing item.
-        var firstIndex = FindNextPassingIndex(data, initialItems, 0, parentIteration);
+        var firstIndex = FindNextPassingIndex(data, initialItems, 0, parentIteration, context.CancellationToken);
         if (firstIndex < 0)
         {
+            _collectionCache.EvictCollection(data.RunId, _stepConfig.Id, parentIteration?.ScopePath);
             TrackStepRun(data, context.CancellationToken, iterationIndex: null, iterationTotal: initialItems.Count);
             return ExecutionResult.Next();
         }
 
         TrackStepRun(data, context.CancellationToken, iterationIndex: firstIndex, iterationTotal: initialItems.Count);
-        var firstItem = new ForEachIterationContext(initialItems[firstIndex], firstIndex, _stepConfig.Id, parentIteration);
         return ExecutionResult.Branch(
-            [firstItem],
+            [new ForEachIterationContext(null, firstIndex, _stepConfig.Id, parentIteration)],
             new IteratorPersistenceData { ChildrenActive = true, Index = firstIndex });
     }
 
-    private int FindNextPassingIndex(AutomationWorkflowData data, IReadOnlyList<object?> items, int from, ForEachIterationContext? parent)
+    private int FindNextPassingIndex(AutomationWorkflowData data, IReadOnlyList<object?> items, int from, ForEachIterationContext? parent, CancellationToken cancellationToken)
     {
         for (var i = from; i < items.Count; i++)
         {
-            if (AnyEdgePassesForItem(data, items[i], i, parent))
+            if (AnyEdgePassesForItem(data, items[i], i, parent, cancellationToken))
             {
                 return i;
             }
@@ -142,7 +155,7 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
         return -1;
     }
 
-    private bool AnyEdgePassesForItem(AutomationWorkflowData data, object? item, int index, ForEachIterationContext? parent)
+    private bool AnyEdgePassesForItem(AutomationWorkflowData data, object? item, int index, ForEachIterationContext? parent, CancellationToken cancellationToken)
     {
         // Skip per-item binding-data construction when no edge gates the branch.
         if (_branchEdges.Count == 0 || !ContainerBranchEdge.AnyHaveFilter(_branchEdges))
@@ -150,8 +163,10 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
             return true;
         }
 
+        // Transient context carrying the in-hand item — never branched, so the item is
+        // not persisted anywhere.
         var iterationContext = new ForEachIterationContext(item, index, _stepConfig.Id, parent);
-        var bindingData = BindingDataBuilder.Build(data, iterationContext);
+        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache, _hydrationCache, cancellationToken);
         return ContainerBranchEdge.AnyEdgePasses(_branchEdges, _conditionEvaluator, bindingData);
     }
 
@@ -169,35 +184,6 @@ internal sealed class ForEachContainerStepBody : ContainerStepBody
             IterationIndex = iterationIndex,
             IterationTotal = iterationTotal,
         };
-        _runRepository.SaveStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
-    }
-
-    private static List<object?> ResolveCollection(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return [];
-        }
-
-        // Try to parse as JSON array.
-        try
-        {
-            using var doc = JsonDocument.Parse(value);
-            if (doc.RootElement.ValueKind == JsonValueKind.Array)
-            {
-                return doc.RootElement.EnumerateArray()
-                    .Select(e => Dispatch.JsonOptions.UnwrapJsonElement(e))
-                    .ToList();
-            }
-        }
-        catch (JsonException)
-        {
-            // Not JSON — treat as comma-separated.
-        }
-
-        // Fall back to comma-separated values.
-        return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Cast<object?>()
-            .ToList();
+        _runRepository.AddStepRunAsync(stepRun, ct).GetAwaiter().GetResult();
     }
 }
