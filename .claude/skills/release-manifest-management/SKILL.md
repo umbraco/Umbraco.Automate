@@ -1,6 +1,6 @@
 ---
 name: release-manifest-management
-description: Generates and manages the release-manifest.json file. Use when you need to create or update the manifest file that specifies which products to include in a release/hotfix. Called by the release-management orchestration skill.
+description: Generates and manages the release-manifest.json file. Use when you need to create or update the manifest file that specifies which products to include in a vN/release or vN/hotfix. Called by the release-management orchestration skill.
 allowed-tools: Bash, Read, Write, Glob
 ---
 
@@ -18,8 +18,8 @@ Generate `release-manifest.json` at the repository root. Products can be provide
 
 ## About Release Manifests
 
-- **Required** on `release/*` branches (CI will fail without it)
-- **Optional** on `hotfix/*` branches (falls back to change detection if absent)
+- **Required** on `vN/release/*` branches (CI will fail without it)
+- **Optional** on `vN/hotfix/*` branches (falls back to change detection if absent)
 - Lists which products to package and release
 - Format: JSON array of product names (e.g., `["Umbraco.Automate", "Umbraco.Automate.OpenIddict"]`)
 
@@ -92,7 +92,7 @@ Check the initial prompt/task for a `--products` parameter:
 ## Important Notes
 
 - Always run from repository root
-- Manifest is validated by CI on `release/*` and `hotfix/*` branches
+- Manifest is validated by CI on `vN/release/*` and `vN/hotfix/*` branches
 - On release branches, CI ensures all changed products are in the manifest
 - The file path must be `release-manifest.json` at the repository root
 - This skill is typically invoked by the `/release-management` orchestration skill

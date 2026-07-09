@@ -27,6 +27,10 @@ public class UmbracoAutomateDbContext : DbContext
 
     internal DbSet<WorkflowInstanceEntity> WorkflowInstances { get; set; } = null!;
 
+    internal DbSet<WorkflowExecutionPointerEntity> WorkflowExecutionPointers { get; set; } = null!;
+
+    internal DbSet<WorkflowLockEntity> WorkflowLocks { get; set; } = null!;
+
     internal DbSet<EventSubscriptionEntity> EventSubscriptions { get; set; } = null!;
 
     internal DbSet<EventEntity> Events { get; set; } = null!;
@@ -191,11 +195,57 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.Reference).HasMaxLength(200);
             entity.Property(e => e.CreateTime).IsRequired();
+            entity.Property(e => e.SchemaVersion).IsRequired().HasDefaultValue(0);
             entity.Property(e => e.Data).IsRequired();
 
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.NextExecution);
             entity.HasIndex(e => new { e.Status, e.NextExecution });
+
+            entity.HasMany(e => e.ExecutionPointers)
+                .WithOne()
+                .HasForeignKey(e => e.WorkflowInstanceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkflowExecutionPointerEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkflowExecutionPointer");
+            entity.HasKey(e => e.PersistenceId);
+
+            entity.Property(e => e.PersistenceId).ValueGeneratedOnAdd();
+            entity.Property(e => e.WorkflowInstanceId).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.PointerId).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.StepId).IsRequired();
+            entity.Property(e => e.Active).IsRequired();
+            entity.Property(e => e.RetryCount).IsRequired().HasDefaultValue(0);
+            entity.Property(e => e.PredecessorId).HasMaxLength(100);
+            entity.Property(e => e.EventName).HasMaxLength(100);
+            entity.Property(e => e.EventKey).HasMaxLength(100);
+            entity.Property(e => e.EventPublished).IsRequired();
+            entity.Property(e => e.StepName).HasMaxLength(100);
+            entity.Property(e => e.Status).IsRequired();
+
+            entity.HasIndex(e => e.WorkflowInstanceId);
+            entity.HasIndex(e => new { e.WorkflowInstanceId, e.Active });
+            // Guards against a duplicate pointer row surviving even a lease-lock race (a slow
+            // processing pass outliving its lease before renewal): without this, two rows for the
+            // same pointer crash every future GetWorkflowInstance call for the instance
+            // (ExecutionPointerCollection.Add's Dictionary.Add throws on the duplicate key).
+            // EFCoreWorkflowPersistenceProvider catches the resulting DbUpdateException and
+            // discards the losing write instead of letting it propagate.
+            entity.HasIndex(e => new { e.WorkflowInstanceId, e.PointerId }).IsUnique();
+        });
+
+        modelBuilder.Entity<WorkflowLockEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkflowLock");
+            entity.HasKey(e => e.LockId);
+
+            entity.Property(e => e.LockId).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.OwnerToken).IsRequired();
+            entity.Property(e => e.AcquiredUtc).IsRequired();
+            entity.Property(e => e.ExpiresUtc).IsRequired();
         });
 
         modelBuilder.Entity<EventSubscriptionEntity>(entity =>

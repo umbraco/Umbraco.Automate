@@ -31,6 +31,8 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     private readonly ControlFlowCollection _controlFlows;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IAutomationRunRepository _runRepository;
@@ -45,6 +47,8 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         ControlFlowCollection controlFlows,
         ActionMiddlewarePipeline pipeline,
         BindingEvaluator bindingEvaluator,
+        ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         SettingsBindingResolver settingsBindingResolver,
         ConditionEvaluator conditionEvaluator,
         IAutomationRunRepository runRepository,
@@ -58,6 +62,8 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         _controlFlows = controlFlows;
         _pipeline = pipeline;
         _bindingEvaluator = bindingEvaluator;
+        _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _settingsBindingResolver = settingsBindingResolver;
         _conditionEvaluator = conditionEvaluator;
         _runRepository = runRepository;
@@ -118,7 +124,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         // Container steps are excluded — their child relationships are handled via Children + Branch(),
         // and any filters on edges leaving a container are honoured by the container body itself
         // (see ContainerBranchEdge plumbing above).
-        WireTransitions(definition, automation.Connections, stepIdToIndex, containerStepIds, _conditionEvaluator);
+        WireTransitions(definition, automation.Connections, stepIdToIndex, containerStepIds, _conditionEvaluator, _hydrationCache);
 
         // Wire up container children and convergence outcomes — must happen after all steps are indexed.
         WireContainerChildren(definition, containerScopes, stepIdToIndex);
@@ -183,6 +189,8 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 action,
                 _pipeline,
                 _bindingEvaluator,
+                _collectionCache,
+                _hydrationCache,
                 _settingsBindingResolver,
                 _runRepository,
                 _connectionService,
@@ -219,32 +227,32 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             case IfControlFlow:
             {
                 var settings = ResolveSettings<IfControlFlowSettings>(stepConfig, controlFlow) ?? new IfControlFlowSettings();
-                return new ControlFlowWorkflowStep(new IfStepBody(stepConfig, settings, _conditionEvaluator, _runRepository));
+                return new ControlFlowWorkflowStep(new IfStepBody(stepConfig, settings, _conditionEvaluator, _hydrationCache, _runRepository));
             }
 
             case SwitchControlFlow:
             {
                 var settings = ResolveSettings<SwitchControlFlowSettings>(stepConfig, controlFlow) ?? new SwitchControlFlowSettings();
-                return new ControlFlowWorkflowStep(new SwitchStepBody(stepConfig, settings, _conditionEvaluator, _runRepository));
+                return new ControlFlowWorkflowStep(new SwitchStepBody(stepConfig, settings, _conditionEvaluator, _hydrationCache, _runRepository));
             }
 
             case ForEachControlFlow:
             {
                 var settings = ResolveSettings<ForEachControlFlowSettings>(stepConfig, controlFlow) ?? new ForEachControlFlowSettings();
                 return new ControlFlowWorkflowStep(new ForEachContainerStepBody(
-                    stepConfig, settings, _bindingEvaluator, _conditionEvaluator, _runRepository, branchEdges));
+                    stepConfig, settings, _collectionCache, _hydrationCache, _conditionEvaluator, _runRepository, branchEdges));
             }
 
             case WhileControlFlow:
             {
                 var settings = ResolveSettings<WhileControlFlowSettings>(stepConfig, controlFlow) ?? new WhileControlFlowSettings();
                 return new ControlFlowWorkflowStep(new WhileContainerStepBody(
-                    stepConfig, settings, _conditionEvaluator, _runRepository, branchEdges));
+                    stepConfig, settings, _collectionCache, _hydrationCache, _conditionEvaluator, _runRepository, branchEdges));
             }
 
             case ParallelControlFlow:
             {
-                return new ControlFlowWorkflowStep(new ParallelContainerStepBody(stepConfig, _conditionEvaluator, branchEdges));
+                return new ControlFlowWorkflowStep(new ParallelContainerStepBody(stepConfig, _collectionCache, _hydrationCache, _conditionEvaluator, branchEdges));
             }
 
             default:
@@ -292,7 +300,8 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         IList<StepConnection> connections,
         Dictionary<Guid, int> stepIdToIndex,
         IReadOnlySet<Guid> containerStepIds,
-        ConditionEvaluator conditionEvaluator)
+        ConditionEvaluator conditionEvaluator,
+        StepOutputHydrationCache hydrationCache)
     {
         if (connections.Count > 0)
         {
@@ -340,7 +349,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                     // are intercepted before this loop and applied by the container body
                     // itself via ContainerBranchEdge plumbing in WorkflowCompiler.Compile.
                     Expression<Func<AutomationWorkflowData, object>> expr = data =>
-                        conditionEvaluator.Evaluate(filter, BindingDataBuilder.Build(data))
+                        conditionEvaluator.Evaluate(filter, BindingDataBuilder.Build(data, null, null, hydrationCache))
                             ? outcomeValue!
                             : FilterFailedSentinel;
                     outcome.Value = expr;

@@ -17,6 +17,7 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
@@ -102,6 +103,8 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
         services.AddSingleton(controlFlow);
         services.AddSingleton(middlewareCollection);
         services.AddSingleton(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        services.AddSingleton<ForEachCollectionCache>();
+        services.AddSingleton<StepOutputHydrationCache>();
         services.AddSingleton<SettingsBindingResolver>();
         services.AddSingleton<ConditionEvaluator>();
         services.AddSingleton<ActionMiddlewarePipeline>();

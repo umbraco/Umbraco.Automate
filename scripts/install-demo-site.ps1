@@ -45,17 +45,43 @@ if ($nodeMajor -lt $requiredNodeMajor) {
 Write-Host "Node $nodeVersionRaw detected (satisfies '$requiredNodeRange')." -ForegroundColor Gray
 Write-Host ""
 
+# Detect template version and major from Directory.Packages.props.
+# The Umbraco.Cms.Core version (lower bound if a range, or the fixed version) is the right
+# template version to scaffold the demo site against.
+$packagesPropsPath = Join-Path $RepoRoot "Directory.Packages.props"
+if (-not (Test-Path $packagesPropsPath)) {
+    Write-Host "ERROR: Could not find $packagesPropsPath" -ForegroundColor Red
+    exit 1
+}
+$packagesContent = Get-Content $packagesPropsPath -Raw
+if ($packagesContent -match 'Include="Umbraco\.Cms\.Core" Version="\[([^,\]]+)') {
+    $TemplateVersion = $matches[1]
+} elseif ($packagesContent -match 'Include="Umbraco\.Cms\.Core" Version="([^"\[]+)"') {
+    $TemplateVersion = $matches[1]
+} else {
+    Write-Host "ERROR: Could not find Umbraco.Cms.Core version in $packagesPropsPath" -ForegroundColor Red
+    exit 1
+}
+$VersionMajor = [int]($TemplateVersion -split '\.')[0]
+$IsTemplatePrerelease = $TemplateVersion -match '-'
+Write-Host "Target Umbraco.Cms template version: $TemplateVersion (v$VersionMajor)" -ForegroundColor Gray
+Write-Host ""
+
+# Versioned demo directory: demos/vN/
+$DemoDir = "demos\v$VersionMajor"
+$DemoSiteDir = "$DemoDir\Umbraco.Automate.DemoSite"
+
 # Check if demo already exists
-if ((Test-Path "demo") -and -not $Force) {
-    Write-Host "Demo folder already exists. Use -Force to recreate." -ForegroundColor Yellow
+if ((Test-Path $DemoDir) -and -not $Force) {
+    Write-Host "Demo folder '$DemoDir' already exists. Use -Force to recreate." -ForegroundColor Yellow
     Write-Host "Or open the existing Umbraco.Automate.local.slnx" -ForegroundColor Yellow
     exit 0
 }
 
 # Clean up existing demo if Force
-if ($Force -and (Test-Path "demo")) {
-    Write-Host "Removing existing demo folder..." -ForegroundColor Yellow
-    Remove-Item -Recurse -Force "demo"
+if ($Force -and (Test-Path $DemoDir)) {
+    Write-Host "Removing existing demo folder '$DemoDir'..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $DemoDir
 }
 
 if ($Force -and (Test-Path "Umbraco.Automate.local.slnx")) {
@@ -64,7 +90,7 @@ if ($Force -and (Test-Path "Umbraco.Automate.local.slnx")) {
 
 # Step 1: Install Umbraco templates
 if (-not $SkipTemplateInstall) {
-    Write-Host "Installing Umbraco templates..." -ForegroundColor Green
+    Write-Host "Installing Umbraco templates ($TemplateVersion)..." -ForegroundColor Green
 
     # Uninstall any existing version to avoid conflicts
     Write-Host "Removing any existing Umbraco.Templates installations..." -ForegroundColor Gray
@@ -77,48 +103,63 @@ if (-not $SkipTemplateInstall) {
         }
     }
 
-    # Pin to 18.0.0-rc2 to match the Umbraco.Cms.Core minimum in Directory.Packages.props. v18 ships
-    # via the umbracoprereleases MyGet feed for now — drop the explicit pin (or move it forward) once
-    # v18 stable lands on nuget.org. Bump in lockstep when the CMS floor moves.
-    dotnet new install Umbraco.Templates::18.0.0-rc2 --force
+    if ($IsTemplatePrerelease) {
+        # Prerelease templates require the umbracoprereleases MyGet feed to be configured.
+        # If not yet configured: dotnet nuget add source https://www.myget.org/F/umbracoprereleases/api/v3/index.json --name UmbracoPreReleases
+        Write-Host "NOTE: Prerelease template ($TemplateVersion) requires the umbracoprereleases MyGet source." -ForegroundColor Yellow
+    }
+    dotnet new install "Umbraco.Templates::$TemplateVersion" --force
 }
 
 # Step 2: Create demo folder with build overrides
-Write-Host "Creating demo folder..." -ForegroundColor Green
-New-Item -ItemType Directory -Path "demo" -Force | Out-Null
+Write-Host "Creating demo folder '$DemoDir'..." -ForegroundColor Green
+New-Item -ItemType Directory -Path $DemoDir -Force | Out-Null
 
 # Disable package validation for demo folder
 $directoryBuildPropsSource = Join-Path $ScriptDir "templates\Directory.Build.props"
-Copy-Item -Path $directoryBuildPropsSource -Destination "demo\Directory.Build.props" -Force
+Copy-Item -Path $directoryBuildPropsSource -Destination "$DemoDir\Directory.Build.props" -Force
 
 # Disable central package management for demo folder
 $directoryPackagesPropsSource = Join-Path $ScriptDir "templates\Directory.Packages.props"
-Copy-Item -Path $directoryPackagesPropsSource -Destination "demo\Directory.Packages.props" -Force
+Copy-Item -Path $directoryPackagesPropsSource -Destination "$DemoDir\Directory.Packages.props" -Force
 
 # Step 3: Create the Umbraco demo site
 Write-Host "Creating Umbraco demo site..." -ForegroundColor Green
-Push-Location "demo"
+Push-Location $DemoDir
 dotnet new umbraco --force -n "Umbraco.Automate.DemoSite" --friendly-name "Administrator" --email "admin@example.com" --password "password1234" --development-database-type SQLite
 Pop-Location
 
 # Step 3.1: Install Clean starter kit
+# Clean's major version does not match the CMS major — map explicitly and add
+# new entries as majors are released. Floating patterns keep multi-version installs correct:
+#   17 -> 7.*   (stable)
+#   18 -> 8.*-* (the CMS-v18-compatible Clean, e.g. 8.0.0-rc1, is still prerelease)
+$cleanVersionMap = @{
+    "17" = "7.*"
+    "18" = "8.*-*"
+}
+$cleanVersion = $cleanVersionMap["$VersionMajor"]
 Write-Host "Installing Clean starter kit..." -ForegroundColor Green
-Push-Location "demo\Umbraco.Automate.DemoSite"
-# --prerelease: the CMS-v18-compatible Clean (8.0.0-rc1) is still prerelease.
-dotnet add package Clean --prerelease
+Push-Location $DemoSiteDir
+if ($cleanVersion) {
+    dotnet add package Clean --version $cleanVersion
+} else {
+    Write-Host "Warning: No Clean version mapping for v$VersionMajor, using latest stable." -ForegroundColor Yellow
+    dotnet add package Clean
+}
 Pop-Location
 
 # Step 3.2: Set fixed port for consistent development
 Write-Host "Configuring fixed port (44380)..." -ForegroundColor Green
 $launchSettingsSource = Join-Path $ScriptDir "templates\launchSettings.json"
-$launchSettingsPath = "demo\Umbraco.Automate.DemoSite\Properties\launchSettings.json"
+$launchSettingsPath = "$DemoSiteDir\Properties\launchSettings.json"
 New-Item -ItemType Directory -Path (Split-Path $launchSettingsPath) -Force | Out-Null
 Copy-Item -Path $launchSettingsSource -Destination $launchSettingsPath -Force
 
 # Step 3.3: Add NamedPipeListenerComposer for HTTP over named pipes
 Write-Host "Adding NamedPipeListenerComposer for HTTP over named pipes..." -ForegroundColor Green
 $composerSourcePath = Join-Path $ScriptDir "templates\NamedPipeListenerComposer.cs"
-$composerDestPath = "demo\Umbraco.Automate.DemoSite\Composers\NamedPipeListenerComposer.cs"
+$composerDestPath = "$DemoSiteDir\Composers\NamedPipeListenerComposer.cs"
 New-Item -ItemType Directory -Path (Split-Path $composerDestPath) -Force | Out-Null
 Copy-Item -Path $composerSourcePath -Destination $composerDestPath -Force
 
@@ -162,11 +203,11 @@ Add-ProductProjects -ProductFolder "Umbraco.Automate.Slack" -SolutionFolder "Sla
 
 # Step 8: Add demo site to solution
 Write-Host "Adding demo site to solution..." -ForegroundColor Green
-dotnet sln "Umbraco.Automate.local.slnx" add "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+dotnet sln "Umbraco.Automate.local.slnx" add "$DemoSiteDir/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
 
 # Step 7: Add project references to demo site
 Write-Host "Adding project references to demo site..." -ForegroundColor Green
-$demoProject = "demo/Umbraco.Automate.DemoSite/Umbraco.Automate.DemoSite.csproj"
+$demoProject = "$DemoSiteDir/Umbraco.Automate.DemoSite.csproj"
 
 # Core references (Startup + Web.StaticAssets)
 dotnet add $demoProject reference "Umbraco.Automate/src/Umbraco.Automate.Startup/Umbraco.Automate.Startup.csproj"
@@ -186,7 +227,7 @@ Write-Host ""
 Write-Host "=== Setup Complete! ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "Solution: Umbraco.Automate.local.slnx" -ForegroundColor Cyan
-Write-Host "Demo site: demo/Umbraco.Automate.DemoSite" -ForegroundColor Cyan
+Write-Host "Demo site: $DemoSiteDir" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Credentials:" -ForegroundColor Yellow
 Write-Host "  Email: admin@example.com"

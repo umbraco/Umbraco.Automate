@@ -5,6 +5,49 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.0.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@18.0.0-beta...Umbraco.Automate@18.0.0) (2026-07-08)
+
+### ⚠ BREAKING CHANGE
+
+* **action:** automations whose HTTP Request steps fetch responses
+larger than 10 MB now fail with a clear error instead of succeeding.
+Raise MaxHttpResponseBodyBytes in configuration to restore the old
+behaviour for larger payloads.
+
+### feat
+
+* **action:** Cap HTTP request response body size at a configurable limit ([58f8df5](https://github.com/umbraco/Umbraco.Automate/commit/58f8df59ebc23e13a39f8d79e8490d818cf61168))
+* **api:** Add cross-automation runs listing endpoint ([b6c8533](https://github.com/umbraco/Umbraco.Automate/commit/b6c8533b34833bc3f60858dfa0e418a7ae882f46))
+* **api:** Scope run metrics endpoints to accessible workspaces ([1d4f268](https://github.com/umbraco/Umbraco.Automate/commit/1d4f2680380f25de348e05b89583545d657f12e2))
+* **frontend:** Live-refresh runs views and use bulk runs endpoint ([eb00bcc](https://github.com/umbraco/Umbraco.Automate/commit/eb00bccd8e6b8ad04fe10b0f4d4b721a3feb8495))
+* **frontend:** Load Overview dashboard from bulk runs and metrics endpoints ([174802d](https://github.com/umbraco/Umbraco.Automate/commit/174802d2fe1419263d7d807bc69082c3984bee55))
+
+### fix
+
+* **action:** Render Log Message log level as a dropdown ([c63b878](https://github.com/umbraco/Umbraco.Automate/commit/c63b8785bf3f7527c5ef6e8ea2223149cff65f98)), closes [#82](https://github.com/umbraco/Umbraco.Automate/issues/82)
+* **api:** Enforce workspace authorization and identity on the approval gate ([e25f968](https://github.com/umbraco/Umbraco.Automate/commit/e25f9688c97e23aeac75fc65a18592b4def4913f)), closes [#70](https://github.com/umbraco/Umbraco.Automate/issues/70)
+* **api:** Prevent duplicate 403 response breaking OpenAPI generation ([0b29d17](https://github.com/umbraco/Umbraco.Automate/commit/0b29d17ed895b416a8dec43ef3104850c70ecb86))
+* **api:** Stabilise runs paging with an Id tiebreaker ([44cb2c9](https://github.com/umbraco/Umbraco.Automate/commit/44cb2c9a4206fe3c47135a85cf78ffb3f7a4aab3)), closes [#139](https://github.com/umbraco/Umbraco.Automate/issues/139)
+* **core:** Address code review findings for loop blob optimisation ([3876da6](https://github.com/umbraco/Umbraco.Automate/commit/3876da6d5a1beadcdb92d7ef5c2477d14bc05bb8))
+* **core:** Address code review findings for run cancellation middleware ([0dc7d64](https://github.com/umbraco/Umbraco.Automate/commit/0dc7d64c806f459c509907c495585681edc82afe))
+* **core:** Address code review findings for step output offload ([5d31a74](https://github.com/umbraco/Umbraco.Automate/commit/5d31a740b481800bba5249fd266603926e8d7aad))
+* **core:** Guard against duplicate execution pointers and add a real distributed lock ([9093b8a](https://github.com/umbraco/Umbraco.Automate/commit/9093b8a49f0a9835440499dd891bf55b8b2d6a1b)), closes [#144](https://github.com/umbraco/Umbraco.Automate/issues/144)
+* **core:** Isolate run-status cache write from DB read ([2b1e956](https://github.com/umbraco/Umbraco.Automate/commit/2b1e956074595c74aa7609119b902e47fc30799a)), closes [#127](https://github.com/umbraco/Umbraco.Automate/issues/127)
+* **core:** Pass StepOutputHydrationCache to ForEachCollectionCache in tests ([f7bb484](https://github.com/umbraco/Umbraco.Automate/commit/f7bb4847926431f1e5ba16b2e33232b28f4c95f1)), closes [#129](https://github.com/umbraco/Umbraco.Automate/issues/129)
+* **core:** Stop QueueType.Index items being misrouted to the event topic ([ec551d4](https://github.com/umbraco/Umbraco.Automate/commit/ec551d4f62a723eff29f3acefbe77b553f40dd3c))
+* **core:** Stop workflow execution when a run is cancelled ([4866b15](https://github.com/umbraco/Umbraco.Automate/commit/4866b150f262373ec07135a299175dc5eda7d048))
+* **frontend:** Preserve automation folder on save and fix move modal ([5a948eb](https://github.com/umbraco/Umbraco.Automate/commit/5a948eb670781621e8988bc493fd68e4e34c6ffc)), closes [#118](https://github.com/umbraco/Umbraco.Automate/issues/118)
+* **frontend:** Refresh runs list on lifecycle actions and harden polling ([ab2ec2a](https://github.com/umbraco/Umbraco.Automate/commit/ab2ec2a1d4f9971910e5a2df9fe1775097657001)), closes [#139](https://github.com/umbraco/Umbraco.Automate/issues/139) [#88](https://github.com/umbraco/Umbraco.Automate/issues/88)
+* **trigger:** Make content trigger cultures survive entity cloning (#113) ([50d91ee](https://github.com/umbraco/Umbraco.Automate/commit/50d91ee9fc7daf252468a6f6eebc1f7c88cbc498)), closes [#113](https://github.com/umbraco/Umbraco.Automate/issues/113)
+
+### perf
+
+* **api:** Memoize automation lookups when listing pending approvals ([08d390a](https://github.com/umbraco/Umbraco.Automate/commit/08d390aca78c9b9d1c021375a1a9257d9dec85b9))
+* **core:** Halve StepRun DB round-trips per step (single-round-trip writes) ([75b8a19](https://github.com/umbraco/Umbraco.Automate/commit/75b8a19ad30ba10dfcac8c7b675053b96e71b34d))
+* **core:** Normalize workflow execution pointers into dedicated table ([7b855d6](https://github.com/umbraco/Umbraco.Automate/commit/7b855d6fe9627daed8c611e24915c3982e9c7e18))
+* **core:** Offload large step outputs from the per-pass workflow blob ([3ab1e45](https://github.com/umbraco/Umbraco.Automate/commit/3ab1e4521a8e749d0c73dd6e92c28cb5b5defb7d))
+* **core:** Stop loop iterations growing the persisted workflow blob ([ff0bc71](https://github.com/umbraco/Umbraco.Automate/commit/ff0bc716dc9f3a2c4e903f8e58c4ddad73c18057))
+
 ## [18.0.0-beta](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.0.0-beta...Umbraco.Automate@18.0.0-beta) (2026-06-24)
 
 > This release targets **Umbraco CMS 18**. It migrates the backoffice to the v18 API, the Management API off Swashbuckle, and the toolchain to Node 24.

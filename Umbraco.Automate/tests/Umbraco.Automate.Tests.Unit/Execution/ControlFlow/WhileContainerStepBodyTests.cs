@@ -14,14 +14,18 @@ namespace Umbraco.Automate.Tests.Unit.Execution.ControlFlow;
 
 public class WhileContainerStepBodyTests
 {
+    private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
 
     public WhileContainerStepBodyTests()
     {
         var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
+        _hydrationCache = new StepOutputHydrationCache(_runRepo.Object);
+        _collectionCache = new ForEachCollectionCache(evaluator, _hydrationCache);
         _conditionEvaluator = new ConditionEvaluator(evaluator);
-        _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
+        _runRepo.Setup(r => r.AddStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
     }
 
@@ -130,7 +134,7 @@ public class WhileContainerStepBodyTests
     public void Run_TracksStepRunOnExit()
     {
         StepRun? saved = null;
-        _runRepo.Setup(r => r.SaveStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
+        _runRepo.Setup(r => r.AddStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
             .Callback<StepRun, CancellationToken>((sr, _) => saved = sr)
             .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
 
@@ -142,15 +146,90 @@ public class WhileContainerStepBodyTests
         saved.Status.ShouldBe(StepRunStatus.Completed);
     }
 
-    private WhileContainerStepBody CreateBody(
-        WhileControlFlowSettings settings,
-        IReadOnlyList<ContainerBranchEdge>? branchEdges = null)
+    [Fact]
+    public void Run_ReEntry_PrunesCompletedIterationScope()
     {
         StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.while").WithName("While");
+        var completedScope = $"{stepConfig.Id:N}:0";
+        var nestedScope = $"{completedScope}/{Guid.NewGuid():N}:1";
+
+        var data = CreateData();
+        data.IterationStepOutputs[completedScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-0" } };
+        data.IterationStepOutputs[nestedScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "nested" } };
+        data.IterationLastCompletedStepId[completedScope] = Guid.NewGuid();
+
+        var body = CreateBody(AlwaysTrueSettings(), stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
+        var result = body.Run(CreateContext(persistenceData: persistence, data: data));
+
+        // Loops again (iteration 1) and the drained iteration 0's scope is gone.
+        result.BranchValues.ShouldNotBeNull();
+        data.IterationStepOutputs.ShouldBeEmpty();
+        data.IterationLastCompletedStepId.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_ReEntry_MaxIterationsReached_PrunesFinalIterationScope()
+    {
+        // Pruning of the just-drained iteration happens before the MaxIterations check,
+        // so the final iteration's scope must not survive loop termination either.
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.while").WithName("While");
+        var completedScope = $"{stepConfig.Id:N}:0";
+
+        var data = CreateData();
+        data.IterationStepOutputs[completedScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-0" } };
+        data.IterationLastCompletedStepId[completedScope] = Guid.NewGuid();
+
+        var settings = AlwaysTrueSettings();
+        settings.MaxIterations = 1;
+
+        var body = CreateBody(settings, stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
+        var result = body.Run(CreateContext(persistenceData: persistence, data: data));
+
+        result.BranchValues.ShouldBeEmpty();
+        result.Proceed.ShouldBeTrue();
+        data.IterationStepOutputs.ShouldNotContainKey(completedScope);
+        data.IterationLastCompletedStepId.ShouldNotContainKey(completedScope);
+    }
+
+    [Fact]
+    public void Run_ReEntry_ConditionBecomesFalse_PrunesFinalIterationScope()
+    {
+        // Same pruning-before-termination guarantee, but reached via the condition
+        // evaluating false rather than the MaxIterations guard.
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.while").WithName("While");
+        var completedScope = $"{stepConfig.Id:N}:0";
+
+        var data = CreateData();
+        data.IterationStepOutputs[completedScope] = new() { [Guid.NewGuid()] = new() { ["message"] = "iter-0" } };
+        data.IterationLastCompletedStepId[completedScope] = Guid.NewGuid();
+
+        var body = CreateBody(AlwaysFalseSettings(), stepConfig: stepConfig);
+        var persistence = new IteratorPersistenceData { ChildrenActive = true, Index = 1 };
+        var result = body.Run(CreateContext(persistenceData: persistence, data: data));
+
+        result.BranchValues.ShouldBeEmpty();
+        result.Proceed.ShouldBeTrue();
+        data.IterationStepOutputs.ShouldNotContainKey(completedScope);
+        data.IterationLastCompletedStepId.ShouldNotContainKey(completedScope);
+    }
+
+    private WhileContainerStepBody CreateBody(
+        WhileControlFlowSettings settings,
+        IReadOnlyList<ContainerBranchEdge>? branchEdges = null,
+        StepConfiguration? stepConfig = null)
+    {
+        stepConfig ??= new StepConfigurationBuilder()
             .WithActionAlias("umbracoAutomate.while").WithName("While");
         return new WhileContainerStepBody(
             stepConfig,
             settings,
+            _collectionCache,
+            _hydrationCache,
             _conditionEvaluator,
             _runRepo.Object,
             branchEdges ?? Array.Empty<ContainerBranchEdge>());
@@ -172,16 +251,18 @@ public class WhileContainerStepBodyTests
         },
     };
 
-    private static IStepExecutionContext CreateContext(object? persistenceData = null)
+    private static AutomationWorkflowData CreateData() => new()
+    {
+        RunId = Guid.NewGuid(),
+        AutomationId = Guid.NewGuid(),
+        TriggerOutput = [],
+    };
+
+    private static IStepExecutionContext CreateContext(object? persistenceData = null, AutomationWorkflowData? data = null)
     {
         var context = new Mock<IStepExecutionContext>();
         var workflow = new Mock<WorkflowInstance>();
-        workflow.Object.Data = new AutomationWorkflowData
-        {
-            RunId = Guid.NewGuid(),
-            AutomationId = Guid.NewGuid(),
-            TriggerOutput = [],
-        };
+        workflow.Object.Data = data ?? CreateData();
         context.Setup(c => c.Workflow).Returns(workflow.Object);
         context.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
         context.Setup(c => c.PersistenceData).Returns(persistenceData!);

@@ -28,6 +28,8 @@ internal sealed class ActionStepBody : StepBodyAsync
     private readonly IAction _action;
     private readonly ActionMiddlewarePipeline _pipeline;
     private readonly BindingEvaluator _bindingEvaluator;
+    private readonly ForEachCollectionCache _collectionCache;
+    private readonly StepOutputHydrationCache _hydrationCache;
     private readonly SettingsBindingResolver _settingsBindingResolver;
     private readonly IAutomationRunRepository _runRepository;
     private readonly IConnectionService _connectionService;
@@ -42,6 +44,8 @@ internal sealed class ActionStepBody : StepBodyAsync
         IAction action,
         ActionMiddlewarePipeline pipeline,
         BindingEvaluator bindingEvaluator,
+        ForEachCollectionCache collectionCache,
+        StepOutputHydrationCache hydrationCache,
         SettingsBindingResolver settingsBindingResolver,
         IAutomationRunRepository runRepository,
         IConnectionService connectionService,
@@ -55,6 +59,8 @@ internal sealed class ActionStepBody : StepBodyAsync
         _action = action;
         _pipeline = pipeline;
         _bindingEvaluator = bindingEvaluator;
+        _collectionCache = collectionCache;
+        _hydrationCache = hydrationCache;
         _settingsBindingResolver = settingsBindingResolver;
         _runRepository = runRepository;
         _connectionService = connectionService;
@@ -95,7 +101,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     {
         // Build binding data context: trigger output + all prior step outputs + loop iteration.
         var iterationContext = context.Item as ForEachIterationContext;
-        var bindingData = BindingDataBuilder.Build(data, iterationContext);
+        var bindingData = BindingDataBuilder.Build(data, iterationContext, _collectionCache, _hydrationCache, cancellationToken);
 
         // Setup phase — resolve inputs, settings, bindings, and connections before we
         // invoke the middleware pipeline. These operations can throw on misconfiguration
@@ -172,7 +178,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             StartedUtc = DateTime.UtcNow,
         };
 
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
 
         // Execute through the middleware pipeline with the timeout-linked token.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
@@ -183,7 +189,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             case ActionSuspension.WaitForEvent wait:
                 stepRun.Status = StepRunStatus.WaitingForInput;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
-                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+                await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
                 _logger.LogInformation(
                     "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
@@ -194,7 +200,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             case ActionSuspension.Sleep sleep:
                 stepRun.Status = StepRunStatus.Sleeping;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
-                await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+                await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
                 _logger.LogInformation(
                     "Step {StepId} is sleeping for {Duration}",
@@ -239,7 +245,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
         }
 
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
         // Pipeline-caught failures: decide retry/terminate/skip based on the configured
         // ErrorBehavior (applied via WorkflowCore on the WorkflowStep) and the classifier.
@@ -353,7 +359,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ErrorCategory = category,
         };
 
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
         _metrics.StepFailed(_action.Alias);
 
         return DecideFailureOutcome(exception, category, context);
@@ -430,7 +436,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         if (decision?.Outcome == ApprovalOutcome.Approved)
         {
             stepRun.Status = StepRunStatus.Completed;
-            await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+            await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
             _metrics.StepExecuted(_action.Alias);
             return ExecutionResult.Next();
         }
@@ -442,7 +448,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ? $"Approval rejected: {decision.Comment ?? "No reason provided"}"
             : "Approval step resumed without a valid decision";
         stepRun.ErrorCategory = StepRunErrorCategory.Cancelled;
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
         if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
         {
@@ -478,7 +484,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         }
 
         _metrics.StepExecuted(_action.Alias);
-        await _runRepository.SaveStepRunAsync(stepRun, cancellationToken);
+        await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
         return ExecutionResult.Next();
     }
@@ -497,10 +503,15 @@ internal sealed class ActionStepBody : StepBodyAsync
         var outputJson = JsonSerializer.Serialize(outputData, Dispatch.JsonOptions.Default);
         stepRun.OutputData = outputJson;
 
-        // Deserialize to a case-insensitive dictionary with plain .NET types (not JsonElement)
-        // so values survive the WorkflowCore Newtonsoft.Json persistence round-trip and are
-        // accessible to BindingEvaluator.ResolvePath.
-        var unwrapped = Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
+        // Small outputs are deserialized to a case-insensitive dictionary with plain .NET
+        // types (not JsonElement) so values survive the WorkflowCore Newtonsoft.Json
+        // persistence round-trip and are accessible to BindingEvaluator.ResolvePath.
+        // Large outputs would be re-serialized into the workflow instance blob on every
+        // execution pass, so only a marker referencing the step run (whose OutputData above
+        // is written once) goes into the workflow data — binding evaluation hydrates it on
+        // demand via StepOutputHydrationCache.
+        var unwrapped = StepOutputReference.CreateInlineOrMarker(
+            outputJson, stepRun.Id, _executionOptions.Value.MaxInlineOutputBytes);
 
         // Write to the run-global table so steps after the loop (and external observers)
         // can still read the most recent value. Inside an iteration the global entry is

@@ -28,9 +28,9 @@ public sealed class ContentPublishedTriggerOutput : IContentScopedTriggerOutput
     public string? ContentTypeAlias { get; init; }
 
     /// <summary>
-    /// Gets the cultures that were published in this event.
-    /// Null for invariant content; an empty array indicates a variant content
-    /// publish where no culture variants were dirty (rare, but possible).
+    /// Gets the cultures published in this event. Null for invariant content.
+    /// Reports the cultures that changed where that is determinable, and falls back to all
+    /// currently-published cultures otherwise (e.g. bulk/branch publishes).
     /// </summary>
     public string[]? Cultures { get; init; }
 

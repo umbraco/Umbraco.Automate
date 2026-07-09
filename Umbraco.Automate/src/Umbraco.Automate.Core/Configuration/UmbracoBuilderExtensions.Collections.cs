@@ -10,6 +10,7 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.HealthChecks;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Conditions;
@@ -63,6 +64,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:RateLimiting"));
         builder.Services.Configure<CircuitBreakerOptions>(
             builder.Config.GetSection("Umbraco:Automate:CircuitBreaker"));
+        builder.Services.Configure<WorkflowLockOptions>(
+            builder.Config.GetSection("Umbraco:Automate:WorkflowLock"));
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -200,17 +203,34 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationOriginAccessor, AutomationOriginAccessor>();
         builder.Services.AddSingleton<IExecutionContextAccessor, ExecutionContextAccessor>();
         builder.Services.AddSingleton<IExecutionNodeEligibility, ExecutionNodeEligibility>();
+        builder.Services.AddSingleton<ForEachCollectionCache>();
+        builder.Services.AddSingleton<StepOutputHydrationCache>();
         builder.Services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         builder.Services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
         builder.Services.AddSingleton<IStepErrorClassifier, DefaultStepErrorClassifier>();
         builder.Services.AddSingleton<RunFinalizer>();
 
-        // WorkflowCore engine with outbox-backed queue.
+        // WorkflowCore engine with outbox-backed queue and an EF-backed distributed lock.
+        // Wired via UseQueueProvider/UseDistributedLockManager (rather than raw AddSingleton
+        // calls before AddWorkflow()) because AddWorkflow() unconditionally re-registers its own
+        // default IQueueProvider/IDistributedLockProvider afterward — under last-registration-wins
+        // DI semantics, a prior plain AddSingleton<IQueueProvider> would be silently shadowed.
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<OutboxQueueProvider>();
-        builder.Services.AddSingleton<IQueueProvider>(sp => sp.GetRequiredService<OutboxQueueProvider>());
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
         builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
-        builder.Services.AddWorkflow();
+        builder.Services.AddSingleton<WorkflowLockProvider>();
+        builder.Services.AddWorkflow(cfg =>
+        {
+            cfg.UseQueueProvider(sp => sp.GetRequiredService<OutboxQueueProvider>());
+            cfg.UseDistributedLockManager(sp => sp.GetRequiredService<WorkflowLockProvider>());
+        });
+        // Per-step cooperative cancellation: TerminateWorkflow alone races the executor's
+        // workflow lock and silently fails while a run is actively executing. AddMemoryCache
+        // is idempotent (TryAdd) — this backs the short-TTL run-status cache the middleware
+        // uses to avoid a DB read on every step of every run.
+        builder.Services.AddMemoryCache();
+        builder.Services.AddWorkflowStepMiddleware<RunCancellationStepMiddleware>();
         builder.Services.AddSingleton<WorkflowDefinitionRecovery>();
         builder.Services.AddHostedService<WorkflowHostLifecycle>();
 

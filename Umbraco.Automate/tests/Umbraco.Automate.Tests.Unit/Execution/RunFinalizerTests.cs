@@ -1,7 +1,9 @@
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging.Abstractions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Scoping;
@@ -40,11 +42,15 @@ public class RunFinalizerTests
         var eventMessagesFactory = new Mock<IEventMessagesFactory>();
         eventMessagesFactory.Setup(f => f.Get()).Returns(new EventMessages());
 
+        var collectionCache = new ForEachCollectionCache(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)), new StepOutputHydrationCache(_runRepo.Object));
+
         _finalizer = new RunFinalizer(
             _runRepo.Object,
+            new StepOutputHydrationCache(_runRepo.Object),
             scopeProvider.Object,
             eventMessagesFactory.Object,
             metrics,
+            collectionCache,
             NullLogger<RunFinalizer>.Instance);
     }
 
