@@ -26,10 +26,9 @@
   </ItemGroup>
 
   <!-- Inter-product (Umbraco.Automate) -->
-  <!-- Prerelease lower bound so the 17.0.0-beta.1 packages satisfy each other's ranges -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[17.0.0-beta.1, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[17.0.0-beta.1, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[17.0.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[17.0.0, 17.999.999)" />
   </ItemGroup>
 
   <!-- WorkflowCore (automation engine) -->
