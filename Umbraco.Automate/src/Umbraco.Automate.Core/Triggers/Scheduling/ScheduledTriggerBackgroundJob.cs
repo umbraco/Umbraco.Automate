@@ -165,11 +165,16 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                     "Dispatching scheduled trigger for automation {AutomationId} (CRON: {CronExpression}, TimeZone: {TimeZoneId}, Timing: {Timing}, Offset: {Offset})",
                     automationId, cronExpression, timeZone.Id, timing, offset);
 
-                var triggerEvent = new TriggerEvent
+                var triggerEvent = new TriggerEvent<ScheduledTriggerOutput>
                 {
                     TriggerAlias = automation.Trigger.TriggerAlias,
                     InitiatorType = TriggerInitiatorType.Scheduled,
                     IdempotencyKey = $"scheduled:{automationId}:{nextOccurrence:O}",
+                    Output = new ScheduledTriggerOutput
+                    {
+                        FiredAtUtc = dueAt,
+                        CronExpression = cronExpression,
+                    },
                 };
 
                 await dispatcher.DispatchAsync(triggerEvent, CancellationToken.None);
