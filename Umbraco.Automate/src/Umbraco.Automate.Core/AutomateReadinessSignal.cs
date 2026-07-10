@@ -19,7 +19,16 @@ public sealed class AutomateReadinessSignal
     public void Signal() => _tcs.TrySetResult();
 
     /// <summary>
+    /// Signals that startup migrations failed, so the database will never become ready.
+    /// Callers waiting via <see cref="WaitAsync"/> fail fast with <see cref="AutomateNotReadyException"/>
+    /// instead of waiting indefinitely for a signal that will never arrive.
+    /// </summary>
+    public void SignalFailed(Exception migrationFailure)
+        => _tcs.TrySetException(new AutomateNotReadyException(migrationFailure));
+
+    /// <summary>
     /// Waits until the database is ready, or until the cancellation token is triggered.
+    /// Throws <see cref="AutomateNotReadyException"/> if startup migrations failed.
     /// </summary>
     public Task WaitAsync(CancellationToken cancellationToken = default)
         => _tcs.Task.WaitAsync(cancellationToken);
