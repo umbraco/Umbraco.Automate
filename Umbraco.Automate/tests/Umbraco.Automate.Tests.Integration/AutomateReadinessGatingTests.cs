@@ -84,6 +84,28 @@ public class AutomateReadinessGatingTests : IDisposable
         await saveTask.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
+    [Fact]
+    public async Task SaveAsync_ShouldFailFast_WhenStartupMigrationsFail()
+    {
+        var readinessSignal = new AutomateReadinessSignal();
+        var repository = new EFCoreAutomationRepository(
+            new TestDbContextFactory(() => CreateContext(readinessSignal)),
+            CreateAutomationFactory());
+
+        Task<Umbraco.Automate.Core.Automations.Automation> saveTask = repository.SaveAsync(new AutomationBuilder()
+            .WithName("Migration failure")
+            .WithAlias("migration-failure-alias")
+            .Build());
+
+        readinessSignal.SignalFailed(new InvalidOperationException("Simulated migration failure"));
+
+        var exception = await Should.ThrowAsync<AutomateNotReadyException>(
+            () => saveTask.WaitAsync(TimeSpan.FromSeconds(5)));
+
+        exception.InnerException.ShouldBeOfType<InvalidOperationException>()
+            .Message.ShouldBe("Simulated migration failure");
+    }
+
     public void Dispose()
     {
         _keepAliveConnection.Close();

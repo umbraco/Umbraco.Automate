@@ -15,6 +15,8 @@ namespace Umbraco.Automate.Persistence;
 /// <c>RunAutomateMigrationNotificationHandler</c>) — that context must be able to write
 /// (via <c>Database.MigrateAsync</c>, which bypasses <see cref="SavingChangesAsync"/> entirely)
 /// before the signal it is responsible for setting has fired.
+/// If startup migrations fail, the signal is set to a faulted state and any save waiting on it
+/// throws <see cref="Core.AutomateNotReadyException"/> immediately rather than hanging forever.
 /// </remarks>
 internal sealed class AutomateReadinessInterceptor : SaveChangesInterceptor
 {
