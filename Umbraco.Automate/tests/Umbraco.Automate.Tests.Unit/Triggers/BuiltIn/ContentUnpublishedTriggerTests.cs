@@ -144,6 +144,33 @@ public class ContentUnpublishedTriggerTests
         output.Cultures.ShouldBe(new[] { "en-US", "fr-FR" }, ignoreOrder: true);
     }
 
+    [Fact]
+    public void MapEvent_VariantContent_PrefersNotificationUnpublishedCultures()
+    {
+        // The per-document UnpublishedCultures delta the CMS now reports (PR #23313) must win over
+        // the "all currently-published cultures" heuristic (which would report en-US + fr-FR here).
+        var key = Guid.NewGuid();
+        var content = CreateContent(
+            key,
+            "Page",
+            "blogPost",
+            variations: ContentVariation.Culture,
+            publishCultureInfos: ContentPublishedTriggerTests.BuildCultureInfos(clean: new[] { "en-US", "fr-FR" }));
+
+        var unpublishedCultures = new Dictionary<Guid, IReadOnlyCollection<string>>
+        {
+            [key] = new[] { "fr-FR" },
+        };
+        var notification = new ContentUnpublishedNotification(new[] { content }, new EventMessages(), unpublishedCultures);
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentUnpublishedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBe(new[] { "fr-FR" });
+    }
+
     private static IContent CreateContent(
         Guid key,
         string name,
