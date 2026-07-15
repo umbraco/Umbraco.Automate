@@ -37,7 +37,7 @@ public sealed class ContentBatchPublishedTrigger
             ContentName = content.Name,
             ContentTypeKey = content.ContentType?.Key,
             ContentTypeAlias = content.ContentType?.Alias,
-            Cultures = ContentCultureHelpers.GetPublishedCultures(content),
+            Cultures = ContentCultureHelpers.GetPublishedCultures(content, notification.PublishedCultures),
         }).ToList();
 
         // Hash the (key, publishedVersionId) tuples so a duplicate notification for the same

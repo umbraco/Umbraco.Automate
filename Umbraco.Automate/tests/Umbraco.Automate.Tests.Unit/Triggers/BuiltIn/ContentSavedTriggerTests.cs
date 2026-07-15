@@ -181,6 +181,33 @@ public class ContentSavedTriggerTests
         output.Cultures.ShouldBe(new[] { "en-US" });
     }
 
+    [Fact]
+    public void MapEvent_VariantContent_PrefersNotificationSavedCultures()
+    {
+        // The per-document SavedCultures delta the CMS now reports (PR #23313) must win over the
+        // change-tracking heuristic (which would report "en-US" here).
+        var key = Guid.NewGuid();
+        var content = CreateContent(
+            key,
+            "Page",
+            "blogPost",
+            variations: ContentVariation.Culture,
+            cultureInfos: ContentPublishedTriggerTests.BuildCultureInfos(dirty: new[] { "en-US" }));
+
+        var savedCultures = new Dictionary<Guid, IReadOnlyCollection<string>>
+        {
+            [key] = new[] { "da-DK" },
+        };
+        var notification = new ContentSavedNotification(new[] { content }, new EventMessages(), savedCultures);
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentSavedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBe(new[] { "da-DK" });
+    }
+
     internal static IContent CreateContent(
         Guid key,
         string name,
