@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Web.Api.Management.Run.Models;
 using Umbraco.Cms.Core.Mapping;
@@ -14,6 +15,7 @@ public class RunMapDefinition : IMapDefinition
     {
         mapper.Define<AutomationRun, AutomationRunResponseModel>((_, _) => new AutomationRunResponseModel(), MapToResponse);
         mapper.Define<StepRun, StepRunResponseModel>((_, _) => new StepRunResponseModel(), MapToStepRunResponse);
+        mapper.Define<ActionLogEntry, StepRunLogEntryResponseModel>((_, _) => new StepRunLogEntryResponseModel(), MapToLogEntryResponse);
         mapper.Define<AutomationRunListItem, AutomationRunListItemResponseModel>((_, _) => new AutomationRunListItemResponseModel(), MapToListItemResponse);
     }
 
@@ -59,5 +61,14 @@ public class RunMapDefinition : IMapDefinition
         target.Error = source.Error;
         target.RetryCount = source.RetryCount;
         target.DurationMs = source.Duration?.TotalMilliseconds;
+        target.LogEntries = context.MapEnumerable<ActionLogEntry, StepRunLogEntryResponseModel>(source.LogEntries);
+    }
+
+    // Umbraco.Code.MapAll
+    private static void MapToLogEntryResponse(ActionLogEntry source, StepRunLogEntryResponseModel target, MapperContext context)
+    {
+        target.TimestampUtc = source.TimestampUtc;
+        target.Level = source.Level;
+        target.Message = source.Message;
     }
 }

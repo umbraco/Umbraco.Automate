@@ -165,6 +165,8 @@ internal sealed class ActionStepBody : StepBodyAsync
             Connection = connection,
             Action = _action,
             BindingData = bindingData,
+            MinimumLogLevel = _executionOptions.Value.MinimumLogLevel,
+            MaxLogEntries = _executionOptions.Value.MaxLogEntriesPerStep,
         };
 
         // Create and persist step run.
@@ -182,6 +184,13 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         // Execute through the middleware pipeline with the timeout-linked token.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
+
+        // Capture any log entries the action recorded, regardless of outcome. Reads from
+        // the same ActionContext instance the pipeline just executed — ErrorHandlingMiddleware
+        // catches exceptions on this same context, so entries recorded before a throw survive
+        // even for a Failed result. Every branch below ends in an UpdateStepRunAsync call, so
+        // this rides along with no extra DB round trip.
+        stepRun.LogEntries = actionContext.LogEntries.ToList();
 
         // Handle suspension: the action needs the workflow to pause.
         switch (result.Suspension)

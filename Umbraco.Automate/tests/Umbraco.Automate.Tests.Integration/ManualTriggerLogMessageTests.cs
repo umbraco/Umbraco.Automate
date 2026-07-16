@@ -202,6 +202,10 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         var stepRun = completedRun.StepRuns.First();
         stepRun.ActionAlias.ShouldBe("umbracoAutomate.logMessage");
         stepRun.Status.ShouldBe(StepRunStatus.Completed);
+
+        var logEntry = stepRun.LogEntries.ShouldHaveSingleItem();
+        logEntry.Level.ShouldBe(ActionLogLevel.Info);
+        logEntry.Message.ShouldBe("Hello from smoke test!");
     }
 
     private async Task<(IEnumerable<AutomationRun> Items, int Total)> WaitForRunAsync(

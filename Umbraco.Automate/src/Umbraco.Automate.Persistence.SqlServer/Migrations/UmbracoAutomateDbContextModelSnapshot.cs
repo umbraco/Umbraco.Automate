@@ -304,6 +304,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.Property<string>("InputData")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("LogEntries")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("OutputData")
                         .HasColumnType("nvarchar(max)");
 
