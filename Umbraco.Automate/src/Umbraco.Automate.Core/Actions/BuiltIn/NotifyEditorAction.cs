@@ -92,6 +92,8 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
 
         await _editorNotifier.NotifyAsync(message, cancellationToken);
 
+        context.LogInfo($"Notified editor of content {contentKey} — \"{title}\": {body}");
+
         return Success(new NotifyEditorOutput
         {
             ContentKey = contentKey
