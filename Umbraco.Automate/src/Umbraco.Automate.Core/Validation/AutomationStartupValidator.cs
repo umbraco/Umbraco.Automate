@@ -38,7 +38,13 @@ internal sealed class AutomationStartupValidator : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await _readinessSignal.WaitAsync(stoppingToken);
+        if (!await _readinessSignal.WaitUntilReadyAsync(stoppingToken))
+        {
+            _logger.LogError(
+                "Automate startup migrations failed; startup automation validation was skipped. " +
+                "Resolve the migration failure and restart.");
+            return;
+        }
 
         try
         {
