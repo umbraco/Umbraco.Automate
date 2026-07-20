@@ -93,6 +93,8 @@ This creates:
 - `Umbraco.Automate.local.slnx` - Unified solution with all products
 - `demos/v18/Umbraco.Automate.DemoSite/` - Umbraco instance with all packages referenced
 
+The demo site is configured to share the CMS's SQLite database (`Umbraco:Automate:UseNamedConnectionString` is set to `umbracoDbDSN` in `appsettings.Development.json`), so no separate Automate database setup is required.
+
 After running the script, build the frontend and backend:
 
 ```bash
