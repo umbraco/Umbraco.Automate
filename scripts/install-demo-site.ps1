@@ -163,6 +163,23 @@ $composerDestPath = "$DemoSiteDir\Composers\NamedPipeListenerComposer.cs"
 New-Item -ItemType Directory -Path (Split-Path $composerDestPath) -Force | Out-Null
 Copy-Item -Path $composerSourcePath -Destination $composerDestPath -Force
 
+# Step 3.4: Point Umbraco.Automate at the CMS database
+# Automate needs its own connection string (defaults to umbracoAutomateDbDSN) or it throws
+# on first run. For the demo we reuse the CMS SQLite connection (umbracoDbDSN) via
+# UseNamedConnectionString so a single database backs both CMS and Automate. This must be
+# configured before the first run, otherwise startup fails.
+Write-Host "Configuring Umbraco.Automate to share the CMS database..." -ForegroundColor Green
+$devSettingsPath = "$DemoSiteDir\appsettings.Development.json"
+$devSettings = Get-Content $devSettingsPath -Raw | ConvertFrom-Json
+if (-not $devSettings.Umbraco) {
+    $devSettings | Add-Member -NotePropertyName "Umbraco" -NotePropertyValue ([PSCustomObject]@{})
+}
+if (-not $devSettings.Umbraco.Automate) {
+    $devSettings.Umbraco | Add-Member -NotePropertyName "Automate" -NotePropertyValue ([PSCustomObject]@{})
+}
+$devSettings.Umbraco.Automate | Add-Member -NotePropertyName "UseNamedConnectionString" -NotePropertyValue "umbracoDbDSN" -Force
+$devSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $devSettingsPath -Encoding utf8 -Force
+
 # Step 4: Create unified solution
 Write-Host "Creating unified solution..." -ForegroundColor Green
 dotnet new sln -n "Umbraco.Automate.local" --force
