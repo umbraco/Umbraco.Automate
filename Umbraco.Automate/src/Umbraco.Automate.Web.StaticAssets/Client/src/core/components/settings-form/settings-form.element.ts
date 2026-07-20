@@ -160,6 +160,17 @@ export class UaSettingsFormElement extends UmbLitElement {
             config.push({ alias: "bindingSources", value: this.bindingSources });
         }
 
+        // Mask sensitive fields that use the default TextBox by switching the
+        // underlying input to type="password". Respects an explicit inputType
+        // already supplied via editorConfig.
+        if (
+            field.isSensitive &&
+            this.#resolveEditorAlias(field) === "Umb.PropertyEditorUi.TextBox" &&
+            !config.some((c) => c.alias === "inputType")
+        ) {
+            config.push({ alias: "inputType", value: "password" });
+        }
+
         return config;
     }
 
