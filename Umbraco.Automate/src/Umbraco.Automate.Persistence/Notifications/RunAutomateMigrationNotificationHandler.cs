@@ -55,10 +55,10 @@ public class RunAutomateMigrationNotificationHandler
 
             await using UmbracoAutomateDbContext dbContext = new UmbracoAutomateDbContext(optionsBuilder.Options);
 
-            IEnumerable<string> pending = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
-            if (pending.Any())
+            List<string> pending = (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
+            if (pending.Count > 0)
             {
-                _logger.LogInformation("Running {Count} pending Automate migrations", pending.Count());
+                _logger.LogInformation("Running {Count} pending Automate migrations", pending.Count);
                 await dbContext.Database.MigrateAsync(cancellationToken);
                 _logger.LogInformation("Automate migrations completed successfully");
             }

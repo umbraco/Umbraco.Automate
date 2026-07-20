@@ -32,4 +32,27 @@ public sealed class AutomateReadinessSignal
     /// </summary>
     public Task WaitAsync(CancellationToken cancellationToken = default)
         => _tcs.Task.WaitAsync(cancellationToken);
+
+    /// <summary>
+    /// Waits until the database is ready. Returns <c>true</c> once ready, or <c>false</c> if startup
+    /// migrations failed and the database will never become ready. Only cancellation throws.
+    /// </summary>
+    /// <remarks>
+    /// Intended for background services that should stop gracefully rather than let
+    /// <see cref="AutomateNotReadyException"/> escape <c>ExecuteAsync</c> — an unhandled exception
+    /// there tears down the whole host under the default <c>BackgroundServiceExceptionBehavior.StopHost</c>.
+    /// Database writes that must fail loudly should keep using <see cref="WaitAsync"/>.
+    /// </remarks>
+    public async Task<bool> WaitUntilReadyAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _tcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (AutomateNotReadyException)
+        {
+            return false;
+        }
+    }
 }

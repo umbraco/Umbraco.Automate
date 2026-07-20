@@ -37,4 +37,18 @@ internal sealed class AutomateReadinessInterceptor : SaveChangesInterceptor
 
         return await base.SavingChangesAsync(eventData, result, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    public override InterceptionResult<int> SavingChanges(
+        DbContextEventData eventData,
+        InterceptionResult<int> result)
+    {
+        // Gate the synchronous save path too, so a SaveChanges() call can't slip a write through
+        // ungated. In steady state the signal is already completed, so this returns instantly and
+        // never blocks — it only ever waits during the pre-ready startup window, and throws
+        // AutomateNotReadyException if migrations failed (mirroring SavingChangesAsync).
+        _readinessSignal.WaitAsync().GetAwaiter().GetResult();
+
+        return base.SavingChanges(eventData, result);
+    }
 }
