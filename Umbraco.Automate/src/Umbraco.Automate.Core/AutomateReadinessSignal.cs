@@ -14,6 +14,13 @@ public sealed class AutomateReadinessSignal
     public bool IsReady => _tcs.Task.IsCompletedSuccessfully;
 
     /// <summary>
+    /// Gets whether startup migrations failed, so the database will never become ready.
+    /// Distinguishes the permanent failure state from the transient "not yet ready" window
+    /// (both of which leave <see cref="IsReady"/> <c>false</c>).
+    /// </summary>
+    public bool HasFailed => _tcs.Task.IsFaulted;
+
+    /// <summary>
     /// Signals that the Automate database is ready for use.
     /// </summary>
     public void Signal() => _tcs.TrySetResult();

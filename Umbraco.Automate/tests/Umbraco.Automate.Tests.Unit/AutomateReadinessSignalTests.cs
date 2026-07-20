@@ -29,6 +29,23 @@ public class AutomateReadinessSignalTests
     }
 
     [Fact]
+    public void HasFailed_DistinguishesFailureFromPending()
+    {
+        var pending = new AutomateReadinessSignal();
+        pending.HasFailed.ShouldBeFalse();
+        pending.IsReady.ShouldBeFalse();
+
+        var ready = new AutomateReadinessSignal();
+        ready.Signal();
+        ready.HasFailed.ShouldBeFalse();
+
+        var failed = new AutomateReadinessSignal();
+        failed.SignalFailed(new InvalidOperationException("boom"));
+        failed.HasFailed.ShouldBeTrue();
+        failed.IsReady.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task WaitAsync_Throws_WhenMigrationsFailed()
     {
         // The DB-write path (interceptor) must still fail loudly.
