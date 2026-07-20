@@ -29,7 +29,13 @@ internal sealed class WorkflowHostLifecycle : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await _readinessSignal.WaitAsync(stoppingToken);
+        if (!await _readinessSignal.WaitUntilReadyAsync(stoppingToken))
+        {
+            _logger.LogError(
+                "Automate startup migrations failed; the WorkflowCore host will not start. " +
+                "Resolve the migration failure and restart.");
+            return;
+        }
 
         // Re-register workflow definitions for in-flight instances before starting the host,
         // so WorkflowCore's poller can resume them without "not registered" errors.
