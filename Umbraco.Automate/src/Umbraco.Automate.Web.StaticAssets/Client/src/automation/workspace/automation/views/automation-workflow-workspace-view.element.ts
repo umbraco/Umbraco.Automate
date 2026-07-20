@@ -160,14 +160,19 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
     }
 
-    async #openTriggerSettingsModal() {
-        if (!this._model?.trigger) return;
+    /**
+     * Opens the trigger settings modal. Returns `true` when the settings were saved or there was
+     * nothing to configure (no settings schema), and `false` when the modal was opened and then
+     * dismissed. Callers adding a brand-new trigger use the return value to roll back the add.
+     */
+    async #openTriggerSettingsModal(): Promise<boolean> {
+        if (!this._model?.trigger) return true;
 
         const catalogueItem = await this.#getTriggerCatalogueItem(this._model.trigger.triggerAlias);
-        if (!catalogueItem) return;
+        if (!catalogueItem) return true;
 
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-        if (!modalManager) return;
+        if (!modalManager) return true;
 
         const modal = modalManager.open(this, UA_TRIGGER_SETTINGS_MODAL, {
             data: {
@@ -184,21 +189,28 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 ...this._model!.trigger!,
                 settings,
             });
+            return true;
         } catch {
             // Modal was dismissed
+            return false;
         }
     }
 
-    async #openNodeSettingsModal(stepId: string) {
-        if (!this._model) return;
+    /**
+     * Opens the node (action) settings modal. Returns `true` when the settings were saved or there
+     * was nothing to configure (no settings schema), and `false` when the modal was opened and then
+     * dismissed. Callers adding a brand-new step use the return value to roll back the add.
+     */
+    async #openNodeSettingsModal(stepId: string): Promise<boolean> {
+        if (!this._model) return true;
         const step = this._model.steps.find((s) => s.id === stepId);
-        if (!step) return;
+        if (!step) return true;
 
         const catalogueItem = await this.#getActionCatalogueItem(step.actionAlias);
-        if (!catalogueItem) return;
+        if (!catalogueItem) return true;
 
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-        if (!modalManager) return;
+        if (!modalManager) return true;
 
         const modal = modalManager.open(this, UA_NODE_SETTINGS_MODAL, {
             data: {
@@ -223,8 +235,10 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 s.id === stepId ? { ...s, settings, connectionId } : s,
             );
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
+            return true;
         } catch {
             // Modal was dismissed
+            return false;
         }
     }
 
@@ -293,6 +307,11 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             const { item } = await modal.onSubmit();
             if (!item || !this._model) return;
 
+            // Snapshot state before inserting so we can roll back the whole add (step plus any
+            // auto-connected/spliced edges) if the settings modal is closed without saving.
+            const previousSteps = this._model.steps;
+            const previousConnections = this._model.connections;
+
             const newStepId = crypto.randomUUID();
             const newStep = {
                 id: newStepId,
@@ -351,7 +370,15 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 this.#workspaceContext?.updateProperty("connections", updatedConnections);
             }
 
-            await this.#openNodeSettingsModal(newStepId);
+            const saved = await this.#openNodeSettingsModal(newStepId);
+            if (!saved) {
+                // Settings modal closed without saving: discard the just-added step and restore
+                // any connections the add rewired.
+                this.#workspaceContext?.updateProperties({
+                    steps: previousSteps,
+                    connections: previousConnections,
+                });
+            }
         } catch {
             // Modal was dismissed
         }
@@ -368,12 +395,20 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             const { item } = await modal.onSubmit();
             if (!item) return;
 
+            // Snapshot the trigger (null when adding to the placeholder) so we can roll back if the
+            // settings modal is closed without saving.
+            const previousTrigger = this._model?.trigger ?? null;
+
             this.#workspaceContext?.updateProperty("trigger", {
                 triggerAlias: item.alias,
                 settings: {},
             });
 
-            await this.#openTriggerSettingsModal();
+            const saved = await this.#openTriggerSettingsModal();
+            if (!saved) {
+                // Settings modal closed without saving: discard the just-added trigger.
+                this.#workspaceContext?.updateProperty("trigger", previousTrigger);
+            }
         } catch {
             // Modal was dismissed
         }
