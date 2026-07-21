@@ -236,6 +236,20 @@ public class BindingEvaluatorTests
         BindingEvaluator.ResolvePath("Key", data).ShouldBe("upper");
     }
 
+    // #112: the exact TryGetValue must short-circuit before the case-insensitive scan,
+    // so an exact match wins even when a differing-case key enumerates first.
+    [Fact]
+    public void ResolvePath_ExactMatch_WinsOverEarlierDifferingCaseKey()
+    {
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["KEY"] = "upper", // enumerates first, matches "key" only case-insensitively
+            ["key"] = "lower", // the exact match the fallback scan must never reach
+        };
+
+        BindingEvaluator.ResolvePath("key", data).ShouldBe("lower");
+    }
+
     // Repro for user-reported bug: step output with a nested object under "first"
     // doesn't resolve AFTER the workflow suspends and resumes, because WorkflowCore
     // persists the data dictionary through Newtonsoft.Json — which returns JObject/
