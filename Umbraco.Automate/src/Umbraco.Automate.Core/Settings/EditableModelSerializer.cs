@@ -1,7 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Microsoft.Extensions.Options;
-using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Security;
 
@@ -13,19 +11,12 @@ namespace Umbraco.Automate.Core.Settings;
 internal sealed class EditableModelSerializer : IEditableModelSerializer
 {
     private readonly ISensitiveFieldProtector _protector;
-    private readonly IReadOnlyList<string> _allowedConfigKeyPrefixes;
+    private readonly IConfigurationReferenceResolver _configReferenceResolver;
 
-    public EditableModelSerializer(ISensitiveFieldProtector protector, IOptions<AutomateOptions>? options = null)
+    public EditableModelSerializer(ISensitiveFieldProtector protector, IConfigurationReferenceResolver configReferenceResolver)
     {
         _protector = protector;
-
-        // Mirror EditableModelResolver: fall back to the secure defaults when constructed without
-        // options so the "is this a configuration reference?" decision uses the same allow-list
-        // the resolver uses to substitute. Production always supplies options via DI.
-        var automateOptions = options?.Value ?? new AutomateOptions();
-        _allowedConfigKeyPrefixes = automateOptions.AllowedConfigurationKeyPrefixes
-            .Where(p => !string.IsNullOrWhiteSpace(p))
-            .ToArray();
+        _configReferenceResolver = configReferenceResolver;
     }
 
     /// <inheritdoc />
@@ -109,8 +100,8 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
                     // allowed prefix (e.g. "Bearer $Umbraco:Automate:Secrets:ApiKey"). These are
                     // pointers to IConfiguration resolved at read time, not actual secrets, and the
                     // reference may sit anywhere in the value — not just at the start. The same
-                    // scanner drives resolution, so the two decisions cannot drift.
-                    if (ConfigurationReferenceScanner.ContainsReference(stringValue, _allowedConfigKeyPrefixes))
+                    // service drives resolution, so the two decisions cannot drift.
+                    if (_configReferenceResolver.ContainsReference(stringValue))
                     {
                         continue;
                     }

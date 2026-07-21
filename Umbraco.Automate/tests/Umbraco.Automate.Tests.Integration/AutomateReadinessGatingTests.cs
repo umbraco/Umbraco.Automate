@@ -50,7 +50,8 @@ public class AutomateReadinessGatingTests : IDisposable
     private static AutomationFactory CreateAutomationFactory()
     {
         var serializer = new EditableModelSerializer(
-            Mock.Of<ISensitiveFieldProtector>(p => p.IsProtected(It.IsAny<string>()) == false));
+            Mock.Of<ISensitiveFieldProtector>(p => p.IsProtected(It.IsAny<string>()) == false),
+            new ConfigurationReferenceResolver(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
         return new AutomationFactory(
             serializer,

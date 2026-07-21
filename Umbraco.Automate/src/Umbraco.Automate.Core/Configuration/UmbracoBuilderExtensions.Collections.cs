@@ -143,6 +143,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationActionAuthorizer, AutomationActionAuthorizer>();
 
         // Settings infrastructure
+        builder.Services.AddSingleton<IConfigurationReferenceResolver, ConfigurationReferenceResolver>();
         builder.Services.AddSingleton<IEditableModelSerializer, EditableModelSerializer>();
         builder.Services.AddSingleton<IEditableModelResolver, EditableModelResolver>();
         builder.Services.AddSingleton<ActionInfrastructure>();

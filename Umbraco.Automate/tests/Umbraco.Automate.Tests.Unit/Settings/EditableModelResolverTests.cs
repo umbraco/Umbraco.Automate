@@ -44,8 +44,13 @@ public class EditableModelResolverTests
             : ["Slack", "TestSettings"];
 
         var options = Options.Create(new AutomateOptions { AllowedConfigurationKeyPrefixes = prefixes });
-        return new EditableModelResolver(_configuration, options);
+        return CreateResolver(options);
     }
+
+    // Wraps the configuration + options in a real ConfigurationReferenceResolver so these tests
+    // exercise the resolver together with the service that now owns config-reference policy.
+    private EditableModelResolver CreateResolver(IOptions<AutomateOptions> options)
+        => new(new ConfigurationReferenceResolver(_configuration, options));
 
     #region ResolveModel<TModel> — Null handling
 
@@ -225,7 +230,7 @@ public class EditableModelResolverTests
         // Umbraco:Automate:Secrets and Umbraco:Automate:Variables, so an arbitrary key is rejected.
         var settings = new FakeSettings { ApiToken = "$Slack:ApiToken" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -244,7 +249,7 @@ public class EditableModelResolverTests
             BaseUrl = "$Umbraco:Automate:Variables:BaseUrl",
         };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -264,7 +269,7 @@ public class EditableModelResolverTests
         // non-sensitive field is rejected.
         var settings = new FakeSettings { ApiToken = "$Umbraco:Automate:Secrets:SlackToken" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -279,7 +284,7 @@ public class EditableModelResolverTests
     {
         var settings = new FakeSettings { SecretField = "$Umbraco:Automate:Secrets:SlackToken" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -293,7 +298,7 @@ public class EditableModelResolverTests
         // Variables are not secret, so they are unrestricted by field sensitivity.
         var settings = new FakeSettings { BaseUrl = "$Umbraco:Automate:Variables:BaseUrl" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -554,7 +559,7 @@ public class EditableModelResolverTests
         // resolve, e.g. an Authorization header of the form "Bearer $Secret".
         var settings = new FakeSettings { SecretField = "Bearer $Umbraco:Automate:Secrets:SlackToken" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -570,7 +575,7 @@ public class EditableModelResolverTests
             BaseUrl = "$Umbraco:Automate:Variables:BaseUrl/api/$Umbraco:Automate:Variables:Region",
         };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -599,7 +604,7 @@ public class EditableModelResolverTests
         // must be preserved. "$ssw0rd" matches no allowed prefix, so it stays literal.
         var settings = new FakeSettings { SecretField = "p$ssw0rd" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -616,7 +621,7 @@ public class EditableModelResolverTests
             BaseUrl = "cost is $$5 not $$Umbraco:Automate:Variables:BaseUrl",
         };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -631,7 +636,7 @@ public class EditableModelResolverTests
         // resolves — so "$$$Var" yields "$" + the resolved value, not a doubly-consumed token.
         var settings = new FakeSettings { BaseUrl = "$$$Umbraco:Automate:Variables:BaseUrl" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -645,7 +650,7 @@ public class EditableModelResolverTests
         // The secret-into-sensitive-only rule still applies to embedded references.
         var settings = new FakeSettings { BaseUrl = "token=$Umbraco:Automate:Secrets:SlackToken" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -665,7 +670,7 @@ public class EditableModelResolverTests
             BaseUrl = "$Umbraco:Automate:Variables:BaseUrl/${ trigger.contentName }",
         };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -674,12 +679,32 @@ public class EditableModelResolverTests
     }
 
     [Fact]
+    public void ResolveModel_WithLeadingBindingExpressionBeforeReference_ResolvesReference()
+    {
+        // Regression for the removed whole-value "${" early-return: a value that *starts* with a
+        // ${ } binding used to short-circuit and skip a real reference later in the string. The
+        // scanner leaves the binding literal wherever it appears, so the trailing config reference
+        // must still resolve regardless of the binding's position.
+        var settings = new FakeSettings
+        {
+            BaseUrl = "${ trigger.contentName }/$Umbraco:Automate:Variables:BaseUrl",
+        };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = CreateResolver(options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("${ trigger.contentName }/https://env.example.com");
+    }
+
+    [Fact]
     public void ResolveModel_WithMissingEmbeddedKey_Throws()
     {
         // An allowed-prefix key that is embedded but absent from configuration still throws.
         var settings = new FakeSettings { BaseUrl = "x=$Umbraco:Automate:Variables:DoesNotExist" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -692,7 +717,7 @@ public class EditableModelResolverTests
         // Regression: the whole-value-is-a-single-reference path is preserved unchanged.
         var settings = new FakeSettings { BaseUrl = "$Umbraco:Automate:Variables:BaseUrl" };
         var options = Options.Create(new AutomateOptions());
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -716,7 +741,7 @@ public class EditableModelResolverTests
         {
             AllowedConfigurationKeyPrefixes = ["CommunityBlogs"],
         });
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -735,7 +760,7 @@ public class EditableModelResolverTests
             AllowedConfigurationKeyPrefixes = ["CommunityBlogs"],
             SecretConfigurationKeyPrefixes = ["CommunityBlogs"],
         });
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -754,7 +779,7 @@ public class EditableModelResolverTests
             AllowedConfigurationKeyPrefixes = ["CommunityBlogs"],
             SecretConfigurationKeyPrefixes = ["CommunityBlogs"],
         });
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
 
@@ -775,7 +800,7 @@ public class EditableModelResolverTests
             AllowedConfigurationKeyPrefixes = ["Umbraco:Automate:Secrets"],
             SecretConfigurationKeyPrefixes = ["CommunityBlogs"],
         });
-        var resolver = new EditableModelResolver(_configuration, options);
+        var resolver = CreateResolver(options);
 
         var result = resolver.ResolveModel<FakeSettings>("test", settings);
 
