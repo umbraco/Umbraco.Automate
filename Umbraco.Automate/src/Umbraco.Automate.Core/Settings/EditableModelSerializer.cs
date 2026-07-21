@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Security;
 
@@ -11,10 +13,19 @@ namespace Umbraco.Automate.Core.Settings;
 internal sealed class EditableModelSerializer : IEditableModelSerializer
 {
     private readonly ISensitiveFieldProtector _protector;
+    private readonly IReadOnlyList<string> _allowedConfigKeyPrefixes;
 
-    public EditableModelSerializer(ISensitiveFieldProtector protector)
+    public EditableModelSerializer(ISensitiveFieldProtector protector, IOptions<AutomateOptions>? options = null)
     {
         _protector = protector;
+
+        // Mirror EditableModelResolver: fall back to the secure defaults when constructed without
+        // options so the "is this a configuration reference?" decision uses the same allow-list
+        // the resolver uses to substitute. Production always supplies options via DI.
+        var automateOptions = options?.Value ?? new AutomateOptions();
+        _allowedConfigKeyPrefixes = automateOptions.AllowedConfigurationKeyPrefixes
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .ToArray();
     }
 
     /// <inheritdoc />
@@ -94,9 +105,12 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
                 var stringValue = jsonValue.GetValue<string>();
                 if (!string.IsNullOrEmpty(stringValue))
                 {
-                    // Skip encryption for configuration references (values starting with $).
-                    // These are pointers to IConfiguration, not actual secrets.
-                    if (stringValue.StartsWith("$", StringComparison.Ordinal))
+                    // Skip encryption for values that contain a configuration reference under an
+                    // allowed prefix (e.g. "Bearer $Umbraco:Automate:Secrets:ApiKey"). These are
+                    // pointers to IConfiguration resolved at read time, not actual secrets, and the
+                    // reference may sit anywhere in the value — not just at the start. The same
+                    // scanner drives resolution, so the two decisions cannot drift.
+                    if (ConfigurationReferenceScanner.ContainsReference(stringValue, _allowedConfigKeyPrefixes))
                     {
                         continue;
                     }

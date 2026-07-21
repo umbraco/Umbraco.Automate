@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 
@@ -100,15 +102,61 @@ public class EditableModelSerializerTests
     [Fact]
     public void Serialize_WithConfigurationReference_DoesNotEncrypt()
     {
-        var model = new TestModel { ApiKey = "$Slack:ApiToken", Endpoint = "https://api.example.com" };
+        var model = new TestModel { ApiKey = "$Umbraco:Automate:Secrets:ApiToken", Endpoint = "https://api.example.com" };
         var schema = CreateSchema(
-            new EditableModelFieldDescriptor { PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true },
-            new EditableModelFieldDescriptor { PropertyName = "Endpoint", Label = "Endpoint", PropertyType = typeof(string), IsSensitive = false });
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true },
+            new EditableModelFieldDescriptor { Key = "endpoint", PropertyName = "Endpoint", Label = "Endpoint", PropertyType = typeof(string), IsSensitive = false });
 
         var result = _serializer.Serialize(model, schema);
 
-        result.ShouldContain("\"apiKey\":\"$Slack:ApiToken\"");
+        result.ShouldContain("\"apiKey\":\"$Umbraco:Automate:Secrets:ApiToken\"");
         _protectorMock.Verify(p => p.Protect(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void Serialize_WithEmbeddedConfigurationReference_DoesNotEncrypt()
+    {
+        // Issue #159: a reference embedded in a larger value is a pointer, not a secret, so the
+        // whole value is stored plaintext to remain resolvable at read time.
+        var model = new TestModel { ApiKey = "Bearer $Umbraco:Automate:Secrets:ApiKey", Endpoint = "https://api.example.com" };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+
+        var result = _serializer.Serialize(model, schema);
+
+        result.ShouldContain("\"apiKey\":\"Bearer $Umbraco:Automate:Secrets:ApiKey\"");
+        _protectorMock.Verify(p => p.Protect(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void Serialize_WithLiteralDollarSecret_StillEncrypts()
+    {
+        // A real secret that merely contains a '$' (e.g. a password) is not a configuration
+        // reference and must still be encrypted.
+        var model = new TestModel { ApiKey = "p$ssw0rd", Endpoint = "https://api.example.com" };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+
+        var result = _serializer.Serialize(model, schema);
+
+        result.ShouldContain("\"apiKey\":\"ENC:p$ssw0rd\"");
+        _protectorMock.Verify(p => p.Protect("p$ssw0rd"), Times.Once);
+    }
+
+    [Fact]
+    public void Serialize_WithReferenceToDisallowedPrefix_Encrypts()
+    {
+        // Only references under an allowed prefix are treated as configuration pointers. A value
+        // that looks like a reference but targets a non-allow-listed section is treated as a
+        // literal secret and encrypted (it would never resolve at read time anyway).
+        var model = new TestModel { ApiKey = "$Slack:ApiToken", Endpoint = "https://api.example.com" };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+
+        var result = _serializer.Serialize(model, schema);
+
+        result.ShouldContain("\"apiKey\":\"ENC:$Slack:ApiToken\"");
+        _protectorMock.Verify(p => p.Protect("$Slack:ApiToken"), Times.Once);
     }
 
     [Fact]
@@ -116,7 +164,7 @@ public class EditableModelSerializerTests
     {
         var model = new AwsModel
         {
-            AccessKeyId = "$AWS:AccessKeyId",
+            AccessKeyId = "$Umbraco:Automate:Variables:AccessKeyId",
             SecretAccessKey = "actual-secret-key",
             Region = "us-east-1",
         };
@@ -127,28 +175,76 @@ public class EditableModelSerializerTests
 
         var result = _serializer.Serialize(model, schema);
 
-        result.ShouldContain("\"accessKeyId\":\"$AWS:AccessKeyId\"");
+        result.ShouldContain("\"accessKeyId\":\"$Umbraco:Automate:Variables:AccessKeyId\"");
         result.ShouldContain("\"secretAccessKey\":\"ENC:actual-secret-key\"");
         result.ShouldContain("\"region\":\"us-east-1\"");
         _protectorMock.Verify(p => p.Protect("actual-secret-key"), Times.Once);
-        _protectorMock.Verify(p => p.Protect("$AWS:AccessKeyId"), Times.Never);
+        _protectorMock.Verify(p => p.Protect("$Umbraco:Automate:Variables:AccessKeyId"), Times.Never);
     }
 
     [Theory]
-    [InlineData("$ConnectionStrings:MyApi")]
-    [InlineData("$OpenAI:ApiKey")]
-    [InlineData("$Azure:Endpoint")]
-    [InlineData("$EnvironmentVariable")]
+    [InlineData("$Umbraco:Automate:Secrets:MyApi")]
+    [InlineData("$Umbraco:Automate:Secrets:OpenAiKey")]
+    [InlineData("$Umbraco:Automate:Variables:Endpoint")]
+    [InlineData("Bearer $Umbraco:Automate:Secrets:Token")]
     public void Serialize_WithVariousConfigReferences_DoesNotEncrypt(string configReference)
     {
         var model = new TestModel { ApiKey = configReference, Endpoint = "https://api.example.com" };
         var schema = CreateSchema(
-            new EditableModelFieldDescriptor { PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
 
         var result = _serializer.Serialize(model, schema);
 
         result.ShouldContain($"\"apiKey\":\"{configReference}\"");
         _protectorMock.Verify(p => p.Protect(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void Serialize_WithEmbeddedReferenceToCustomAllowedPrefix_DoesNotEncrypt()
+    {
+        // Issue #159: once an admin opts a custom section into AllowedConfigurationKeyPrefixes,
+        // an embedded "Bearer $CommunityBlogs:ApiKey" header is a pointer, not a secret, so the
+        // serializer stores it plaintext (matching what the resolver will substitute at read time).
+        var serializer = CreateSerializer("CommunityBlogs");
+        var model = new TestModel { ApiKey = "Bearer $CommunityBlogs:ApiKey", Endpoint = "https://api.example.com" };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+
+        var result = serializer.Serialize(model, schema);
+
+        result.ShouldContain("\"apiKey\":\"Bearer $CommunityBlogs:ApiKey\"");
+        _protectorMock.Verify(p => p.Protect(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void Serialize_WithEmbeddedReferenceToNonAllowedCustomPrefix_Encrypts()
+    {
+        // Without the opt-in, the same value targets a non-allow-listed section, so it is treated
+        // as a literal secret and encrypted (it would never resolve at read time anyway). This is
+        // the contrast to the test above — the allow-list is what flips the behaviour.
+        var model = new TestModel { ApiKey = "Bearer $CommunityBlogs:ApiKey", Endpoint = "https://api.example.com" };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+
+        var result = _serializer.Serialize(model, schema); // default prefixes — CommunityBlogs not allowed
+
+        result.ShouldContain("\"apiKey\":\"ENC:Bearer $CommunityBlogs:ApiKey\"");
+        _protectorMock.Verify(p => p.Protect("Bearer $CommunityBlogs:ApiKey"), Times.Once);
+    }
+
+    [Fact]
+    public void SerializeAndDeserialize_WithMixedLiteralAndReference_PreservesValue()
+    {
+        // The mixed literal+reference value must survive a save→load round trip unchanged so
+        // the resolver can substitute the reference later.
+        var model = new TestModel { ApiKey = "Bearer $Umbraco:Automate:Secrets:ApiKey", Endpoint = "https://api.example.com" };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+
+        var serialized = _serializer.Serialize(model, schema);
+        var deserialized = (JsonElement)_serializer.Deserialize(serialized);
+
+        deserialized.GetProperty("apiKey").GetString().ShouldBe("Bearer $Umbraco:Automate:Secrets:ApiKey");
     }
 
     #endregion
@@ -231,6 +327,14 @@ public class EditableModelSerializerTests
 
     private static EditableModelSchema CreateSchema(params EditableModelFieldDescriptor[] fields)
         => new() { Fields = fields.ToList() };
+
+    // Builds a serializer whose allow-list is exactly the given prefixes, reusing the shared
+    // protector mock so encrypt/skip expectations still hold.
+    private EditableModelSerializer CreateSerializer(params string[] allowedPrefixes)
+    {
+        var options = Options.Create(new AutomateOptions { AllowedConfigurationKeyPrefixes = allowedPrefixes });
+        return new EditableModelSerializer(_protectorMock.Object, options);
+    }
 
     private class TestModel
     {
