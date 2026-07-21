@@ -625,6 +625,21 @@ public class EditableModelResolverTests
     }
 
     [Fact]
+    public void ResolveModel_WithEscapedDollarImmediatelyBeforeReference_EscapesThenResolves()
+    {
+        // "$$" collapses to a literal '$', and a real reference immediately after it still
+        // resolves — so "$$$Var" yields "$" + the resolved value, not a doubly-consumed token.
+        var settings = new FakeSettings { BaseUrl = "$$$Umbraco:Automate:Variables:BaseUrl" };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("$https://env.example.com");
+    }
+
+    [Fact]
     public void ResolveModel_WithEmbeddedSecretInNonSensitiveField_Throws()
     {
         // The secret-into-sensitive-only rule still applies to embedded references.
