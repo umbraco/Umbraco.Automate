@@ -21,10 +21,13 @@ public class EditableModelResolverTests
             { "TestSettings:MaxRetries", "5" },
             { "Umbraco:Automate:Secrets:SlackToken", "xoxb-secret-token" },
             { "Umbraco:Automate:Variables:BaseUrl", "https://env.example.com" },
+            { "Umbraco:Automate:Variables:Region", "eu-west-1" },
             // A key outside the sanctioned sections — must not be resolvable from settings.
             { "OutOfScope:SomeValue", "value-outside-allowed-sections" },
             // Sits just outside the Umbraco:Automate:Secrets prefix boundary.
             { "Umbraco:Automate:SecretsBackup:Token", "should-not-resolve" },
+            // Issue #159: a custom section an admin opts into via AllowedConfigurationKeyPrefixes.
+            { "CommunityBlogs:ApiKey", "cb-live-abc123" },
         };
 
         _configuration = new ConfigurationBuilder()
@@ -538,6 +541,231 @@ public class EditableModelResolverTests
         exception.Message.ShouldContain("at '$");
         exception.InnerException.ShouldNotBeNull();
         exception.InnerException.ShouldBeOfType<JsonException>();
+    }
+
+    #endregion
+
+    #region ResolveModel<TModel> — Embedded configuration references (issue #159)
+
+    [Fact]
+    public void ResolveModel_WithEmbeddedReferenceInSensitiveField_ResolvesToken()
+    {
+        // Issue #159: a reference embedded within a larger string (not the whole value) must
+        // resolve, e.g. an Authorization header of the form "Bearer $Secret".
+        var settings = new FakeSettings { SecretField = "Bearer $Umbraco:Automate:Secrets:SlackToken" };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.SecretField.ShouldBe("Bearer xoxb-secret-token");
+    }
+
+    [Fact]
+    public void ResolveModel_WithMultipleEmbeddedReferences_ResolvesAll()
+    {
+        var settings = new FakeSettings
+        {
+            BaseUrl = "$Umbraco:Automate:Variables:BaseUrl/api/$Umbraco:Automate:Variables:Region",
+        };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("https://env.example.com/api/eu-west-1");
+    }
+
+    [Fact]
+    public void ResolveModel_WithDisallowedEmbeddedReference_LeavesLiteralWithoutThrowing()
+    {
+        // A $token whose key is outside the allow-list is not a reference when embedded — it is
+        // left literal rather than throwing (unlike the whole-value case, which still throws).
+        var settings = new FakeSettings { BaseUrl = "prefix-$OutOfScope:SomeValue-suffix" };
+        var resolver = CreateResolver(); // Slack/TestSettings only
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("prefix-$OutOfScope:SomeValue-suffix");
+    }
+
+    [Fact]
+    public void ResolveModel_WithLiteralDollarInValue_LeavesValueUntouched()
+    {
+        // Highest-risk edge case: a literal '$' in a value (e.g. a password) must not throw and
+        // must be preserved. "$ssw0rd" matches no allowed prefix, so it stays literal.
+        var settings = new FakeSettings { SecretField = "p$ssw0rd" };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.SecretField.ShouldBe("p$ssw0rd");
+    }
+
+    [Fact]
+    public void ResolveModel_WithEscapedDollar_CollapsesToLiteralDollar()
+    {
+        // "$$" is an escape for a literal '$' and must not introduce a reference.
+        var settings = new FakeSettings
+        {
+            BaseUrl = "cost is $$5 not $$Umbraco:Automate:Variables:BaseUrl",
+        };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("cost is $5 not $Umbraco:Automate:Variables:BaseUrl");
+    }
+
+    [Fact]
+    public void ResolveModel_WithEmbeddedSecretInNonSensitiveField_Throws()
+    {
+        // The secret-into-sensitive-only rule still applies to embedded references.
+        var settings = new FakeSettings { BaseUrl = "token=$Umbraco:Automate:Secrets:SlackToken" };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
+
+        var exception = Should.Throw<InvalidOperationException>(act);
+        exception.Message.ShouldContain("secret");
+        exception.Message.ShouldContain("sensitive field");
+        exception.Message.ShouldNotContain("xoxb-secret-token");
+    }
+
+    [Fact]
+    public void ResolveModel_WithEmbeddedBindingExpression_LeavesBindingUntouched()
+    {
+        // ${ ... } bindings must not be captured by the config-ref scan, even when embedded
+        // alongside a real reference.
+        var settings = new FakeSettings
+        {
+            BaseUrl = "$Umbraco:Automate:Variables:BaseUrl/${ trigger.contentName }",
+        };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("https://env.example.com/${ trigger.contentName }");
+    }
+
+    [Fact]
+    public void ResolveModel_WithMissingEmbeddedKey_Throws()
+    {
+        // An allowed-prefix key that is embedded but absent from configuration still throws.
+        var settings = new FakeSettings { BaseUrl = "x=$Umbraco:Automate:Variables:DoesNotExist" };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
+
+        Should.Throw<InvalidOperationException>(act).Message.ShouldContain("not found");
+    }
+
+    [Fact]
+    public void ResolveModel_WholeValueReference_StillResolves_Regression()
+    {
+        // Regression: the whole-value-is-a-single-reference path is preserved unchanged.
+        var settings = new FakeSettings { BaseUrl = "$Umbraco:Automate:Variables:BaseUrl" };
+        var options = Options.Create(new AutomateOptions());
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("https://env.example.com");
+    }
+
+    #endregion
+
+    #region ResolveModel<TModel> — Custom opt-in prefix for embedded reference (issue #159)
+
+    [Fact]
+    public void ResolveModel_EmbeddedReference_CustomAllowedPrefix_ResolvesFromAnyField()
+    {
+        // The exact scenario from issue #159: an "Authorization: Bearer $CommunityBlogs:ApiKey"
+        // style header. Once an admin opts the CommunityBlogs section into the allow-list, the
+        // embedded reference resolves. It is not a secret prefix, so it resolves from an ordinary
+        // (non-sensitive) field too.
+        var settings = new FakeSettings { BaseUrl = "Bearer $CommunityBlogs:ApiKey" };
+        var options = Options.Create(new AutomateOptions
+        {
+            AllowedConfigurationKeyPrefixes = ["CommunityBlogs"],
+        });
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.BaseUrl.ShouldBe("Bearer cb-live-abc123");
+    }
+
+    [Fact]
+    public void ResolveModel_EmbeddedReference_CustomSecretPrefix_ResolvesFromSensitiveField()
+    {
+        // Adding CommunityBlogs to the secret list as well confines it to sensitive fields —
+        // the recommended shape for an API key. From a sensitive field it resolves.
+        var settings = new FakeSettings { SecretField = "Bearer $CommunityBlogs:ApiKey" };
+        var options = Options.Create(new AutomateOptions
+        {
+            AllowedConfigurationKeyPrefixes = ["CommunityBlogs"],
+            SecretConfigurationKeyPrefixes = ["CommunityBlogs"],
+        });
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.SecretField.ShouldBe("Bearer cb-live-abc123");
+    }
+
+    [Fact]
+    public void ResolveModel_EmbeddedReference_CustomSecretPrefix_InNonSensitiveField_Throws()
+    {
+        // ...and referencing that same secret prefix from a non-sensitive field is rejected,
+        // without leaking the resolved value into the error.
+        var settings = new FakeSettings { BaseUrl = "Bearer $CommunityBlogs:ApiKey" };
+        var options = Options.Create(new AutomateOptions
+        {
+            AllowedConfigurationKeyPrefixes = ["CommunityBlogs"],
+            SecretConfigurationKeyPrefixes = ["CommunityBlogs"],
+        });
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
+
+        var exception = Should.Throw<InvalidOperationException>(act);
+        exception.Message.ShouldContain("secret");
+        exception.Message.ShouldContain("sensitive field");
+        exception.Message.ShouldNotContain("cb-live-abc123");
+    }
+
+    [Fact]
+    public void ResolveModel_EmbeddedReference_SecretPrefixNotAllowed_LeavesLiteral()
+    {
+        // A prefix present only in the secret list but not the allow-list is never resolvable:
+        // the allow-list gate runs first, so an embedded token is left literal (no throw).
+        var settings = new FakeSettings { SecretField = "Bearer $CommunityBlogs:ApiKey" };
+        var options = Options.Create(new AutomateOptions
+        {
+            AllowedConfigurationKeyPrefixes = ["Umbraco:Automate:Secrets"],
+            SecretConfigurationKeyPrefixes = ["CommunityBlogs"],
+        });
+        var resolver = new EditableModelResolver(_configuration, options);
+
+        var result = resolver.ResolveModel<FakeSettings>("test", settings);
+
+        result.ShouldNotBeNull();
+        result!.SecretField.ShouldBe("Bearer $CommunityBlogs:ApiKey");
     }
 
     #endregion
