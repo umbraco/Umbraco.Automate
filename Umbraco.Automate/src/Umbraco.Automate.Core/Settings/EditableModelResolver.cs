@@ -176,6 +176,12 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         // Otherwise scan for references embedded in a larger string and splice in their string
         // values. Tokens outside the allow-list are left literal (no throw) so a stray '$' — a
         // password like "p$ssw0rd" — passes through untouched. See ConfigurationReferenceScanner.
+        //
+        // Limitation: the resolved value is spliced verbatim into the surrounding string. When
+        // that string is later re-parsed as JSON (e.g. an HTTP Request action's Headers field),
+        // a resolved value containing '"' or '\' can produce malformed JSON, which downstream
+        // parsing may swallow silently. Structured (per-value) header modelling would avoid this
+        // entirely — tracked under #161.
         var resolved = ConfigurationReferenceScanner.Scan(
             strValue,
             _allowedConfigKeyPrefixes,

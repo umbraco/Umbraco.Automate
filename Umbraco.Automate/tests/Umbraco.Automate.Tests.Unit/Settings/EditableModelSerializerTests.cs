@@ -160,6 +160,22 @@ public class EditableModelSerializerTests
     }
 
     [Fact]
+    public void Serialize_WithEscapedDollarLookalikeReference_Encrypts()
+    {
+        // A secret whose literal text happens to look like a reference is escaped with "$$".
+        // The scanner then sees no allow-listed reference, so the value is treated as a real
+        // secret and encrypted rather than stored plaintext as a pointer.
+        var model = new TestModel { ApiKey = "$$Umbraco:Automate:Secrets:NotAReference", Endpoint = "https://api.example.com" };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "apiKey", PropertyName = "ApiKey", Label = "API Key", PropertyType = typeof(string), IsSensitive = true });
+
+        var result = _serializer.Serialize(model, schema);
+
+        result.ShouldContain("\"apiKey\":\"ENC:$$Umbraco:Automate:Secrets:NotAReference\"");
+        _protectorMock.Verify(p => p.Protect("$$Umbraco:Automate:Secrets:NotAReference"), Times.Once);
+    }
+
+    [Fact]
     public void Serialize_WithMixedConfigReferenceAndActualSecret_EncryptsOnlySecret()
     {
         var model = new AwsModel
