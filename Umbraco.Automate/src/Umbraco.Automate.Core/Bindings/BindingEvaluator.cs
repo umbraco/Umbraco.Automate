@@ -244,8 +244,10 @@ public sealed class BindingEvaluator
         // Lookups must not depend on the dictionary's own comparer: a WorkflowCore
         // persistence round-trip through Newtonsoft rebuilds nested dictionaries with
         // the default (case-sensitive) comparer, so a PascalCase binding would miss a
-        // camelCase-stored key. Try the O(1) exact match first, then fall back to a
-        // case-insensitive scan.
+        // camelCase-stored key. Try the O(1) exact match first, then fall back to the
+        // first case-insensitive match. Step output originates from a single POCO, so
+        // keys differing only by case are not expected; if they ever occurred the exact
+        // match still wins and the fallback's tie-break is simply enumeration order.
         if (current is IReadOnlyDictionary<string, object?> roDict)
         {
             if (roDict.TryGetValue(key, out var val))
