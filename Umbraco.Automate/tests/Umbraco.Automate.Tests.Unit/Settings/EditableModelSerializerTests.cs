@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Security;
@@ -14,7 +15,7 @@ public class EditableModelSerializerTests
     public EditableModelSerializerTests()
     {
         _protectorMock = new Mock<ISensitiveFieldProtector>();
-        _serializer = new EditableModelSerializer(_protectorMock.Object);
+        _serializer = new EditableModelSerializer(_protectorMock.Object, CreateConfigReferenceResolver());
 
         _protectorMock
             .Setup(p => p.Protect(It.IsAny<string?>()))
@@ -347,9 +348,19 @@ public class EditableModelSerializerTests
     // Builds a serializer whose allow-list is exactly the given prefixes, reusing the shared
     // protector mock so encrypt/skip expectations still hold.
     private EditableModelSerializer CreateSerializer(params string[] allowedPrefixes)
+        => new(_protectorMock.Object, CreateConfigReferenceResolver(allowedPrefixes));
+
+    // The serializer only asks the service "does this contain a reference?", which depends solely
+    // on the allow-list, so an empty configuration suffices here. Passing no prefixes uses the
+    // secure defaults (Secrets/Variables), matching the shared _serializer instance.
+    private static IConfigurationReferenceResolver CreateConfigReferenceResolver(params string[] allowedPrefixes)
     {
-        var options = Options.Create(new AutomateOptions { AllowedConfigurationKeyPrefixes = allowedPrefixes });
-        return new EditableModelSerializer(_protectorMock.Object, options);
+        var automateOptions = allowedPrefixes.Length > 0
+            ? new AutomateOptions { AllowedConfigurationKeyPrefixes = allowedPrefixes }
+            : new AutomateOptions();
+        return new ConfigurationReferenceResolver(
+            new ConfigurationBuilder().Build(),
+            Options.Create(automateOptions));
     }
 
     private class TestModel

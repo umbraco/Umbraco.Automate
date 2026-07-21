@@ -67,7 +67,7 @@ public class StepOutputOffloadTests : IAsyncLifetime
         var dbContextFactory = new TestDbContextFactory(_fixture.CreateContext);
         var configuration = new ConfigurationBuilder().Build();
 
-        var modelResolver = new EditableModelResolver(configuration);
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(configuration));
 
         var actions = new ActionCollection(() =>
         {
