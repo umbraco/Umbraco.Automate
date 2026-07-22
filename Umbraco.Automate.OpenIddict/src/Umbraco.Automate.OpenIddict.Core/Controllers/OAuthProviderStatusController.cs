@@ -1,6 +1,8 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.OpenIddict.ConnectionTypes;
+using Umbraco.Automate.OpenIddict.Extensions;
 using Umbraco.Automate.OpenIddict.Providers;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Cms.Api.Common.Attributes;
@@ -44,8 +46,7 @@ public sealed class OAuthProviderStatusController : ControllerBase
     public ActionResult<OAuthProviderStatusResponseModel> Status(string provider)
     {
         var configuration = _configurationSource.GetConfiguration(provider);
-        var isConfigured = !string.IsNullOrWhiteSpace(configuration?.ClientId)
-            && !string.IsNullOrWhiteSpace(configuration?.ClientSecret);
+        var isConfigured = configuration.HasClientCredentials();
 
         var setupDocsUrl = _connectionTypes
             .OfType<IOAuthConnectionType>()
@@ -66,4 +67,6 @@ public sealed class OAuthProviderStatusController : ControllerBase
 /// Optional link to documentation describing how to obtain this provider's OAuth application
 /// credentials, if its connection type declares one.
 /// </param>
-public sealed record OAuthProviderStatusResponseModel(bool IsConfigured, string? SetupDocsUrl);
+public sealed record OAuthProviderStatusResponseModel(
+    [property: JsonPropertyName("isConfigured")] bool IsConfigured,
+    [property: JsonPropertyName("setupDocsUrl")] string? SetupDocsUrl);

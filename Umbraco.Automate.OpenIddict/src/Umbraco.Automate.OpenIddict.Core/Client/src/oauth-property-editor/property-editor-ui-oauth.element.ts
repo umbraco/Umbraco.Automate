@@ -52,6 +52,8 @@ export class UmbAutomatePropertyEditorUIOAuthElement
     #boundMessageHandler = this.#onMessage.bind(this);
     #notificationContext?: UmbNotificationContext;
     #authContext?: UmbAuthContext;
+    /** The provider whose status has been requested, to dedupe the two triggers (config setter + auth context). */
+    #checkedProvider?: string;
 
     constructor() {
         super();
@@ -73,15 +75,23 @@ export class UmbAutomatePropertyEditorUIOAuthElement
     async #checkProviderStatus() {
         if (!this._provider || !this.#authContext) return;
 
+        // Both the config setter and the auth-context callback call this, and the config setter can
+        // fire repeatedly — only check each provider once.
+        if (this._provider === this.#checkedProvider) return;
+        const provider = this._provider;
+        this.#checkedProvider = provider;
+
         try {
             const { base, credentials, token } = this.#authContext.getOpenApiConfiguration();
             const response = await fetch(
-                `${base}/umbraco/automate/oauth/status/${encodeURIComponent(this._provider)}`,
+                `${base}/umbraco/automate/oauth/status/${encodeURIComponent(provider)}`,
                 { credentials, headers: { Authorization: `Bearer ${await token()}` } },
             );
 
             if (!response.ok) {
-                this._isProviderConfigured = undefined;
+                // Allow a retry, and keep any previously-known state rather than resetting to
+                // undefined — a transient failure shouldn't clear a valid warning.
+                this.#checkedProvider = undefined;
                 return;
             }
 
@@ -89,8 +99,9 @@ export class UmbAutomatePropertyEditorUIOAuthElement
             this._isProviderConfigured = data.isConfigured;
             this._setupDocsUrl = data.setupDocsUrl;
         } catch {
-            // Network/parse failure — leave undefined rather than risk a false warning.
-            this._isProviderConfigured = undefined;
+            // Network/parse failure — allow a retry and leave the last-known state untouched
+            // rather than risk clearing a valid warning.
+            this.#checkedProvider = undefined;
         }
     }
 
@@ -271,8 +282,8 @@ export class UmbAutomatePropertyEditorUIOAuthElement
                               rel="noopener noreferrer"
                               label=${`Get ${providerLabel} credentials`}
                           >
-                              <uui-icon name="icon-out"></uui-icon>
                               Get ${providerLabel} credentials
+                              <uui-icon name="icon-out" slot="extra"></uui-icon>
                           </uui-button>
                       `
                     : nothing}
@@ -307,7 +318,7 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         .not-configured-warning {
             padding: var(--uui-size-space-4) var(--uui-size-space-5);
             border-radius: var(--uui-border-radius);
-            border-left: 3px solid var(--uui-color-warning-standalone);
+            border: 1px solid var(--uui-color-warning-standalone);
             background-color: var(--uui-color-warning);
             color: var(--uui-color-warning-contrast);
         }
@@ -318,6 +329,10 @@ export class UmbAutomatePropertyEditorUIOAuthElement
 
         .not-configured-warning code {
             font-size: 0.9em;
+        }
+
+        .not-configured-warning .docs-link uui-icon {
+            margin-left: var(--uui-size-space-2);
         }
     `;
 }
