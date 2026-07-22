@@ -73,7 +73,22 @@ public class OAuthChallengeControllerTests
 
         var result = _controller.Challenge("Slack").ShouldBeOfType<ContentResult>();
 
-        result.Content.ShouldContain("\"success\": false");
+        result.Content.ShouldContain("\"success\":false");
+    }
+
+    [Fact]
+    public void Challenge_EncodesProviderName_SoItCannotInjectMarkup()
+    {
+        // #107: the provider route value is attacker-controllable and reflected into the popup
+        // page, so it must be encoded — raw markup must never reach the response body or the
+        // <script> postMessage payload.
+        const string malicious = "</script><img src=x onerror=alert(1)>";
+        _configurationSource.Setup(s => s.GetConfiguration(malicious)).Returns((OAuthProviderConfiguration?)null);
+
+        var result = _controller.Challenge(malicious).ShouldBeOfType<ContentResult>();
+
+        result.Content.ShouldNotContain("<img");
+        result.Content.ShouldContain("&lt;img");
     }
 
     [Fact]

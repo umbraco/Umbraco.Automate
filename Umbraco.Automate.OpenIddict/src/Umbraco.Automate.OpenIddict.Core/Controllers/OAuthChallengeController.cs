@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Client.AspNetCore;
+using Umbraco.Automate.OpenIddict.Extensions;
 using Umbraco.Automate.OpenIddict.Providers;
 using Umbraco.Cms.Api.Common.Attributes;
 
@@ -39,12 +40,11 @@ public sealed class OAuthChallengeController : ControllerBase
         // guard here too — OpenIddict throws an unhandled InvalidOperationException rather than
         // a friendly result if the client ID is missing when the challenge is dispatched.
         var configuration = _configurationSource.GetConfiguration(provider);
-        if (string.IsNullOrWhiteSpace(configuration?.ClientId) || string.IsNullOrWhiteSpace(configuration?.ClientSecret))
+        if (!configuration.HasClientCredentials())
         {
-            return Content(
-                BuildPopupHtml($"{provider} is not configured. Add a client ID and secret under " +
-                    $"Umbraco:Automate:Providers:{provider} in appsettings.json."),
-                "text/html");
+            return OAuthPopupResult.Failure(
+                $"{provider} is not configured. Add a client ID and secret under " +
+                $"Umbraco:Automate:Providers:{provider} in appsettings.json.");
         }
 
         var properties = new AuthenticationProperties
@@ -58,28 +58,5 @@ public sealed class OAuthChallengeController : ControllerBase
         properties.SetString(OpenIddictClientAspNetCoreConstants.Properties.ProviderName, provider);
 
         return Challenge(properties, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
-    }
-
-    // Mirrors OAuthCallbackController's popup-close pattern so a misconfigured provider closes
-    // the popup with a friendly notification instead of leaving an unhandled exception page open.
-    private static string BuildPopupHtml(string error)
-    {
-        var messagePayload = $$"""{ "type": "oauth-complete", "success": false, "error": "{{error}}" }""";
-
-        return $$"""
-            <!DOCTYPE html>
-            <html>
-            <head><title>OAuth Complete</title></head>
-            <body>
-                <p>Authentication failed: {{error}}</p>
-                <script>
-                    if (window.opener) {
-                        window.opener.postMessage({{messagePayload}}, window.location.origin);
-                    }
-                    window.close();
-                </script>
-            </body>
-            </html>
-            """;
     }
 }
