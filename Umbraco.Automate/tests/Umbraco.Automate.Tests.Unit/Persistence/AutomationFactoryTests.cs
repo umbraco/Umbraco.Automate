@@ -37,7 +37,8 @@ public class AutomationFactoryTests
         // Create a factory with a passthrough serializer (no encryption).
         var serializer = new EditableModelSerializer(
             Mock.Of<Core.Security.ISensitiveFieldProtector>(p =>
-                p.IsProtected(It.IsAny<string>()) == false));
+                p.IsProtected(It.IsAny<string>()) == false),
+            new ConfigurationReferenceResolver(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
         return new AutomationFactory(
             serializer,
@@ -147,8 +148,8 @@ public class AutomationFactoryTests
         protector.Setup(p => p.Unprotect(It.IsAny<string>()))
             .Returns((string v) => v[4..]);
 
-        var serializer = new EditableModelSerializer(protector.Object);
-        var modelResolver = new EditableModelResolver(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        var serializer = new EditableModelSerializer(protector.Object, new ConfigurationReferenceResolver(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
         var triggers = new TriggerCollection(() =>
         {
             var deps = new TriggerInfrastructure(modelResolver);
