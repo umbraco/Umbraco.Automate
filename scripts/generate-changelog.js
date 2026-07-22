@@ -69,34 +69,31 @@ function getProductConfig(product, rootDir) {
 // Get previous version tag for a product
 function getPreviousVersion(product, currentVersion, tagPrefix) {
     try {
-        // Get all tags for this product, sorted by version
-        const tags = execSync(`git tag --list "${tagPrefix}*" --sort=-version:refname`, {
+        // Find the most recent tag for this product REACHABLE from HEAD. Using
+        // reachability (like CI's detect-changes.ps1 and `git describe`) instead of a
+        // repo-wide version sort avoids two bugs on parallel support lines:
+        //   1. `git tag --sort=-version:refname` returns the highest tag across ALL
+        //      major lines, so a v17 release run would grab a v18 tag as its base;
+        //   2. git's version:refname sort is not true semver — it ranks
+        //      17.0.0-beta.1 above 17.0.0.
+        const described = execSync(`git describe --tags --abbrev=0 --match="${tagPrefix}*" HEAD`, {
             encoding: "utf-8",
-        })
-            .trim()
-            .split("\n")
-            .filter((t) => t);
+            stdio: ["pipe", "pipe", "ignore"],
+        }).trim();
 
-        if (tags.length === 0) {
-            return null; // No previous tags
+        // When regenerating a changelog for an already-tagged version, describe returns
+        // that same tag; step back one commit so we compare against the prior release.
+        if (currentVersion && described === `${tagPrefix}${currentVersion}`) {
+            const prior = execSync(`git describe --tags --abbrev=0 --match="${tagPrefix}*" ${described}^`, {
+                encoding: "utf-8",
+                stdio: ["pipe", "pipe", "ignore"],
+            }).trim();
+            return prior || null;
         }
 
-        // If currentVersion is provided, find the tag before it
-        if (currentVersion) {
-            const currentTag = `${tagPrefix}${currentVersion}`;
-            const currentIndex = tags.indexOf(currentTag);
-
-            if (currentIndex > 0) {
-                return tags[currentIndex - 1];
-            } else if (currentIndex === 0) {
-                return null; // This is the first version
-            }
-        }
-
-        // Return the most recent tag
-        return tags[0];
+        return described || null;
     } catch (err) {
-        console.warn(`Warning: Could not get previous version for ${product}:`, err.message);
+        // Non-zero exit means no matching tag is reachable — first release on this line.
         return null;
     }
 }
