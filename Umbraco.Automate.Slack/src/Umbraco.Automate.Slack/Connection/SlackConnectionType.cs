@@ -30,6 +30,9 @@ public sealed class SlackConnectionType : OAuthConnectionTypeBase<SlackConnectio
     /// <inheritdoc />
     public override string ProviderName => "Slack";
 
+    /// <inheritdoc />
+    public override string? SetupDocsUrl => "https://docs.umbraco.com/umbraco-automate/add-ons/slack/installation#create-a-slack-app";
+
     /// <summary>
     /// Adds a Slack-specific check on top of the base token-resolution check: calls
     /// <c>auth.test</c> to confirm the token actually works against the Slack API and returns
