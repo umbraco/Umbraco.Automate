@@ -39,7 +39,7 @@ public sealed class OAuthCallbackController : ControllerBase
         var result = await HttpContext.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
         if (!result.Succeeded)
         {
-            return Content(BuildPopupHtml(success: false, error: "Authentication failed."), "text/html");
+            return OAuthPopupResult.Failure("Authentication failed.");
         }
 
         var accessToken = result.Properties?.GetTokenValue(Tokens.BackchannelAccessToken);
@@ -48,7 +48,7 @@ public sealed class OAuthCallbackController : ControllerBase
 
         if (string.IsNullOrEmpty(accessToken))
         {
-            return Content(BuildPopupHtml(success: false, error: "No access token received."), "text/html");
+            return OAuthPopupResult.Failure("No access token received.");
         }
 
         // The {provider} route segment is the lowercased convention used for the callback URL
@@ -80,29 +80,6 @@ public sealed class OAuthCallbackController : ControllerBase
 
         var saved = await _credentialsService.CreateCredentialsAsync(credential);
 
-        return Content(BuildPopupHtml(success: true, credentialId: saved.Id.ToString()), "text/html");
-    }
-
-    private static string BuildPopupHtml(bool success, string? credentialId = null, string? error = null)
-    {
-        var messagePayload = success
-            ? $$"""{ "type": "oauth-complete", "success": true, "credentialId": "{{credentialId}}" }"""
-            : $$"""{ "type": "oauth-complete", "success": false, "error": "{{error}}" }""";
-
-        return $$"""
-            <!DOCTYPE html>
-            <html>
-            <head><title>OAuth Complete</title></head>
-            <body>
-                <p>{{(success ? "Authentication successful. This window will close." : $"Authentication failed: {error}")}}</p>
-                <script>
-                    if (window.opener) {
-                        window.opener.postMessage({{messagePayload}}, window.location.origin);
-                    }
-                    window.close();
-                </script>
-            </body>
-            </html>
-            """;
+        return OAuthPopupResult.Success(saved.Id.ToString());
     }
 }

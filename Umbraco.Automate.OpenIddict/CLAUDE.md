@@ -32,7 +32,7 @@ Umbraco.Automate.OpenIddict provides reusable OAuth connection infrastructure fo
 - **OAuthConnectionTypeBase** — Abstract base class for OAuth-enabled connection types; provider packages extend this
 - **IOAuthProviderConfigurationSource** — Replaceable source for provider app credentials (client ID/secret). Default reads from `IConfiguration` at `Umbraco:Automate:Providers:{providerName}`
 - **OpenIddictClientCredentialsConfigurator** — `IPostConfigureOptions<OpenIddictClientOptions>` that patches credentials and redirect URIs onto OpenIddict registrations at runtime via `IOAuthProviderConfigurationSource`
-- **OAuthChallengeController** — Initiates the OAuth popup flow (requires backoffice auth)
+- **OAuthChallengeController** — Initiates the OAuth popup flow (anonymous, like the callback; it only redirects to the external provider and is secured by the state token validated on callback)
 - **OAuthCallbackController** — Handles provider redirects, exchanges codes for tokens, stores credentials
 - **IOAuthCredentialsService** — Service for credentials CRUD and transparent token refresh
 - **OAuth Property Editor** (`Umb.Automate.OAuth`) — Lit component handling the popup OAuth flow UI
