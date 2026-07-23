@@ -27,8 +27,8 @@
 
   <!-- Inter-product (Umbraco.Automate) -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[17.0.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[17.0.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[17.1.0, 17.999.999)" />
   </ItemGroup>
 
   <!-- WorkflowCore (automation engine) -->
