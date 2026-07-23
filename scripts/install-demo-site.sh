@@ -180,6 +180,24 @@ echo "Adding NamedPipeListenerComposer for HTTP over named pipes..."
 mkdir -p "$DEMO_SITE_DIR/Composers"
 cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "$DEMO_SITE_DIR/Composers/NamedPipeListenerComposer.cs"
 
+# Step 3.4: Point Umbraco.Automate at the CMS database
+# Automate needs its own connection string (defaults to umbracoAutomateDbDSN) or it throws
+# on first run. For the demo we reuse the CMS SQLite connection (umbracoDbDSN) via
+# UseNamedConnectionString so a single database backs both CMS and Automate. This must be
+# configured before the first run, otherwise startup fails. Node is guaranteed present by the
+# toolchain check above, so we use it to edit the JSON robustly (no jq dependency).
+echo "Configuring Umbraco.Automate to share the CMS database..."
+DEV_SETTINGS_PATH="$DEMO_SITE_DIR/appsettings.Development.json"
+node -e '
+const fs = require("fs");
+const p = process.argv[1];
+const s = JSON.parse(fs.readFileSync(p, "utf8"));
+s.Umbraco = s.Umbraco || {};
+s.Umbraco.Automate = s.Umbraco.Automate || {};
+s.Umbraco.Automate.UseNamedConnectionString = "umbracoDbDSN";
+fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
+' "$DEV_SETTINGS_PATH"
+
 # Step 4: Create unified solution
 echo "Creating unified solution..."
 dotnet new sln -n "Umbraco.Automate.local" --force

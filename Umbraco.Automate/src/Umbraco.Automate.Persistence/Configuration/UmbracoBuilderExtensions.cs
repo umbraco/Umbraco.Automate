@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
@@ -47,6 +48,12 @@ public static partial class UmbracoBuilderExtensions
                 serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
                 serviceProvider.GetRequiredService<IConfiguration>());
             UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
+
+            // Defer writes on this (DI-resolved) context until Automate's own startup migrations
+            // have completed. The migration handler's own standalone context is configured
+            // separately, via the same ConfigureProvider call, and is deliberately not gated here.
+            options.AddInterceptors(new AutomateReadinessInterceptor(
+                serviceProvider.GetRequiredService<AutomateReadinessSignal>()));
         });
 
         builder.Services.AddSingleton<AutomationFactory>();

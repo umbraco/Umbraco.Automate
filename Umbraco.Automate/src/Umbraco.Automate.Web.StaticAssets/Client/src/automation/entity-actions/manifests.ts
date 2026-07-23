@@ -6,7 +6,7 @@ import {
 import { UA_WORKSPACE_ENTITY_TYPE } from "../../workspace-management/constants.js";
 import { UA_AUTOMATION_FOLDER_REPOSITORY_ALIAS } from "../tree/folder/constants.js";
 import { automationMoveManifests } from "./move/manifests.js";
-import { UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./automation-has-manual-trigger.condition.constants.js";
+import { UA_ENTITY_AUTOMATION_CAN_RUN_NOW_CONDITION_ALIAS } from "./automation-can-run-now.condition.constants.js";
 import { UA_ENTITY_AUTOMATION_IS_DISABLED_CONDITION_ALIAS } from "./automation-is-disabled.condition.constants.js";
 
 export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
@@ -46,7 +46,8 @@ export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
             folderRepositoryAlias: UA_AUTOMATION_FOLDER_REPOSITORY_ALIAS,
         } as any,
     },
-    // Run now — only surfaces for automations that use the Manual trigger.
+    // Run now — only surfaces for automations that use a manually-runnable trigger
+    // (Manual or Scheduled).
     {
         type: "entityAction",
         kind: "default",
@@ -60,14 +61,14 @@ export const automationEntityActionManifests: Array<UmbExtensionManifest> = [
             label: "#uaAutomation_runNow",
         },
         conditions: [
-            { alias: UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS },
+            { alias: UA_ENTITY_AUTOMATION_CAN_RUN_NOW_CONDITION_ALIAS },
         ],
     },
     {
         type: "condition",
-        alias: UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS,
-        name: "Entity Automation Has Manual Trigger Condition",
-        api: () => import("./automation-has-manual-trigger.condition.js"),
+        alias: UA_ENTITY_AUTOMATION_CAN_RUN_NOW_CONDITION_ALIAS,
+        name: "Entity Automation Can Run Now Condition",
+        api: () => import("./automation-can-run-now.condition.js"),
     },
     // Re-enable — only surfaces for automations auto-disabled by the circuit breaker.
     {

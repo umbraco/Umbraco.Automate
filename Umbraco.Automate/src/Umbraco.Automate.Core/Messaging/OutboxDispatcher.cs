@@ -63,7 +63,13 @@ internal sealed class OutboxDispatcher : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Wait for Automate migrations to complete before accessing the database.
-        await _readinessSignal.WaitAsync(stoppingToken);
+        if (!await _readinessSignal.WaitUntilReadyAsync(stoppingToken))
+        {
+            _logger.LogError(
+                "Automate startup migrations failed; the outbox dispatcher will not start. " +
+                "Resolve the migration failure and restart.");
+            return;
+        }
 
         var handlersByTopic = _handlers.ToDictionary(h => h.Topic, h => h);
         var topics = handlersByTopic.Keys.ToList();
