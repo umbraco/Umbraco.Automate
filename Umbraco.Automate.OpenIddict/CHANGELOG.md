@@ -5,6 +5,12 @@ All notable changes to Umbraco.Automate.OpenIddict will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.1.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@18.0.0...Umbraco.Automate.OpenIddict@18.1.0) (2026-07-22)
+
+### feat
+
+* **oauth:** Warn before authenticate when provider credentials are missing ([e5da787](https://github.com/umbraco/Umbraco.Automate/commit/e5da787d3a8322a75fe466e6d8ced29a76adfff7)), closes [#107](https://github.com/umbraco/Umbraco.Automate/issues/107)
+
 ## [18.0.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@18.0.0-beta...Umbraco.Automate.OpenIddict@18.0.0) (2026-07-08)
 
 ### Internal
