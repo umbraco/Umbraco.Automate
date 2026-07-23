@@ -8,10 +8,13 @@ import { UmbConditionBase } from "@umbraco-cms/backoffice/extension-registry";
 import { UMB_ENTITY_CONTEXT } from "@umbraco-cms/backoffice/entity";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { AutomationsService } from "../../api/sdk.gen.js";
+import { UA_MANUAL_TRIGGER_ALIAS, UA_SCHEDULED_TRIGGER_ALIAS } from "../constants.js";
 
-export { UA_ENTITY_AUTOMATION_HAS_MANUAL_TRIGGER_CONDITION_ALIAS } from "./automation-has-manual-trigger.condition.constants.js";
+export { UA_ENTITY_AUTOMATION_CAN_RUN_NOW_CONDITION_ALIAS } from "./automation-can-run-now.condition.constants.js";
 
-const MANUAL_TRIGGER_ALIAS = "umbracoAutomate.manual";
+function isManuallyRunnableTriggerAlias(alias: string | null | undefined): boolean {
+    return alias === UA_MANUAL_TRIGGER_ALIAS || alias === UA_SCHEDULED_TRIGGER_ALIAS;
+}
 
 // Per-process cache so the same automation isn't refetched every time the menu
 // renders for the same entity. Tree refreshes invalidate by recreating items.
@@ -19,13 +22,13 @@ const triggerAliasCache = new Map<string, string | null>();
 
 /**
  * Permitted when the entity context's unique points to an automation whose
- * configured trigger is the Manual trigger.
+ * configured trigger can be run on demand (Manual or Scheduled).
  *
  * Fetches the full automation from the API on first evaluation per id so the
  * condition is independent of which tree store the entity action was launched
  * from (standalone automation tree vs workspace tree).
  */
-export class UaEntityAutomationHasManualTriggerCondition
+export class UaEntityAutomationCanRunNowCondition
     extends UmbConditionBase<UmbConditionConfigBase>
     implements UmbExtensionCondition
 {
@@ -43,7 +46,7 @@ export class UaEntityAutomationHasManualTriggerCondition
         if (!unique) return false;
 
         if (triggerAliasCache.has(unique)) {
-            return triggerAliasCache.get(unique) === MANUAL_TRIGGER_ALIAS;
+            return isManuallyRunnableTriggerAlias(triggerAliasCache.get(unique));
         }
 
         const { data } = await tryExecute(
@@ -52,8 +55,8 @@ export class UaEntityAutomationHasManualTriggerCondition
         );
         const triggerAlias = data?.trigger?.triggerAlias ?? null;
         triggerAliasCache.set(unique, triggerAlias);
-        return triggerAlias === MANUAL_TRIGGER_ALIAS;
+        return isManuallyRunnableTriggerAlias(triggerAlias);
     }
 }
 
-export { UaEntityAutomationHasManualTriggerCondition as api };
+export { UaEntityAutomationCanRunNowCondition as api };

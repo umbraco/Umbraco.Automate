@@ -1,8 +1,5 @@
-{
-    "include": [
-        "Umbraco.Automate",
-        "Umbraco.Automate.OpenIddict",
-        "Umbraco.Automate.Slack"
-    ],
-    "exclude": []
-}
+[
+  "Umbraco.Automate",
+  "Umbraco.Automate.OpenIddict",
+  "Umbraco.Automate.Slack"
+]

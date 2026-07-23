@@ -34,6 +34,14 @@ internal sealed class TriggerSubscriptionRegistry : ITriggerSubscriptionRegistry
     /// <inheritdoc />
     public async Task<bool> HasSubscribersAsync(string triggerAlias, CancellationToken cancellationToken = default)
     {
+        // Fail closed if startup migrations permanently failed: don't attempt dispatch that the
+        // readiness interceptor would only reject, which would surface as an error on every content
+        // operation. Automate is non-functional in this state, so events are deliberately dropped.
+        if (_readinessSignal.HasFailed)
+        {
+            return false;
+        }
+
         // Fail-open before the database is ready: don't drop events while migrations run.
         if (!_readinessSignal.IsReady)
         {

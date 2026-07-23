@@ -42,6 +42,24 @@ public class TriggerSubscriptionRegistryTests
     }
 
     [Fact]
+    public async Task HasSubscribers_AfterMigrationsFailed_ReturnsFalse()
+    {
+        // Fail closed once migrations permanently fail: the readiness interceptor would reject any
+        // dispatch write anyway, so don't attempt it (which would error every content operation).
+        var svc = AutomationService();
+        var failed = new AutomateReadinessSignal();
+        failed.SignalFailed(new InvalidOperationException("Simulated migration failure"));
+
+        var registry = new TriggerSubscriptionRegistry(
+            svc.Object, failed, Mock.Of<ILogger<TriggerSubscriptionRegistry>>());
+
+        var result = await registry.HasSubscribersAsync("anything");
+
+        result.ShouldBeFalse();
+        svc.Verify(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task HasSubscribers_PublishedAutomation_ReturnsTrue()
     {
         var automation = new AutomationBuilder()

@@ -155,6 +155,101 @@ public class BindingEvaluatorTests
         matches.Length.ShouldBeGreaterThan(2); // not "[]" or ""
     }
 
+    // Regression for #112: after the WorkflowCore persistence round-trip through
+    // Newtonsoft with TypeNameHandling.All, nested dictionaries are rebuilt with the
+    // DEFAULT (case-sensitive) comparer — losing the OrdinalIgnoreCase comparer they
+    // were created with. A PascalCase binding against a camelCase-stored key then
+    // silently resolves to "". Path resolution must be case-insensitive regardless
+    // of the dictionary's own comparer.
+    [Fact]
+    public void Evaluate_AfterAutomationWorkflowDataRoundTrip_ResolvesPascalCaseBindingOnCamelCaseKey()
+    {
+        var findContentId = Guid.Parse("814d234d-16fc-4916-9cf8-ead07d3b0e72");
+        var output = new Umbraco.Automate.Core.Actions.BuiltIn.FindContentOutput
+        {
+            Matches = [new Umbraco.Automate.Core.Actions.BuiltIn.FindContentMatch
+            {
+                ContentKey = Guid.Parse("776a648d-3a0d-4745-8853-2de74cd486d8"),
+                Name = "Novicell UK",
+                ContentTypeAlias = "partnerPage",
+            }],
+        };
+        var stjJson = JsonSerializer.Serialize(output, JsonOptions.Default);
+        var unwrapped = JsonOptions.DeserializeToUnwrappedDictionary(stjJson);
+
+        var data = new Umbraco.Automate.Core.Execution.AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            AutomationAlias = "test",
+            StepOutputs = new Dictionary<Guid, Dictionary<string, object?>> { [findContentId] = unwrapped },
+            StepAliases = new Dictionary<Guid, string> { [findContentId] = "findContent" },
+        };
+
+        var settings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All,
+            ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore,
+        };
+        var persisted = Newtonsoft.Json.JsonConvert.SerializeObject(data, settings);
+        var rehydrated = Newtonsoft.Json.JsonConvert.DeserializeObject<Umbraco.Automate.Core.Execution.AutomationWorkflowData>(persisted, settings)!;
+
+        var bindingData = Umbraco.Automate.Core.Execution.BindingDataBuilder.Build(rehydrated);
+
+        // PascalCase binding against a camelCase-stored key: must still resolve.
+        _evaluator.Evaluate("${ steps.findContent.first.ContentKey }", bindingData)
+            .ShouldBe("776a648d-3a0d-4745-8853-2de74cd486d8");
+    }
+
+    // #112: ResolveKey must not depend on the dictionary's own comparer. A plain
+    // ORDINAL dictionary (post-round-trip state) with a camelCase key must still
+    // resolve a PascalCase segment via case-insensitive fallback.
+    [Fact]
+    public void ResolvePath_CaseInsensitiveFallback_OnOrdinalDictionary()
+    {
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["steps"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["findContent"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["contentKey"] = "abc-123",
+                },
+            },
+        };
+
+        BindingEvaluator.ResolvePath("steps.findContent.ContentKey", data)
+            .ShouldBe("abc-123");
+    }
+
+    // #112: exact match must win over a differing-case key when both are present.
+    [Fact]
+    public void ResolvePath_ExactMatch_WinsOverDifferingCase()
+    {
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["key"] = "lower",
+            ["Key"] = "upper",
+        };
+
+        BindingEvaluator.ResolvePath("key", data).ShouldBe("lower");
+        BindingEvaluator.ResolvePath("Key", data).ShouldBe("upper");
+    }
+
+    // #112: the exact TryGetValue must short-circuit before the case-insensitive scan,
+    // so an exact match wins even when a differing-case key enumerates first.
+    [Fact]
+    public void ResolvePath_ExactMatch_WinsOverEarlierDifferingCaseKey()
+    {
+        var data = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["KEY"] = "upper", // enumerates first, matches "key" only case-insensitively
+            ["key"] = "lower", // the exact match the fallback scan must never reach
+        };
+
+        BindingEvaluator.ResolvePath("key", data).ShouldBe("lower");
+    }
+
     // Repro for user-reported bug: step output with a nested object under "first"
     // doesn't resolve AFTER the workflow suspends and resumes, because WorkflowCore
     // persists the data dictionary through Newtonsoft.Json — which returns JObject/

@@ -5,5 +5,6 @@ export * from "./workspace/constants.js";
 export * from "./repository/constants.js";
 export * from "./collection/constants.js";
 export * from "./tree/constants.js";
+export * from "./triggers/constants.js";
 
 export const UA_AUTOMATION_ICON = "icon-mindmap";

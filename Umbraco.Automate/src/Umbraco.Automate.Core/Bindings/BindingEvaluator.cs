@@ -241,14 +241,31 @@ public sealed class BindingEvaluator
 
     private static object? ResolveKey(object? current, string key)
     {
+        // Lookups must not depend on the dictionary's own comparer: a WorkflowCore
+        // persistence round-trip through Newtonsoft rebuilds nested dictionaries with
+        // the default (case-sensitive) comparer, so a PascalCase binding would miss a
+        // camelCase-stored key. Try the O(1) exact match first, then fall back to the
+        // first case-insensitive match. Step output originates from a single POCO, so
+        // keys differing only by case are not expected; if they ever occurred the exact
+        // match still wins and the fallback's tie-break is simply enumeration order.
         if (current is IReadOnlyDictionary<string, object?> roDict)
         {
-            return roDict.TryGetValue(key, out var val) ? val : null;
+            if (roDict.TryGetValue(key, out var val))
+            {
+                return val;
+            }
+
+            return roDict.FirstOrDefault(kvp => string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
         }
 
         if (current is IDictionary<string, object?> mDict)
         {
-            return mDict.TryGetValue(key, out var val) ? val : null;
+            if (mDict.TryGetValue(key, out var val))
+            {
+                return val;
+            }
+
+            return mDict.FirstOrDefault(kvp => string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
         }
 
         return null;

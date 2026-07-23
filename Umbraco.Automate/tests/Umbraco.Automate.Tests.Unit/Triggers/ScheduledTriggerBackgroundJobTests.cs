@@ -135,6 +135,49 @@ public class ScheduledTriggerBackgroundJobTests
     }
 
     [Fact]
+    public async Task PerformExecuteAsync_ScheduledTriggerDue_PopulatesOutputWithFiredAtUtcAndCronExpression()
+    {
+        // Regression for #152: the dispatched event must carry a populated ScheduledTriggerOutput
+        // so {{trigger.firedAtUtc}} / {{trigger.cronExpression}} bindings resolve on a real fire,
+        // not just an empty TriggerEvent with no output.
+        var automationId = Guid.NewGuid();
+
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
+
+        var automation = new Automation
+        {
+            Alias = "test",
+            Name = "Test",
+            Status = AutomationStatus.Published,
+            Trigger = new TriggerConfiguration { TriggerAlias = ScheduledTriggerAlias, Settings = [] },
+        };
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DateTime.UtcNow.AddMinutes(-2));
+
+        TriggerEvent? captured = null;
+        _dispatcher.Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((e, _) => captured = e)
+            .Returns(Task.CompletedTask);
+
+        await _job.PerformExecuteAsync(null);
+
+        var withOutput = captured.ShouldBeOfType<TriggerEvent<ScheduledTriggerOutput>>();
+        withOutput.Output.CronExpression.ShouldBe("* * * * *");
+        // FiredAtUtc is the cron tick (dueAt), not wall-clock "now" — must be a real value in the past.
+        withOutput.Output.FiredAtUtc.ShouldNotBe(default);
+        withOutput.Output.FiredAtUtc.ShouldBeLessThanOrEqualTo(DateTime.UtcNow);
+    }
+
+    [Fact]
     public async Task PerformExecuteAsync_LastFiredKindUnspecified_StillDispatches()
     {
         // Regression: Cronos rejects DateTime values with Kind=Unspecified,

@@ -23,6 +23,9 @@ namespace Umbraco.Automate.OpenIddict.Providers;
 ///   }
 /// }
 /// </code>
+/// Keep the client secret out of source control — use environment variables, user secrets, or a
+/// key vault to inject it at deployment time. <see cref="IConfiguration"/> reads from whichever
+/// of these sources is registered, so the appsettings.json shape above is illustrative only.
 /// </example>
 internal sealed class ConfigurationOAuthProviderConfigurationSource : IOAuthProviderConfigurationSource
 {
