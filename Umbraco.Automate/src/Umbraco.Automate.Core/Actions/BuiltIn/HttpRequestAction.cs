@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Http;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
@@ -74,7 +75,7 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
             return ResponseTooLarge(settings.Url, declaredLength, maxBodyBytes);
         }
 
-        var body = await ReadBodyCappedAsync(response.Content, maxBodyBytes, cancellationToken);
+        var body = await HttpResponseBodyReader.ReadCappedAsync(response.Content, maxBodyBytes, cancellationToken);
         if (body is null)
         {
             return ResponseTooLarge(settings.Url, actualBytes: null, maxBodyBytes);
@@ -92,47 +93,6 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
             : ActionResult.Failed(
                 new HttpRequestException($"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}"),
                 StepRunErrorCategory.InvalidResponse);
-    }
-
-    /// <summary>
-    /// Reads the response body up to <paramref name="maxBytes"/>, returning <c>null</c> when
-    /// the body turns out to be larger (cap enforced while streaming, so at most one chunk
-    /// past the limit is ever buffered).
-    /// </summary>
-    private static async Task<string?> ReadBodyCappedAsync(HttpContent content, long maxBytes, CancellationToken cancellationToken)
-    {
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        using var buffer = new MemoryStream();
-        var chunk = new byte[81920];
-        int read;
-        while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
-        {
-            if (buffer.Length + read > maxBytes)
-            {
-                return null;
-            }
-
-            buffer.Write(chunk, 0, read);
-        }
-
-        return ResolveEncoding(content.Headers.ContentType?.CharSet).GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
-    }
-
-    private static Encoding ResolveEncoding(string? charset)
-    {
-        if (string.IsNullOrWhiteSpace(charset))
-        {
-            return Encoding.UTF8;
-        }
-
-        try
-        {
-            return Encoding.GetEncoding(charset.Trim('"'));
-        }
-        catch (ArgumentException)
-        {
-            return Encoding.UTF8;
-        }
     }
 
     private static ActionResult ResponseTooLarge(string? url, long? actualBytes, long maxBytes)
