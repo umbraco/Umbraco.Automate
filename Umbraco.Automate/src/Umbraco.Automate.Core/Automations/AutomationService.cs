@@ -109,6 +109,7 @@ internal sealed class AutomationService : IAutomationService
         }
 
         EnsureStepAliases(automation);
+        ValidateStepSettings(automation);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -133,6 +134,7 @@ internal sealed class AutomationService : IAutomationService
     public async Task<Automation> UpdateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         EnsureStepAliases(automation);
+        ValidateStepSettings(automation);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -278,6 +280,46 @@ internal sealed class AutomationService : IAutomationService
         {
             throw new AutomationValidationException(
                 $"Cannot publish automation '{automation.Name}'.",
+                errors);
+        }
+    }
+
+    /// <summary>
+    /// Validates the settings of every step whose action opts into <see cref="IValidatableStepType"/>
+    /// (e.g. the Run Script action compiling its script), rejecting the save if any are invalid.
+    /// </summary>
+    private void ValidateStepSettings(Automation automation)
+    {
+        var errors = new List<string>();
+
+        foreach (var step in automation.Steps)
+        {
+            if (_actions.GetByAlias(step.ActionAlias) is not IValidatableStepType validatable)
+            {
+                continue;
+            }
+
+            object? resolved;
+            try
+            {
+                resolved = ((IStepType)validatable).ResolveSettings(step.Settings);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Step '{step.Name}' has invalid settings: {ex.Message}");
+                continue;
+            }
+
+            foreach (var error in validatable.ValidateSettings(resolved))
+            {
+                errors.Add($"Step '{step.Name}': {error}");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new AutomationValidationException(
+                $"Cannot save automation '{automation.Name}'.",
                 errors);
         }
     }
