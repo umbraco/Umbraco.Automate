@@ -630,7 +630,7 @@ public class SlackAutomateComposer : IComposer
 
 | Group | Triggers | Actions |
 |-------|----------|---------|
-| **Core** | Manual, Scheduled (CRON), Webhook Received | HTTP Request, Delay, Log Message, Set Variable |
+| **Core** | Manual, Scheduled (CRON), Webhook Received | HTTP Request, Run Script, Delay, Log Message, Set Variable |
 | **Content** | Content Published, Content Unpublished, Content Saved, Content Deleted, Content Moved | Publish Content, Unpublish Content, Create Content, Update Content, Delete Content |
 | **Media** | Media Uploaded, Media Deleted | Upload Media, Delete Media |
 | **Members** | Member Created, Member Approved, Member Locked Out | Create Member, Update Member, Assign Group |
