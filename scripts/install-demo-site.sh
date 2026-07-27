@@ -180,6 +180,13 @@ echo "Adding NamedPipeListenerComposer for HTTP over named pipes..."
 mkdir -p "$DEMO_SITE_DIR/Composers"
 cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "$DEMO_SITE_DIR/Composers/NamedPipeListenerComposer.cs"
 
+# Step 3.4: Configure Automate to share the CMS's SQLite connection string
+# (avoids requiring a separate umbracoAutomateDbDSN for local dev)
+echo "Configuring Automate to share the CMS database connection..."
+DEV_APPSETTINGS_PATH="$DEMO_SITE_DIR/appsettings.Development.json"
+sed -i.bak 's/"Umbraco": {/"Umbraco": {\n    "Automate": {\n      "UseNamedConnectionString": "umbracoDbDSN"\n    },/' "$DEV_APPSETTINGS_PATH"
+rm -f "$DEV_APPSETTINGS_PATH.bak"
+
 # Step 4: Create unified solution
 echo "Creating unified solution..."
 dotnet new sln -n "Umbraco.Automate.local" --force

@@ -163,6 +163,16 @@ $composerDestPath = "$DemoSiteDir\Composers\NamedPipeListenerComposer.cs"
 New-Item -ItemType Directory -Path (Split-Path $composerDestPath) -Force | Out-Null
 Copy-Item -Path $composerSourcePath -Destination $composerDestPath -Force
 
+# Step 3.4: Configure Automate to share the CMS's SQLite connection string
+# (avoids requiring a separate umbracoAutomateDbDSN for local dev)
+Write-Host "Configuring Automate to share the CMS database connection..." -ForegroundColor Green
+$devAppSettingsPath = "$DemoSiteDir\appsettings.Development.json"
+$devAppSettingsContent = Get-Content $devAppSettingsPath -Raw
+$anchor = '"Umbraco": {'
+$replacement = "`"Umbraco`": {`n    `"Automate`": {`n      `"UseNamedConnectionString`": `"umbracoDbDSN`"`n    },"
+$devAppSettingsContent = $devAppSettingsContent.Replace($anchor, $replacement)
+Set-Content -Path $devAppSettingsPath -Value $devAppSettingsContent -NoNewline -Encoding utf8
+
 # Step 4: Create unified solution
 Write-Host "Creating unified solution..." -ForegroundColor Green
 dotnet new sln -n "Umbraco.Automate.local" --force
