@@ -1,5 +1,6 @@
 using System.Dynamic;
 using System.Globalization;
+using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 using Jint;
 using Jint.Native;
@@ -223,8 +224,10 @@ public sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, ILo
         // Round-trip through the engine's JSON.stringify so the result obeys JSON semantics:
         // functions/undefined are dropped, NaN/Infinity become null, dates become ISO strings,
         // and circular references throw a JavaScriptException we classify as a runtime error.
-        engine.SetValue("__automateResult", value);
-        var json = engine.Evaluate("JSON.stringify(__automateResult)");
+        // Invoke the intrinsic directly rather than evaluating a snippet against a temporary
+        // global, which the script itself could read or shadow.
+        var stringify = engine.GetValue("JSON").Get("stringify");
+        var json = engine.Invoke(stringify, value);
         return json.IsString() ? JsonNode.Parse(json.AsString()) : null;
     }
 
@@ -261,14 +264,27 @@ public sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, ILo
         // would reach a host the allowlist check (which only validated the initial URL) never
         // vetted, so the allowlist must bind the host actually contacted.
         var followRedirects = requestInit.Redirect is "follow" && options.FetchAllowedHosts.Count == 0;
-        using var client = followRedirects
+
+        // Not disposed: the response body is read after this method returns, and a factory client
+        // owns no handler of its own to release anyway.
+        var client = followRedirects
             ? clientFactory.CreateClient(DefaultHttpClientName)
             : clientFactory.CreateClient(NoRedirectHttpClientName);
 
         try
         {
             using var cts = new CancellationTokenSource(options.HttpRequestTimeout);
-            var response = await client.SendAsync(request, cts.Token);
+
+            // Stream the response so MaxResponseBodyBytes is enforced while the body is read
+            // (see HttpResponseBodyReader) rather than after HttpClient has already buffered the
+            // whole payload into the host process.
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+
+            if (requestInit.Redirect is "error" && IsRedirect(response))
+            {
+                response.Dispose();
+                throw new JavaScriptException("http request was redirected");
+            }
 
             return new Response(requestUri, response, engine, options.MaxResponseBodyBytes);
         }
@@ -321,17 +337,43 @@ public sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, ILo
         }
     }
 
+    private static bool IsRedirect(HttpResponseMessage response) => (int)response.StatusCode is >= 300 and <= 399;
+
     private static void AddHeader(HttpRequestMessage request, string key, object? value)
     {
-        if (key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase))
+        // Which collection a header belongs to is HttpClient's own classification, not a name
+        // prefix — "Expires" is a content header, and a request without a body has nowhere to put
+        // content headers at all. Try the content first, fall back to the request, and report a
+        // header neither collection accepts instead of dropping it silently.
+        if (request.Content is not null && TryAddHeader(request.Content.Headers, key, value?.ToString()))
         {
-            // Content- headers can only appear once, so remove any existing value first.
-            request.Content?.Headers.Remove(key);
-            request.Content?.Headers.Add(key, value?.ToString());
+            return;
         }
-        else
+
+        if (!TryAddHeader(request.Headers, key, value?.ToString()))
         {
-            request.Headers.Add(key, value?.ToString());
+            throw new JavaScriptException($"header '{key}' cannot be set on this request");
+        }
+    }
+
+    private static bool TryAddHeader(HttpHeaders headers, string key, string? value)
+    {
+        // A header can only appear once here, so remove any existing value first.
+        headers.Remove(key);
+
+        try
+        {
+            headers.Add(key, value);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // This collection does not accept the header — the caller tries the other one.
+            return false;
+        }
+        catch (FormatException)
+        {
+            throw new JavaScriptException($"header '{key}' has an invalid value");
         }
     }
 

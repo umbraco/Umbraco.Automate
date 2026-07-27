@@ -29,14 +29,16 @@ public sealed class Headers
     /// <summary>Initializes a new, empty, mutable <see cref="Headers"/> instance.</summary>
     public Headers()
     {
-        _headers = new();
+        _headers = new(StringComparer.OrdinalIgnoreCase);
         _setCookie = new();
     }
 
     /// <summary>Initializes a new <see cref="Headers"/> instance copied from another.</summary>
     public Headers(Headers headers)
     {
-        _headers = new(headers._headers);
+        // Copy the value lists too: sharing them would let a mutable copy append to the headers
+        // of the (immutable) response it was copied from.
+        _headers = headers._headers.ToDictionary(x => x.Key, x => new List<string?>(x.Value), StringComparer.OrdinalIgnoreCase);
         _setCookie = new(headers._setCookie);
     }
 

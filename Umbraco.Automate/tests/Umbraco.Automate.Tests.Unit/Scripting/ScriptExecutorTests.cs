@@ -427,6 +427,122 @@ public class ScriptExecutorTests
         captured!.Headers.GetValues("X-Test").ShouldContain("abc");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_FetchLowercaseMethod_IsNormalised()
+    {
+        // The web fetch API normalises method case; silently falling back to GET would send the
+        // body on the wrong method and report success.
+        HttpRequestMessage? captured = null;
+        var (executor, options) = CreateCapturing(req => captured = req);
+
+        await executor.ExecuteAsync(
+            "script",
+            """
+            export default async function () {
+                await fetch('https://example.org/submit', { method: 'post', body: 'payload' });
+                return null;
+            }
+            """,
+            null,
+            options);
+
+        captured!.Method.ShouldBe(HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchContentHeaderWithBody_AppliesToContent()
+    {
+        HttpRequestMessage? captured = null;
+        var (executor, options) = CreateCapturing(req => captured = req);
+
+        await executor.ExecuteAsync(
+            "script",
+            """
+            export default async function () {
+                await fetch('https://example.org', {
+                    method: 'POST',
+                    body: '{}',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Last-Modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
+                    },
+                });
+                return null;
+            }
+            """,
+            null,
+            options);
+
+        captured!.Content!.Headers.ContentType!.MediaType.ShouldBe("application/json");
+
+        // "Last-Modified" is a content header despite not starting with "Content-".
+        captured.Content.Headers.LastModified.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchContentHeaderWithoutBody_ReportsError()
+    {
+        // There is nowhere to put a content header on a bodyless request — say so rather than
+        // dropping it and sending a request the receiver will reject.
+        ScriptError? error = null;
+        var (executor, options) = CreateCapturing(_ => { });
+        options.OnError = e => error = e;
+
+        var result = await executor.ExecuteAsync(
+            "script",
+            """
+            export default async function () {
+                await fetch('https://example.org', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                return null;
+            }
+            """,
+            null,
+            options);
+
+        result.ShouldBeNull();
+        error!.Value.Kind.ShouldBe(ScriptErrorKind.Runtime);
+        error!.Value.Message.ShouldContain("Content-Type");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchRedirectError_RejectsRedirectedResponse()
+    {
+        ScriptError? error = null;
+        var (executor, options) = Create(HttpStatusCode.Found);
+        options.OnError = e => error = e;
+
+        var result = await executor.ExecuteAsync(
+            "script",
+            """
+            export default async function () {
+                await fetch('https://example.org', { redirect: 'error' });
+                return 'unreachable';
+            }
+            """,
+            null,
+            options);
+
+        result.ShouldBeNull();
+        error!.Value.Kind.ShouldBe(ScriptErrorKind.Runtime);
+        error!.Value.Message.ShouldContain("redirected");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ResultSerialization_DoesNotExposeHostGlobals()
+    {
+        // The getter runs during JSON.stringify — the point at which the executor used to have a
+        // temporary global in scope.
+        var (executor, options) = Create();
+
+        var result = await executor.ExecuteAsync(
+            "script",
+            "export default () => ({ get leaked() { return typeof __automateResult } })",
+            null,
+            options);
+
+        result!["leaked"]!.GetValue<string>().ShouldBe("undefined");
+    }
+
     private static (ScriptExecutor Executor, ScriptExecutorOptions Options) CreateCapturing(Action<HttpRequestMessage> onRequest)
     {
         var handler = new Mock<HttpMessageHandler>();

@@ -61,9 +61,12 @@ public sealed class RequestInit
         get => _method;
         set
         {
-            if (value is "GET" or "HEAD" or "POST" or "PUT" or "DELETE" or "CONNECT" or "OPTIONS" or "TRACE" or "PATCH")
+            // The web fetch API normalises method case, so `{ method: 'post' }` must not fall
+            // through to the default GET — which would send the body on the wrong method.
+            var method = value?.ToUpperInvariant();
+            if (method is "GET" or "HEAD" or "POST" or "PUT" or "DELETE" or "CONNECT" or "OPTIONS" or "TRACE" or "PATCH")
             {
-                _method = value;
+                _method = method;
             }
         }
     }
