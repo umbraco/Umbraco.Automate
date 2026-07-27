@@ -42,6 +42,7 @@ public sealed class CreateAutomationController : AutomationControllerBase
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> CreateAutomation(
         CreateAutomationRequestModel requestModel,
         CancellationToken cancellationToken = default)
@@ -54,7 +55,15 @@ public sealed class CreateAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        var created = await _automationService.CreateAutomationAsync(automation, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        Core.Automations.Automation created;
+        try
+        {
+            created = await _automationService.CreateAutomationAsync(automation, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        }
+        catch (AutomationValidationException ex)
+        {
+            return ValidationFailed(ex.Message, ex.Errors);
+        }
 
         return CreatedAtAction(
             nameof(ByIdAutomationController.GetAutomationById),

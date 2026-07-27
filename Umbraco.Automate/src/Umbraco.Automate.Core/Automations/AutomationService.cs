@@ -506,26 +506,42 @@ internal sealed class AutomationService : IAutomationService
             MaxRetries = s.MaxRetries,
         }).ToList();
 
-        if (existingAutomationId is null)
+        // The save itself validates too (step aliases, step settings). Report those failures
+        // through the import contract rather than letting them escape as an exception the import
+        // endpoints do not handle.
+        try
         {
-            var created = await CreateImportedAutomationAsync(def, steps, workspaceId, userId, cancellationToken);
+            if (existingAutomationId is null)
+            {
+                var created = await CreateImportedAutomationAsync(def, steps, workspaceId, userId, cancellationToken);
+                return new AutomationImportResult
+                {
+                    Success = true,
+                    AutomationId = created.Id,
+                    AutomationAlias = created.Alias,
+                    Warnings = validationResult.Warnings,
+                };
+            }
+
+            var updated = await OverwriteImportedAutomationAsync(existingAutomationId.Value, def, steps, userId, cancellationToken);
             return new AutomationImportResult
             {
                 Success = true,
-                AutomationId = created.Id,
-                AutomationAlias = created.Alias,
+                AutomationId = updated.Id,
+                AutomationAlias = updated.Alias,
                 Warnings = validationResult.Warnings,
             };
         }
-
-        var updated = await OverwriteImportedAutomationAsync(existingAutomationId.Value, def, steps, userId, cancellationToken);
-        return new AutomationImportResult
+        catch (AutomationValidationException ex)
         {
-            Success = true,
-            AutomationId = updated.Id,
-            AutomationAlias = updated.Alias,
-            Warnings = validationResult.Warnings,
-        };
+            return new AutomationImportResult
+            {
+                Success = false,
+                AutomationAlias = def.Alias,
+                Errors = [.. ex.Errors],
+                Warnings = validationResult.Warnings,
+            };
+        }
     }
 
     private async Task<Automation> CreateImportedAutomationAsync(

@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Models;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Web.Api.Management.Versioning.Models;
@@ -240,6 +241,7 @@ public class EntityVersionHistoryController : VersioningControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> RollbackToVersion(
         [FromRoute] string entityType,
         [FromRoute] Guid entityId,
@@ -269,6 +271,12 @@ public class EntityVersionHistoryController : VersioningControllerBase
             var userKey = CurrentUserKey(_backOfficeSecurityAccessor);
             await handler.RollbackAsync(entityId, entityVersion, userKey, cancellationToken);
             return NoContent();
+        }
+        catch (AutomationValidationException ex)
+        {
+            // Must precede the InvalidOperationException catch below (it derives from it), which
+            // would otherwise report a restored-but-invalid entity as "not found".
+            return ValidationFailed(ex.Message, ex.Errors);
         }
         catch (InvalidOperationException ex)
         {

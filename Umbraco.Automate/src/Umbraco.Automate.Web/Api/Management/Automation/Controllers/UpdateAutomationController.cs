@@ -44,6 +44,7 @@ public sealed class UpdateAutomationController : AutomationControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UpdateAutomation(
         Guid id,
         UpdateAutomationRequestModel requestModel,
@@ -75,6 +76,10 @@ public sealed class UpdateAutomationController : AutomationControllerBase
         catch (ConcurrencyConflictException)
         {
             return ConcurrencyConflict("automation");
+        }
+        catch (AutomationValidationException ex)
+        {
+            return ValidationFailed(ex.Message, ex.Errors);
         }
 
         return Ok();

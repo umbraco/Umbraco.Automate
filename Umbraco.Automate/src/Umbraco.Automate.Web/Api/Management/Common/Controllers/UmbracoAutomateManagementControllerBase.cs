@@ -86,6 +86,20 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
     }
 
     /// <summary>
+    /// Returns a 422 Unprocessable Entity response carrying the individual validation errors.
+    /// </summary>
+    /// <param name="detail">A summary of what could not be validated.</param>
+    /// <param name="errors">One message per validation problem.</param>
+    protected IActionResult ValidationFailed(string detail, IReadOnlyList<string> errors)
+        => UnprocessableEntity(new ProblemDetails
+        {
+            Title = "Validation failed",
+            Detail = detail,
+            Status = StatusCodes.Status422UnprocessableEntity,
+            Extensions = { ["errors"] = errors },
+        });
+
+    /// <summary>
     /// Returns a 409 Conflict response for an optimistic concurrency violation.
     /// </summary>
     protected IActionResult ConcurrencyConflict(string entityName)
