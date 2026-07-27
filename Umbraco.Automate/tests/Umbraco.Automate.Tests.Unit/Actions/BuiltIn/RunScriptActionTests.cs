@@ -1,3 +1,5 @@
+using Json.Schema;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -7,6 +9,7 @@ using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Scripting;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
@@ -118,16 +121,102 @@ public class RunScriptActionTests
     }
 
     [Fact]
-    public void ValidateSettings_InvalidScript_ReturnsErrors()
+    public async Task ValidateSettingsAsync_InvalidScript_ReturnsErrors()
     {
-        var errors = CreateAction().ValidateSettings(new RunScriptSettings { Script = "export default function ( {" });
+        var errors = await CreateAction().ValidateSettingsAsync(new RunScriptSettings { Script = "export default function ( {" });
         errors.ShouldNotBeEmpty();
     }
 
     [Fact]
-    public void ValidateSettings_ValidScript_ReturnsNoErrors()
+    public async Task ValidateSettingsAsync_ValidScript_ReturnsNoErrors()
     {
-        var errors = CreateAction().ValidateSettings(new RunScriptSettings { Script = "export default (d) => d" });
+        var errors = await CreateAction().ValidateSettingsAsync(new RunScriptSettings { Script = "export default (d) => d" });
+        errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetOutputSchemaAsync_ConfiguredSchema_DescribesResultProperties()
+    {
+        IStepType action = CreateAction();
+
+        var schema = await action.GetOutputSchemaAsync(new Dictionary<string, object?>
+        {
+            ["script"] = "export default (d) => ({ upper: d.name.toUpperCase() })",
+            ["outputSchema"] = """{ "type": "object", "properties": { "upper": { "type": "string" } } }""",
+        });
+
+        schema.ShouldNotBeNull();
+
+        // The configured shape sits under the reserved `result` property, so downstream steps bind
+        // ${ steps.<alias>.result.upper }.
+        var result = schema!.GetProperties()!["result"];
+        result.GetProperties()!.Keys.ShouldContain("upper");
+    }
+
+    [Fact]
+    public async Task GetOutputSchemaAsync_NoConfiguredSchema_FallsBackToStaticSchema()
+    {
+        IStepType action = CreateAction();
+
+        var schema = await action.GetOutputSchemaAsync(new Dictionary<string, object?>
+        {
+            ["script"] = "export default (d) => d",
+        });
+
+        // `result` stays bindable, it just has no described shape.
+        schema.ShouldNotBeNull();
+        schema!.GetProperties()!.Keys.ShouldContain("result");
+    }
+
+    [Fact]
+    public async Task GetOutputSchemaAsync_UnusableSchema_FallsBackToStaticSchema()
+    {
+        // Binding autocomplete must degrade quietly — save-time validation reports the problem.
+        IStepType action = CreateAction();
+
+        var schema = await action.GetOutputSchemaAsync(new Dictionary<string, object?>
+        {
+            ["script"] = "export default (d) => d",
+            ["outputSchema"] = "{ not json",
+        });
+
+        schema.ShouldNotBeNull();
+        schema!.GetProperties()!.Keys.ShouldContain("result");
+    }
+
+    [Fact]
+    public async Task ValidateSettingsAsync_MalformedOutputSchema_ReturnsError()
+    {
+        var errors = await CreateAction().ValidateSettingsAsync(new RunScriptSettings
+        {
+            Script = "export default (d) => d",
+            OutputSchema = "{ not json",
+        });
+
+        errors.ShouldHaveSingleItem().ShouldContain("Output schema");
+    }
+
+    [Fact]
+    public async Task ValidateSettingsAsync_NonObjectOutputSchema_ReturnsError()
+    {
+        var errors = await CreateAction().ValidateSettingsAsync(new RunScriptSettings
+        {
+            Script = "export default (d) => d",
+            OutputSchema = "\"just a string\"",
+        });
+
+        errors.ShouldHaveSingleItem().ShouldContain("must be a JSON object");
+    }
+
+    [Fact]
+    public async Task ValidateSettingsAsync_ValidOutputSchema_ReturnsNoErrors()
+    {
+        var errors = await CreateAction().ValidateSettingsAsync(new RunScriptSettings
+        {
+            Script = "export default (d) => d",
+            OutputSchema = """{ "type": "object", "properties": { "upper": { "type": "string" } } }""",
+        });
+
         errors.ShouldBeEmpty();
     }
 
@@ -149,7 +238,11 @@ public class RunScriptActionTests
         factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient());
 
         var executor = new ScriptExecutor(factory.Object, NullLogger<ScriptExecutor>.Instance);
-        var infrastructure = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
+
+        // A real resolver, not a mock: output-schema resolution goes through ResolveSettings, which
+        // a mocked resolver would return null from.
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(new ConfigurationBuilder().Build()));
+        var infrastructure = new ActionInfrastructure(modelResolver);
         return new RunScriptAction(
             infrastructure,
             executor,

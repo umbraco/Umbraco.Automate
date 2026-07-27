@@ -3,8 +3,8 @@ namespace Umbraco.Automate.Core.StepTypes;
 /// <summary>
 /// Implemented by step types (actions, control flow) that can validate their own resolved settings
 /// at author time. When an automation is saved, the automation service calls
-/// <see cref="ValidateSettings"/> for each step whose type implements this, and rejects the save
-/// if any errors are returned.
+/// <see cref="ValidateSettingsAsync"/> for each step whose type implements this, and rejects the
+/// save if any errors are returned.
 /// </summary>
 public interface IValidatableStepType
 {
@@ -13,5 +13,6 @@ public interface IValidatableStepType
     /// message per problem.
     /// </summary>
     /// <param name="settings">The resolved settings instance (may be <c>null</c>).</param>
-    IReadOnlyList<string> ValidateSettings(object? settings);
+    /// <param name="cancellationToken">A token to cancel the validation.</param>
+    Task<IReadOnlyList<string>> ValidateSettingsAsync(object? settings, CancellationToken cancellationToken = default);
 }

@@ -109,7 +109,7 @@ internal sealed class AutomationService : IAutomationService
         }
 
         EnsureStepAliases(automation);
-        ValidateStepSettings(automation);
+        await ValidateStepSettingsAsync(automation, cancellationToken);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -134,7 +134,7 @@ internal sealed class AutomationService : IAutomationService
     public async Task<Automation> UpdateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         EnsureStepAliases(automation);
-        ValidateStepSettings(automation);
+        await ValidateStepSettingsAsync(automation, cancellationToken);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -288,7 +288,7 @@ internal sealed class AutomationService : IAutomationService
     /// Validates the settings of every step whose action opts into <see cref="IValidatableStepType"/>
     /// (e.g. the Run Script action compiling its script), rejecting the save if any are invalid.
     /// </summary>
-    private void ValidateStepSettings(Automation automation)
+    private async Task ValidateStepSettingsAsync(Automation automation, CancellationToken cancellationToken)
     {
         var errors = new List<string>();
 
@@ -310,7 +310,7 @@ internal sealed class AutomationService : IAutomationService
                 continue;
             }
 
-            foreach (var error in validatable.ValidateSettings(resolved))
+            foreach (var error in await validatable.ValidateSettingsAsync(resolved, cancellationToken))
             {
                 errors.Add($"Step '{step.Name}': {error}");
             }

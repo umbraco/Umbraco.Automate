@@ -15,7 +15,9 @@ public interface IScriptValidator
     /// <summary>
     /// Validates the given script. Returns an empty list when valid, otherwise one message per problem.
     /// </summary>
-    IReadOnlyList<string> Validate(string? script);
+    /// <param name="script">The script to validate.</param>
+    /// <param name="cancellationToken">A token to cancel the validation.</param>
+    Task<IReadOnlyList<string>> ValidateScriptAsync(string? script, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -27,32 +29,48 @@ internal sealed class ScriptValidator : IScriptValidator
     private static readonly TimeSpan CompileTimeout = TimeSpan.FromSeconds(2);
 
     /// <inheritdoc />
-    public IReadOnlyList<string> Validate(string? script)
+    public async Task<IReadOnlyList<string>> ValidateScriptAsync(string? script, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(script))
         {
             return ["Script is required."];
         }
 
-        // Compile on a background task under a wall-clock backstop: this runs on the save request
-        // thread, and the engine's statement-checked limits cannot interrupt pathological top-level
-        // code (e.g. a parked await), so the task guarantees the save call stops waiting regardless.
-        using var cts = new CancellationTokenSource(CompileTimeout);
-        var task = Task.Run(() => CompileAndCheck(script!, cts.Token), cts.Token);
+        // Compile on a background task under a wall-clock backstop: the engine's statement-checked
+        // limits cannot interrupt pathological top-level code (e.g. a parked await), so the task
+        // guarantees the caller stops waiting regardless. Not wrapped in `using` — an overran
+        // compile still holds the token, so disposal is deferred to the continuation below.
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(CompileTimeout);
+
+        // The token bounds the compile itself, but must not be Task.Run's creation token: that
+        // cancels the work item before it is ever dequeued, failing a valid script whenever the
+        // thread pool is slow to start it.
+        var task = Task.Run(() => CompileAndCheck(script!, cts.Token), CancellationToken.None);
+        _ = task.ContinueWith(
+            t =>
+            {
+                _ = t.Exception; // observe to avoid an unobserved-task-exception
+                cts.Dispose();
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
         try
         {
-            if (!task.Wait(CompileTimeout + TimeSpan.FromSeconds(1)))
-            {
-                return ["Script validation timed out. Simplify top-level module code so it loads quickly."];
-            }
+            return await task.WaitAsync(CompileTimeout + TimeSpan.FromSeconds(1), cancellationToken);
         }
-        catch (AggregateException)
+        catch (TimeoutException)
         {
-            return ["Script could not be validated."];
+            return ["Script validation timed out. Simplify top-level module code so it loads quickly."];
         }
-
-        return task.Result;
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Anything CompileAndCheck did not translate into a message itself — report it rather
+            // than discarding the only description of what went wrong.
+            return [$"Script could not be validated: {ex.Message}"];
+        }
     }
 
     private static IReadOnlyList<string> CompileAndCheck(string script, CancellationToken cancellationToken)

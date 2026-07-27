@@ -8,41 +8,51 @@ public class ScriptValidatorTests
     private readonly ScriptValidator _validator = new();
 
     [Fact]
-    public void Validate_ValidScript_ReturnsNoErrors()
+    public async Task ValidateScriptAsync_ValidScript_ReturnsNoErrors()
     {
-        _validator.Validate("export default function (data) { return data; }").ShouldBeEmpty();
+        (await _validator.ValidateScriptAsync("export default function (data) { return data; }")).ShouldBeEmpty();
     }
 
     [Fact]
-    public void Validate_ValidArrowFunction_ReturnsNoErrors()
+    public async Task ValidateScriptAsync_ValidArrowFunction_ReturnsNoErrors()
     {
-        _validator.Validate("export default (data) => data").ShouldBeEmpty();
+        (await _validator.ValidateScriptAsync("export default (data) => data")).ShouldBeEmpty();
     }
 
     [Fact]
-    public void Validate_EmptyScript_ReturnsError()
+    public async Task ValidateScriptAsync_EmptyScript_ReturnsError()
     {
-        _validator.Validate("   ").ShouldHaveSingleItem().ShouldContain("required");
+        (await _validator.ValidateScriptAsync("   ")).ShouldHaveSingleItem().ShouldContain("required");
     }
 
     [Fact]
-    public void Validate_SyntaxError_ReturnsError()
+    public async Task ValidateScriptAsync_SyntaxError_ReturnsError()
     {
-        var errors = _validator.Validate("export default function ( {");
+        var errors = await _validator.ValidateScriptAsync("export default function ( {");
         errors.ShouldNotBeEmpty();
     }
 
     [Fact]
-    public void Validate_NoDefaultExport_ReturnsError()
+    public async Task ValidateScriptAsync_NoDefaultExport_ReturnsError()
     {
-        var errors = _validator.Validate("export function foo() {}");
+        var errors = await _validator.ValidateScriptAsync("export function foo() {}");
         errors.ShouldHaveSingleItem().ShouldContain("default function");
     }
 
     [Fact]
-    public void Validate_DefaultExportNotAFunction_ReturnsError()
+    public async Task ValidateScriptAsync_DefaultExportNotAFunction_ReturnsError()
     {
-        var errors = _validator.Validate("export default 42");
+        var errors = await _validator.ValidateScriptAsync("export default 42");
         errors.ShouldHaveSingleItem().ShouldContain("default function");
+    }
+
+    [Fact]
+    public async Task ValidateScriptAsync_AlreadyCancelled_Throws()
+    {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => _validator.ValidateScriptAsync("export default (d) => d", cts.Token));
     }
 }

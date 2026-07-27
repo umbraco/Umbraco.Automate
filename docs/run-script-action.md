@@ -24,6 +24,39 @@ export default function (data) {
   strings; a circular reference fails the step with a runtime error.
 - The function may be `async` and may `await` promises (including `fetch`).
 
+## Declaring the output shape
+
+By default the binding UI knows only that the step produces a `result` — it cannot know what is
+inside it, because the shape is whatever the script returns. Fill in the **Output schema** setting
+with a JSON Schema describing the return value and the binding picker offers the individual
+properties:
+
+```json
+{
+    "type": "object",
+    "properties": {
+        "upper": { "type": "string" },
+        "length": { "type": "integer" }
+    }
+}
+```
+
+Downstream steps can then bind `${ steps.<alias>.result.upper }` with autocomplete, instead of
+binding the whole `result` and picking it apart by hand. This mirrors how an AI agent exposes its
+structured output schema to Automate.
+
+- The setting is **optional**. Left empty, `result` stays bindable as a single opaque value —
+  exactly as it behaves without a schema.
+- The schema describes what sits **under** `result` — it is not flattened onto the output root,
+  because a script may also return an array or a primitive.
+- It is **advisory**: nothing forces the script's return value to match it. A mismatch does not
+  fail the step; it only means the binding suggestions were wrong. (An AI agent's schema *is*
+  enforced, because the provider is given it as a response format — there is no equivalent for
+  arbitrary JavaScript.)
+- A schema that is not usable — malformed JSON, not an object, or not a valid JSON Schema — is
+  rejected at save time, alongside the other validation checks below. At design time the binding
+  UI quietly falls back to the opaque `result` rather than breaking.
+
 ## fetch
 
 When enabled, scripts can make outbound HTTP requests with a browser-compatible `fetch`:
@@ -43,9 +76,9 @@ or a `Headers` instance. It is gated by both the tenant-wide master switch
 
 ## Validation
 
-Scripts are validated when the automation is **saved**: a script that has a syntax error or does
-not export a default function is rejected with a clear message, rather than only failing at run
-time.
+Scripts are validated when the automation is **saved**: a script that has a syntax error, does not
+export a default function, or is configured with an output schema that is not a valid JSON Schema
+is rejected with a clear message, rather than only failing at run time.
 
 ## Configuration
 
