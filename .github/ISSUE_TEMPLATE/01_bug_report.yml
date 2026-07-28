@@ -1,0 +1,76 @@
+---
+name: 🐛 Bug Report
+description: "Report a bug for Umbraco.Automate or its related providers/add-ons."
+labels: ["bug"]
+body:
+    - type: dropdown
+      id: component
+      attributes:
+          label: "Which component is this issue related to?"
+          description: "Select the product/add-on that is experiencing this issue"
+          options:
+              - Umbraco.Automate (Core)
+              - Umbraco.Automate.OpenIddict
+              - Umbraco.Automate.Slack
+              - Other / Not sure
+      validations:
+          required: true
+    - type: input
+      id: version
+      attributes:
+          label: "Which Umbraco.Automate version are you using? (Please write the *exact* version, example: 18.1.0)"
+          description: "Go to the Packages > Installed section in the backoffice to find the version you are using"
+      validations:
+          required: true
+    - type: input
+      id: cms-version
+      attributes:
+          label: "Which Umbraco CMS version are you running? (Please write the *exact* version, example: 18.0.1)"
+          description: "Automate major versions track CMS major versions, so we need both to reproduce"
+      validations:
+          required: true
+    - type: dropdown
+      id: database
+      attributes:
+          label: "Which database are you using?"
+          options:
+              - SQL Server
+              - SQLite
+              - Not sure
+      validations:
+          required: true
+    - type: textarea
+      id: summary
+      attributes:
+          label: "Bug summary"
+          description: "Write a short summary of the bug."
+          placeholder: "Try to pinpoint it as much as possible."
+      validations:
+          required: true
+    - type: textarea
+      id: specifics
+      attributes:
+          label: "Specifics"
+          description: "Include logs, screenshots, error messages, etc. Please remove any credentials, tokens or personal data first."
+    - type: textarea
+      id: reproduction
+      attributes:
+          label: "Steps to reproduce"
+          description: "How can we reproduce the problem on a clean Umbraco install? Include the automation shape (trigger, steps, control flow) where relevant."
+      validations:
+          required: true
+    - type: textarea
+      id: result
+      attributes:
+          label: "Expected result / actual result"
+          description: "What did you expect, and what actually happened?"
+    - type: textarea
+      id: automation-export
+      attributes:
+          label: "Automation export"
+          description: "If the issue is with a specific automation, attach or paste its export. Remember to strip connection credentials."
+    - type: textarea
+      id: dependencies
+      attributes:
+          label: "Dependencies"
+          description: "List any related add-ons, providers, or integrations and their versions."
