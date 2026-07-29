@@ -180,6 +180,16 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<string?> GetRunTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.AutomationRuns
+            .Where(r => r.Id == runId)
+            .Select(r => r.TriggerData)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);

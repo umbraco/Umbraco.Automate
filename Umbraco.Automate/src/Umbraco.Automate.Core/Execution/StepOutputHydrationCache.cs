@@ -3,11 +3,12 @@ using Umbraco.Automate.Core.Runs;
 namespace Umbraco.Automate.Core.Execution;
 
 /// <summary>
-/// Per-process cache of hydrated offloaded step outputs, keyed by run and step run. When a
+/// Per-process cache of hydrated offloaded outputs, keyed by run and step run. When a
 /// binding touches a <see cref="StepOutputReference"/> marker, the full output is fetched from
-/// the StepRun table (multi-node safe — hydration always goes through the database, never
+/// the database (multi-node safe — hydration always goes through the database, never
 /// assumes the output was produced on this node) and memoised so repeated binds within a run
-/// don't hammer the database. Misses (step run deleted by retention cleanup, or no output)
+/// don't hammer it: a step's output from the StepRun table, and a run's <em>trigger</em> output
+/// from <c>AutomationRun.TriggerData</c>. Misses (row deleted by retention cleanup, or no output)
 /// are memoised as empty so the path resolves like an unknown step instead of throwing.
 /// Entries are evicted when their run reaches a terminal state (see <c>RunFinalizer</c>);
 /// entries for runs abandoned mid-flight are bounded by the <see cref="MaxEntries"/> LRU
@@ -39,6 +40,15 @@ internal sealed class StepOutputHydrationCache
     /// </summary>
     internal const int MaxEntries = 64;
 
+    /// <summary>
+    /// Sentinel step-run id under which a run's offloaded <em>trigger</em> output is memoised.
+    /// A step run id is always a generated <see cref="Guid"/>, so <see cref="Guid.Empty"/> can
+    /// never collide with one — and keying trigger entries in the same index means
+    /// <see cref="EvictRun"/> (called by <c>RunFinalizer</c>) drops them with the rest of the
+    /// run's entries for free.
+    /// </summary>
+    private static readonly Guid TriggerOutputKey = Guid.Empty;
+
     private static readonly IReadOnlyDictionary<string, object?> EmptyOutputs =
         new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
@@ -57,9 +67,31 @@ internal sealed class StepOutputHydrationCache
     /// access. Returns an empty dictionary when the step run row is gone or has no output.
     /// </summary>
     public IReadOnlyDictionary<string, object?> GetOutput(Guid runId, Guid stepRunId, CancellationToken cancellationToken = default)
-    {
-        var key = (runId, stepRunId);
+        => GetOrHydrate(
+            (runId, stepRunId),
+            // Sync-over-async: hydration happens inside synchronous binding-path traversal.
+            // See the class remarks for why this remains sync-over-async rather than a fully
+            // async call chain. Precedent: ForEachContainerStepBody.TrackStepRun.
+            () => _runRepository.GetStepRunOutputAsync(stepRunId, runId, cancellationToken).GetAwaiter().GetResult());
 
+    /// <summary>
+    /// Gets the hydrated trigger output dictionary for a run, fetching and memoising it on first
+    /// access. The payload comes from <c>AutomationRun.TriggerData</c>, written once when the run
+    /// was created — the trigger-output counterpart of <see cref="GetOutput"/>. Returns an empty
+    /// dictionary when the run row is gone or carries no trigger data.
+    /// </summary>
+    public IReadOnlyDictionary<string, object?> GetTriggerOutput(Guid runId, CancellationToken cancellationToken = default)
+        => GetOrHydrate(
+            (runId, TriggerOutputKey),
+            () => _runRepository.GetRunTriggerDataAsync(runId, cancellationToken).GetAwaiter().GetResult());
+
+    /// <summary>
+    /// Gets a memoised entry, hydrating it through <paramref name="fetchJson"/> on a miss.
+    /// </summary>
+    private IReadOnlyDictionary<string, object?> GetOrHydrate(
+        (Guid RunId, Guid StepRunId) key,
+        Func<string?> fetchJson)
+    {
         lock (_lock)
         {
             if (_index.TryGetValue(key, out var existingNode))
@@ -69,10 +101,7 @@ internal sealed class StepOutputHydrationCache
             }
         }
 
-        // Sync-over-async: hydration happens inside synchronous binding-path traversal.
-        // See the class remarks for why this remains sync-over-async rather than a fully
-        // async call chain. Precedent: ForEachContainerStepBody.TrackStepRun.
-        var outputJson = _runRepository.GetStepRunOutputAsync(stepRunId, runId, cancellationToken).GetAwaiter().GetResult();
+        var outputJson = fetchJson();
         var outputs = outputJson is null
             ? EmptyOutputs
             : Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(outputJson);
