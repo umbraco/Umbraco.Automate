@@ -69,9 +69,11 @@ convenience, and a re-fired routine will ask twice.
 1. **In a cloud routine, do nothing.** The session already has its own isolated checkout and no
    sibling work to collide with. Return that checkout's path with `reused: true`,
    `fidelity: "ci-parity"`, and a note saying the session checkout was used. Do **not** nest a
-   worktree inside it. Detect this the plain way: if the process is not running against the
-   developer's `D:/DXP/Automate/Umbraco.Automate` main checkout with sibling worktrees, assume
-   cloud.
+   worktree inside it. Detect this the plain way: read the repo's main worktree root with
+   `git rev-parse --path-format=absolute --git-common-dir` and drop the trailing `.git`; if that
+   root is not the developer's `D:/DXP/Automate/Umbraco.Automate` checkout, assume cloud. Never
+   decide cloud-versus-local from the current directory alone — a local run legitimately starts
+   inside a worktree under `.claude/worktrees/`.
 
 2. **Work out the slug and path** from the branch, per the convention above. If
    `.claude/worktrees/<slug>` already exists, return it with `reused: true` and stop.
