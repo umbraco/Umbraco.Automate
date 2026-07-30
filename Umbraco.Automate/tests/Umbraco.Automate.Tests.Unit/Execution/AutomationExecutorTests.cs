@@ -25,6 +25,7 @@ public class AutomationExecutorTests
     private readonly Mock<IWorkflowRegistry> _workflowRegistry = new();
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
     private readonly Mock<IWorkspaceService> _workspaceService = new();
+    private readonly Umbraco.Automate.Core.Configuration.ExecutionOptions _executionOptions = new();
     private readonly AutomationExecutor _executor;
 
     private readonly Workspace _defaultWorkspace;
@@ -112,6 +113,7 @@ public class AutomationExecutorTests
             Mock.Of<IRateLimitService>(),
             circuitBreaker.Object,
             conditionEvaluator,
+            Microsoft.Extensions.Options.Options.Create(_executionOptions),
             metrics,
             Mock.Of<ILogger<AutomationExecutor>>());
     }
@@ -550,6 +552,103 @@ public class AutomationExecutorTests
         savedRun.ShouldNotBeNull();
         savedRun.Status.ShouldBe(AutomationRunStatus.Completed);
         savedRun.CompletedUtc.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_LargeTriggerOutput_PutsOnlyAMarkerInTheWorkflowData()
+    {
+        // The payload must live once on the run record; the workflow data — re-serialized by
+        // WorkflowCore on every execution pass — gets only a reference to it.
+        _executionOptions.MaxInlineOutputBytes = 64;
+        var automation = CreateAutomation("testAction");
+        CaptureWorkflowData();
+        var savedRuns = CaptureSavedRuns();
+
+        var triggerData = new Dictionary<string, object?> { ["recordFieldsJson"] = new string('x', 512) };
+        var runId = await _executor.ExecuteAsync(automation, "user", null, triggerData, CancellationToken.None);
+
+        _capturedWorkflowData.ShouldNotBeNull();
+        _capturedWorkflowData.TriggerOutput.ShouldNotContainKey("recordFieldsJson");
+        StepOutputReference.TryGetTriggerRunId(_capturedWorkflowData.TriggerOutput, out var referenced).ShouldBeTrue();
+        referenced.ShouldBe(runId);
+
+        // ...and the full payload is still persisted on the run, which is what hydration reads.
+        savedRuns.ShouldNotBeEmpty();
+        savedRuns[0].TriggerData.ShouldNotBeNull();
+        savedRuns[0].TriggerData!.ShouldContain("recordFieldsJson");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SmallTriggerOutput_StaysInlineInTheWorkflowData()
+    {
+        var automation = CreateAutomation("testAction");
+        CaptureWorkflowData();
+
+        var triggerData = new Dictionary<string, object?> { ["country"] = "DK" };
+        await _executor.ExecuteAsync(automation, "user", null, triggerData, CancellationToken.None);
+
+        _capturedWorkflowData.ShouldNotBeNull();
+        _capturedWorkflowData.TriggerOutput["country"].ShouldBe("DK");
+        StepOutputReference.TryGetTriggerRunId(_capturedWorkflowData.TriggerOutput, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoTriggerOutput_LeavesWorkflowDataTriggerOutputEmpty()
+    {
+        var automation = CreateAutomation("testAction");
+        CaptureWorkflowData();
+
+        await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
+
+        _capturedWorkflowData.ShouldNotBeNull();
+        _capturedWorkflowData.TriggerOutput.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_LargeTriggerOutput_TriggerEdgeFilterStillEvaluatesAgainstThePayload()
+    {
+        // The filter is evaluated before the marker swap, against the in-memory payload, so an
+        // oversized trigger output must not turn a passing trigger-edge filter into a skipped run.
+        _executionOptions.MaxInlineOutputBytes = 64;
+        StepConfiguration step = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step");
+        var filter = MakeEqualsFilter("${ trigger.country }", "DK");
+
+        var automation = new AutomationBuilder()
+            .AddStep(step)
+            .WithConnection(Guid.Empty, step.Id, outcome: null, filter: filter)
+            .Build();
+
+        CaptureWorkflowData();
+
+        var triggerData = new Dictionary<string, object?>
+        {
+            ["country"] = "DK",
+            ["recordFieldsJson"] = new string('x', 512),
+        };
+        await _executor.ExecuteAsync(automation, "user", null, triggerData, CancellationToken.None);
+
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.IsAny<string>(),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Once);
+
+        // The run started, and what reached WorkflowCore is the marker rather than the payload.
+        _capturedWorkflowData.ShouldNotBeNull();
+        StepOutputReference.TryGetTriggerRunId(_capturedWorkflowData.TriggerOutput, out _).ShouldBeTrue();
+    }
+
+    private void CaptureWorkflowData()
+        => _workflowHost.Setup(h => h.StartWorkflow(It.IsAny<string>(), It.IsAny<AutomationWorkflowData>(), It.IsAny<string>()))
+            .ReturnsAsync("instance-1")
+            .Callback<string, AutomationWorkflowData, string>((_, data, _) => _capturedWorkflowData = data);
+
+    private List<AutomationRun> CaptureSavedRuns()
+    {
+        var saved = new List<AutomationRun>();
+        _runRepo.Setup(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRun, CancellationToken>((run, _) => saved.Add(run))
+            .ReturnsAsync((AutomationRun run, CancellationToken _) => run);
+        return saved;
     }
 
     private static ConditionSet MakeEqualsFilter(string left, string right)
