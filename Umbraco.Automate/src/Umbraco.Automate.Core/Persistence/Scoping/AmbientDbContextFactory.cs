@@ -1,14 +1,14 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 
-namespace Umbraco.Automate.Persistence.Scoping;
+namespace Umbraco.Automate.Core.Persistence.Scoping;
 
 /// <summary>
-/// <see cref="IDbContextFactory{TContext}"/> decorator that enlists Automate's writes in the ambient
-/// Umbraco scope's transaction when Automate shares the Umbraco CMS database, and otherwise defers to
-/// the pooled factory it wraps.
+/// <see cref="IDbContextFactory{TContext}"/> decorator that enlists an Automate DbContext's work in
+/// the ambient Umbraco scope's transaction when that context shares the Umbraco CMS database, and
+/// otherwise defers to the pooled factory it wraps.
 /// </summary>
+/// <typeparam name="TDbContext">The Automate DbContext this factory produces.</typeparam>
 /// <remarks>
 /// <para>
 /// Without this, every Automate read and write opens a second, independent connection. On SQL Server
@@ -39,46 +39,43 @@ namespace Umbraco.Automate.Persistence.Scoping;
 /// detached path.
 /// </para>
 /// </remarks>
-internal sealed class AmbientAutomateDbContextFactory : IDbContextFactory<UmbracoAutomateDbContext>
+internal sealed class AmbientDbContextFactory<TDbContext> : IDbContextFactory<TDbContext>
+    where TDbContext : DbContext
 {
-    private readonly IDbContextFactory<UmbracoAutomateDbContext> _detachedFactory;
+    private readonly IDbContextFactory<TDbContext> _detachedFactory;
     private readonly IAmbientAutomateConnection _ambientConnection;
-    private readonly string _providerName;
-    private readonly IInterceptor[] _interceptors;
+    private readonly Func<DbConnection, TDbContext> _createEnlistedContext;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="AmbientAutomateDbContextFactory"/> class.
+    /// Initializes a new instance of the <see cref="AmbientDbContextFactory{TDbContext}"/> class.
     /// </summary>
     /// <param name="detachedFactory">The pooled factory used whenever there is no transaction to enlist in.</param>
     /// <param name="ambientConnection">Supplies the ambient Umbraco transaction, when there is one to share.</param>
-    /// <param name="providerName">The Umbraco provider name Automate resolved its connection for.</param>
-    /// <param name="interceptors">
-    /// Interceptors to apply to an enlisted context. These must mirror the ones configured on the
-    /// pooled factory, so a write behaves the same on both paths.
+    /// <param name="createEnlistedContext">
+    /// Builds a context bound to the supplied connection. Owned by the product rather than by this
+    /// type, because each DbContext has its own provider configuration and interceptors — and those
+    /// must mirror the pooled factory's, so a write behaves the same on both paths.
     /// </param>
-    public AmbientAutomateDbContextFactory(
-        IDbContextFactory<UmbracoAutomateDbContext> detachedFactory,
+    public AmbientDbContextFactory(
+        IDbContextFactory<TDbContext> detachedFactory,
         IAmbientAutomateConnection ambientConnection,
-        string providerName,
-        IInterceptor[] interceptors)
+        Func<DbConnection, TDbContext> createEnlistedContext)
     {
         _detachedFactory = detachedFactory;
         _ambientConnection = ambientConnection;
-        _providerName = providerName;
-        _interceptors = interceptors;
+        _createEnlistedContext = createEnlistedContext;
     }
 
     /// <inheritdoc />
-    public UmbracoAutomateDbContext CreateDbContext()
+    public TDbContext CreateDbContext()
         => TryCreateEnlistedContext() ?? _detachedFactory.CreateDbContext();
 
     /// <inheritdoc />
-    public async Task<UmbracoAutomateDbContext> CreateDbContextAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<TDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
         => TryCreateEnlistedContext()
             ?? await _detachedFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-    private UmbracoAutomateDbContext? TryCreateEnlistedContext()
+    private TDbContext? TryCreateEnlistedContext()
     {
         DbTransaction? transaction = _ambientConnection.Transaction;
         if (transaction?.Connection is not DbConnection connection)
@@ -86,15 +83,7 @@ internal sealed class AmbientAutomateDbContextFactory : IDbContextFactory<Umbrac
             return null;
         }
 
-        var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-        UmbracoAutomateDbContext.ConfigureProvider(options, connection, _providerName);
-
-        if (_interceptors.Length > 0)
-        {
-            options.AddInterceptors(_interceptors);
-        }
-
-        var context = new UmbracoAutomateDbContext(options.Options);
+        TDbContext context = _createEnlistedContext(connection);
 
         try
         {

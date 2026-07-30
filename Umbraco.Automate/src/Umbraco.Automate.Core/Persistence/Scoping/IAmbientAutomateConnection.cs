@@ -1,15 +1,16 @@
 using System.Data.Common;
 
-namespace Umbraco.Automate.Persistence.Scoping;
+namespace Umbraco.Automate.Core.Persistence.Scoping;
 
 /// <summary>
 /// Exposes the transaction of the ambient Umbraco scope, but only when Automate is configured
 /// against the very same physical database as Umbraco CMS.
 /// </summary>
 /// <remarks>
-/// This is the seam that lets <see cref="AmbientAutomateDbContextFactory"/> decide between
+/// This is the seam that lets <see cref="AmbientDbContextFactory{TDbContext}"/> decide between
 /// enlisting in a caller's transaction and opening its own connection, without knowing anything
-/// about Umbraco's scoping internals.
+/// about Umbraco's scoping internals. It is shared across every Automate DbContext: whether
+/// Automate targets the Umbraco database is a property of the host, not of one context.
 /// </remarks>
 internal interface IAmbientAutomateConnection
 {

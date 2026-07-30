@@ -1,4 +1,4 @@
-using Umbraco.Automate.Persistence.Scoping;
+using Umbraco.Automate.Core.Persistence.Scoping;
 
 namespace Umbraco.Automate.Tests.Unit.Persistence;
 

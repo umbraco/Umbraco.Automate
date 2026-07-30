@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Umbraco.Automate.Persistence.Scoping;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Automations;
@@ -71,9 +70,24 @@ public static partial class UmbracoBuilderExtensions
         // ambient Umbraco transaction instead of opening a second connection to the same database.
         // On SQLite a second connection cannot get the write lock the ambient scope is holding, which
         // deadlocks any caller that keeps a transaction open across an Automate write — Umbraco
-        // Deploy's restore being the reported case. See AmbientAutomateDbContextFactory.
-        builder.Services.AddSingleton<IAmbientAutomateConnection, UmbracoAmbientAutomateConnection>();
-        builder.Services.EnlistDbContextFactoryInAmbientScope();
+        // Deploy's restore being the reported case. See AmbientDbContextFactory.
+        builder.Services.EnlistDbContextFactoryInAmbientScope(
+            (serviceProvider, connection) =>
+            {
+                var (_, providerName) = DatabaseConnectionInfo.Resolve(
+                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                    serviceProvider.GetRequiredService<IConfiguration>());
+
+                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
+                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
+
+                // Mirrors the interceptor on the pooled factory, so a write is gated on Automate's
+                // startup migrations whichever path it takes.
+                options.AddInterceptors(new AutomateReadinessInterceptor(
+                    serviceProvider.GetRequiredService<AutomateReadinessSignal>()));
+
+                return new UmbracoAutomateDbContext(options.Options);
+            });
 
         builder.Services.AddSingleton<AutomationFactory>();
         builder.Services.AddSingleton<ConnectionFactory>();
@@ -104,53 +118,5 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, StuckRunRecoveryNotificationHandler>();
 
         return builder;
-    }
-
-    /// <summary>
-    /// Wraps the <see cref="IDbContextFactory{TContext}"/> that
-    /// <c>AddUmbracoDbContext</c> registered in an <see cref="AmbientAutomateDbContextFactory"/>, so
-    /// every consumer of the factory gets ambient-transaction participation without having to ask
-    /// for it.
-    /// </summary>
-    /// <remarks>
-    /// Hand-rolled because neither Umbraco nor this repository takes a dependency on a decoration
-    /// library, and the registration has to be replaced rather than added: the whole point is that
-    /// the pooled factory stops being what callers resolve.
-    /// </remarks>
-    internal static void EnlistDbContextFactoryInAmbientScope(this IServiceCollection services)
-    {
-        ServiceDescriptor pooled = services.Last(
-            descriptor => descriptor.ServiceType == typeof(IDbContextFactory<UmbracoAutomateDbContext>));
-
-        services.Remove(pooled);
-
-        services.AddSingleton<IDbContextFactory<UmbracoAutomateDbContext>>(serviceProvider =>
-        {
-            var (_, providerName) = DatabaseConnectionInfo.Resolve(
-                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                serviceProvider.GetRequiredService<IConfiguration>());
-
-            return new AmbientAutomateDbContextFactory(
-                ResolvePooledFactory(serviceProvider, pooled),
-                serviceProvider.GetRequiredService<IAmbientAutomateConnection>(),
-                providerName,
-                [
-                    // Mirrors the interceptor on the pooled factory, so a write is gated on
-                    // Automate's startup migrations whichever path it takes.
-                    new AutomateReadinessInterceptor(
-                        serviceProvider.GetRequiredService<AutomateReadinessSignal>()),
-                ]);
-        });
-    }
-
-    private static IDbContextFactory<UmbracoAutomateDbContext> ResolvePooledFactory(
-        IServiceProvider serviceProvider,
-        ServiceDescriptor pooled)
-    {
-        var instance = pooled.ImplementationInstance
-            ?? pooled.ImplementationFactory?.Invoke(serviceProvider)
-            ?? ActivatorUtilities.CreateInstance(serviceProvider, pooled.ImplementationType!);
-
-        return (IDbContextFactory<UmbracoAutomateDbContext>)instance;
     }
 }

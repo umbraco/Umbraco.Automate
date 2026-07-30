@@ -1,7 +1,7 @@
 using System.Data.Common;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 
-namespace Umbraco.Automate.Persistence.Scoping;
+namespace Umbraco.Automate.Core.Persistence.Scoping;
 
 /// <summary>
 /// Decides whether two connection strings address the same physical database, which is the

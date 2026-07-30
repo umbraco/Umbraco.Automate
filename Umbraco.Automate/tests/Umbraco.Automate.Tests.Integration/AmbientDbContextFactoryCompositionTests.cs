@@ -6,7 +6,7 @@ using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Extensions;
 using Umbraco.Automate.Persistence;
-using Umbraco.Automate.Persistence.Scoping;
+using Umbraco.Automate.Core.Persistence.Scoping;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Extensions;
 
@@ -27,7 +27,7 @@ public class AmbientDbContextFactoryCompositionTests
         ServiceProvider serviceProvider = BuildServiceProvider();
 
         serviceProvider.GetRequiredService<IDbContextFactory<UmbracoAutomateDbContext>>()
-            .ShouldBeOfType<AmbientAutomateDbContextFactory>();
+            .ShouldBeOfType<AmbientDbContextFactory<UmbracoAutomateDbContext>>();
     }
 
     [Fact]
@@ -87,7 +87,18 @@ public class AmbientDbContextFactoryCompositionTests
             },
             shareUmbracoConnection: false);
 
-        services.EnlistDbContextFactoryInAmbientScope();
+        services.EnlistDbContextFactoryInAmbientScope(
+            (serviceProvider, connection) =>
+            {
+                var (_, providerName) = DatabaseConnectionInfo.Resolve(
+                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                    serviceProvider.GetRequiredService<IConfiguration>());
+
+                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
+                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
+
+                return new UmbracoAutomateDbContext(options.Options);
+            });
 
         return services.BuildServiceProvider();
     }

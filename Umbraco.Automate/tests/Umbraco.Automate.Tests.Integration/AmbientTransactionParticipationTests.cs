@@ -8,7 +8,7 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Persistence;
 using Umbraco.Automate.Persistence.Automations;
-using Umbraco.Automate.Persistence.Scoping;
+using Umbraco.Automate.Core.Persistence.Scoping;
 using Umbraco.Automate.Testing.Builders;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -155,12 +155,20 @@ public sealed class AmbientTransactionParticipationTests : IDisposable
         return new UmbracoAutomateDbContext(options.Options);
     }
 
-    private AmbientAutomateDbContextFactory CreateAmbientFactory(DbTransaction? ambientTransaction)
+    private UmbracoAutomateDbContext CreateEnlistedContext(DbConnection connection)
+    {
+        var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
+        UmbracoAutomateDbContext.ConfigureProvider(options, connection, SqliteProviderName);
+
+        return new UmbracoAutomateDbContext(options.Options);
+    }
+
+    private AmbientDbContextFactory<UmbracoAutomateDbContext> CreateAmbientFactory(
+        DbTransaction? ambientTransaction)
         => new(
             new DetachedDbContextFactory(CreateDetachedContext),
             new StubAmbientConnection(ambientTransaction),
-            SqliteProviderName,
-            interceptors: []);
+            CreateEnlistedContext);
 
     private async Task<int> CountAutomationsOnANewConnectionAsync()
     {

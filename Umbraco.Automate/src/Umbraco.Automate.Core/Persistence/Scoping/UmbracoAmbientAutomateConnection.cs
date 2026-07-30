@@ -1,11 +1,10 @@
 using System.Data.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using Umbraco.Automate.Core.Persistence;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Infrastructure.Scoping;
 
-namespace Umbraco.Automate.Persistence.Scoping;
+namespace Umbraco.Automate.Core.Persistence.Scoping;
 
 /// <summary>
 /// <see cref="IAmbientAutomateConnection"/> backed by Umbraco's ambient scope.

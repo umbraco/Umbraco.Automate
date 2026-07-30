@@ -29,7 +29,11 @@
   </ItemGroup>
   <!-- Inter-product (Umbraco.Automate) -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.1.0, 18.999.999)" />
+    <!-- 18.1.1 floor: OpenIddict's persistence uses the ambient-scope DbContext plumbing added to
+         Umbraco.Automate.Core in Persistence/Scoping. Release-branch packs resolve the LOWEST version
+         in this range from nuget.org (vN/dev packs use project references instead), so this floor must
+         name the first Core version that actually ships those types. -->
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.1.1, 18.999.999)" />
     <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[18.1.0, 18.999.999)" />
   </ItemGroup>
   <!-- WorkflowCore (automation engine) -->
