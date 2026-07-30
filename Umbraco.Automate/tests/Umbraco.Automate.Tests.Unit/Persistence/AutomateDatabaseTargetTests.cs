@@ -12,39 +12,56 @@ public class AutomateDatabaseTargetTests
     private const string Sqlite = "Microsoft.Data.Sqlite";
     private const string SqlServer = "Microsoft.Data.SqlClient";
 
+    /// <summary>
+    /// A rooted directory built with the running platform's own separator. SQLite paths must be
+    /// native: <see cref="AutomateDatabaseTarget"/> canonicalises them with <see cref="Path"/>, which
+    /// only recognises the separators and rooting rules of the platform it runs on — so a hard-coded
+    /// <c>C:\…</c> is neither rooted nor segmented on the Linux and macOS CI agents.
+    /// </summary>
+    private static readonly string s_dataDirectory =
+        Path.GetFullPath(Path.Combine(Path.GetTempPath(), "site", "umbraco", "Data"));
+
+    private static string DataSource(params string[] segments)
+        => $"Data Source={Path.Combine([s_dataDirectory, .. segments])}";
+
     [Fact]
     public void IsSameDatabase_TrueForIdenticalSqliteConnectionStrings()
         => AutomateDatabaseTarget.IsSameDatabase(
-                @"Data Source=C:\site\umbraco\Data\Umbraco.sqlite.db;Cache=Shared", Sqlite,
-                @"Data Source=C:\site\umbraco\Data\Umbraco.sqlite.db;Cache=Shared", Sqlite)
+                $"{DataSource("Umbraco.sqlite.db")};Cache=Shared", Sqlite,
+                $"{DataSource("Umbraco.sqlite.db")};Cache=Shared", Sqlite)
             .ShouldBeTrue();
 
+    /// <summary>
+    /// Only keyword casing and ordering are asserted here, not filename casing: paths are
+    /// case-sensitive on Linux and macOS, so two SQLite files differing only in case are genuinely
+    /// two different databases there.
+    /// </summary>
     [Fact]
-    public void IsSameDatabase_TrueWhenOnlyKeywordsAndCasingDiffer()
+    public void IsSameDatabase_TrueWhenOnlyKeywordsAndTheirOrderDiffer()
         => AutomateDatabaseTarget.IsSameDatabase(
-                @"Cache=Shared;Data Source=C:\site\umbraco\Data\Umbraco.sqlite.db;Pooling=True", Sqlite,
-                @"data source=C:\SITE\umbraco\Data\Umbraco.sqlite.db;Foreign Keys=True", Sqlite)
+                $"Cache=Shared;{DataSource("Umbraco.sqlite.db")};Pooling=True", Sqlite,
+                $"cache=shared;foreign keys=True;data source={Path.Combine(s_dataDirectory, "Umbraco.sqlite.db")}", Sqlite)
             .ShouldBeTrue();
 
     [Fact]
     public void IsSameDatabase_TrueForEquivalentSqlitePaths()
         => AutomateDatabaseTarget.IsSameDatabase(
-                @"Data Source=C:\site\umbraco\Data\Umbraco.sqlite.db", Sqlite,
-                @"Data Source=C:\site\umbraco\Data\..\Data\Umbraco.sqlite.db", Sqlite)
+                DataSource("Umbraco.sqlite.db"), Sqlite,
+                DataSource("..", "Data", "Umbraco.sqlite.db"), Sqlite)
             .ShouldBeTrue();
 
     [Fact]
     public void IsSameDatabase_FalseForDifferentSqliteFiles()
         => AutomateDatabaseTarget.IsSameDatabase(
-                @"Data Source=C:\site\umbraco\Data\Umbraco.sqlite.db", Sqlite,
-                @"Data Source=C:\site\umbraco\Data\Umbraco.Automate.sqlite.db", Sqlite)
+                DataSource("Umbraco.sqlite.db"), Sqlite,
+                DataSource("Umbraco.Automate.sqlite.db"), Sqlite)
             .ShouldBeFalse();
 
     [Fact]
     public void IsSameDatabase_FalseWhenProvidersDiffer()
         => AutomateDatabaseTarget.IsSameDatabase(
-                @"Data Source=C:\site\umbraco\Data\Umbraco.sqlite.db", Sqlite,
-                @"Data Source=C:\site\umbraco\Data\Umbraco.sqlite.db", SqlServer)
+                DataSource("Umbraco.sqlite.db"), Sqlite,
+                DataSource("Umbraco.sqlite.db"), SqlServer)
             .ShouldBeFalse();
 
     [Theory]
@@ -52,8 +69,8 @@ public class AutomateDatabaseTargetTests
     [InlineData("microsoft.data.sqlite")]
     public void IsSameDatabase_AcceptsAlternateSqliteProviderSpellings(string providerName)
         => AutomateDatabaseTarget.IsSameDatabase(
-                @"Data Source=C:\site\Umbraco.sqlite.db", Sqlite,
-                @"Data Source=C:\site\Umbraco.sqlite.db", providerName)
+                DataSource("Umbraco.sqlite.db"), Sqlite,
+                DataSource("Umbraco.sqlite.db"), providerName)
             .ShouldBeTrue();
 
     /// <summary>
@@ -151,9 +168,16 @@ public class AutomateDatabaseTargetTests
 
         try
         {
+            // The placeholder is followed by the platform's own separator, as the host that wrote the
+            // connection string would use.
+            var placeholderPath = string.Join(
+                Path.DirectorySeparatorChar,
+                Umbraco.Cms.Core.Constants.System.DataDirectoryPlaceholder,
+                "Umbraco.sqlite.db");
+
             AutomateDatabaseTarget.IsSameDatabase(
-                    $@"Data Source={Path.Combine(dataDirectory, "Umbraco.sqlite.db")}", Sqlite,
-                    @"Data Source=|DataDirectory|\Umbraco.sqlite.db", Sqlite)
+                    $"Data Source={Path.Combine(dataDirectory, "Umbraco.sqlite.db")}", Sqlite,
+                    $"Data Source={placeholderPath}", Sqlite)
                 .ShouldBeTrue();
         }
         finally
