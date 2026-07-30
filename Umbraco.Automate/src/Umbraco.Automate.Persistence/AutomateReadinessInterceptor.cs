@@ -6,17 +6,28 @@ namespace Umbraco.Automate.Persistence;
 /// <summary>
 /// EF Core save interceptor for <see cref="UmbracoAutomateDbContext"/> that defers writes until
 /// Automate's own startup migrations have completed (<see cref="AutomateReadinessSignal"/>).
-/// Without this, an early caller — e.g. Umbraco Deploy's disk-triggered import, which can run
-/// before Automate's <c>UmbracoApplicationStartedNotification</c> handler has migrated the
-/// schema — can write against a database that hasn't finished migrating yet.
+/// Without this, an early caller — e.g. Umbraco Deploy's disk-triggered import — could write
+/// against a database that hasn't finished migrating yet.
 /// </summary>
 /// <remarks>
-/// Not applied to the standalone context the migration handler itself uses (see
-/// <c>RunAutomateMigrationNotificationHandler</c>) — that context must be able to write
-/// (via <c>Database.MigrateAsync</c>, which bypasses <see cref="SavingChangesAsync"/> entirely)
-/// before the signal it is responsible for setting has fired.
+/// <para>
+/// This is a backstop, not the primary ordering guarantee. The schema is created during component
+/// initialization (<c>AutomateSchemaComponent</c>), which every boot path runs before publishing
+/// <c>UmbracoApplicationStartingNotification</c>, so in practice the signal is already resolved by
+/// the time any other caller runs. That matters: waiting here cannot be the answer for a caller that
+/// runs <em>inside</em> the notification whose completion resolves the signal, because such a wait
+/// can never be satisfied. See https://github.com/umbraco/Umbraco.Automate/issues/198.
+/// </para>
+/// <para>
+/// Not applied to the standalone context used to migrate (see <c>AutomateSchemaInitializer</c>) —
+/// that context must be able to write (via <c>Database.MigrateAsync</c>, which bypasses
+/// <see cref="SavingChangesAsync"/> entirely) before the signal it is responsible for setting
+/// has fired.
+/// </para>
+/// <para>
 /// If startup migrations fail, the signal is set to a faulted state and any save waiting on it
 /// throws <see cref="Core.AutomateNotReadyException"/> immediately rather than hanging forever.
+/// </para>
 /// </remarks>
 internal sealed class AutomateReadinessInterceptor : SaveChangesInterceptor
 {
