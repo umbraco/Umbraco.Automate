@@ -32,15 +32,38 @@ public class AutomateDatabaseTargetTests
             .ShouldBeTrue();
 
     /// <summary>
-    /// Only keyword casing and ordering are asserted here, not filename casing: paths are
-    /// case-sensitive on Linux and macOS, so two SQLite files differing only in case are genuinely
-    /// two different databases there.
+    /// Only keyword casing and ordering are asserted here, never filename casing — that follows the
+    /// platform, and <see cref="IsSameDatabase_FollowsThePlatformForSqliteFilenameCasing"/> covers it.
     /// </summary>
     [Fact]
     public void IsSameDatabase_TrueWhenOnlyKeywordsAndTheirOrderDiffer()
         => AutomateDatabaseTarget.IsSameDatabase(
                 $"Cache=Shared;{DataSource("Umbraco.sqlite.db")};Pooling=True", Sqlite,
                 $"cache=shared;foreign keys=True;data source={Path.Combine(s_dataDirectory, "Umbraco.sqlite.db")}", Sqlite)
+            .ShouldBeTrue();
+
+    /// <summary>
+    /// Two SQLite paths differing only in case are the same file on Windows and two different files
+    /// on Linux and macOS, so the answer has to follow the platform rather than pick one. Matching
+    /// them case-insensitively on a case-sensitive filesystem would enlist Automate on a connection
+    /// that cannot see its tables.
+    /// </summary>
+    [Fact]
+    public void IsSameDatabase_FollowsThePlatformForSqliteFilenameCasing()
+        => AutomateDatabaseTarget.IsSameDatabase(
+                DataSource("Umbraco.sqlite.db"), Sqlite,
+                DataSource("umbraco.sqlite.db"), Sqlite)
+            .ShouldBe(OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// SQL Server identifiers stay case-insensitive on every platform, so the SQLite rule above must
+    /// not have leaked into them.
+    /// </summary>
+    [Fact]
+    public void IsSameDatabase_IgnoresCaseInSqlServerServerAndCatalogNames()
+        => AutomateDatabaseTarget.IsSameDatabase(
+                "Server=DB.Example.Net;Database=Umbraco-Site;Integrated Security=true", SqlServer,
+                "Server=db.example.net;Database=umbraco-site;Integrated Security=true", SqlServer)
             .ShouldBeTrue();
 
     [Fact]

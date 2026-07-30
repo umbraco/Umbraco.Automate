@@ -42,8 +42,24 @@ internal static class AutomateDatabaseTarget
         var automateTarget = Describe(automateConnectionString, umbracoProvider);
 
         return umbracoTarget is not null &&
-               string.Equals(umbracoTarget, automateTarget, StringComparison.OrdinalIgnoreCase);
+               string.Equals(umbracoTarget, automateTarget, ComparisonFor(umbracoProvider));
     }
+
+    /// <summary>
+    /// Picks the comparison the provider's identifiers actually use.
+    /// </summary>
+    /// <remarks>
+    /// A SQLite target is a file, and file names are case-sensitive everywhere except Windows: on
+    /// Linux and macOS two paths differing only in case are two different databases, so matching
+    /// them case-insensitively would be exactly the false positive this class exists to avoid. The
+    /// reverse mistake is the safe one — a missed match keeps the pre-existing detached behaviour —
+    /// so a case-insensitive volume on a case-sensitive platform is deliberately not accommodated.
+    /// SQL Server server and catalog names are case-insensitive on every platform.
+    /// </remarks>
+    private static StringComparison ComparisonFor(DatabaseProvider provider)
+        => provider == DatabaseProvider.Sqlite && !OperatingSystem.IsWindows()
+            ? StringComparison.Ordinal
+            : StringComparison.OrdinalIgnoreCase;
 
     private static string? Describe(string? connectionString, DatabaseProvider provider)
     {
