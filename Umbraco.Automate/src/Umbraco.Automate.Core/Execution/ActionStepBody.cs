@@ -438,20 +438,33 @@ internal sealed class ActionStepBody : StepBodyAsync
             _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
         }
 
-        if (decision?.Outcome == ApprovalOutcome.Approved)
+        // A rejection is a designed path, not a failure: the step is terminal either way and the
+        // decision picks the outcome, so an author can wire the approved and rejected handles to
+        // different steps without an intervening If. Automations predating those handles have a
+        // single unlabelled edge, which the compiler wires with a null outcome value that matches
+        // whichever outcome is returned — see ApprovalOutcomeTests for the guard on that.
+        //
+        // A refusal is recorded as Rejected rather than Completed so RunFinalizer can mark the run
+        // Rejected without re-reading step output. Both count as an executed step: the step did its
+        // job, which was to obtain a decision.
+        if (decision is not null)
         {
-            stepRun.Status = StepRunStatus.Completed;
+            var approved = decision.Outcome == ApprovalOutcome.Approved;
+
+            stepRun.Status = approved ? StepRunStatus.Completed : StepRunStatus.Rejected;
             await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
             _metrics.StepExecuted(_action.Alias);
-            return ExecutionResult.Next();
+
+            return ExecutionResult.Outcome(approved
+                ? RequestApprovalAction.ApprovedOutcome
+                : RequestApprovalAction.RejectedOutcome);
         }
 
-        // Rejected or no decision — fail the step.
+        // No decision on the event — the step was resumed by something that is not an approval
+        // submission. That is a genuine error rather than an outcome.
         stepRun.Status = StepRunStatus.Failed;
         _metrics.StepFailed(_action.Alias);
-        stepRun.Error = decision is not null
-            ? $"Approval rejected: {decision.Comment ?? "No reason provided"}"
-            : "Approval step resumed without a valid decision";
+        stepRun.Error = "Approval step resumed without a valid decision";
         stepRun.ErrorCategory = StepRunErrorCategory.Cancelled;
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 

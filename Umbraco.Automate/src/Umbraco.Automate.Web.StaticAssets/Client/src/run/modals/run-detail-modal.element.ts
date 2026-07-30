@@ -76,6 +76,8 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             case "Pending":
             case "WaitingForInput":
             case "Suspended":
+            // Used for both run and step status here. Either way a refusal is not an error.
+            case "Rejected":
                 return "warning";
             case "Failed":
                 return "danger";
@@ -303,7 +305,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                         @click=${() => this.modalContext?.reject()}
                     ></uui-button>
                     ${when(
-                        this._run && (this._run.status === "Failed" || this._run.status === "Completed"),
+                        this._run &&
+                            (this._run.status === "Failed" ||
+                                this._run.status === "Completed" ||
+                                this._run.status === "Rejected"),
                         () => html`
                             <uui-button
                                 look="primary"
