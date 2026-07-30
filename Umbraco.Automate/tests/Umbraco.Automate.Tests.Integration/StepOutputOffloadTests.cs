@@ -38,13 +38,14 @@ using WorkflowCore.Models;
 namespace Umbraco.Automate.Tests.Integration;
 
 /// <summary>
-/// End-to-end checks for large step-output reference-offload: outputs whose serialized size
-/// exceeds <see cref="ExecutionOptions.MaxInlineOutputBytes"/> are kept out of the workflow
-/// data (which WorkflowCore re-serializes on every execution pass) and replaced by a
-/// <see cref="StepOutputReference"/> marker, while later steps binding into them still
-/// resolve the real value by hydrating from the StepRun table — including inside ForEach
-/// iteration scopes. Small outputs stay inline exactly as before, which also keeps the
-/// pending-approvals prompt flow working.
+/// End-to-end checks for large output reference-offload: step outputs — and the trigger
+/// output — whose serialized size exceeds <see cref="ExecutionOptions.MaxInlineOutputBytes"/>
+/// are kept out of the workflow data (which WorkflowCore re-serializes on every execution pass)
+/// and replaced by a <see cref="StepOutputReference"/> marker, while steps binding into them
+/// still resolve the real value by hydrating from the database — the StepRun table for a step,
+/// the run's TriggerData for the trigger — including inside ForEach iteration scopes. Small
+/// outputs stay inline exactly as before, which also keeps the pending-approvals prompt flow
+/// working.
 /// </summary>
 public class StepOutputOffloadTests : IAsyncLifetime
 {
@@ -309,6 +310,65 @@ public class StepOutputOffloadTests : IAsyncLifetime
         StepOutputReference.TryGetStepRunId(data.StepOutputs[bigStep.Id], out _).ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task LargeTriggerOutput_IsOffloadedFromWorkflowData_AndResolvesInStep()
+    {
+        var payload = PayloadSentinel + new string('t', 4000);
+        var readerStep = LogStep("triggerReaderLog", "saw:${ trigger.recordFieldsJson }");
+        var tailStep = LogStep("tailLog", "done");
+
+        var automation = BuildAutomation("test-offload-trigger-output", readerStep, tailStep);
+        await TriggerAsync(automation, new Dictionary<string, object?> { ["recordFieldsJson"] = payload });
+
+        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+
+        // A step binding into the trigger still resolved the real value, via hydration.
+        var completed = await _runRepository.GetAsync(run.Id);
+        var readerRun = completed!.StepRuns.Single(s => s.StepId == readerStep.Id);
+        ReadMessage(readerRun.OutputData!).ShouldBe("saw:" + payload);
+
+        // The payload lives once on the run record...
+        completed.TriggerData.ShouldNotBeNull();
+        completed.TriggerData!.ShouldContain(PayloadSentinel);
+
+        // ...while the workflow data holds only a marker referencing that run...
+        var data = instance.Data.ShouldBeOfType<AutomationWorkflowData>();
+        StepOutputReference.TryGetTriggerRunId(data.TriggerOutput, out var referencedRunId).ShouldBeTrue();
+        referencedRunId.ShouldBe(run.Id);
+
+        // ...so the blob re-serialized on every execution pass carries no payload at all.
+        var blob = SerializeAsPersistenceBlob(data);
+        blob.ShouldNotContain(PayloadSentinel);
+        blob.ShouldContain(StepOutputReference.TriggerMarkerKey);
+    }
+
+    [Fact]
+    public async Task SmallTriggerOutput_StaysInlineInWorkflowData()
+    {
+        const string country = "tiny-trigger-sentinel";
+        var readerStep = LogStep("triggerReaderLog", "saw:${ trigger.country }");
+        var tailStep = LogStep("tailLog", "done");
+
+        var automation = BuildAutomation("test-offload-small-trigger-output", readerStep, tailStep);
+        await TriggerAsync(automation, new Dictionary<string, object?> { ["country"] = country });
+
+        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+
+        var completed = await _runRepository.GetAsync(run.Id);
+        ReadMessage(completed!.StepRuns.Single(s => s.StepId == readerStep.Id).OutputData!)
+            .ShouldBe("saw:" + country);
+
+        // Inline exactly as before this change: value in the blob, no trigger marker.
+        var data = instance.Data.ShouldBeOfType<AutomationWorkflowData>();
+        data.TriggerOutput["country"].ShouldBe(country);
+
+        var blob = SerializeAsPersistenceBlob(data);
+        blob.ShouldContain(country);
+        blob.ShouldNotContain(StepOutputReference.TriggerMarkerKey);
+    }
+
     private static StepConfiguration LogStep(string alias, string message) => new()
     {
         Id = Guid.NewGuid(),
@@ -333,7 +393,7 @@ public class StepOutputOffloadTests : IAsyncLifetime
             .WithConnection(first.Id, second.Id)
             .Build();
 
-    private async Task TriggerAsync(Automation automation)
+    private async Task TriggerAsync(Automation automation, Dictionary<string, object?>? triggerOutput = null)
     {
         _automationServiceMock
             .Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
@@ -343,6 +403,9 @@ public class StepOutputOffloadTests : IAsyncLifetime
         {
             TriggerAlias = "umbracoAutomate.manual",
             InitiatorType = "system",
+            OutputData = triggerOutput is null
+                ? null
+                : JsonSerializer.Serialize(triggerOutput, JsonOptions.Default),
         };
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
     }
