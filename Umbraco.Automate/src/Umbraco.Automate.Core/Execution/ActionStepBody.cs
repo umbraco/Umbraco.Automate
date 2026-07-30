@@ -462,10 +462,15 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         // No decision on the event — the step was resumed by something that is not an approval
         // submission. That is a genuine error rather than an outcome.
+        //
+        // Categorised as a configuration error, not as Cancelled: nothing was cancelled, and this is
+        // the category DefaultStepErrorClassifier already gives the InvalidOperationException thrown
+        // just below. Both are terminal, so retry behaviour is unchanged — a resume payload that was
+        // not a decision will not become one on a second attempt.
         stepRun.Status = StepRunStatus.Failed;
         _metrics.StepFailed(_action.Alias);
         stepRun.Error = "Approval step resumed without a valid decision";
-        stepRun.ErrorCategory = StepRunErrorCategory.Cancelled;
+        stepRun.ErrorCategory = StepRunErrorCategory.ConfigurationError;
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
         if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
