@@ -11,10 +11,12 @@ namespace Umbraco.Automate.Core.Settings;
 internal sealed class EditableModelSerializer : IEditableModelSerializer
 {
     private readonly ISensitiveFieldProtector _protector;
+    private readonly IConfigurationReferenceResolver _configReferenceResolver;
 
-    public EditableModelSerializer(ISensitiveFieldProtector protector)
+    public EditableModelSerializer(ISensitiveFieldProtector protector, IConfigurationReferenceResolver configReferenceResolver)
     {
         _protector = protector;
+        _configReferenceResolver = configReferenceResolver;
     }
 
     /// <inheritdoc />
@@ -94,9 +96,12 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
                 var stringValue = jsonValue.GetValue<string>();
                 if (!string.IsNullOrEmpty(stringValue))
                 {
-                    // Skip encryption for configuration references (values starting with $).
-                    // These are pointers to IConfiguration, not actual secrets.
-                    if (stringValue.StartsWith("$", StringComparison.Ordinal))
+                    // Skip encryption for values that contain a configuration reference under an
+                    // allowed prefix (e.g. "Bearer $Umbraco:Automate:Secrets:ApiKey"). These are
+                    // pointers to IConfiguration resolved at read time, not actual secrets, and the
+                    // reference may sit anywhere in the value — not just at the start. The same
+                    // service drives resolution, so the two decisions cannot drift.
+                    if (_configReferenceResolver.ContainsReference(stringValue))
                     {
                         continue;
                     }

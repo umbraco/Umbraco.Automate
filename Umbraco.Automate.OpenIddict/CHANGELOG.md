@@ -5,6 +5,19 @@ All notable changes to Umbraco.Automate.OpenIddict will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.1.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@17.0.0...Umbraco.Automate.OpenIddict@17.1.0) (2026-07-22)
+
+### feat
+
+* **openiddict:** Add OAuth provider configuration status endpoint ([6cd3f69](https://github.com/umbraco/Umbraco.Automate/commit/6cd3f69187ec01d154277d3711e88e21aa6ccf05))
+* **openiddict:** Add provider setup docs link and secrets-handling reminder ([0b3c5a0](https://github.com/umbraco/Umbraco.Automate/commit/0b3c5a0ea610f2557a52e20398e6c97bb8746f03))
+* **openiddict:** Warn and disable Authenticate button when provider is unconfigured ([68791a6](https://github.com/umbraco/Umbraco.Automate/commit/68791a6b2ac1237c35292bddf1cf8a6ba9cce115))
+
+### fix
+
+* **oauth:** Encode OAuth popup HTML to prevent reflected XSS ([2d71ea0](https://github.com/umbraco/Umbraco.Automate/commit/2d71ea0f18aaade59083372461f644652cc35930))
+* **openiddict:** Reject OAuth challenge gracefully when provider is unconfigured ([c6a2260](https://github.com/umbraco/Umbraco.Automate/commit/c6a22608b1ad3118c9445e758c39c69deed1c0fe))
+
 ## [17.0.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@17.0.0-beta.1...Umbraco.Automate.OpenIddict@17.0.0) (2026-07-08)
 
 ### Miscellaneous

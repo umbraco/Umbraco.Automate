@@ -9,7 +9,7 @@ namespace Umbraco.Automate.OpenIddict.ConnectionTypes;
 /// Provider packages derive from this and register their OpenIddict provider in a Composer.
 /// </summary>
 /// <typeparam name="TSettings">The settings POCO type containing an <c>OAuthCredentialsId</c> field.</typeparam>
-public abstract class OAuthConnectionTypeBase<TSettings> : ConnectionTypeBase<TSettings>
+public abstract class OAuthConnectionTypeBase<TSettings> : ConnectionTypeBase<TSettings>, IOAuthConnectionType
     where TSettings : class, new()
 {
     /// <summary>
@@ -28,6 +28,13 @@ public abstract class OAuthConnectionTypeBase<TSettings> : ConnectionTypeBase<TS
     /// (e.g. <c>"Slack"</c>, <c>"GitHub"</c>).
     /// </summary>
     public abstract string ProviderName { get; }
+
+    /// <summary>
+    /// Gets an optional URL to documentation describing how to obtain this provider's OAuth
+    /// application credentials. Override to point at the provider's app-registration page
+    /// (e.g. Slack's "Your Apps" page). Defaults to <c>null</c> (no link shown).
+    /// </summary>
+    public virtual string? SetupDocsUrl => null;
 
     /// <summary>
     /// Gets the credentials service — exposed to derived provider types so they can perform

@@ -78,6 +78,15 @@ internal interface IAutomationRunRepository
     Task<string?> GetStepRunOutputAsync(Guid stepRunId, Guid runId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the serialized trigger data of a single run, or <c>null</c> when the run no longer
+    /// exists (e.g. removed by retention cleanup) or was started without trigger data.
+    /// Lightweight single-column primary-key read, the trigger-output counterpart of
+    /// <see cref="GetStepRunOutputAsync"/>, used to hydrate an offloaded trigger output at
+    /// binding time.
+    /// </summary>
+    Task<string?> GetRunTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes all runs for an automation (cascade deletes step runs).
     /// </summary>
     Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default);

@@ -117,6 +117,14 @@ public class OAuthConnectionTypeBaseTests
             () => _connectionType.ValidateAsync(settings, CancellationToken.None));
     }
 
+    [Fact]
+    public void SetupDocsUrl_DefaultsToNull()
+    {
+        // Virtual with a null default (#106) — must hold for already-published providers that
+        // haven't overridden it, so this can't be a breaking change on recompilation.
+        _connectionType.SetupDocsUrl.ShouldBeNull();
+    }
+
     private sealed class TestSettings
     {
         public Guid? OAuthCredentialsId { get; set; }

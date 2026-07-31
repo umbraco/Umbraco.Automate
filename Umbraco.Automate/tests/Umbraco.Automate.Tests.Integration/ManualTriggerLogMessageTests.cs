@@ -56,7 +56,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         var configuration = new ConfigurationBuilder().Build();
 
         // Collections — manually constructed without Umbraco TypeLoader.
-        var modelResolver = new EditableModelResolver(configuration);
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(configuration));
 
         var actions = new ActionCollection(() =>
         {

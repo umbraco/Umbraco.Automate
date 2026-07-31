@@ -5,6 +5,23 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.1.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.0.0...Umbraco.Automate@17.1.0) (2026-07-22)
+
+### feat
+
+* **ui:** Allow manual Run now for Scheduled-trigger automations ([0254815](https://github.com/umbraco/Umbraco.Automate/commit/02548156bf7b53bf429942cfbc9febd0b7cec2f5))
+
+### fix
+
+* **core:** Defer Automate database writes until startup migrations finish ([2689d7b](https://github.com/umbraco/Umbraco.Automate/commit/2689d7baa35a9200b23f654ea36b753edc8c98cd))
+* **core:** Degrade gracefully when startup migrations fail ([381f3eb](https://github.com/umbraco/Umbraco.Automate/commit/381f3eb967c8883ee90815988d17dbd90b3d51d6))
+* **core:** Fail fast instead of hanging when startup migrations fail ([5d44d92](https://github.com/umbraco/Umbraco.Automate/commit/5d44d92b8dfa929350a663a3b2e5b03d66ea7fd6))
+* **core:** Populate ScheduledTriggerOutput on real CRON fires ([b3d71d9](https://github.com/umbraco/Umbraco.Automate/commit/b3d71d9d6360db85df05a0c568ca31ab6082a423))
+* **core:** Resolve step-output bindings case-insensitively after persistence round-trip ([b0ac50e](https://github.com/umbraco/Umbraco.Automate/commit/b0ac50e46023ea9158a6b9976e2e23a90a09598d)), closes [#112](https://github.com/umbraco/Umbraco.Automate/issues/112)
+* **settings:** Resolve config references embedded within larger string values ([6e70e30](https://github.com/umbraco/Umbraco.Automate/commit/6e70e30f2e016a09cb393049596ca79782421fc0)), closes [#159](https://github.com/umbraco/Umbraco.Automate/issues/159)
+* **trigger:** Fail closed on trigger dispatch when migrations permanently fail ([1b72483](https://github.com/umbraco/Umbraco.Automate/commit/1b72483385ed1458199fd2877c7e0f8c48f15286))
+* **ui:** Discard unconfigured trigger/action when settings modal is closed ([d57116b](https://github.com/umbraco/Umbraco.Automate/commit/d57116b593f132060f2f1afe6b60e68f12ce039f))
+
 ## [17.0.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.0.0-beta.1...Umbraco.Automate@17.0.0) (2026-07-08)
 
 ### ⚠ BREAKING CHANGE

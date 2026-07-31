@@ -3,6 +3,7 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbFormControlMixin } from "@umbraco-cms/backoffice/validation";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
 import { UMB_NOTIFICATION_CONTEXT, type UmbNotificationContext } from "@umbraco-cms/backoffice/notification";
+import { UMB_AUTH_CONTEXT, type UmbAuthContext } from "@umbraco-cms/backoffice/auth";
 import type {
     UmbPropertyEditorConfigCollection,
     UmbPropertyEditorUiElement,
@@ -13,6 +14,11 @@ interface OAuthCompleteMessage {
     success: boolean;
     credentialId?: string;
     error?: string;
+}
+
+interface OAuthProviderStatusResponse {
+    isConfigured: boolean;
+    setupDocsUrl?: string;
 }
 
 const elementName = "umb-automate-property-editor-ui-oauth";
@@ -34,21 +40,69 @@ export class UmbAutomatePropertyEditorUIOAuthElement
     @state()
     private _authenticating = false;
 
+    /** undefined while the status check is in flight (or hasn't started yet). */
+    @state()
+    private _isProviderConfigured: boolean | undefined;
+
+    @state()
+    private _setupDocsUrl: string | undefined;
+
     #popup: Window | null = null;
     #popupPollTimer?: ReturnType<typeof setInterval>;
     #boundMessageHandler = this.#onMessage.bind(this);
     #notificationContext?: UmbNotificationContext;
+    #authContext?: UmbAuthContext;
+    /** The provider whose status has been requested, to dedupe the two triggers (config setter + auth context). */
+    #checkedProvider?: string;
 
     constructor() {
         super();
         this.consumeContext(UMB_NOTIFICATION_CONTEXT, (context) => {
             this.#notificationContext = context;
         });
+        this.consumeContext(UMB_AUTH_CONTEXT, (context) => {
+            this.#authContext = context;
+            this.#checkProviderStatus();
+        });
     }
 
     public set config(config: UmbPropertyEditorConfigCollection | undefined) {
         if (!config) return;
         this._provider = config.getValueByAlias<string>("provider") ?? "";
+        this.#checkProviderStatus();
+    }
+
+    async #checkProviderStatus() {
+        if (!this._provider || !this.#authContext) return;
+
+        // Both the config setter and the auth-context callback call this, and the config setter can
+        // fire repeatedly — only check each provider once.
+        if (this._provider === this.#checkedProvider) return;
+        const provider = this._provider;
+        this.#checkedProvider = provider;
+
+        try {
+            const { base, credentials, token } = this.#authContext.getOpenApiConfiguration();
+            const response = await fetch(
+                `${base}/umbraco/automate/oauth/status/${encodeURIComponent(provider)}`,
+                { credentials, headers: { Authorization: `Bearer ${await token()}` } },
+            );
+
+            if (!response.ok) {
+                // Allow a retry, and keep any previously-known state rather than resetting to
+                // undefined — a transient failure shouldn't clear a valid warning.
+                this.#checkedProvider = undefined;
+                return;
+            }
+
+            const data = (await response.json()) as OAuthProviderStatusResponse;
+            this._isProviderConfigured = data.isConfigured;
+            this._setupDocsUrl = data.setupDocsUrl;
+        } catch {
+            // Network/parse failure — allow a retry and leave the last-known state untouched
+            // rather than risk clearing a valid warning.
+            this.#checkedProvider = undefined;
+        }
     }
 
     override connectedCallback() {
@@ -113,6 +167,11 @@ export class UmbAutomatePropertyEditorUIOAuthElement
             return;
         }
 
+        if (this._isProviderConfigured === false) {
+            this.#notify("danger", `${this._provider} is not configured. Add a client ID and secret in appsettings.json first.`);
+            return;
+        }
+
         this._authenticating = true;
 
         const url = `/umbraco/automate/oauth/challenge/${encodeURIComponent(this._provider)}`;
@@ -174,19 +233,60 @@ export class UmbAutomatePropertyEditorUIOAuthElement
 
     #renderDisconnected() {
         const providerLabel = this._provider || "provider";
+        const isUnconfigured = this._isProviderConfigured === false;
 
         return html`
             <div class="oauth-state disconnected">
+                ${isUnconfigured ? this.#renderNotConfiguredWarning(providerLabel) : nothing}
                 <uui-button
                     look="primary"
                     label=${`Authenticate with ${providerLabel}`}
-                    ?disabled=${this.readonly || this._authenticating}
+                    ?disabled=${this.readonly || this._authenticating || isUnconfigured}
                     @click=${this.#onAuthenticate}
                 >
                     ${this._authenticating
                         ? html`<uui-loader-bar></uui-loader-bar>`
                         : html`Authenticate with ${providerLabel}`}
                 </uui-button>
+            </div>
+        `;
+    }
+
+    #renderNotConfiguredWarning(providerLabel: string) {
+        return html`
+            <div class="not-configured-warning">
+                <div class="heading">
+                    <uui-icon name="icon-alert"></uui-icon>
+                    <strong>${providerLabel} is not configured</strong>
+                </div>
+                <p>
+                    Add a client ID and secret under
+                    <code>Umbraco:Automate:Providers:${this._provider}</code> in appsettings.json
+                    before authenticating.
+                    <br/>
+                    <small>
+
+                        Keep the client secret out of source control. Use environment variables,
+                        user secrets, or a key vault to inject it at deployment time.
+                    </small>
+                </p>
+                ${this._setupDocsUrl
+                    ? html`
+                          <uui-button
+                              class="docs-link"
+                              look="secondary"
+                              color="warning"
+                              compact
+                              href=${this._setupDocsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              label=${`Get ${providerLabel} credentials`}
+                          >
+                              Get ${providerLabel} credentials
+                              <uui-icon name="icon-out" slot="extra"></uui-icon>
+                          </uui-button>
+                      `
+                    : nothing}
             </div>
         `;
     }
@@ -213,6 +313,26 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         .disconnected {
             flex-direction: column;
             align-items: flex-start;
+        }
+
+        .not-configured-warning {
+            padding: var(--uui-size-space-4) var(--uui-size-space-5);
+            border-radius: var(--uui-border-radius);
+            border: 1px solid var(--uui-color-warning-standalone);
+            background-color: var(--uui-color-warning);
+            color: var(--uui-color-warning-contrast);
+        }
+
+        .not-configured-warning p {
+            margin-top: 0;
+        }
+
+        .not-configured-warning code {
+            font-size: 0.9em;
+        }
+
+        .not-configured-warning .docs-link uui-icon {
+            margin-left: var(--uui-size-space-2);
         }
     `;
 }

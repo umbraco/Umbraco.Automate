@@ -6,9 +6,10 @@ using Umbraco.Automate.Core.Runs;
 namespace Umbraco.Automate.Tests.Unit.Execution;
 
 /// <summary>
-/// Covers on-demand hydration of offloaded step outputs: binding evaluation that touches a
-/// marker fetches the full output from the StepRun table (lazily, memoised, null-tolerant),
-/// while inline outputs and unrelated bindings never pay a read.
+/// Covers on-demand hydration of offloaded step outputs and offloaded trigger output: binding
+/// evaluation that touches a marker fetches the full output from the database (lazily, memoised,
+/// null-tolerant) — the StepRun table for a step, the run's TriggerData for the trigger — while
+/// inline outputs and unrelated bindings never pay a read.
 /// </summary>
 public class StepOutputHydrationTests
 {
@@ -23,6 +24,18 @@ public class StepOutputHydrationTests
         => _runRepository
             .Setup(r => r.GetStepRunOutputAsync(stepRunId, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(outputJson);
+
+    private void SetupRunTriggerData(Guid runId, string? triggerJson)
+        => _runRepository
+            .Setup(r => r.GetRunTriggerDataAsync(runId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(triggerJson);
+
+    private static AutomationWorkflowData CreateTriggerData(Dictionary<string, object?> triggerOutput)
+        => new()
+        {
+            RunId = RunId,
+            TriggerOutput = triggerOutput,
+        };
 
     private static AutomationWorkflowData CreateData(Guid stepId, Dictionary<string, object?> outputs, string alias = "offloaded")
         => new()
@@ -196,6 +209,134 @@ public class StepOutputHydrationTests
         var bindingData = BindingDataBuilder.Build(data);
 
         _evaluator.EvaluateRaw("${ steps.offloaded.message }", bindingData).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Build_TriggerMarker_HydratesFieldFromRunTriggerData()
+    {
+        SetupRunTriggerData(RunId, """{"formName":"Contact","recordFields":{"email":"a@b.dk"}}""");
+        var data = CreateTriggerData(StepOutputReference.CreateTriggerMarker(RunId));
+
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: CreateCache());
+
+        _evaluator.Evaluate("${ trigger.formName }", bindingData).ShouldBe("Contact");
+        _evaluator.Evaluate("${ trigger.recordFields.email }", bindingData).ShouldBe("a@b.dk");
+    }
+
+    [Fact]
+    public void Build_TriggerMarker_NotFetchedWhenNothingBindsIntoIt()
+    {
+        var stepId = Guid.NewGuid();
+        var data = CreateData(
+            stepId,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["message"] = "small" });
+        data.TriggerOutput = StepOutputReference.CreateTriggerMarker(RunId);
+
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: CreateCache());
+        _evaluator.Evaluate("${ steps.offloaded.message }", bindingData).ShouldBe("small");
+
+        _runRepository.Verify(
+            r => r.GetRunTriggerDataAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void Build_RepeatedBindsToOffloadedTriggerOutput_FetchesOnce()
+    {
+        SetupRunTriggerData(RunId, """{"formName":"memoised"}""");
+        var data = CreateTriggerData(StepOutputReference.CreateTriggerMarker(RunId));
+        var cache = CreateCache();
+
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: cache);
+        _evaluator.Evaluate("${ trigger.formName }", bindingData).ShouldBe("memoised");
+        _evaluator.Evaluate("${ trigger.formName }", bindingData).ShouldBe("memoised");
+        var laterBindingData = BindingDataBuilder.Build(data, hydrationCache: cache);
+        _evaluator.Evaluate("${ trigger.formName }", laterBindingData).ShouldBe("memoised");
+
+        _runRepository.Verify(
+            r => r.GetRunTriggerDataAsync(RunId, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public void Build_WholeTriggerBind_StringifiesHydratedOutput()
+    {
+        SetupRunTriggerData(RunId, """{"formName":"whole-bind"}""");
+        var data = CreateTriggerData(StepOutputReference.CreateTriggerMarker(RunId));
+
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: CreateCache());
+
+        var result = _evaluator.Evaluate("${ trigger }", bindingData);
+        result.ShouldContain("whole-bind");
+        result.ShouldNotContain(StepOutputReference.TriggerMarkerKey);
+    }
+
+    [Fact]
+    public void Build_RunRowMissing_TriggerResolvesAsMissingPathWithoutThrowing()
+    {
+        SetupRunTriggerData(RunId, null);
+        var data = CreateTriggerData(StepOutputReference.CreateTriggerMarker(RunId));
+
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: CreateCache());
+
+        _evaluator.EvaluateRaw("${ trigger.formName }", bindingData).ShouldBeNull();
+        _evaluator.Evaluate("${ trigger.formName }", bindingData).ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void Build_InlineTriggerOutput_ResolvesUnchangedWithHydrationCachePresent()
+    {
+        // Backward compatibility: in-flight runs (and every run under the threshold) carry the
+        // trigger payload inline and must resolve with zero hydration reads.
+        var data = CreateTriggerData(
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["country"] = "DK" });
+
+        var bindingData = BindingDataBuilder.Build(data, hydrationCache: CreateCache());
+
+        _evaluator.Evaluate("${ trigger.country }", bindingData).ShouldBe("DK");
+        _runRepository.Verify(
+            r => r.GetRunTriggerDataAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void Build_TriggerMarkerWithoutHydrationCache_LeavesMarkerUnresolvedWithoutThrowing()
+    {
+        var data = CreateTriggerData(StepOutputReference.CreateTriggerMarker(RunId));
+
+        var bindingData = BindingDataBuilder.Build(data);
+
+        _evaluator.EvaluateRaw("${ trigger.formName }", bindingData).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Cache_EvictRun_RemovesTheRunsTriggerEntryToo()
+    {
+        SetupRunTriggerData(RunId, """{"formName":"evicted"}""");
+        var cache = CreateCache();
+
+        cache.GetTriggerOutput(RunId);
+        cache.EvictRun(RunId);
+        cache.GetTriggerOutput(RunId);
+
+        _runRepository.Verify(
+            r => r.GetRunTriggerDataAsync(RunId, It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public void Cache_TriggerAndStepEntries_DoNotCollide()
+    {
+        // Trigger entries are keyed by a sentinel step-run id; a real step run in the same run
+        // must still hydrate separately.
+        var stepRunId = Guid.NewGuid();
+        SetupStepRunOutput(stepRunId, """{"message":"from-step"}""");
+        SetupRunTriggerData(RunId, """{"message":"from-trigger"}""");
+        var cache = CreateCache();
+
+        cache.GetTriggerOutput(RunId)["message"].ShouldBe("from-trigger");
+        cache.GetOutput(RunId, stepRunId)["message"].ShouldBe("from-step");
+        cache.GetTriggerOutput(RunId)["message"].ShouldBe("from-trigger");
     }
 
     [Fact]

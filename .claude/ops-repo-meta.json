@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "lines": {
+    "live": ["v17", "v18"],
+    "primary": "v18",
+    "port_order": "downward"
+  }
+}

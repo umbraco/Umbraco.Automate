@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Conditions;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
@@ -23,6 +25,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IRateLimitService _rateLimitService;
     private readonly ICircuitBreakerService _circuitBreaker;
     private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly AutomateMetrics _metrics;
     private readonly ILogger<AutomationExecutor> _logger;
 
@@ -35,6 +38,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IRateLimitService rateLimitService,
         ICircuitBreakerService circuitBreaker,
         ConditionEvaluator conditionEvaluator,
+        IOptions<ExecutionOptions> executionOptions,
         AutomateMetrics metrics,
         ILogger<AutomationExecutor> logger)
     {
@@ -46,6 +50,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _rateLimitService = rateLimitService;
         _circuitBreaker = circuitBreaker;
         _conditionEvaluator = conditionEvaluator;
+        _executionOptions = executionOptions;
         _metrics = metrics;
         _logger = logger;
     }
@@ -76,6 +81,13 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         var workspace = await _workspaceService.GetWorkspaceAsync(automation.WorkspaceId, cancellationToken)
             ?? throw new InvalidOperationException($"Workspace '{automation.WorkspaceId}' not found for automation '{automation.Name}'.");
 
+        // Serialized once and reused: it is both the run's persisted TriggerData and the size
+        // measurement that decides whether the workflow data carries the payload inline or only
+        // a marker referencing this run.
+        var triggerJson = triggerOutputData is not null
+            ? JsonSerializer.Serialize(triggerOutputData, Dispatch.JsonOptions.Default)
+            : null;
+
         // Create the automation run record.
         var run = new AutomationRun
         {
@@ -88,9 +100,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             StartedUtc = DateTime.UtcNow,
             InitiatedBy = initiatorType,
             CorrelationId = initiatorId,
-            TriggerData = triggerOutputData is not null
-                ? JsonSerializer.Serialize(triggerOutputData, Dispatch.JsonOptions.Default)
-                : null,
+            TriggerData = triggerJson,
         };
 
         await _runRepository.SaveAsync(run, cancellationToken);
@@ -124,7 +134,9 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             _workflowRegistry.RegisterWorkflow(definition);
         }
 
-        // Start the workflow with our data.
+        // Start the workflow with our data. Trigger output starts out inline so the trigger-edge
+        // filter below binds against the in-memory payload (no database read); it is swapped for
+        // a marker, if oversized, immediately afterwards — before the data reaches WorkflowCore.
         var workflowData = new AutomationWorkflowData
         {
             RunId = run.Id,
@@ -154,6 +166,16 @@ internal sealed class AutomationExecutor : IAutomationExecutor
                 run.Id, automation.Name);
 
             return run.Id;
+        }
+
+        // A large trigger payload would be re-serialized into the WorkflowCore instance blob on
+        // every execution pass, so only a marker referencing this run (whose TriggerData above is
+        // written once) goes into the workflow data — binding evaluation hydrates it on demand via
+        // StepOutputHydrationCache, exactly as it does for offloaded step outputs.
+        if (triggerOutputData is not null && triggerJson is not null)
+        {
+            workflowData.TriggerOutput = StepOutputReference.CreateInlineOrTriggerMarker(
+                triggerOutputData, triggerJson, run.Id, _executionOptions.Value.MaxInlineOutputBytes);
         }
 
         var instanceId = await _workflowHost.StartWorkflow(workflowId, workflowData);
