@@ -34,6 +34,6 @@ public sealed class HttpRequestSettings
     /// <summary>
     /// Gets or sets custom headers as a JSON object string (key-value pairs).
     /// </summary>
-    [Field(Label = "Headers", Description = "Custom headers as JSON object (e.g. {\"Authorization\": \"Bearer token\"}).", SortOrder = 4, IsSensitive = true, SupportsBindings = true)]
+    [Field(Label = "Headers", Description = "Custom headers as JSON object (e.g. {\"Authorization\": \"Bearer token\"}).", SortOrder = 4, IsSensitive = true, SupportsBindings = true, EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
     public string? Headers { get; set; }
 }
