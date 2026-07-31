@@ -8,7 +8,9 @@ using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Persistence;
 using Umbraco.Automate.Persistence.Workspaces;
 using Umbraco.Automate.Tests.Common.Fixtures;
+using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Integration;
 
@@ -127,6 +129,7 @@ public class AutomateSchemaInitializerTests : IDisposable
             BuildConfiguration(),
             Mock.Of<IOptionsMonitor<ConnectionStrings>>(),
             readinessSignal,
+            Mock.Of<IRuntimeState>(x => x.Level == RuntimeLevel.Run),
             NullLogger<AutomateSchemaInitializer>.Instance);
 
     private IConfiguration BuildConfiguration()

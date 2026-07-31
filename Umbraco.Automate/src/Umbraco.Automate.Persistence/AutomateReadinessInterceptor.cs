@@ -27,10 +27,23 @@ namespace Umbraco.Automate.Persistence;
 /// <para>
 /// If startup migrations fail, the signal is set to a faulted state and any save waiting on it
 /// throws <see cref="Core.AutomateNotReadyException"/> immediately rather than hanging forever.
+/// A failure is not the only way the signal can stay unresolved, though: below
+/// <c>RuntimeLevel.Run</c> the schema is deliberately not migrated and the signal is left pending, so
+/// the synchronous path below waits with a timeout rather than blocking its thread indefinitely.
 /// </para>
 /// </remarks>
 internal sealed class AutomateReadinessInterceptor : SaveChangesInterceptor
 {
+    /// <summary>
+    /// How long a synchronous save waits for the schema to become ready before giving up.
+    /// </summary>
+    /// <remarks>
+    /// Only ever reached during the pre-ready startup window, and generous enough that a first-boot
+    /// migration on a slow server is not mistaken for a stuck one. The asynchronous path is not
+    /// bounded this way because it observes its caller's <see cref="CancellationToken"/>.
+    /// </remarks>
+    private static readonly TimeSpan SynchronousSaveTimeout = TimeSpan.FromSeconds(30);
+
     private readonly AutomateReadinessSignal _readinessSignal;
 
     public AutomateReadinessInterceptor(AutomateReadinessSignal readinessSignal)
@@ -58,7 +71,22 @@ internal sealed class AutomateReadinessInterceptor : SaveChangesInterceptor
         // ungated. In steady state the signal is already completed, so this returns instantly and
         // never blocks — it only ever waits during the pre-ready startup window, and throws
         // AutomateNotReadyException if migrations failed (mirroring SavingChangesAsync).
-        _readinessSignal.WaitAsync().GetAwaiter().GetResult();
+        //
+        // There is no CancellationToken on this overload, so the wait is bounded explicitly. Without
+        // that, a write attempted while the signal is still pending — which is the normal state below
+        // RuntimeLevel.Run, where the schema is deliberately not migrated — would block this thread
+        // for the lifetime of the process.
+        try
+        {
+            _readinessSignal.WaitAsync().WaitAsync(SynchronousSaveTimeout).GetAwaiter().GetResult();
+        }
+        catch (TimeoutException ex)
+        {
+            throw new AutomateNotReadyException(
+                $"Automate's schema was still not ready after {SynchronousSaveTimeout.TotalSeconds:0} seconds, so this write was rejected. " +
+                "This usually means the site has not reached a running state, and therefore Automate's startup migrations have not run.",
+                ex);
+        }
 
         return base.SavingChanges(eventData, result);
     }

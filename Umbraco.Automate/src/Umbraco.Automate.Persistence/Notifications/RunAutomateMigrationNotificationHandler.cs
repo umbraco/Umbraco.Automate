@@ -15,6 +15,13 @@ namespace Umbraco.Automate.Persistence.Notifications;
 /// that the schema is still initialized on any boot path that does not initialize components first,
 /// and is a no-op once it has been.
 /// </remarks>
+/// <remarks>
+/// Unlike the component, this notification is published even below <c>RuntimeLevel.Run</c>, so it can
+/// run at a point where there is no database to migrate against. It does not guard on the runtime
+/// level itself: <see cref="IAutomateSchemaInitializer"/> owns that check, precisely so this handler
+/// cannot record a failed attempt that the component would then skip past on the restart that follows
+/// an install.
+/// </remarks>
 public class RunAutomateMigrationNotificationHandler
     : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {

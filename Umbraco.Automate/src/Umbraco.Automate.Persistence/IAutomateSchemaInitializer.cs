@@ -26,5 +26,11 @@ public interface IAutomateSchemaInitializer
     /// broken Automate schema does not prevent the rest of the site from starting. Cancellation does
     /// propagate, and leaves the schema state unresolved so a later call can retry.
     /// </remarks>
+    /// <remarks>
+    /// Below <see cref="Umbraco.Cms.Core.RuntimeLevel.Run"/> this returns without attempting anything
+    /// and without recording an attempt, because there is no database to migrate against yet. Callers
+    /// therefore do not need to check the runtime level themselves, and must not assume a completed
+    /// call means the schema is ready — that is what <see cref="AutomateReadinessSignal"/> is for.
+    /// </remarks>
     Task EnsureMigratedAsync(CancellationToken cancellationToken = default);
 }
