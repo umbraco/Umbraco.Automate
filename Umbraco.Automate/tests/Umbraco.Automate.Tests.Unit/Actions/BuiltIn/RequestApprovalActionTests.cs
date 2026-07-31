@@ -1,3 +1,4 @@
+using Json.Schema;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
@@ -26,6 +27,40 @@ public class RequestApprovalActionTests
     public void SettingsType_Is_RequestApprovalSettings()
     {
         _action.SettingsType.ShouldBe(typeof(RequestApprovalSettings));
+    }
+
+    [Fact]
+    public void OutputType_Is_ApprovalDecisionOutput()
+    {
+        _action.OutputType.ShouldBe(typeof(ApprovalDecisionOutput));
+    }
+
+    [Fact]
+    public void OutputSchema_Exposes_Approved_As_Boolean()
+    {
+        // The schema drives the backoffice binding picker, so the approval step only shows up as a
+        // binding source if this is non-null. `approved` is the field conditions should branch on.
+        var schema = _action.GetOutputSchema();
+
+        schema.ShouldNotBeNull();
+        var properties = schema.GetProperties();
+        properties.ShouldNotBeNull();
+        properties!.TryGetValue("approved", out var approvedSchema).ShouldBeTrue();
+        approvedSchema!.GetJsonType().ShouldBe(SchemaValueType.Boolean);
+    }
+
+    [Fact]
+    public void OutputSchema_Still_Exposes_Outcome_As_String()
+    {
+        // Kept alongside `approved` for backwards compatibility: conditions written against
+        // `outcome` must keep resolving, and it must read as a word, not an enum index.
+        var schema = _action.GetOutputSchema();
+
+        schema.ShouldNotBeNull();
+        var properties = schema.GetProperties();
+        properties.ShouldNotBeNull();
+        properties!.TryGetValue("outcome", out var outcomeSchema).ShouldBeTrue();
+        outcomeSchema!.GetJsonType().ShouldBe(SchemaValueType.String);
     }
 
     [Fact]
