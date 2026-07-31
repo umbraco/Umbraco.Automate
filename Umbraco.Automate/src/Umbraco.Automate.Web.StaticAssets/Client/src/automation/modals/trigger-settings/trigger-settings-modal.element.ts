@@ -1,4 +1,4 @@
-import { html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbValidationContext } from "@umbraco-cms/backoffice/validation";
 import type { UaTriggerSettingsModalData, UaTriggerSettingsModalValue } from "./types.js";
@@ -90,6 +90,16 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
             </umb-body-layout>
         `;
     }
+
+    static styles = [
+        css`
+            #content {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-layout-1);
+            }
+        `,
+    ];
 }
 
 export default UaTriggerSettingsModalElement;

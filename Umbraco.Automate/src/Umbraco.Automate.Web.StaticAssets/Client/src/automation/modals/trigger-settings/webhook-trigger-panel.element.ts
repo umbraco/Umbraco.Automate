@@ -58,14 +58,14 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
         return html`
             <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
                 <div slot="editor" class="url">
-                    <code>${url}</code>
+                    <uui-input readonly .value=${url}></uui-input>
                     <uui-button
                         compact
-                        look="outline"
+                        look="secondary"
                         label=${this.localize.term("uaWebhook_copyUrl")}
                         @click=${() => this.#copy(url)}
                     >
-                        <uui-icon name="icon-documents"></uui-icon>
+                        <uui-icon name="icon-clipboard-copy"></uui-icon>
                     </uui-button>
                 </div>
             </umb-property-layout>
@@ -185,6 +185,12 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
     static styles = [
         UmbTextStyles,
         css`
+            /* Match ua-settings-form so the panel's rows sit on the same rhythm as the
+               settings fields directly above it. */
+            umb-property-layout {
+                --uui-size-layout-1: var(--uui-size-space-2);
+            }
+
             .hint {
                 margin: 0;
                 color: var(--uui-color-text-alt);
@@ -193,13 +199,12 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
             .url {
                 display: flex;
                 align-items: center;
-                gap: var(--uui-size-space-3);
+                gap: var(--uui-size-space-2);
             }
 
-            .url code {
+            .url uui-input {
                 flex: 1;
-                word-break: break-all;
-                font-size: var(--uui-size-4);
+                font-family: var(--uui-font-family-mono, monospace);
             }
 
             uui-textarea {
