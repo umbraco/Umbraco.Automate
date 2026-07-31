@@ -1,0 +1,227 @@
+import { css, html, customElement, property, state, nothing } from "@umbraco-cms/backoffice/external/lit";
+import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
+import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
+import { AutomationsService } from "../../../api/sdk.gen.js";
+import { UA_EMPTY_GUID, buildWebhookUrl, dispatchActionEvent } from "../../../core/index.js";
+import { UaAutomationRunsChangedEvent } from "../../events/automation-runs-changed.event.js";
+
+/** Headers every test request carries unless the user overrides them in the advanced box. */
+const DEFAULT_TEST_HEADERS: Record<string, string> = {
+    "Content-Type": "application/json",
+};
+
+/**
+ * Webhook-specific extras for the trigger settings sidebar: the endpoint URL (so it can be
+ * copied while setting up the signing secret) and a test request that stands in for an
+ * external caller while the automation is being developed.
+ */
+@customElement("ua-webhook-trigger-panel")
+export class UaWebhookTriggerPanelElement extends UmbLitElement {
+    /** Unique of the automation this webhook belongs to. */
+    @property({ type: String, attribute: "automation-id" })
+    automationId = "";
+
+    /** HTTP method the webhook accepts, taken from the trigger's settings. */
+    @property({ type: String, attribute: "allowed-method" })
+    allowedMethod = "POST";
+
+    @state()
+    private _body = "";
+
+    @state()
+    private _headers = "";
+
+    @state()
+    private _sending = false;
+
+    get #isSaved(): boolean {
+        return !!this.automationId && this.automationId !== UA_EMPTY_GUID;
+    }
+
+    override render() {
+        return html`
+            <uui-box headline=${this.localize.term("uaWebhook_headline")}>
+                ${this.#isSaved ? this.#renderUrl() : this.#renderUnsavedHint()}
+                ${this.#isSaved ? this.#renderTestRequest() : nothing}
+            </uui-box>
+        `;
+    }
+
+    #renderUnsavedHint() {
+        return html`<p class="hint">${this.localize.term("uaWebhook_unsavedHint")}</p>`;
+    }
+
+    #renderUrl() {
+        const url = buildWebhookUrl(this.automationId);
+
+        return html`
+            <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
+                <div slot="editor" class="url">
+                    <code>${url}</code>
+                    <uui-button
+                        compact
+                        look="outline"
+                        label=${this.localize.term("uaWebhook_copyUrl")}
+                        @click=${() => this.#copy(url)}
+                    >
+                        <uui-icon name="icon-documents"></uui-icon>
+                    </uui-button>
+                </div>
+            </umb-property-layout>
+        `;
+    }
+
+    #renderTestRequest() {
+        return html`
+            <umb-property-layout
+                label=${this.localize.term("uaWebhook_testHeadline")}
+                description=${this.localize.term("uaWebhook_testDescription")}
+                orientation="vertical"
+            >
+                <div slot="editor">
+                    <uui-textarea
+                        rows="8"
+                        .value=${this._body}
+                        placeholder=${this.localize.term("uaWebhook_testBodyPlaceholder")}
+                        @input=${(e: InputEvent) => (this._body = (e.target as HTMLTextAreaElement).value)}
+                    ></uui-textarea>
+
+                    <details>
+                        <summary>${this.localize.term("uaFieldGroups_advancedLabel")}</summary>
+                        <uui-textarea
+                            rows="4"
+                            .value=${this._headers}
+                            placeholder=${this.localize.term("uaWebhook_testHeadersPlaceholder")}
+                            @input=${(e: InputEvent) => (this._headers = (e.target as HTMLTextAreaElement).value)}
+                        ></uui-textarea>
+                    </details>
+
+                    <uui-button
+                        look="secondary"
+                        ?disabled=${this._sending}
+                        label=${this.localize.term("uaWebhook_sendTest")}
+                        @click=${this.#onSendTest}
+                    >
+                        ${this.localize.term("uaWebhook_sendTest")}
+                    </uui-button>
+                </div>
+            </umb-property-layout>
+        `;
+    }
+
+    async #onSendTest() {
+        const headers = this.#parseHeaders();
+        if (headers === undefined) return;
+
+        this._sending = true;
+        try {
+            // The real endpoint hands steps the body verbatim as a string, so send the pasted
+            // text as-is rather than a parsed object — malformed JSON is the caller's business
+            // and a step under test may well want to see it.
+            const { error } = await AutomationsService.postAutomationsByIdTrigger({
+                path: { id: this.automationId },
+                body: {
+                    triggerOutputData: {
+                        method: this.allowedMethod || "POST",
+                        body: this._body,
+                        headers,
+                        query: {},
+                    },
+                },
+            });
+
+            if (error) {
+                // Typically 409 when the automation isn't published — the server's problem
+                // detail says why, so prefer it over generic copy.
+                this.#notify(
+                    "danger",
+                    (error as { detail?: string } | undefined)?.detail ??
+                        this.localize.term("uaWebhook_testFailed"),
+                );
+                return;
+            }
+
+            dispatchActionEvent(this, new UaAutomationRunsChangedEvent(this.automationId));
+            this.#notify("positive", this.localize.term("uaWebhook_testSent"));
+        } finally {
+            this._sending = false;
+        }
+    }
+
+    /**
+     * Parses the advanced headers box, layered over the defaults. Returns `undefined` (and
+     * notifies) when the text isn't a JSON object, so the caller can abort the send.
+     */
+    #parseHeaders(): Record<string, string> | undefined {
+        if (!this._headers.trim()) return { ...DEFAULT_TEST_HEADERS };
+
+        try {
+            const parsed = JSON.parse(this._headers);
+            if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+                throw new Error("Not an object");
+            }
+            return { ...DEFAULT_TEST_HEADERS, ...parsed };
+        } catch {
+            this.#notify("danger", this.localize.term("uaWebhook_testHeadersInvalid"));
+            return undefined;
+        }
+    }
+
+    async #copy(value: string) {
+        try {
+            await navigator.clipboard.writeText(value);
+            this.#notify("positive", this.localize.term("uaWebhook_urlCopied"));
+        } catch {
+            this.#notify("danger", this.localize.term("uaWebhook_urlCopyFailed"));
+        }
+    }
+
+    async #notify(color: "positive" | "danger", message: string) {
+        const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+        notifications?.peek(color, { data: { message } });
+    }
+
+    static styles = [
+        UmbTextStyles,
+        css`
+            .hint {
+                margin: 0;
+                color: var(--uui-color-text-alt);
+            }
+
+            .url {
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-3);
+            }
+
+            .url code {
+                flex: 1;
+                word-break: break-all;
+                font-size: var(--uui-size-4);
+            }
+
+            uui-textarea {
+                width: 100%;
+            }
+
+            details {
+                margin: var(--uui-size-space-3) 0;
+            }
+
+            summary {
+                cursor: pointer;
+                color: var(--uui-color-text-alt);
+            }
+        `,
+    ];
+}
+
+export default UaWebhookTriggerPanelElement;
+
+declare global {
+    interface HTMLElementTagNameMap {
+        "ua-webhook-trigger-panel": UaWebhookTriggerPanelElement;
+    }
+}

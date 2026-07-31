@@ -176,6 +176,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
 
         const modal = modalManager.open(this, UA_TRIGGER_SETTINGS_MODAL, {
             data: {
+                automationId: this._model.unique,
                 triggerAlias: this._model.trigger.triggerAlias,
                 triggerName: catalogueItem.name,
                 settings: this._model.trigger.settings,

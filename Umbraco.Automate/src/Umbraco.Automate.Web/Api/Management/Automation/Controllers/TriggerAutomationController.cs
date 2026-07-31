@@ -2,9 +2,11 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Web.Api.Management.Automation.Models;
 using Umbraco.Cms.Api.Common.Builders;
 using Umbraco.Cms.Core.Security;
 
@@ -49,6 +51,7 @@ public sealed class TriggerAutomationController : AutomationControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> TriggerAutomation(
         Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] TriggerAutomationRequestModel? request = null,
         CancellationToken cancellationToken = default)
     {
         var automation = await _automationService.GetAutomationAsync(id, cancellationToken);
@@ -85,11 +88,19 @@ public sealed class TriggerAutomationController : AutomationControllerBase
         // Matches the pattern used by ReplayRunController.
         var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key;
 
+        // Optional stand-in payload for the trigger the automation would normally wait on —
+        // lets a webhook automation be developed and tested without an external caller.
+        // Unwrapped to plain types so bindings can traverse it and it survives the
+        // Newtonsoft round-trip in the WorkflowCore persistence layer.
+        var triggerOutputData = request?.TriggerOutputData is { Count: > 0 } raw
+            ? Core.Dispatch.JsonOptions.UnwrapDictionary(raw)
+            : null;
+
         await _executor.ExecuteAsync(
             automation,
             TriggerInitiatorType.User,
             initiatorId: userKey?.ToString(),
-            triggerOutputData: null,
+            triggerOutputData,
             cancellationToken);
 
         return Accepted();

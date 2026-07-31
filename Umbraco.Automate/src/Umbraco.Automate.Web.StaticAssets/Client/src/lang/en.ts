@@ -104,6 +104,22 @@ export default {
         disabledBanner:
             "This automation was auto-disabled by the circuit breaker after repeated failures. Fix the configuration, then re-enable it.",
     },
+    uaWebhook: {
+        headline: "Webhook",
+        unsavedHint: "Save this automation to get its webhook URL.",
+        copyUrl: "Copy URL",
+        urlCopied: "Webhook URL copied to clipboard.",
+        urlCopyFailed: "Could not copy the URL. Select the value manually.",
+        testHeadline: "Test request",
+        testDescription:
+            "Send a test request to this webhook without an external caller. Runs the published automation, so save and publish before testing your latest changes.",
+        testBodyPlaceholder: '{\n  "title": "Hello"\n}',
+        testHeadersPlaceholder: '{\n  "X-Custom-Header": "value"\n}',
+        sendTest: "Send test request",
+        testSent: "Test request sent",
+        testFailed: "Could not send the test request",
+        testHeadersInvalid: "Headers must be a JSON object.",
+    },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
             `Are you sure you want to delete "${label}"?`,
