@@ -1,7 +1,4 @@
-using Microsoft.Extensions.Logging;
-using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Composing;
-using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Persistence;
 
@@ -41,40 +38,28 @@ namespace Umbraco.Automate.Persistence;
 /// wait there is unsatisfiable, so gating the read would have replaced the error with a startup
 /// that never completes.
 /// </para>
+/// <para>
+/// Nor could Automate simply tolerate the not-yet-migrated state the way a package whose tables are
+/// only read by its own code can (Umbraco Forms, for instance, guards every analytics read with a
+/// table-exists check). The failing read here belongs to Deploy, and a package cannot make another
+/// package's read defensive. Guaranteeing the schema exists first is the only lever Automate has.
+/// </para>
+/// <para>
+/// Deliberately thin: the runtime-level check and the once-per-process latch both live in
+/// <see cref="IAutomateSchemaInitializer"/>, so the safety-net startup handler cannot disagree with
+/// this component about when migrating is possible.
+/// </para>
 /// </remarks>
 internal sealed class AutomateSchemaComponent : IAsyncComponent
 {
     private readonly IAutomateSchemaInitializer _schemaInitializer;
-    private readonly IRuntimeState _runtimeState;
-    private readonly ILogger<AutomateSchemaComponent> _logger;
 
-    public AutomateSchemaComponent(
-        IAutomateSchemaInitializer schemaInitializer,
-        IRuntimeState runtimeState,
-        ILogger<AutomateSchemaComponent> logger)
-    {
-        _schemaInitializer = schemaInitializer;
-        _runtimeState = runtimeState;
-        _logger = logger;
-    }
+    public AutomateSchemaComponent(IAutomateSchemaInitializer schemaInitializer)
+        => _schemaInitializer = schemaInitializer;
 
     /// <inheritdoc />
     public Task InitializeAsync(bool isRestarting, CancellationToken cancellationToken)
-    {
-        if (_runtimeState.Level != RuntimeLevel.Run)
-        {
-            // Install/Upgrade/BootFailed: there is no database to migrate against yet. The signal is
-            // deliberately left unresolved rather than marked failed — the CMS restarts the runtime
-            // once an install completes, which initializes components again at Run.
-            _logger.LogDebug(
-                "Skipping Automate schema initialization because the runtime level is {RuntimeLevel}.",
-                _runtimeState.Level);
-
-            return Task.CompletedTask;
-        }
-
-        return _schemaInitializer.EnsureMigratedAsync(cancellationToken);
-    }
+        => _schemaInitializer.EnsureMigratedAsync(cancellationToken);
 
     /// <inheritdoc />
     public Task TerminateAsync(bool isRestarting, CancellationToken cancellationToken)

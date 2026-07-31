@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Persistence;
 
@@ -14,6 +16,7 @@ internal sealed class AutomateSchemaInitializer : IAutomateSchemaInitializer, ID
     private readonly IConfiguration _configuration;
     private readonly IOptionsMonitor<ConnectionStrings> _connectionStrings;
     private readonly AutomateReadinessSignal _readinessSignal;
+    private readonly IRuntimeState _runtimeState;
     private readonly ILogger<AutomateSchemaInitializer> _logger;
 
     // Callers are startup-only (a component, and a notification handler as a safety net), so there is
@@ -27,17 +30,39 @@ internal sealed class AutomateSchemaInitializer : IAutomateSchemaInitializer, ID
         IConfiguration configuration,
         IOptionsMonitor<ConnectionStrings> connectionStrings,
         AutomateReadinessSignal readinessSignal,
+        IRuntimeState runtimeState,
         ILogger<AutomateSchemaInitializer> logger)
     {
         _configuration = configuration;
         _connectionStrings = connectionStrings;
         _readinessSignal = readinessSignal;
+        _runtimeState = runtimeState;
         _logger = logger;
     }
 
     /// <inheritdoc />
     public async Task EnsureMigratedAsync(CancellationToken cancellationToken = default)
     {
+        // Read once: this is queried again for the log message, and the level can change underneath us.
+        RuntimeLevel runtimeLevel = _runtimeState.Level;
+        if (runtimeLevel != RuntimeLevel.Run)
+        {
+            // Install/Upgrade/BootFailed: there is no database to migrate against yet. Return before
+            // taking the gate, so no attempt is recorded and the readiness signal is left unresolved
+            // rather than faulted — the CMS restarts the runtime once an install completes, and that
+            // restart must still be able to migrate.
+            //
+            // This guard lives here rather than in each caller on purpose. This type is a singleton
+            // whose "attempted" latch outlives a runtime restart, so a caller that reached the latch
+            // at a level where migrating could never succeed would fault the signal permanently and
+            // leave Automate dead for the rest of the process.
+            _logger.LogDebug(
+                "Skipping Automate schema initialization because the runtime level is {RuntimeLevel}.",
+                runtimeLevel);
+
+            return;
+        }
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
