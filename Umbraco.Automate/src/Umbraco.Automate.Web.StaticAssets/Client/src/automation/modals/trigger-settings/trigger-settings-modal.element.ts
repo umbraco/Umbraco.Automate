@@ -1,9 +1,11 @@
-import { html, customElement, state } from "@umbraco-cms/backoffice/external/lit";
+import { html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbValidationContext } from "@umbraco-cms/backoffice/validation";
 import type { UaTriggerSettingsModalData, UaTriggerSettingsModalValue } from "./types.js";
 import type { SettingsChangeDetail } from "../../../core/components/settings-form/settings-form.element.js";
+import { UA_WEBHOOK_TRIGGER_ALIAS } from "../../triggers/constants.js";
 import "../../../core/components/settings-form/settings-form.element.js";
+import "./webhook-trigger-panel.element.js";
 
 @customElement("ua-trigger-settings-modal")
 export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
@@ -43,6 +45,22 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
         this.modalContext?.reject();
     }
 
+    /**
+     * Webhook triggers get the endpoint URL and a test request alongside their settings, so the
+     * URL is to hand while configuring the signing secret. The panel reads the allowed method
+     * from the live form values rather than the saved settings.
+     */
+    #renderWebhookPanel() {
+        if (this.data?.triggerAlias !== UA_WEBHOOK_TRIGGER_ALIAS) return nothing;
+
+        return html`
+            <ua-webhook-trigger-panel
+                automation-id=${this.data.automationId}
+                allowed-method=${(this._settings.allowedMethod as string | undefined) ?? "POST"}
+            ></ua-webhook-trigger-panel>
+        `;
+    }
+
     override render() {
         if (!this.data) return html``;
 
@@ -55,6 +73,7 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
                         .values=${this._settings}
                         @ua:settings-change=${this.#onSettingsChange}
                     ></ua-settings-form>
+                    ${this.#renderWebhookPanel()}
                 </div>
                 <div slot="actions">
                     <uui-button

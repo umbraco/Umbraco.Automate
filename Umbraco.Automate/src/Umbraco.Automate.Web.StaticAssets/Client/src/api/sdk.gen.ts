@@ -145,7 +145,11 @@ export class AutomationsService {
         return (options.client ?? client).post<PostAutomationsByIdTriggerResponses, PostAutomationsByIdTriggerErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
             url: '/umbraco/automate/management/api/v1/automations/{id}/trigger',
-            ...options
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
         });
     }
     

@@ -6,7 +6,8 @@ import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import type { UaAutomationDetailModel } from "../../../types.js";
 import { UA_AUTOMATION_ENTITY_TYPE } from "../../../constants.js";
-import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
+import { UA_EMPTY_GUID, buildWebhookUrl, formatDateTime } from "../../../../core/index.js";
+import { UA_WEBHOOK_TRIGGER_ALIAS } from "../../../triggers/constants.js";
 import { AutomationsService } from "../../../../api/sdk.gen.js";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
@@ -87,10 +88,10 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
     }
 
     #renderWebhookUrl() {
-        if (!this._model?.trigger || this._model.trigger.triggerAlias !== "umbracoAutomate.webhook") return html``;
+        if (!this._model?.trigger || this._model.trigger.triggerAlias !== UA_WEBHOOK_TRIGGER_ALIAS) return html``;
         if (this._model.unique === UA_EMPTY_GUID) return html``;
 
-        const webhookUrl = `${window.location.origin}/automate/webhook/${this._model.unique}`;
+        const webhookUrl = buildWebhookUrl(this._model.unique);
         return html`
             <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
                 <div slot="editor" class="webhook-url">
