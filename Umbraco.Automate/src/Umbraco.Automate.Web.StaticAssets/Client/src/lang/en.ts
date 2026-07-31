@@ -112,9 +112,10 @@ export default {
         urlCopyFailed: "Could not copy the URL. Select the value manually.",
         testHeadline: "Test request",
         testDescription:
-            "Send a test request to this webhook without an external caller. Runs the published automation, so save and publish before testing your latest changes.",
-        testBodyPlaceholder: '{\n  "title": "Hello"\n}',
-        testHeadersPlaceholder: '{\n  "X-Custom-Header": "value"\n}',
+            "Paste the JSON body an external caller would send. Runs the published automation, so save and publish before testing your latest changes.",
+        testHeadersLabel: "Test request headers",
+        testHeadersDescription:
+            "Optional JSON object, layered over the default Content-Type: application/json.",
         sendTest: "Send test request",
         testSent: "Test request sent",
         testFailed: "Could not send the test request",

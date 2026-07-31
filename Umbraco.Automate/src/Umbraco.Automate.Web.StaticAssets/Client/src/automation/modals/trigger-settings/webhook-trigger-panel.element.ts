@@ -2,11 +2,14 @@ import { css, html, customElement, property, state, nothing } from "@umbraco-cms
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
+import type { UmbCodeEditorElement } from "@umbraco-cms/backoffice/code-editor";
 import { AutomationsService } from "../../../api/sdk.gen.js";
 import { UA_EMPTY_GUID, buildWebhookUrl, dispatchActionEvent } from "../../../core/index.js";
 import { UaAutomationRunsChangedEvent } from "../../events/automation-runs-changed.event.js";
 
-/** Headers every test request carries unless the user overrides them in the advanced box. */
+import "@umbraco-cms/backoffice/code-editor";
+
+/** Headers every test request carries unless the user overrides them in the headers editor. */
 const DEFAULT_TEST_HEADERS: Record<string, string> = {
     "Content-Type": "application/json",
 };
@@ -79,34 +82,40 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
                 description=${this.localize.term("uaWebhook_testDescription")}
                 orientation="vertical"
             >
-                <div slot="editor">
-                    <uui-textarea
-                        rows="8"
-                        .value=${this._body}
-                        placeholder=${this.localize.term("uaWebhook_testBodyPlaceholder")}
-                        @input=${(e: InputEvent) => (this._body = (e.target as HTMLTextAreaElement).value)}
-                    ></uui-textarea>
-
-                    <details>
-                        <summary>${this.localize.term("uaFieldGroups_advancedLabel")}</summary>
-                        <uui-textarea
-                            rows="4"
-                            .value=${this._headers}
-                            placeholder=${this.localize.term("uaWebhook_testHeadersPlaceholder")}
-                            @input=${(e: InputEvent) => (this._headers = (e.target as HTMLTextAreaElement).value)}
-                        ></uui-textarea>
-                    </details>
-
-                    <uui-button
-                        look="secondary"
-                        ?disabled=${this._sending}
-                        label=${this.localize.term("uaWebhook_sendTest")}
-                        @click=${this.#onSendTest}
-                    >
-                        ${this.localize.term("uaWebhook_sendTest")}
-                    </uui-button>
-                </div>
+                <umb-code-editor
+                    slot="editor"
+                    language="json"
+                    disable-minimap
+                    word-wrap
+                    .code=${this._body}
+                    @input=${(e: Event) => (this._body = (e.target as UmbCodeEditorElement).code)}
+                ></umb-code-editor>
             </umb-property-layout>
+
+            <umb-property-layout
+                label=${this.localize.term("uaWebhook_testHeadersLabel")}
+                description=${this.localize.term("uaWebhook_testHeadersDescription")}
+                orientation="vertical"
+            >
+                <umb-code-editor
+                    slot="editor"
+                    class="short"
+                    language="json"
+                    disable-minimap
+                    word-wrap
+                    .code=${this._headers}
+                    @input=${(e: Event) => (this._headers = (e.target as UmbCodeEditorElement).code)}
+                ></umb-code-editor>
+            </umb-property-layout>
+
+            <uui-button
+                look="secondary"
+                ?disabled=${this._sending}
+                label=${this.localize.term("uaWebhook_sendTest")}
+                @click=${this.#onSendTest}
+            >
+                ${this.localize.term("uaWebhook_sendTest")}
+            </uui-button>
         `;
     }
 
@@ -150,7 +159,7 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
     }
 
     /**
-     * Parses the advanced headers box, layered over the defaults. Returns `undefined` (and
+     * Parses the headers editor, layered over the defaults. Returns `undefined` (and
      * notifies) when the text isn't a JSON object, so the caller can abort the send.
      */
     #parseHeaders(): Record<string, string> | undefined {
@@ -207,17 +216,16 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
                 font-family: var(--uui-font-family-mono, monospace);
             }
 
-            uui-textarea {
-                width: 100%;
+            /* Same framing the CMS code editor property editor UI applies. */
+            umb-code-editor {
+                display: block;
+                height: 160px;
+                border-radius: var(--uui-border-radius);
+                border: 1px solid var(--uui-color-divider-emphasis);
             }
 
-            details {
-                margin: var(--uui-size-space-3) 0;
-            }
-
-            summary {
-                cursor: pointer;
-                color: var(--uui-color-text-alt);
+            umb-code-editor.short {
+                height: 100px;
             }
         `,
     ];
