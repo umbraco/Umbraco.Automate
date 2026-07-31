@@ -10,7 +10,11 @@ public sealed class UnpublishContentActionSettings
     /// <summary>
     /// Gets or sets the key (GUID) of the content item to unpublish.
     /// </summary>
-    [Field(Label = "Content Key", Description = "The key of the content item to unpublish.", SupportsBindings = true)]
+    [Field(
+        Label = "Content Key",
+        Description = "The content item to unpublish.",
+        EditorUiAlias = Constants.EditorUiAliases.ContentKeyPicker,
+        SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>
