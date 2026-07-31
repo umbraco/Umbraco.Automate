@@ -53,10 +53,14 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
     #renderWebhookPanel() {
         if (this.data?.triggerAlias !== UA_WEBHOOK_TRIGGER_ALIAS) return nothing;
 
+        // Settings values are untyped, so only trust an actual string — anything else would
+        // stringify into a nonsense method on the attribute.
+        const allowedMethod = this._settings.allowedMethod;
+
         return html`
             <ua-webhook-trigger-panel
                 automation-id=${this.data.automationId}
-                allowed-method=${(this._settings.allowedMethod as string | undefined) ?? "POST"}
+                allowed-method=${typeof allowedMethod === "string" && allowedMethod ? allowedMethod : "POST"}
             ></ua-webhook-trigger-panel>
         `;
     }
