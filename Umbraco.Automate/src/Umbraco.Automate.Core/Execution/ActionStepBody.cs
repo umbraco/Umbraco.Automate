@@ -418,12 +418,17 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Store the decision as step output.
         if (decision is not null)
         {
-            var outputData = new
+            var outputData = new ApprovalDecisionOutput
             {
-                decision.Outcome,
-                decision.Comment,
-                decision.ApprovedByUserKey,
-                decision.DecisionUtc,
+                Approved = decision.Outcome == ApprovalOutcome.Approved,
+
+                // Name, not the enum value: JsonOptions.Default has no string-enum converter, so
+                // an ApprovalOutcome here would bind as 0/1 and force conditions to compare
+                // against a magic number instead of "Approved"/"Rejected".
+                Outcome = decision.Outcome.ToString(),
+                Comment = decision.Comment,
+                ApprovedByUserKey = decision.ApprovedByUserKey,
+                DecisionUtc = decision.DecisionUtc,
             };
             StoreOutputData(outputData, stepRun, data, context.Item as ForEachIterationContext);
         }
