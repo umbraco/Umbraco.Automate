@@ -4,10 +4,11 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import type { UmbCodeEditorElement } from "@umbraco-cms/backoffice/code-editor";
 import { AutomationsService } from "../../../api/sdk.gen.js";
-import { UA_EMPTY_GUID, buildWebhookUrl, dispatchActionEvent } from "../../../core/index.js";
+import { UA_EMPTY_GUID, dispatchActionEvent } from "../../../core/index.js";
 import { UaAutomationRunsChangedEvent } from "../../events/automation-runs-changed.event.js";
 
 import "@umbraco-cms/backoffice/code-editor";
+import "../../../core/components/webhook-url-field/webhook-url-field.element.js";
 
 /** Headers every test request carries unless the user overrides them in the headers editor. */
 const DEFAULT_TEST_HEADERS: Record<string, string> = {
@@ -56,21 +57,9 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
     }
 
     #renderUrl() {
-        const url = buildWebhookUrl(this.automationId);
-
         return html`
             <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
-                <div slot="editor" class="url">
-                    <uui-input readonly .value=${url}></uui-input>
-                    <uui-button
-                        compact
-                        look="secondary"
-                        label=${this.localize.term("uaWebhook_copyUrl")}
-                        @click=${() => this.#copy(url)}
-                    >
-                        <uui-icon name="icon-clipboard-copy"></uui-icon>
-                    </uui-button>
-                </div>
+                <ua-webhook-url-field slot="editor" automation-id=${this.automationId}></ua-webhook-url-field>
             </umb-property-layout>
         `;
     }
@@ -177,15 +166,6 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
         }
     }
 
-    async #copy(value: string) {
-        try {
-            await navigator.clipboard.writeText(value);
-            this.#notify("positive", this.localize.term("uaWebhook_urlCopied"));
-        } catch {
-            this.#notify("danger", this.localize.term("uaWebhook_urlCopyFailed"));
-        }
-    }
-
     async #notify(color: "positive" | "danger", message: string) {
         const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
         notifications?.peek(color, { data: { message } });
@@ -203,17 +183,6 @@ export class UaWebhookTriggerPanelElement extends UmbLitElement {
             .hint {
                 margin: 0;
                 color: var(--uui-color-text-alt);
-            }
-
-            .url {
-                display: flex;
-                align-items: center;
-                gap: var(--uui-size-space-2);
-            }
-
-            .url uui-input {
-                flex: 1;
-                font-family: var(--uui-font-family-mono, monospace);
             }
 
             /* Same framing the CMS code editor property editor UI applies. */
