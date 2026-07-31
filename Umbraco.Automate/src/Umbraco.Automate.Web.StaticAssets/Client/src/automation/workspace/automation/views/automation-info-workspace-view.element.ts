@@ -6,12 +6,13 @@ import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import type { UaAutomationDetailModel } from "../../../types.js";
 import { UA_AUTOMATION_ENTITY_TYPE } from "../../../constants.js";
-import { UA_EMPTY_GUID, buildWebhookUrl, formatDateTime } from "../../../../core/index.js";
+import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
 import { UA_WEBHOOK_TRIGGER_ALIAS } from "../../../triggers/constants.js";
 import { AutomationsService } from "../../../../api/sdk.gen.js";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
 import "../../../../core/version-history/components/version-history/version-history.element.js";
+import "../../../../core/components/webhook-url-field/webhook-url-field.element.js";
 
 @customElement("ua-automation-info-workspace-view")
 export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
@@ -91,19 +92,9 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
         if (!this._model?.trigger || this._model.trigger.triggerAlias !== UA_WEBHOOK_TRIGGER_ALIAS) return html``;
         if (this._model.unique === UA_EMPTY_GUID) return html``;
 
-        const webhookUrl = buildWebhookUrl(this._model.unique);
         return html`
             <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
-                <div slot="editor" class="webhook-url">
-                    <code>${webhookUrl}</code>
-                    <uui-button
-                        compact
-                        look="outline"
-                        label="Copy"
-                        @click=${() => navigator.clipboard.writeText(webhookUrl)}>
-                        <uui-icon name="icon-documents"></uui-icon>
-                    </uui-button>
-                </div>
+                <ua-webhook-url-field slot="editor" automation-id=${this._model.unique}></ua-webhook-url-field>
             </umb-property-layout>
         `;
     }
@@ -221,18 +212,6 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-            }
-
-            .webhook-url {
-                display: flex;
-                align-items: center;
-                gap: var(--uui-size-space-3);
-            }
-
-            .webhook-url code {
-                flex: 1;
-                word-break: break-all;
-                font-size: var(--uui-size-4);
             }
 
             .health-banner {
