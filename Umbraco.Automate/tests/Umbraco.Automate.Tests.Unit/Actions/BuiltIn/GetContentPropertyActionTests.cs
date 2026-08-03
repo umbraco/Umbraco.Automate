@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
@@ -19,10 +20,20 @@ public class GetContentPropertyActionTests
     private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
     private readonly Mock<IContentValueNormaliser> _normaliser = new();
     private readonly Mock<IAutomationActionAuthorizer> _authorizer = new();
+
+    // Real accessor, not a mock: IsAvailable == false makes it fall back to its AsyncLocal,
+    // which is exactly what the accessor does on a background thread with no HTTP request.
+    private readonly IVariationContextAccessor _variationContextAccessor =
+        new HybridVariationContextAccessor(Mock.Of<IRequestCache>(c => c.IsAvailable == false));
+
     private readonly GetContentPropertyAction _action;
 
     public GetContentPropertyActionTests()
     {
+        // The AsyncLocal behind the accessor is static, so clear it rather than inherit
+        // a value from an unrelated test.
+        _variationContextAccessor.VariationContext = null;
+
         _contextFactory
             .Setup(x => x.EnsureUmbracoContext())
             .Returns(new UmbracoContextReference(
@@ -40,6 +51,7 @@ public class GetContentPropertyActionTests
             _contextFactory.Object,
             _normaliser.Object,
             _authorizer.Object,
+            _variationContextAccessor,
             Mock.Of<ILogger<GetContentPropertyAction>>());
     }
 
@@ -149,6 +161,93 @@ public class GetContentPropertyActionTests
         output.ShouldNotBeNull();
         output.Value.ShouldBe("Hello");
         output.HasValue.ShouldBeTrue();
+    }
+
+    // Issue 205: see GetContentActionTests for the full explanation. Reading a property value
+    // with no ambient VariationContext leaves the segment null, which the published cache
+    // rejects with "Value cannot be null. (Parameter 'key2')".
+    [Fact]
+    public async Task ExecuteAsync_SetsVariationContextWhileReadingTheProperty()
+    {
+        var contentKey = Guid.NewGuid();
+        var content = MockVariantPublishedContent(contentKey, "nl-NL");
+
+        var prop = new Mock<IPublishedProperty>();
+        prop.SetupGet(x => x.Alias).Returns("title");
+        content.Setup(x => x.GetProperty("title")).Returns(prop.Object);
+
+        _cache.Setup(x => x.GetByIdAsync(contentKey, It.IsAny<bool?>()))
+            .ReturnsAsync(content.Object);
+
+        VariationContext? observed = null;
+        _normaliser
+            .Setup(x => x.ReadProperty(content.Object, "title", "nl-NL"))
+            .Callback(() => observed = _variationContextAccessor.VariationContext)
+            .Returns("Hallo");
+
+        var context = CreateContext(new GetContentPropertySettings
+        {
+            ContentKey = contentKey.ToString(),
+            PropertyAlias = "title",
+            Culture = "nl-NL",
+        });
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        observed.ShouldNotBeNull(
+            "No VariationContext was in scope while the property value was read.");
+        observed.Culture.ShouldBe("nl-NL");
+        observed.Segment.ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RestoresThePreviousVariationContext()
+    {
+        var previous = new VariationContext("da-DK");
+        _variationContextAccessor.VariationContext = previous;
+
+        var contentKey = Guid.NewGuid();
+        var content = MockVariantPublishedContent(contentKey, "nl-NL");
+
+        var prop = new Mock<IPublishedProperty>();
+        prop.SetupGet(x => x.Alias).Returns("title");
+        content.Setup(x => x.GetProperty("title")).Returns(prop.Object);
+
+        _cache.Setup(x => x.GetByIdAsync(contentKey, It.IsAny<bool?>()))
+            .ReturnsAsync(content.Object);
+
+        _normaliser
+            .Setup(x => x.ReadProperty(content.Object, "title", "nl-NL"))
+            .Returns("Hallo");
+
+        var context = CreateContext(new GetContentPropertySettings
+        {
+            ContentKey = contentKey.ToString(),
+            PropertyAlias = "title",
+            Culture = "nl-NL",
+        });
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        _variationContextAccessor.VariationContext.ShouldBeSameAs(previous);
+    }
+
+    private static Mock<IPublishedContent> MockVariantPublishedContent(Guid key, string culture)
+    {
+        var content = MockPublishedContent(key);
+
+        var contentType = new Mock<IPublishedContentType>();
+        contentType.SetupGet(x => x.Alias).Returns("page");
+        contentType.SetupGet(x => x.Key).Returns(Guid.NewGuid());
+        contentType.SetupGet(x => x.Variations).Returns(ContentVariation.Culture);
+        content.SetupGet(x => x.ContentType).Returns(contentType.Object);
+
+        content.SetupGet(x => x.Cultures).Returns(new Dictionary<string, PublishedCultureInfo>(StringComparer.OrdinalIgnoreCase)
+        {
+            [culture] = new PublishedCultureInfo(culture, "Test", "test", DateTime.UtcNow),
+        });
+
+        return content;
     }
 
     private static Mock<IPublishedContent> MockPublishedContent(Guid key)
