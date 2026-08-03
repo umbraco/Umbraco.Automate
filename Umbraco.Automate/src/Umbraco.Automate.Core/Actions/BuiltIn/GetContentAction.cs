@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -39,6 +40,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     private readonly IUserIdKeyResolver _userIdKeyResolver;
     private readonly IContentValueNormaliser _normaliser;
     private readonly IAutomationActionAuthorizer _authorizer;
+    private readonly IVariationContextAccessor _variationContextAccessor;
     private readonly ILogger<GetContentAction> _logger;
 
     /// <summary>
@@ -52,6 +54,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         IUserIdKeyResolver userIdKeyResolver,
         IContentValueNormaliser normaliser,
         IAutomationActionAuthorizer authorizer,
+        IVariationContextAccessor variationContextAccessor,
         ILogger<GetContentAction> logger)
         : base(infrastructure)
     {
@@ -61,6 +64,7 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         _userIdKeyResolver = userIdKeyResolver;
         _normaliser = normaliser;
         _authorizer = authorizer;
+        _variationContextAccessor = variationContextAccessor;
         _logger = logger;
     }
 
@@ -102,6 +106,11 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         var culture = NormaliseCulture(settings.Culture, content);
         var creatorKey = await TryResolveUserKeyAsync(content.CreatorId);
         var writerKey = await TryResolveUserKeyAsync(content.WriterId);
+
+        // Property reads need an ambient VariationContext to resolve the culture and segment
+        // they were not given. There is none on the automation thread, and a null segment is
+        // rejected by the published cache. See EnterVariationContext.
+        using var variationScope = _variationContextAccessor.EnterVariationContext(culture);
 
         return Success(Project(content, culture, creatorKey, writerKey));
     }
