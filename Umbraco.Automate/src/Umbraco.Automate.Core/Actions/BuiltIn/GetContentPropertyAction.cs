@@ -123,11 +123,9 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
         // Property reads need an ambient VariationContext to resolve the culture and segment
         // they were not given. There is none on the automation thread, and a null segment is
         // rejected by the published cache. See EnterVariationContext.
-        object? value;
-        using (_variationContextAccessor.EnterVariationContext(culture))
-        {
-            value = _normaliser.ReadProperty(content, settings.PropertyAlias, culture);
-        }
+        using var variationScope = _variationContextAccessor.EnterVariationContext(culture);
+
+        var value = _normaliser.ReadProperty(content, settings.PropertyAlias, culture);
 
         return Success(new GetContentPropertyOutput
         {
