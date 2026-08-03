@@ -26,16 +26,16 @@ internal static class VariationContextScopeExtensions
     /// </remarks>
     /// <param name="accessor">The variation context accessor.</param>
     /// <param name="culture">The culture to read values for. Null means invariant.</param>
-    /// <param name="segment">The segment to read values for. Null means the neutral segment.</param>
-    public static IDisposable EnterVariationContext(
-        this IVariationContextAccessor accessor,
-        string? culture,
-        string? segment = null)
+    public static IDisposable EnterVariationContext(this IVariationContextAccessor accessor, string? culture)
     {
         ArgumentNullException.ThrowIfNull(accessor);
 
         VariationContext? previous = accessor.VariationContext;
-        accessor.VariationContext = new VariationContext(culture, segment);
+
+        // Segment is left unset, which resolves to the neutral segment — the same one a
+        // front-end request with no segment provider would read. Reading a named segment
+        // is not something the actions expose yet.
+        accessor.VariationContext = new VariationContext(culture);
 
         return new VariationContextScope(accessor, previous);
     }
