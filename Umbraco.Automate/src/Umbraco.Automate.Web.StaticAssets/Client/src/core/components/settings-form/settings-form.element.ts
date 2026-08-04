@@ -6,6 +6,7 @@ import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.j
 import type { BindingSource } from "../../utils/binding-context.utils.js";
 import { BINDING_TEXT_BOX_UI_ALIAS } from "../binding-text-box/manifests.js";
 import { BINDING_TEXT_AREA_UI_ALIAS } from "../binding-text-area/manifests.js";
+import { SENSITIVE_FIELD_UI_ALIAS } from "../sensitive-field/manifests.js";
 
 export interface SettingsChangeDetail {
     settings: Record<string, unknown>;
@@ -146,6 +147,15 @@ export class UaSettingsFormElement extends UmbLitElement {
             }
             if (alias === "Umb.PropertyEditorUi.TextArea") {
                 return BINDING_TEXT_AREA_UI_ALIAS;
+            }
+            // A sensitive field the schema builder routed to the masked editor still has to
+            // render the binding picker, so it takes the same swap. Bindings are pointers the
+            // author has to read and choose, like configuration references, so the value shows
+            // in clear here. Only reachable when binding sources are actually in scope; the
+            // same field falls back to the masked editor everywhere else. Set an explicit
+            // EditorUiAlias on the field to pin one editor across both cases.
+            if (alias === SENSITIVE_FIELD_UI_ALIAS) {
+                return BINDING_TEXT_BOX_UI_ALIAS;
             }
         }
         return field.editorUiAlias ?? "Umb.PropertyEditorUi.TextBox";

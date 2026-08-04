@@ -5,7 +5,7 @@
  * `Set<NotifyOnFlag>` for its toggle state and serialises back to the wire format
  * (`NotifyOnModel`, which may be a single name or a comma-separated combination).
  */
-export type NotifyOnFlag = 'Failed' | 'Suspended' | 'Resumed' | 'Completed' | 'Recovered' | 'Warning' | 'Disabled' | 'ReEnabled';
+export type NotifyOnFlag = 'Failed' | 'Suspended' | 'Resumed' | 'Completed' | 'Rejected' | 'Recovered' | 'Warning' | 'Disabled' | 'ReEnabled';
 
 /**
  * Atomic notification flags shown as toggles in the channel modal, in render order.
@@ -17,6 +17,7 @@ export const NOTIFY_ON_FLAGS: ReadonlyArray<NotifyOnFlag> = [
     "Suspended",
     "Resumed",
     "Completed",
+    "Rejected",
     "Recovered",
     "Warning",
     "Disabled",

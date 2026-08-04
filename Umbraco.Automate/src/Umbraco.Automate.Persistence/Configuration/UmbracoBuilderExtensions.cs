@@ -77,7 +77,16 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
         builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
 
-        // Run pending EF Core migrations on startup.
+        builder.Services.AddSingleton<IAutomateSchemaInitializer, AutomateSchemaInitializer>();
+
+        // Run pending EF Core migrations during component initialization, which both boot paths do
+        // immediately before publishing UmbracoApplicationStartingNotification. That puts the schema
+        // in place before any Starting handler can query it — notably Umbraco Deploy's boot-time
+        // restore. See AutomateSchemaComponent for why a Started handler was too late.
+        builder.Components().Append<AutomateSchemaComponent>();
+
+        // Safety net for any boot path that does not initialize components first. No-op once the
+        // component above has run.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();
 
         // Recover runs stuck in Running/Pending from the previous process.

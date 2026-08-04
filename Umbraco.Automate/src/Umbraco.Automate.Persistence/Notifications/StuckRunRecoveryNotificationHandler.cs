@@ -108,6 +108,7 @@ internal sealed class StuckRunRecoveryNotificationHandler
             (int)AutomationRunStatus.Completed,
             (int)AutomationRunStatus.Failed,
             (int)AutomationRunStatus.Cancelled,
+            (int)AutomationRunStatus.Rejected,
         };
 
         var orphanedSteps = await db.StepRuns

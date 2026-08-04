@@ -5,6 +5,8 @@ namespace Umbraco.Automate.Tests.Unit.Settings;
 
 public class EditableModelSchemaBuilderTests
 {
+    private const string SensitiveFieldAlias = "Umb.Automate.SensitiveField";
+
     [Fact]
     public void Build_ReturnsNull_ForEmptyType()
     {
@@ -116,6 +118,61 @@ public class EditableModelSchemaBuilderTests
     }
 
     [Fact]
+    public void Build_InfersMaskedEditor_ForSensitiveString()
+    {
+        // A credential should never render as a plain text box by default, so it isn't left
+        // on screen during demos and screen shares.
+        var schema = EditableModelSchemaBuilder.Build(typeof(SensitiveEditorSettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == "ApiKey");
+
+        field.EditorUiAlias.ShouldBe(SensitiveFieldAlias);
+    }
+
+    [Fact]
+    public void Build_InfersMaskedEditor_ForNullableSensitiveString()
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(SensitiveEditorSettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == "NullableApiKey");
+
+        field.EditorUiAlias.ShouldBe(SensitiveFieldAlias);
+    }
+
+    [Fact]
+    public void Build_InfersTextBox_ForNonSensitiveString()
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(SensitiveEditorSettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == "Endpoint");
+
+        field.EditorUiAlias.ShouldBe("Umb.PropertyEditorUi.TextBox");
+    }
+
+    [Fact]
+    public void Build_SensitiveWithExplicitEditorUiAlias_KeepsExplicitEditor()
+    {
+        // The explicit alias is the escape hatch: masking a structured field such as a JSON
+        // headers blob would make it unusable, so a named editor always wins.
+        var schema = EditableModelSchemaBuilder.Build(typeof(SensitiveEditorSettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == "HeadersJson");
+
+        field.EditorUiAlias.ShouldBe("Umb.PropertyEditorUi.TextArea");
+    }
+
+    [Fact]
+    public void Build_SensitiveNonStringType_KeepsTypeSpecificEditor()
+    {
+        // Masking only stands in for a text box. A type with its own editor keeps it.
+        var schema = EditableModelSchemaBuilder.Build(typeof(SensitiveEditorSettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == "RotationDays");
+
+        field.EditorUiAlias.ShouldBe("Umb.PropertyEditorUi.Integer");
+    }
+
+    [Fact]
     public void HumanizePropertyName_ConvertsCorrectly()
     {
         EditableModelSchemaBuilder.HumanizePropertyName("ContentName").ShouldBe("Content Name");
@@ -151,6 +208,24 @@ public class EditableModelSchemaBuilderTests
     private class CacheProbeSettings
     {
         public string Anything { get; set; } = string.Empty;
+    }
+
+    private class SensitiveEditorSettings
+    {
+        [Field(IsSensitive = true)]
+        public string ApiKey { get; set; } = string.Empty;
+
+        [Field(IsSensitive = true)]
+        public string? NullableApiKey { get; set; }
+
+        [Field]
+        public string Endpoint { get; set; } = string.Empty;
+
+        [Field(IsSensitive = true, EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
+        public string? HeadersJson { get; set; }
+
+        [Field(IsSensitive = true)]
+        public int RotationDays { get; set; }
     }
 
     private class EditorInferenceSettings

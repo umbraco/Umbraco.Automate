@@ -16,7 +16,8 @@ internal static class BindingDataBuilder
     /// <param name="iterationContext">Optional ForEach iteration context for child steps inside a loop.</param>
     /// <param name="collectionCache">Optional cache used to resolve <c>loop.item</c> for index-only iteration contexts.</param>
     /// <param name="hydrationCache">Optional cache used to lazily hydrate offloaded step outputs
-    /// (see <see cref="StepOutputReference"/>). Without it markers resolve as missing paths.</param>
+    /// and an offloaded trigger output (see <see cref="StepOutputReference"/>). Without it markers
+    /// resolve as missing paths.</param>
     /// <param name="cancellationToken">Propagated to the lazy hydration read so it can be
     /// cancelled if the step or workflow is cancelled before a binding actually reads an
     /// offloaded output. Defaults to <see cref="CancellationToken.None"/> for call sites
@@ -55,7 +56,7 @@ internal static class BindingDataBuilder
 
         var bindingData = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
-            ["trigger"] = data.TriggerOutput,
+            ["trigger"] = ResolveTriggerEntry(data, hydrationCache, cancellationToken),
             ["steps"] = stepsDict,
         };
 
@@ -89,6 +90,25 @@ internal static class BindingDataBuilder
         return bindingData;
     }
 
+    /// <summary>
+    /// Resolves the <c>trigger</c> binding entry: the inline trigger output, or — when the
+    /// payload was offloaded to <c>AutomationRun.TriggerData</c> and only a marker sits in the
+    /// workflow data — a lazy stand-in that hydrates it on first read. As with step outputs the
+    /// marker itself stays in the workflow data, so nothing new is ever persisted.
+    /// </summary>
+    private static object? ResolveTriggerEntry(
+        AutomationWorkflowData data,
+        StepOutputHydrationCache? hydrationCache,
+        CancellationToken cancellationToken)
+    {
+        if (hydrationCache is not null && StepOutputReference.TryGetTriggerRunId(data.TriggerOutput, out var triggerRunId))
+        {
+            return OffloadedStepOutput.ForTrigger(hydrationCache, triggerRunId, cancellationToken);
+        }
+
+        return data.TriggerOutput;
+    }
+
     private static void AddStepEntry(
         Dictionary<string, object?> stepsDict,
         AutomationWorkflowData data,
@@ -103,7 +123,7 @@ internal static class BindingDataBuilder
         object? entry = outputs;
         if (hydrationCache is not null && StepOutputReference.TryGetStepRunId(outputs, out var stepRunId))
         {
-            entry = new OffloadedStepOutput(hydrationCache, data.RunId, stepRunId, cancellationToken);
+            entry = OffloadedStepOutput.ForStepRun(hydrationCache, data.RunId, stepRunId, cancellationToken);
         }
 
         stepsDict[stepId.ToString()] = entry;
