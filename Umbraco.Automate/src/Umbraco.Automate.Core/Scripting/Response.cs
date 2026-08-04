@@ -12,7 +12,7 @@ namespace Umbraco.Automate.Core.Scripting;
 /// oversized payload into the engine.
 /// </summary>
 #pragma warning disable S2325 // instance members mirror the web Response API surface
-public sealed class Response : IDisposable
+internal sealed class Response : IDisposable
 {
     private readonly HttpResponseMessage _response;
     private readonly Engine _engine;

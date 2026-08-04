@@ -109,7 +109,7 @@ internal sealed class AutomationService : IAutomationService
         }
 
         EnsureStepAliases(automation);
-        await ValidateStepSettingsAsync(automation, cancellationToken);
+        await ValidateForSaveAsync(automation, cancellationToken);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -134,7 +134,7 @@ internal sealed class AutomationService : IAutomationService
     public async Task<Automation> UpdateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         EnsureStepAliases(automation);
-        await ValidateStepSettingsAsync(automation, cancellationToken);
+        await ValidateForSaveAsync(automation, cancellationToken);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -198,7 +198,7 @@ internal sealed class AutomationService : IAutomationService
         if (workspace is null)
         {
             errors.Add($"Workspace '{automation.WorkspaceId}' not found.");
-            ThrowIfErrors(automation, errors);
+            ThrowIfErrors(automation, errors, "publish");
             return;
         }
 
@@ -214,7 +214,7 @@ internal sealed class AutomationService : IAutomationService
             await AddSectionAccessErrorsAsync(automation, workspace, errors, cancellationToken);
         }
 
-        ThrowIfErrors(automation, errors);
+        ThrowIfErrors(automation, errors, "publish");
     }
 
     private static void AddDisallowedConnectionErrors(Automation automation, Workspace workspace, List<string> errors)
@@ -274,24 +274,34 @@ internal sealed class AutomationService : IAutomationService
         }
     }
 
-    private static void ThrowIfErrors(Automation automation, List<string> errors)
+    private static void ThrowIfErrors(Automation automation, List<string> errors, string operation)
     {
         if (errors.Count > 0)
         {
             throw new AutomationValidationException(
-                $"Cannot publish automation '{automation.Name}'.",
+                $"Cannot {operation} automation '{automation.Name}'.",
                 errors);
         }
     }
 
-    /// <summary>
-    /// Validates the settings of every step whose action opts into <see cref="IValidatableStepType"/>
-    /// (e.g. the Run Script action compiling its script), rejecting the save if any are invalid.
-    /// </summary>
-    private async Task ValidateStepSettingsAsync(Automation automation, CancellationToken cancellationToken)
+    private async Task ValidateForSaveAsync(Automation automation, CancellationToken cancellationToken)
     {
         var errors = new List<string>();
 
+        await AddStepSettingsErrorsAsync(automation, errors, cancellationToken);
+
+        ThrowIfErrors(automation, errors, "save");
+    }
+
+    /// <summary>
+    /// Collects a message for every step whose action opts into <see cref="IValidatableStepType"/>
+    /// (e.g. the Run Script action compiling its script) and reports invalid settings.
+    /// </summary>
+    private async Task AddStepSettingsErrorsAsync(
+        Automation automation,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
         foreach (var step in automation.Steps)
         {
             if (_actions.GetByAlias(step.ActionAlias) is not IValidatableStepType validatable)
@@ -314,13 +324,6 @@ internal sealed class AutomationService : IAutomationService
             {
                 errors.Add($"Step '{step.Name}': {error}");
             }
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new AutomationValidationException(
-                $"Cannot save automation '{automation.Name}'.",
-                errors);
         }
     }
 

@@ -7,7 +7,7 @@ namespace Umbraco.Automate.Core.Http;
 /// payload can never be buffered whole into memory. Shared by the HTTP Request action and the
 /// Run Script action's <c>fetch</c> implementation so both enforce the same cap.
 /// </summary>
-public static class HttpResponseBodyReader
+internal static class HttpResponseBodyReader
 {
     /// <summary>
     /// Reads <paramref name="content"/> up to <paramref name="maxBytes"/>, returning <c>null</c>

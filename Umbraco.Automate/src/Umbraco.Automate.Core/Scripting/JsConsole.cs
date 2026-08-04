@@ -4,7 +4,7 @@ namespace Umbraco.Automate.Core.Scripting;
 /// A <c>console</c> shim exposed to scripts. Each method forwards to <see cref="Logger"/> with the
 /// level name, so the host can route script logging into the automation run log.
 /// </summary>
-public sealed class JsConsole
+internal sealed class JsConsole
 {
     /// <summary>
     /// Gets or sets the callback invoked for every <c>console</c> call, receiving the level

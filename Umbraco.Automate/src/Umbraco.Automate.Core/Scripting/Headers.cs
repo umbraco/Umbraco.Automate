@@ -6,7 +6,7 @@ namespace Umbraco.Automate.Core.Scripting;
 /// A minimal implementation of the web <c>Headers</c> interface exposed to scripts, backing the
 /// <c>fetch</c> request/response header surface.
 /// </summary>
-public sealed class Headers
+internal sealed class Headers
 {
     private readonly Dictionary<string, List<string?>> _headers;
     private readonly List<string> _setCookie;

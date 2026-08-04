@@ -5,7 +5,7 @@ namespace Umbraco.Automate.Core.Scripting;
 /// <c>fetch</c>. Only the members meaningful to server-side execution are honoured; the rest are
 /// accepted for API compatibility.
 /// </summary>
-public sealed class RequestInit
+internal sealed class RequestInit
 {
     private string _cache = "default";
     private string _credentials = "same-origin";
