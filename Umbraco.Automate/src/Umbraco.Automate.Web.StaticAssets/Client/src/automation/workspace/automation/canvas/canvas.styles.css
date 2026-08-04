@@ -345,6 +345,7 @@
 .ua-node--action { --ua-node-stripe: #3b82f6; }
 .ua-node--if { --ua-node-stripe: #f59e0b; }
 .ua-node--switch { --ua-node-stripe: #8b5cf6; }
+.ua-node--approval { --ua-node-stripe: #0ea5e9; }
 
 /* Handle overrides */
 .react-flow__handle {
@@ -391,5 +392,11 @@
 
 .run-status-skipped .ua-node {
     opacity: 0.4;
+    border-style: dashed;
+}
+
+/* An approval that was refused. Amber rather than red — the step worked, the answer was no. */
+.run-status-rejected .ua-node {
+    border-color: #f59e0b;
     border-style: dashed;
 }

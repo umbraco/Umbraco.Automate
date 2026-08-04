@@ -153,6 +153,9 @@ export default {
             "A paused run resumed — e.g. after an approval was granted or a wait-for-event completed.",
         notifyOnCompleted: "Completed",
         notifyOnCompletedDesc: "Every successful run. Verbose; usually only useful for auditing.",
+        notifyOnRejected: "Rejected",
+        notifyOnRejectedDesc:
+            "A run ended because someone refused an approval. Not an error — nothing went wrong.",
         notifyOnRecovered: "Recovered",
         notifyOnRecoveredDesc:
             "A successful run after a previous failure. Quieter than Completed.",

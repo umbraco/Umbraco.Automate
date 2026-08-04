@@ -11,10 +11,20 @@ const DEFAULT_TRIGGER_POSITION = { x: 250, y: 50 };
 
 const IF_ALIAS = "umbracoAutomate.if";
 const SWITCH_ALIAS = "umbracoAutomate.switch";
+const APPROVAL_ALIAS = "umbracoAutomate.requestApproval";
+
+/**
+ * Outcome names the Request Approval step returns, used as its source handle ids so a connection
+ * drawn from a handle is saved with the matching outcome. Must stay in step with
+ * RequestApprovalAction.ApprovedOutcome / RejectedOutcome on the server.
+ */
+export const APPROVED_OUTCOME = "approved";
+export const REJECTED_OUTCOME = "rejected";
 
 function getNodeType(actionAlias: string): string {
     if (actionAlias === IF_ALIAS) return "if";
     if (actionAlias === SWITCH_ALIAS) return "switch";
+    if (actionAlias === APPROVAL_ALIAS) return "approval";
     return "action";
 }
 
