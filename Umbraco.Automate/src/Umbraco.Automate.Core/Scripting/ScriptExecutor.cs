@@ -31,12 +31,6 @@ namespace Umbraco.Automate.Core.Scripting;
 /// </remarks>
 public sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, ILogger<ScriptExecutor> logger)
 {
-    /// <summary>The named <see cref="HttpClient"/> used by <c>fetch</c> when redirects are followed.</summary>
-    public const string DefaultHttpClientName = "UmbracoAutomate";
-
-    /// <summary>The named <see cref="HttpClient"/> used by <c>fetch</c> when redirects are not followed.</summary>
-    public const string NoRedirectHttpClientName = "UmbracoAutomateNoRedirect";
-
     /// <summary>
     /// Executes <paramref name="script"/>, invoking its <c>default</c> export with
     /// <paramref name="data"/> and returning the (promise-unwrapped) result.
@@ -268,8 +262,8 @@ public sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, ILo
         // Not disposed: the response body is read after this method returns, and a factory client
         // owns no handler of its own to release anyway.
         var client = followRedirects
-            ? clientFactory.CreateClient(DefaultHttpClientName)
-            : clientFactory.CreateClient(NoRedirectHttpClientName);
+            ? clientFactory.CreateClient(Constants.HttpClients.Default)
+            : clientFactory.CreateClient(Constants.HttpClients.NoRedirect);
 
         try
         {

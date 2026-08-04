@@ -44,7 +44,7 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
                 StepRunErrorCategory.Validation);
         }
 
-        using var client = _httpClientFactory.CreateClient("UmbracoAutomate");
+        using var client = _httpClientFactory.CreateClient(Constants.HttpClients.Default);
         using var request = new HttpRequestMessage(ParseMethod(settings.Method), settings.Url);
 
         if (!string.IsNullOrWhiteSpace(settings.Body) && HasBody(settings.Method))

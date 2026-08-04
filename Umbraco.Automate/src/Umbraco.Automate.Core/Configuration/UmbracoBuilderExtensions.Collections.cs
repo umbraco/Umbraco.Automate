@@ -184,12 +184,12 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<SettingsBindingResolver>();
         builder.Services.AddSingleton<ConditionEvaluator>();
 
-        // HTTP client for HttpRequestAction — with SSRF protection
-        builder.Services.AddHttpClient(ScriptExecutor.DefaultHttpClientName)
+        // Shared outbound HTTP client — with SSRF protection
+        builder.Services.AddHttpClient(Constants.HttpClients.Default)
             .ConfigurePrimaryHttpMessageHandler(_ => SsrfProtectionHandler.Create());
 
         // Non-redirecting variant used by the Run Script action's fetch() when redirect: "manual".
-        builder.Services.AddHttpClient(ScriptExecutor.NoRedirectHttpClientName)
+        builder.Services.AddHttpClient(Constants.HttpClients.NoRedirect)
             .ConfigurePrimaryHttpMessageHandler(_ =>
             {
                 var handler = SsrfProtectionHandler.Create();
