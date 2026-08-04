@@ -21,6 +21,18 @@ public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings, 
     public const string ApprovalEventName = "approval";
 
     /// <summary>
+    /// The named outcome taken when the approval is granted. Doubles as the source handle id on
+    /// the canvas node, so a connection drawn from that handle is stored with this outcome value.
+    /// </summary>
+    public const string ApprovedOutcome = "approved";
+
+    /// <summary>
+    /// The named outcome taken when the approval is refused. Doubles as the source handle id on
+    /// the canvas node, so a connection drawn from that handle is stored with this outcome value.
+    /// </summary>
+    public const string RejectedOutcome = "rejected";
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="RequestApprovalAction"/> class.
     /// </summary>
     public RequestApprovalAction(ActionInfrastructure infrastructure)
