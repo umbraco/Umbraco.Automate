@@ -48,7 +48,11 @@ internal sealed class CircuitBreakerService : ICircuitBreakerService
 
         switch (run.Status)
         {
+            // Rejected counts as a success: the automation executed exactly as designed and a human
+            // declined. Ignoring it instead would starve a half-open breaker of the successes it
+            // needs to close, so an automation that is usually rejected could never recover.
             case AutomationRunStatus.Completed:
+            case AutomationRunStatus.Rejected:
                 await HandleSuccessAsync(run.AutomationId, cancellationToken);
                 break;
 

@@ -78,6 +78,10 @@ internal sealed class RunCompletedNotificationDispatcher
             AutomationRunStatus.Failed => notifyOn.HasFlag(NotifyOn.Failed),
             AutomationRunStatus.Suspended => notifyOn.HasFlag(NotifyOn.Suspended),
             AutomationRunStatus.Completed => await ShouldNotifyCompletedAsync(run, notifyOn, cancellationToken),
+
+            // A refusal has its own flag. It deliberately does not satisfy NotifyOn.Failed —
+            // nothing errored — nor NotifyOn.Completed, which people use to confirm work happened.
+            AutomationRunStatus.Rejected => notifyOn.HasFlag(NotifyOn.Rejected),
             _ => false,
         };
     }
@@ -99,7 +103,9 @@ internal sealed class RunCompletedNotificationDispatcher
 
         // Recovery is a success that follows a failure. Suspended runs are intentional pauses,
         // not failures, so a success after a Suspended run isn't a "recovery" — and in any case
-        // Suspended is not in TerminalStatuses, so this query would never return it.
+        // Suspended is not in TerminalStatuses, so this query would never return it. Rejected IS
+        // terminal and can come back from this query, but it is not a failure either, so the
+        // Failed-only check below correctly declines to call the next success a recovery.
         var previousStatus = await _runService.GetPreviousTerminalRunStatusAsync(
             run.AutomationId, run.Id, cancellationToken);
 
