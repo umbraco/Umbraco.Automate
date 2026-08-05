@@ -1,6 +1,8 @@
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Profiling;
+using StackExchange.Profiling.Data;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
@@ -10,6 +12,7 @@ using Umbraco.Automate.Persistence;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Core.Persistence.Scoping;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Cms.Infrastructure.Persistence.FaultHandling;
 
 namespace Umbraco.Automate.Tests.Integration;
 
@@ -125,20 +128,62 @@ public sealed class AmbientTransactionParticipationTests : IDisposable
     }
 
     /// <summary>
+    /// The shape a real ambient scope actually hands over. NPoco applies Umbraco's registered
+    /// <c>IProviderSpecificInterceptor</c>s to every connection it opens
+    /// (<c>UmbracoDatabaseFactory.CreateSqlContext</c>), and for SQLite both of them wrap
+    /// unconditionally, MiniProfiler first and then the retry policy. So
+    /// <c>scope.Database.Transaction</c> is a <c>ProfiledDbTransaction</c> whose connection is a
+    /// <c>ProfiledDbConnection</c>, never the bare <see cref="SqliteConnection"/> the other tests here
+    /// use — and EF Core has to accept that.
+    /// </summary>
+    [Fact]
+    public async Task AmbientFactory_Writes_WhenTheAmbientConnectionIsWrappedTheWayUmbracoWrapsIt()
+    {
+        using AmbientWriteTransaction ambient = BeginAmbientWriteTransaction(wrapLikeUmbraco: true);
+
+        ambient.Transaction.ShouldBeOfType<ProfiledDbTransaction>();
+        ambient.Transaction.Connection.ShouldBeOfType<ProfiledDbConnection>();
+
+        var repository = CreateRepository(CreateAmbientFactory(ambient.Transaction));
+        await repository.SaveAsync(new AutomationBuilder().WithAlias("wrapped").Build());
+
+        // Uncommitted, so the write really did land on the ambient transaction rather than on a
+        // second connection that quietly committed.
+        (await CountAutomationsOnANewConnectionAsync()).ShouldBe(0);
+
+        ambient.Transaction.Commit();
+
+        (await CountAutomationsOnANewConnectionAsync()).ShouldBe(1);
+    }
+
+    /// <summary>
     /// Stands in for Umbraco Deploy's ambient scope: an open connection whose transaction has
     /// already written, and therefore holds SQLite's single per-file write lock.
     /// </summary>
-    private AmbientWriteTransaction BeginAmbientWriteTransaction()
+    /// <param name="wrapLikeUmbraco">
+    /// When <c>true</c>, wraps the connection the way NPoco's interceptors do in a real site. See
+    /// <see cref="AmbientFactory_Writes_WhenTheAmbientConnectionIsWrappedTheWayUmbracoWrapsIt"/>.
+    /// </param>
+    private AmbientWriteTransaction BeginAmbientWriteTransaction(bool wrapLikeUmbraco = false)
     {
-        var connection = new SqliteConnection(_connectionString);
-        connection.Open();
+        var sqliteConnection = new SqliteConnection(_connectionString);
+        sqliteConnection.Open();
 
-        SqliteTransaction transaction = connection.BeginTransaction();
+        // Registration order in Umbraco.Cms.Persistence.Sqlite.UmbracoBuilderExtensions: MiniProfiler
+        // then retry policy, so the retry wrapper ends up outermost.
+        DbConnection connection = wrapLikeUmbraco
+            ? new RetryDbConnection(
+                new ProfiledDbConnection(sqliteConnection, MiniProfiler.Current),
+                conRetryPolicy: null,
+                cmdRetryPolicy: null)
+            : sqliteConnection;
+
+        DbTransaction transaction = connection.BeginTransaction();
 
         // SQLite defers the write lock until the first write in the transaction, so issue one.
         // Deploy's equivalent is EagerWriteLock's UPDATE of umbracoLock.
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
+        using DbCommand command = sqliteConnection.CreateCommand();
+        command.Transaction = Unwrap(transaction);
         command.CommandText =
             "CREATE TABLE IF NOT EXISTS ambientWriteLockProbe (id INTEGER PRIMARY KEY); " +
             "INSERT INTO ambientWriteLockProbe (id) VALUES (1);";
@@ -146,6 +191,10 @@ public sealed class AmbientTransactionParticipationTests : IDisposable
 
         return new AmbientWriteTransaction(connection, transaction);
     }
+
+    // The priming write goes through the raw connection, so it needs the raw transaction.
+    private static DbTransaction Unwrap(DbTransaction transaction)
+        => transaction is ProfiledDbTransaction profiled ? profiled.WrappedTransaction : transaction;
 
     private UmbracoAutomateDbContext CreateDetachedContext()
     {
@@ -206,23 +255,30 @@ public sealed class AmbientTransactionParticipationTests : IDisposable
     {
         SqliteConnection.ClearAllPools();
 
-        if (File.Exists(_databasePath))
+        // WAL mode leaves a -wal and a -shm alongside the database file; delete all three or the temp
+        // directory collects two orphans per test class run.
+        foreach (var suffix in new[] { string.Empty, "-wal", "-shm" })
         {
-            File.Delete(_databasePath);
+            var path = _databasePath + suffix;
+
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 
     private sealed class AmbientWriteTransaction : IDisposable
     {
-        private readonly SqliteConnection _connection;
+        private readonly DbConnection _connection;
 
-        internal AmbientWriteTransaction(SqliteConnection connection, SqliteTransaction transaction)
+        internal AmbientWriteTransaction(DbConnection connection, DbTransaction transaction)
         {
             _connection = connection;
             Transaction = transaction;
         }
 
-        internal SqliteTransaction Transaction { get; }
+        internal DbTransaction Transaction { get; }
 
         public void Dispose()
         {

@@ -163,9 +163,16 @@ public sealed class AmbientTransactionParticipationTests : IDisposable
     {
         SqliteConnection.ClearAllPools();
 
-        if (File.Exists(_databasePath))
+        // WAL mode leaves a -wal and a -shm alongside the database file; delete all three or the temp
+        // directory collects two orphans per test class run.
+        foreach (var suffix in new[] { string.Empty, "-wal", "-shm" })
         {
-            File.Delete(_databasePath);
+            var path = _databasePath + suffix;
+
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 

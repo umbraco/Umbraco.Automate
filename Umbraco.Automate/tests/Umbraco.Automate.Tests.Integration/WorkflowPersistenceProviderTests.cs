@@ -6,6 +6,7 @@ using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
+using Umbraco.Automate.Core.Persistence.Scoping;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Persistence;
 using Umbraco.Automate.Persistence.Workflows;
@@ -254,7 +255,7 @@ public class WorkflowPersistenceProviderTests : IDisposable
     // synchronous event EF Core raises immediately before a save's DB commands execute -
     // letting a test inject another writer's commit into the exact load-then-save gap the
     // provider's DbUpdateException catch defends against.
-    private sealed class HookingDbContextFactory : IDbContextFactory<UmbracoAutomateDbContext>
+    private sealed class HookingDbContextFactory : IDetachedDbContextFactory<UmbracoAutomateDbContext>
     {
         private readonly Func<UmbracoAutomateDbContext> _inner;
         private readonly Action _onSavingChanges;

@@ -72,6 +72,52 @@ public class UmbracoAmbientAutomateConnectionTests
         sut.Transaction.ShouldBeNull();
     }
 
+    /// <summary>
+    /// A connection string that is missing right now does not mean "separate database". The install
+    /// wizard writes both entries at run time, and hosts that synthesise a DSN (Umbraco Cloud, Umbraco
+    /// Deploy) populate theirs through the options pipeline after boot. Caching that transient "no"
+    /// would leave the process on the detached path — and exposed to the SQLite deadlock — until the
+    /// next restart.
+    /// </summary>
+    [Fact]
+    public void Transaction_IsNotCached_WhenAutomatesConnectionStringArrivesAfterTheFirstCall()
+    {
+        using SqliteConnection connection = OpenConnection();
+        using SqliteTransaction ambientTransaction = connection.BeginTransaction();
+
+        IConfigurationRoot configuration = BuildConfiguration();
+        UmbracoAmbientAutomateConnection sut = CreateSut(ambientTransaction, configuration);
+
+        sut.Transaction.ShouldBeNull();
+
+        configuration["Umbraco:Automate:UseNamedConnectionString"] = "umbracoDbDSN";
+
+        sut.Transaction.ShouldBeSameAs(ambientTransaction);
+    }
+
+    /// <summary>
+    /// The counterpart: a definitive answer is only computed once, since it sits on the path of every
+    /// Automate query.
+    /// </summary>
+    [Fact]
+    public void Transaction_IsCached_OnceTheAnswerIsKnowable()
+    {
+        using SqliteConnection connection = OpenConnection();
+        using SqliteTransaction ambientTransaction = connection.BeginTransaction();
+
+        IConfigurationRoot configuration = BuildConfiguration(
+            ("Umbraco:Automate:UseNamedConnectionString", "umbracoDbDSN"));
+        UmbracoAmbientAutomateConnection sut = CreateSut(ambientTransaction, configuration);
+
+        sut.Transaction.ShouldBeSameAs(ambientTransaction);
+
+        // Repointing Automate at another database after the fact does not un-latch the answer, which
+        // is why the latch waits until both connection strings resolve.
+        configuration["Umbraco:Automate:UseNamedConnectionString"] = "umbracoAutomateDbDSN";
+
+        sut.Transaction.ShouldBeSameAs(ambientTransaction);
+    }
+
     private static SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection("Data Source=:memory:");
@@ -82,6 +128,10 @@ public class UmbracoAmbientAutomateConnectionTests
 
     private static UmbracoAmbientAutomateConnection CreateSut(
         DbTransaction? ambientTransaction,
+        params (string Key, string? Value)[] additionalConfiguration)
+        => CreateSut(ambientTransaction, BuildConfiguration(additionalConfiguration));
+
+    private static IConfigurationRoot BuildConfiguration(
         params (string Key, string? Value)[] additionalConfiguration)
     {
         var settings = new Dictionary<string, string?>
@@ -95,10 +145,15 @@ public class UmbracoAmbientAutomateConnectionTests
             settings[key] = value;
         }
 
-        IConfiguration configuration = new ConfigurationBuilder()
+        return new ConfigurationBuilder()
             .AddInMemoryCollection(settings)
             .Build();
+    }
 
+    private static UmbracoAmbientAutomateConnection CreateSut(
+        DbTransaction? ambientTransaction,
+        IConfiguration configuration)
+    {
         // Bind ConnectionStrings the way Umbraco does (UmbracoBuilder.Configuration.cs), so the
         // default option resolves umbracoDbDSN rather than an empty instance.
         var services = new ServiceCollection();

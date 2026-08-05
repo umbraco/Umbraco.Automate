@@ -121,6 +121,39 @@ public class AutomateDatabaseTargetTests
                 "Server=localhost;Database=umbraco;Integrated Security=true", SqlServer)
             .ShouldBeTrue();
 
+    /// <summary>
+    /// The spellings that address one instance. On Umbraco Cloud the CMS connection string is generated
+    /// by the host and Automate's is written by hand, so these differences are the normal case there,
+    /// and each unrecognised one silently drops back to the detached path.
+    /// </summary>
+    [Theory]
+    [InlineData("tcp:db.example.net", "db.example.net")]
+    [InlineData("np:db.example.net", "db.example.net")]
+    [InlineData("db.example.net,1433", "db.example.net")]
+    [InlineData("tcp:db.example.net,1433", "db.example.net")]
+    [InlineData(".\\SQLEXPRESS", "localhost\\SQLEXPRESS")]
+    [InlineData("(local)\\SQLEXPRESS", "LOCALHOST\\sqlexpress")]
+    [InlineData("tcp:(local),1433", "localhost")]
+    public void IsSameDatabase_TrueForEquivalentSqlServerServerSpellings(string umbraco, string automate)
+        => AutomateDatabaseTarget.IsSameDatabase(
+                $"Server={umbraco};Database=umbraco;Integrated Security=true", SqlServer,
+                $"Server={automate};Database=umbraco;Integrated Security=true", SqlServer)
+            .ShouldBeTrue();
+
+    /// <summary>
+    /// Only the default port is interchangeable with no port. A different one is a different endpoint,
+    /// and a named instance is a different server.
+    /// </summary>
+    [Theory]
+    [InlineData("db.example.net,1434", "db.example.net")]
+    [InlineData("db.example.net\\SQLEXPRESS", "db.example.net")]
+    [InlineData("db.example.net\\ONE", "db.example.net\\TWO")]
+    public void IsSameDatabase_FalseForSqlServerEndpointsThatOnlyLookAlike(string umbraco, string automate)
+        => AutomateDatabaseTarget.IsSameDatabase(
+                $"Server={umbraco};Database=umbraco;Integrated Security=true", SqlServer,
+                $"Server={automate};Database=umbraco;Integrated Security=true", SqlServer)
+            .ShouldBeFalse();
+
     [Fact]
     public void IsSameDatabase_FalseForDifferentCatalogsOnTheSameServer()
         => AutomateDatabaseTarget.IsSameDatabase(

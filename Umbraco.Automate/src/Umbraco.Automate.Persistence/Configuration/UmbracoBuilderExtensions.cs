@@ -72,19 +72,17 @@ public static partial class UmbracoBuilderExtensions
         // deadlocks any caller that keeps a transaction open across an Automate write — Umbraco
         // Deploy's restore being the reported case. See AmbientDbContextFactory.
         builder.Services.EnlistDbContextFactoryInAmbientScope(
-            (serviceProvider, connection) =>
+            (serviceProvider, connection, providerName) =>
             {
-                var (_, providerName) = DatabaseConnectionInfo.Resolve(
-                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                    serviceProvider.GetRequiredService<IConfiguration>());
-
                 var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
                 UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
 
                 // Mirrors the interceptor on the pooled factory, so a write is gated on Automate's
-                // startup migrations whichever path it takes.
+                // startup migrations whichever path it takes — but with a timeout, because this path
+                // waits while holding the caller's transaction (and on SQLite, its write lock).
                 options.AddInterceptors(new AutomateReadinessInterceptor(
-                    serviceProvider.GetRequiredService<AutomateReadinessSignal>()));
+                    serviceProvider.GetRequiredService<AutomateReadinessSignal>(),
+                    AutomateReadinessInterceptor.EnlistedWaitTimeout));
 
                 return new UmbracoAutomateDbContext(options.Options);
             });

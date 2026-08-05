@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Persistence.Scoping;
 
 namespace Umbraco.Automate.Persistence.Workflows;
 
@@ -15,9 +16,14 @@ namespace Umbraco.Automate.Persistence.Workflows;
 /// </summary>
 internal sealed class EFCoreWorkflowLockStore : IWorkflowLockStore
 {
-    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
+    private readonly IDetachedDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
 
-    public EFCoreWorkflowLockStore(IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory)
+    /// <param name="dbContextFactory">
+    /// Deliberately the detached factory: a lease taken inside a caller's transaction would be
+    /// invisible to every other holder until that caller commits, and would vanish on rollback while
+    /// this process still believed it held the lock.
+    /// </param>
+    public EFCoreWorkflowLockStore(IDetachedDbContextFactory<UmbracoAutomateDbContext> dbContextFactory)
     {
         _dbContextFactory = dbContextFactory;
     }

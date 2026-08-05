@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Persistence.Scoping;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -9,11 +10,14 @@ namespace Umbraco.Automate.Persistence.Workflows;
 
 /// <summary>
 /// EF Core-backed <see cref="IPersistenceProvider"/> for WorkflowCore.
-/// Uses <see cref="IDbContextFactory{T}"/> for database access with an isolated connection.
+/// Uses <see cref="IDetachedDbContextFactory{TDbContext}"/> for database access with an isolated
+/// connection: engine state must never be enlisted in a caller's transaction, or a workflow instance
+/// this process is already executing would be invisible to the other workers until that caller
+/// commits, and gone if it rolls back.
 /// </summary>
 internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
 {
-    private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
+    private readonly IDetachedDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly RunFinalizer _runFinalizer;
     private readonly ILogger<EFCoreWorkflowPersistenceProvider> _logger;
 
@@ -30,7 +34,7 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     private const int SchemaVersionNormalized = 1;
 
     public EFCoreWorkflowPersistenceProvider(
-        IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
+        IDetachedDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
         RunFinalizer runFinalizer,
         ILogger<EFCoreWorkflowPersistenceProvider> logger)
     {

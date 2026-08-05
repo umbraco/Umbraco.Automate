@@ -6,8 +6,11 @@ using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Extensions;
 using Umbraco.Automate.Persistence;
+using Umbraco.Automate.Persistence.Workflows;
 using Umbraco.Automate.Core.Persistence.Scoping;
+using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Cms.Infrastructure.Scoping;
 using Umbraco.Extensions;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -44,6 +47,43 @@ public class AmbientDbContextFactoryCompositionTests
         context.Database.ProviderName.ShouldBe("Microsoft.EntityFrameworkCore.Sqlite");
     }
 
+    /// <summary>
+    /// Engine internals ask for the detached factory by type so their writes can never join a caller's
+    /// transaction. If the decoration ever swallowed that registration, the engine would silently start
+    /// enlisting and nothing else would notice.
+    /// </summary>
+    [Fact]
+    public void EnlistDbContextFactoryInAmbientScope_KeepsThePooledFactoryReachableAsDetached()
+    {
+        ServiceProvider serviceProvider = BuildServiceProvider();
+
+        IDetachedDbContextFactory<UmbracoAutomateDbContext> detached = serviceProvider
+            .GetRequiredService<IDetachedDbContextFactory<UmbracoAutomateDbContext>>();
+
+        detached.ShouldNotBeAssignableTo<AmbientDbContextFactory<UmbracoAutomateDbContext>>();
+
+        using UmbracoAutomateDbContext context = detached.CreateDbContext();
+
+        context.Database.ProviderName.ShouldBe("Microsoft.EntityFrameworkCore.Sqlite");
+    }
+
+    /// <summary>
+    /// The engine stores must take the detached factory, not the ambient one. Constructor injection is
+    /// the only thing enforcing that, so it is asserted rather than trusted.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(EFCoreWorkflowPersistenceProvider))]
+    [InlineData(typeof(EFCoreWorkflowLockStore))]
+    public void EngineStores_TakeTheDetachedFactory(Type storeType)
+    {
+        IEnumerable<Type> parameterTypes = storeType
+            .GetConstructors()
+            .SelectMany(constructor => constructor.GetParameters())
+            .Select(parameter => parameter.ParameterType);
+
+        parameterTypes.ShouldContain(typeof(IDetachedDbContextFactory<UmbracoAutomateDbContext>));
+    }
+
     [Fact]
     public void EnlistDbContextFactoryInAmbientScope_KeepsTheTransientDbContextRegistrationWorking()
     {
@@ -56,11 +96,39 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     /// <summary>
+    /// The other tests here substitute <see cref="IAmbientAutomateConnection"/>, so nothing exercises
+    /// the implementation the extension actually registers. It depends on
+    /// <c>Lazy&lt;IScopeAccessor&gt;</c>, which plain Microsoft DI cannot resolve — only Umbraco's
+    /// <c>Lazy&lt;&gt;</c> registration makes it work, and that is a dependency on the host this
+    /// package does not own.
+    /// </summary>
+    [Fact]
+    public void EnlistDbContextFactoryInAmbientScope_RegistersAnAmbientConnectionThatResolvesInAnUmbracoHost()
+    {
+        ServiceProvider serviceProvider = BuildServiceProvider(useRealAmbientConnection: true);
+
+        serviceProvider.GetRequiredService<IAmbientAutomateConnection>()
+            .ShouldBeOfType<UmbracoAmbientAutomateConnection>();
+
+        // Resolving the factory and creating a context walks the whole chain, Lazy<IScopeAccessor>
+        // included.
+        using UmbracoAutomateDbContext context = serviceProvider
+            .GetRequiredService<IDbContextFactory<UmbracoAutomateDbContext>>()
+            .CreateDbContext();
+
+        context.Database.ProviderName.ShouldBe("Microsoft.EntityFrameworkCore.Sqlite");
+    }
+
+    /// <summary>
     /// Replicates the persistence-layer registration block from
     /// <c>UmbracoBuilderExtensions.AddUmbracoAutomatePersistence</c>. Kept in step with it by hand,
     /// as <c>IUmbracoBuilder</c> is not constructible outside a full Umbraco host.
     /// </summary>
-    private static ServiceProvider BuildServiceProvider()
+    /// <param name="useRealAmbientConnection">
+    /// When <c>true</c>, leaves <see cref="IAmbientAutomateConnection"/> to the extension and registers
+    /// what an Umbraco host provides for it instead of substituting the whole thing.
+    /// </param>
+    private static ServiceProvider BuildServiceProvider(bool useRealAmbientConnection = false)
     {
         var services = new ServiceCollection();
 
@@ -75,7 +143,18 @@ public class AmbientDbContextFactoryCompositionTests
         services.AddSingleton(configuration);
         services.Configure<ConnectionStrings>(configuration.GetSection("ConnectionStrings"));
         services.AddSingleton<AutomateReadinessSignal>();
-        services.AddSingleton(Mock.Of<IAmbientAutomateConnection>());
+
+        if (useRealAmbientConnection)
+        {
+            // What the host brings: Umbraco's open-generic Lazy<> support
+            // (Umbraco.Cms.Core.DependencyInjection.ServiceCollectionExtensions) and the scope accessor.
+            services.AddTransient(typeof(Lazy<>), typeof(LazyResolve<>));
+            services.AddSingleton(Mock.Of<IScopeAccessor>());
+        }
+        else
+        {
+            services.AddSingleton(Mock.Of<IAmbientAutomateConnection>());
+        }
 
         services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
             (IServiceProvider serviceProvider, DbContextOptionsBuilder options, string? _, string? _) =>
@@ -88,12 +167,8 @@ public class AmbientDbContextFactoryCompositionTests
             shareUmbracoConnection: false);
 
         services.EnlistDbContextFactoryInAmbientScope(
-            (serviceProvider, connection) =>
+            (_, connection, providerName) =>
             {
-                var (_, providerName) = DatabaseConnectionInfo.Resolve(
-                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                    serviceProvider.GetRequiredService<IConfiguration>());
-
                 var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
                 UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
 
