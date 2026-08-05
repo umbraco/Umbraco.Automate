@@ -106,12 +106,8 @@ public static class UmbracoBuilderExtensions
         // writer per database file, deadlock against a caller holding the write lock across the write.
         // See AmbientDbContextFactory.
         builder.Services.EnlistDbContextFactoryInAmbientScope(
-            (serviceProvider, connection) =>
+            (_, connection, providerName) =>
             {
-                var (_, providerName) = DatabaseConnectionInfo.Resolve(
-                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                    serviceProvider.GetRequiredService<IConfiguration>());
-
                 var options = new DbContextOptionsBuilder<OpenIddictDbContext>();
                 OpenIddictDbContext.ConfigureProvider(options, connection, providerName);
 
