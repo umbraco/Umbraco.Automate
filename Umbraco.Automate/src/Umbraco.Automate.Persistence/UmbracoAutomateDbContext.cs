@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Core.Persistence;
@@ -58,6 +59,10 @@ public class UmbracoAutomateDbContext : DbContext
     {
     }
 
+    private static readonly AutomateMigrationsAssemblies MigrationsAssemblies = new(
+        SqlServer: "Umbraco.Automate.Persistence.SqlServer",
+        Sqlite: "Umbraco.Automate.Persistence.Sqlite");
+
     /// <summary>
     /// Configures the EF Core database provider with the correct migrations assembly.
     /// </summary>
@@ -65,32 +70,17 @@ public class UmbracoAutomateDbContext : DbContext
         DbContextOptionsBuilder options,
         string connectionString,
         string providerName)
-    {
-        switch (providerName)
-        {
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
-                options.UseSqlServer(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                    x.EnableRetryOnFailure();
-                });
-                break;
+        => AutomateDbProvider.Configure(options, connectionString, providerName, MigrationsAssemblies);
 
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                options.UseSqlite(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
-        }
-    }
+    /// <summary>
+    /// Configures the EF Core database provider against an already-open connection owned by someone
+    /// else — the ambient Umbraco scope — so writes join that connection's transaction.
+    /// </summary>
+    internal static void ConfigureProvider(
+        DbContextOptionsBuilder options,
+        DbConnection connection,
+        string providerName)
+        => AutomateDbProvider.Configure(options, connection, providerName, MigrationsAssemblies);
 
     // All DateTime columns in this DbContext represent UTC instants. Neither SQL Server's
     // datetime2 nor SQLite's TEXT format preserves DateTimeKind across a round-trip, so
