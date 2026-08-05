@@ -74,6 +74,9 @@ export class UaRunsTableElement extends UmbLitElement {
                 return "positive";
             case "Running":
             case "Pending":
+            // A refusal is not an error, so never danger — but it is the outcome someone
+            // scanning this list wants to spot, so it does not blend in as default either.
+            case "Rejected":
                 return "warning";
             case "Failed":
                 return "danger";

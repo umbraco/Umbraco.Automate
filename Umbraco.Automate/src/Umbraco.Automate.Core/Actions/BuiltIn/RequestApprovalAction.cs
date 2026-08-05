@@ -8,7 +8,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     Description = "Pauses the automation and waits for a human to approve or reject before continuing.",
     Group = "Core",
     Icon = "icon-operator")]
-public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings>
+public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings, ApprovalDecisionOutput>
 {
     /// <summary>
     /// The action alias for the request approval action.
@@ -19,6 +19,18 @@ public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings>
     /// The WorkflowCore event name used for approval events.
     /// </summary>
     public const string ApprovalEventName = "approval";
+
+    /// <summary>
+    /// The named outcome taken when the approval is granted. Doubles as the source handle id on
+    /// the canvas node, so a connection drawn from that handle is stored with this outcome value.
+    /// </summary>
+    public const string ApprovedOutcome = "approved";
+
+    /// <summary>
+    /// The named outcome taken when the approval is refused. Doubles as the source handle id on
+    /// the canvas node, so a connection drawn from that handle is stored with this outcome value.
+    /// </summary>
+    public const string RejectedOutcome = "rejected";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RequestApprovalAction"/> class.
@@ -45,6 +57,9 @@ public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings>
             TimeoutHours = settings.TimeoutHours,
         };
 
+        // The suspend-time payload is the pending-approval record, not the declared
+        // ApprovalDecisionOutput — there is no decision yet, and the pending-approvals API reads
+        // the prompt from it. The typed WaitForInput overload is bypassed for that reason.
         return Task.FromResult(ActionResult.WaitForInput(ApprovalEventName, eventKey, output));
     }
 }

@@ -7,6 +7,7 @@ import { bindingTextAreaManifests } from "./components/binding-text-area/manifes
 import { webhookAuthenticatorPickerManifests } from "./components/webhook-authenticator-picker/manifests.js";
 import { webhookMethodPickerManifests } from "./components/webhook-method-picker/manifests.js";
 import { webhookSecretFieldManifests } from "./components/webhook-secret-field/manifests.js";
+import { sensitiveFieldManifests } from "./components/sensitive-field/manifests.js";
 import { editorNotificationSeverityPickerManifests } from "./components/editor-notification-severity-picker/manifests.js";
 import { memberTypePickerManifests } from "./components/member-type-picker/manifests.js";
 import { userGroupPickerManifests } from "./components/user-group-picker/manifests.js";
@@ -21,6 +22,7 @@ export const manifests: UmbExtensionManifest[] = [
     ...webhookAuthenticatorPickerManifests,
     ...webhookMethodPickerManifests,
     ...webhookSecretFieldManifests,
+    ...sensitiveFieldManifests,
     ...editorNotificationSeverityPickerManifests,
     ...memberTypePickerManifests,
     ...userGroupPickerManifests,

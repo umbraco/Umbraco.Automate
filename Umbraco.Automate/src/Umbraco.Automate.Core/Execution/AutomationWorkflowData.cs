@@ -22,7 +22,11 @@ public sealed class AutomationWorkflowData
     public string AutomationAlias { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the trigger output data (flattened key-value pairs).
+    /// Gets or sets the trigger output data (flattened key-value pairs), or — when the payload
+    /// exceeded <c>ExecutionOptions.MaxInlineOutputBytes</c> — a <see cref="StepOutputReference"/>
+    /// trigger marker referencing the run whose <c>TriggerData</c> holds it. Binding hydrates the
+    /// marker on demand, so a large trigger payload is not re-serialized into the workflow
+    /// instance blob on every execution pass.
     /// </summary>
     public Dictionary<string, object?> TriggerOutput { get; set; } = [];
 

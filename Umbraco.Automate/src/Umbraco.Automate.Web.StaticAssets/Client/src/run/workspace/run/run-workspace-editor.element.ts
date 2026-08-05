@@ -26,6 +26,7 @@ export class UaRunWorkspaceEditorElement extends UmbLitElement {
                 return "positive";
             case "Running":
             case "Pending":
+            case "Rejected":
                 return "warning";
             case "Failed":
                 return "danger";

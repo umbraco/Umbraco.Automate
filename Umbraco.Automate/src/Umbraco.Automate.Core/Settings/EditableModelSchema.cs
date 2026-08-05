@@ -76,7 +76,10 @@ public sealed class EditableModelFieldDescriptor
     public int SortOrder { get; init; }
 
     /// <summary>
-    /// Gets whether this field contains sensitive data.
+    /// Gets whether this field holds a secret. See
+    /// <see cref="EditableModelFieldAttribute.IsSensitive"/> for what that implies. Rendering
+    /// does not read this — the masked editor is already baked into
+    /// <see cref="EditorUiAlias"/> by the schema builder.
     /// </summary>
     public bool IsSensitive { get; init; }
 

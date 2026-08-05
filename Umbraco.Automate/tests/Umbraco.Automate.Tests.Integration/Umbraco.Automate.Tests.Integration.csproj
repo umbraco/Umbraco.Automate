@@ -27,6 +27,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
     <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence\Umbraco.Automate.Persistence.csproj" />
+    <!-- Holds the SQLite migrations. Referenced so AutomateSchemaInitializerTests can exercise a real
+         Database.MigrateAsync — EF Core loads the migrations assembly by name at run time, so it has
+         to be present in the test output. -->
+    <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence.Sqlite\Umbraco.Automate.Persistence.Sqlite.csproj" />
     <ProjectReference Include="..\Umbraco.Automate.Tests.Common\Umbraco.Automate.Tests.Common.csproj" />
   </ItemGroup>
 

@@ -180,6 +180,16 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<string?> GetRunTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.AutomationRuns
+            .Where(r => r.Id == runId)
+            .Select(r => r.TriggerData)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -209,6 +219,7 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         (int)AutomationRunStatus.Completed,
         (int)AutomationRunStatus.Failed,
         (int)AutomationRunStatus.Cancelled,
+        (int)AutomationRunStatus.Rejected,
     ];
 
     public async Task<int> DeleteRunsOlderThanAsync(DateTime threshold, CancellationToken cancellationToken = default)
@@ -413,13 +424,17 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
         var completedStatus = (int)AutomationRunStatus.Completed;
         var failedStatus = (int)AutomationRunStatus.Failed;
 
+        // Rejected counts as a success here: the automation ran as designed and a human declined.
+        // Counting it against the success rate would misreport a working approval flow.
+        var rejectedStatus = (int)AutomationRunStatus.Rejected;
+
         var groups = await query
             .GroupBy(r => r.AutomationId)
             .Select(g => new
             {
                 AutomationId = g.Key,
                 TotalRuns = g.Count(),
-                SuccessCount = g.Count(r => r.Status == completedStatus),
+                SuccessCount = g.Count(r => r.Status == completedStatus || r.Status == rejectedStatus),
                 FailCount = g.Count(r => r.Status == failedStatus),
             })
             .OrderByDescending(g => g.TotalRuns)
