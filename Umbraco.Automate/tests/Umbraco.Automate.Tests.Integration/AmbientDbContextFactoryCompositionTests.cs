@@ -167,12 +167,8 @@ public class AmbientDbContextFactoryCompositionTests
             shareUmbracoConnection: false);
 
         services.EnlistDbContextFactoryInAmbientScope(
-            (serviceProvider, connection) =>
+            (_, connection, providerName) =>
             {
-                var (_, providerName) = DatabaseConnectionInfo.Resolve(
-                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                    serviceProvider.GetRequiredService<IConfiguration>());
-
                 var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
                 UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
 
