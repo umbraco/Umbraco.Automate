@@ -48,6 +48,11 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
         this.#checkedServiceAccountKey = serviceAccountKey;
 
         const { data } = await this.#userItemRepository.requestItems([serviceAccountKey]);
+
+        // Ignore a stale response: a newer check may have started (or completed) for a
+        // different key while this request was in flight.
+        if (this.#checkedServiceAccountKey !== serviceAccountKey) return;
+
         this._serviceAccountUnresolved = !data?.some((user) => user.unique === serviceAccountKey);
     }
 
