@@ -72,8 +72,12 @@ public static partial class UmbracoBuilderExtensions
         // deadlocks any caller that keeps a transaction open across an Automate write — Umbraco
         // Deploy's restore being the reported case. See AmbientDbContextFactory.
         builder.Services.EnlistDbContextFactoryInAmbientScope(
-            (serviceProvider, connection, providerName) =>
+            (serviceProvider, connection) =>
             {
+                var (_, providerName) = DatabaseConnectionInfo.Resolve(
+                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                    serviceProvider.GetRequiredService<IConfiguration>());
+
                 var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
                 UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
 

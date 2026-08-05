@@ -1,12 +1,8 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
-using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Core.Persistence.Scoping;
-using Umbraco.Cms.Core.Configuration.Models;
 
 namespace Umbraco.Automate.Extensions;
 
@@ -25,9 +21,8 @@ internal static class AmbientDbContextFactoryExtensions
     /// <typeparam name="TDbContext">The DbContext whose factory should participate.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="createEnlistedContext">
-    /// Builds a context bound to the ambient connection, for the resolved provider. Must configure the
-    /// same provider and interceptors as the pooled factory, so a write behaves the same however it is
-    /// created.
+    /// Builds a context bound to the ambient connection. Must configure the same provider and
+    /// interceptors as the pooled factory, so a write behaves the same however it is created.
     /// </param>
     /// <remarks>
     /// <para>
@@ -42,7 +37,7 @@ internal static class AmbientDbContextFactoryExtensions
     /// </remarks>
     internal static IServiceCollection EnlistDbContextFactoryInAmbientScope<TDbContext>(
         this IServiceCollection services,
-        Func<IServiceProvider, DbConnection, string, TDbContext> createEnlistedContext)
+        Func<IServiceProvider, DbConnection, TDbContext> createEnlistedContext)
         where TDbContext : DbContext
     {
         // Shared by every participating DbContext: whether Automate targets the Umbraco database, and
@@ -71,26 +66,10 @@ internal static class AmbientDbContextFactoryExtensions
             serviceProvider => new AmbientDbContextFactory<TDbContext>(
                 serviceProvider.GetRequiredService<IDetachedDbContextFactory<TDbContext>>(),
                 serviceProvider.GetRequiredService<IAmbientAutomateConnection>(),
-                connection => createEnlistedContext(
-                    serviceProvider,
-                    connection,
-                    ResolveProviderName(serviceProvider))),
+                connection => createEnlistedContext(serviceProvider, connection)),
             pooled.Lifetime));
 
         return services;
-    }
-
-    /// <summary>
-    /// Resolves the provider name the same way the pooled factory does, so both paths agree on which
-    /// provider the context is being configured for.
-    /// </summary>
-    private static string ResolveProviderName(IServiceProvider serviceProvider)
-    {
-        var (_, providerName) = DatabaseConnectionInfo.Resolve(
-            serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-            serviceProvider.GetRequiredService<IConfiguration>());
-
-        return providerName;
     }
 
     private static IDbContextFactory<TDbContext> ResolvePooledFactory<TDbContext>(
@@ -98,18 +77,10 @@ internal static class AmbientDbContextFactoryExtensions
         ServiceDescriptor pooled)
         where TDbContext : DbContext
     {
-        // AddPooledDbContextFactory registers an implementation factory, so one of these two produces
-        // the pooled factory DI would have handed out. Deliberately no ActivatorUtilities fallback for
-        // a plain type registration: that would build a second factory outside DI, with its own pool,
-        // which is worse than failing here if EF Core ever changes how it registers.
-        var instance = pooled.ImplementationInstance ?? pooled.ImplementationFactory?.Invoke(serviceProvider);
+        var instance = pooled.ImplementationInstance
+            ?? pooled.ImplementationFactory?.Invoke(serviceProvider)
+            ?? ActivatorUtilities.CreateInstance(serviceProvider, pooled.ImplementationType!);
 
-        return instance as IDbContextFactory<TDbContext>
-            ?? throw new InvalidOperationException(
-                $"The registered IDbContextFactory<{typeof(TDbContext).Name}> could not be resolved " +
-                $"from its service descriptor ({pooled.Lifetime}, " +
-                $"implementation type '{pooled.ImplementationType?.Name ?? "none"}'), so " +
-                $"{nameof(AmbientDbContextFactory<TDbContext>)} has nothing to fall back to. " +
-                "AddUmbracoDbContext is expected to register it via an implementation factory.");
+        return (IDbContextFactory<TDbContext>)instance;
     }
 }
