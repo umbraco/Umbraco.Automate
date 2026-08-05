@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Core.Persistence;
@@ -80,6 +81,46 @@ public class UmbracoAutomateDbContext : DbContext
             case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
             case "Microsoft.Data.SQLite":
                 options.UseSqlite(connectionString, x =>
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
+        }
+    }
+
+    /// <summary>
+    /// Configures the EF Core database provider against an already-open connection owned by someone
+    /// else — the ambient Umbraco scope — so writes join that connection's transaction.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately does not enable retry-on-failure for SQL Server: EF Core's retrying execution
+    /// strategy refuses to run inside a user-initiated transaction, which is exactly what an enlisted
+    /// context always has. Retries are the caller's business here, since the caller owns the
+    /// transaction that any retry would have to restart.
+    /// </remarks>
+    internal static void ConfigureProvider(
+        DbContextOptionsBuilder options,
+        DbConnection connection,
+        string providerName)
+    {
+        switch (providerName)
+        {
+            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
+                options.UseSqlServer(connection, x =>
+                {
+                    x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer");
+                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
+                });
+                break;
+
+            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
+            case "Microsoft.Data.SQLite":
+                options.UseSqlite(connection, x =>
                 {
                     x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
                     x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
