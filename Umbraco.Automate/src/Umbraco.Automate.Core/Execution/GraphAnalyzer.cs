@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 
 namespace Umbraco.Automate.Core.Execution;
@@ -13,10 +14,12 @@ internal static class GraphAnalyzer
     /// </summary>
     /// <param name="connections">The connections between steps.</param>
     /// <param name="containerStepIds">The set of step IDs that are container control flow steps.</param>
+    /// <param name="logger">Optional logger used to warn about malformed container wiring.</param>
     /// <returns>A dictionary mapping container step IDs to their scope analysis results.</returns>
     public static Dictionary<Guid, ContainerScope> Analyze(
         IList<StepConnection> connections,
-        IReadOnlySet<Guid> containerStepIds)
+        IReadOnlySet<Guid> containerStepIds,
+        ILogger? logger = null)
     {
         if (containerStepIds.Count == 0)
         {
@@ -48,7 +51,7 @@ internal static class GraphAnalyzer
 
         foreach (var containerId in containerStepIds)
         {
-            var scope = AnalyzeContainer(containerId, forwardAdj, containerStepIds);
+            var scope = AnalyzeContainer(containerId, forwardAdj, containerStepIds, logger);
             result[containerId] = scope;
         }
 
@@ -58,7 +61,8 @@ internal static class GraphAnalyzer
     private static ContainerScope AnalyzeContainer(
         Guid containerId,
         Dictionary<Guid, List<Edge>> forwardAdj,
-        IReadOnlySet<Guid> containerStepIds)
+        IReadOnlySet<Guid> containerStepIds,
+        ILogger? logger)
     {
         if (!forwardAdj.TryGetValue(containerId, out var outgoing) || outgoing.Count == 0)
         {
@@ -69,19 +73,36 @@ internal static class GraphAnalyzer
         // to infer. Everything else leaving the container is a body branch — including edges with
         // no handle at all, which is what connections saved before the handles existed look like.
         Guid? doneTarget = null;
+        var doneEdgeCount = 0;
         var bodyOutgoing = new List<Edge>(outgoing.Count);
         foreach (var edge in outgoing)
         {
             if (ContainerHandles.IsDone(edge.SourceHandle))
             {
-                // A container has one done handle, so extra done edges are a malformed graph.
-                // Take the first and let the rest fall through as body edges rather than throwing
-                // at compile time — a broken canvas should not stop the whole automation loading.
+                // A container renders one done handle and the canvas keeps one connection on it, so
+                // more than one done edge means the graph was written by something other than the
+                // canvas. Keep the first as the post-container step and drop the rest — they are
+                // dropped from the compiler's branch edges too (see
+                // WorkflowCompiler.BuildContainerBranchEdges), so analysis and compilation agree
+                // that those targets do not run. Warn rather than throw: a malformed graph should
+                // not stop the whole automation loading.
+                doneEdgeCount++;
                 doneTarget ??= edge.Target;
                 continue;
             }
 
             bodyOutgoing.Add(edge);
+        }
+
+        if (doneEdgeCount > 1)
+        {
+            logger?.LogWarning(
+                "Container step {ContainerStepId} has {DoneEdgeCount} connections on the '{DoneHandle}' handle. " +
+                "The first is used as the post-container step; the other {IgnoredEdgeCount} are ignored and their target steps will never run.",
+                containerId,
+                doneEdgeCount,
+                ContainerHandles.Done,
+                doneEdgeCount - 1);
         }
 
         // Collect branch entry steps — immediate successors of the container via the body handle.

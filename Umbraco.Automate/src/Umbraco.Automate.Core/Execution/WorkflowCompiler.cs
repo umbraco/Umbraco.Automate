@@ -87,7 +87,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         var containerStepIds = IdentifyContainerSteps(automation.Steps);
 
         // Run graph analysis to determine children and convergence for containers.
-        var containerScopes = GraphAnalyzer.Analyze(automation.Connections, containerStepIds);
+        var containerScopes = GraphAnalyzer.Analyze(automation.Connections, containerStepIds, _logger);
 
         // Build the per-container outgoing edge list (target + optional filter). Containers
         // need this at runtime to evaluate filters in iteration context — the filter cannot
