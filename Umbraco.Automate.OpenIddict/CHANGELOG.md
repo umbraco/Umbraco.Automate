@@ -5,6 +5,12 @@ All notable changes to Umbraco.Automate.OpenIddict will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.1.2](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@17.1.0...Umbraco.Automate.OpenIddict@17.1.2) (2026-08-10)
+
+### fix
+
+* **openiddict:** Enlist the credentials DbContext in the ambient Umbraco transaction when it shares a database ([8139016](https://github.com/umbraco/Umbraco.Automate/commit/8139016b06c2c07d82859a9e363135185fa03f7f)), closes [#197](https://github.com/umbraco/Umbraco.Automate/issues/197)
+
 ## [17.1.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@17.0.0...Umbraco.Automate.OpenIddict@17.1.0) (2026-07-22)
 
 ### feat
