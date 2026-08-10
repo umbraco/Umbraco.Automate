@@ -5,6 +5,40 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.2.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@18.1.0...Umbraco.Automate@18.2.0) (2026-08-10)
+
+### ⚠ BREAKING CHANGE
+
+* **action:** an approval step configured with StepErrorBehavior.Terminate no
+longer stops the run on a refusal. It follows the rejected path, or completes if
+nothing is wired there, and the run reports Rejected rather than Failed.
+* **action:** step output `outcome` is now "Approved"/"Rejected" rather than
+0/1. Any condition written against the numeric value needs updating. The field
+was absent from the binding picker, so this is expected to affect nobody.
+
+### feat
+
+* **action:** Add approved and rejected outcome handles to Request Approval ([e4f5422](https://github.com/umbraco/Umbraco.Automate/commit/e4f54224887b4e8e6f4bf23fa54567d9e1bc046f))
+* **action:** Declare an output type for the Request Approval step ([7b78643](https://github.com/umbraco/Umbraco.Automate/commit/7b78643384788d095f237bc6b7f83684bd632928))
+* **frontend:** Mask sensitive settings fields as password input ([ae72f47](https://github.com/umbraco/Umbraco.Automate/commit/ae72f47fb578ea6c736977b1633cdc8b79e20290)), closes [#161](https://github.com/umbraco/Umbraco.Automate/issues/161)
+* **settings:** Mask sensitive fields with a dedicated masked editor ([132e3a1](https://github.com/umbraco/Umbraco.Automate/commit/132e3a1822b85f05c4c121b3cfe3907b82b9a048)), closes [#161](https://github.com/umbraco/Umbraco.Automate/issues/161)
+
+### fix
+
+* **action:** Set a VariationContext when reading published property values ([f18fcd4](https://github.com/umbraco/Umbraco.Automate/commit/f18fcd4e9b3a9e01d7305d97fd068c0f2cdcc263)), closes [#205](https://github.com/umbraco/Umbraco.Automate/issues/205)
+* **core:** Categorise an invalid approval resume as a configuration error ([9e021f6](https://github.com/umbraco/Umbraco.Automate/commit/9e021f6e303c5795b32004204317670e7f8dec60))
+* **core:** Compare SQLite database paths case-sensitively off Windows ([d6507e6](https://github.com/umbraco/Umbraco.Automate/commit/d6507e669b352423c81a836da7c712cc6ac806de))
+* **core:** Enlist in the ambient Umbraco transaction on a shared database ([3ddb5ff](https://github.com/umbraco/Umbraco.Automate/commit/3ddb5ff5b7f1433b2c1712785f8503e0eb697c66))
+* **core:** Migrate Automate's schema before Deploy's boot-time restore ([662e673](https://github.com/umbraco/Umbraco.Automate/commit/662e6732f914e5b6d3abf25da3cfc83cbb66c77c)), closes [#198](https://github.com/umbraco/Umbraco.Automate/issues/198)
+* **core:** Move the schema migration runtime-level guard into the initializer ([ec98610](https://github.com/umbraco/Umbraco.Automate/commit/ec98610326f2f92328ff5b539da4a99258dcd468))
+* **core:** Share the ambient-scope DbContext plumbing with OpenIddict ([4902fec](https://github.com/umbraco/Umbraco.Automate/commit/4902feccf5337ad5986762fe0119b8df7c0a8fb9))
+* **ui:** Guard against stale service account resolution responses ([bf08549](https://github.com/umbraco/Umbraco.Automate/commit/bf0854966dfdb9ec30173642d9b010866eed3858))
+* **ui:** Handle unresolved workspace service account in picker ([3889ba8](https://github.com/umbraco/Umbraco.Automate/commit/3889ba8f9641dbfc60a6e404ae5eece7583a7b44)), closes [#214](https://github.com/umbraco/Umbraco.Automate/issues/214)
+
+### perf
+
+* **core:** Offload large trigger outputs from the workflow blob (#193) ([724647b](https://github.com/umbraco/Umbraco.Automate/commit/724647b40f8d090b473d36475beb0b3f107c01d3)), closes [#193](https://github.com/umbraco/Umbraco.Automate/issues/193) [#182](https://github.com/umbraco/Umbraco.Automate/issues/182)
+
 ## [18.1.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@18.0.0...Umbraco.Automate@18.1.0) (2026-07-22)
 
 ### feat
