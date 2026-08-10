@@ -133,11 +133,16 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
     }
 
     /// <summary>
-    /// Indexes the connections leaving each container step. Each entry pairs the target
+    /// Indexes the body connections leaving each container step. Each entry pairs the target
     /// step ID with the connection's filter (if any) so the container's runtime body can
     /// evaluate the filter with iteration context.
     /// </summary>
-    private static Dictionary<Guid, IReadOnlyList<ContainerBranchEdge>> BuildContainerBranchEdges(
+    /// <remarks>
+    /// Done edges are excluded. The step on a container's done handle runs after the container
+    /// finishes, wired as the container's outcome by <see cref="WireContainerChildren"/>; treating
+    /// it as a branch edge here would spawn it once per iteration as well.
+    /// </remarks>
+    internal static Dictionary<Guid, IReadOnlyList<ContainerBranchEdge>> BuildContainerBranchEdges(
         IList<StepConnection> connections,
         IReadOnlySet<Guid> containerStepIds)
     {
@@ -146,6 +151,11 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         foreach (var connection in connections)
         {
             if (!containerStepIds.Contains(connection.SourceStepId))
+            {
+                continue;
+            }
+
+            if (ContainerHandles.IsDone(connection.SourceHandle))
             {
                 continue;
             }

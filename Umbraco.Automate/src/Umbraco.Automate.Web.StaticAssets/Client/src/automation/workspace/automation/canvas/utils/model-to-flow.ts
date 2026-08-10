@@ -14,6 +14,16 @@ const SWITCH_ALIAS = "umbracoAutomate.switch";
 const APPROVAL_ALIAS = "umbracoAutomate.requestApproval";
 
 /**
+ * Control flow steps that own a body of steps. They render as ContainerNode, which carries a
+ * body handle and a done handle rather than a single unnamed output.
+ */
+const CONTAINER_ALIASES = new Set([
+    "umbracoAutomate.while",
+    "umbracoAutomate.forEach",
+    "umbracoAutomate.parallel",
+]);
+
+/**
  * Outcome names the Request Approval step returns, used as its source handle ids so a connection
  * drawn from a handle is saved with the matching outcome. Must stay in step with
  * RequestApprovalAction.ApprovedOutcome / RejectedOutcome on the server.
@@ -21,10 +31,19 @@ const APPROVAL_ALIAS = "umbracoAutomate.requestApproval";
 export const APPROVED_OUTCOME = "approved";
 export const REJECTED_OUTCOME = "rejected";
 
+/**
+ * Source handle ids for container steps. A connection drawn from the body handle runs inside the
+ * container; one drawn from the done handle runs once after it finishes. Must stay in step with
+ * ContainerHandles on the server.
+ */
+export const BODY_HANDLE = "body";
+export const DONE_HANDLE = "done";
+
 function getNodeType(actionAlias: string): string {
     if (actionAlias === IF_ALIAS) return "if";
     if (actionAlias === SWITCH_ALIAS) return "switch";
     if (actionAlias === APPROVAL_ALIAS) return "approval";
+    if (CONTAINER_ALIASES.has(actionAlias)) return "container";
     return "action";
 }
 

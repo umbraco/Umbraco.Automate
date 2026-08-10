@@ -24,7 +24,7 @@ internal static class GraphAnalyzer
         }
 
         // Build forward adjacency from connections.
-        var forwardAdj = new Dictionary<Guid, List<(Guid Target, string? Outcome)>>();
+        var forwardAdj = new Dictionary<Guid, List<Edge>>();
         var reverseAdj = new Dictionary<Guid, List<Guid>>();
 
         foreach (var conn in connections)
@@ -34,7 +34,7 @@ internal static class GraphAnalyzer
                 fwd = [];
                 forwardAdj[conn.SourceStepId] = fwd;
             }
-            fwd.Add((conn.TargetStepId, conn.Outcome));
+            fwd.Add(new Edge(conn.TargetStepId, conn.Outcome, conn.SourceHandle));
 
             if (!reverseAdj.TryGetValue(conn.TargetStepId, out var rev))
             {
@@ -57,7 +57,7 @@ internal static class GraphAnalyzer
 
     private static ContainerScope AnalyzeContainer(
         Guid containerId,
-        Dictionary<Guid, List<(Guid Target, string? Outcome)>> forwardAdj,
+        Dictionary<Guid, List<Edge>> forwardAdj,
         IReadOnlySet<Guid> containerStepIds)
     {
         if (!forwardAdj.TryGetValue(containerId, out var outgoing) || outgoing.Count == 0)
@@ -65,11 +65,30 @@ internal static class GraphAnalyzer
             return new ContainerScope(new HashSet<Guid>(), new HashSet<Guid>(), null);
         }
 
-        // Collect branch entry steps — immediate successors of the container.
+        // An edge leaving the done handle names the post-loop step outright, so there is nothing
+        // to infer. Everything else leaving the container is a body branch — including edges with
+        // no handle at all, which is what connections saved before the handles existed look like.
+        Guid? doneTarget = null;
+        var bodyOutgoing = new List<Edge>(outgoing.Count);
+        foreach (var edge in outgoing)
+        {
+            if (ContainerHandles.IsDone(edge.SourceHandle))
+            {
+                // A container has one done handle, so extra done edges are a malformed graph.
+                // Take the first and let the rest fall through as body edges rather than throwing
+                // at compile time — a broken canvas should not stop the whole automation loading.
+                doneTarget ??= edge.Target;
+                continue;
+            }
+
+            bodyOutgoing.Add(edge);
+        }
+
+        // Collect branch entry steps — immediate successors of the container via the body handle.
         // These are the only steps that go into WorkflowStep.Children. Steps further
         // down the body chain are reached via outcome routing, not by being spawned
         // as additional children when the container branches.
-        var branchEntries = new HashSet<Guid>(outgoing.Select(o => o.Target));
+        var branchEntries = new HashSet<Guid>(bodyOutgoing.Select(o => o.Target));
 
         // For each branch entry, walk forward collecting all reachable steps. This
         // gives us the transitive body membership, used for convergence detection.
@@ -81,9 +100,12 @@ internal static class GraphAnalyzer
             branchReachable.Add(reachable);
         }
 
-        // Find convergence point: the first step reachable from ALL branches (but not the container itself).
-        Guid? convergenceId = null;
-        if (branchReachable.Count > 1)
+        var convergenceId = doneTarget;
+
+        // Legacy fallback: with no done edge, the post-loop step is whatever the branches converge
+        // on. This is the only way to express "after the loop" before the handles existed, so it
+        // stays supported for automations saved back then. Remove once those can no longer exist.
+        if (!convergenceId.HasValue && branchReachable.Count > 1)
         {
             // Intersection of all branch reachable sets.
             var intersection = new HashSet<Guid>(branchReachable[0]);
@@ -121,7 +143,7 @@ internal static class GraphAnalyzer
 
     private static void WalkForward(
         Guid start,
-        Dictionary<Guid, List<(Guid Target, string? Outcome)>> forwardAdj,
+        Dictionary<Guid, List<Edge>> forwardAdj,
         IReadOnlySet<Guid> containerStepIds,
         HashSet<Guid> visited)
     {
@@ -138,7 +160,7 @@ internal static class GraphAnalyzer
                 continue;
             }
 
-            foreach (var (target, _) in outgoing)
+            foreach (var (target, _, _) in outgoing)
             {
                 // Don't cross into other container boundaries.
                 if (containerStepIds.Contains(target))
@@ -157,7 +179,7 @@ internal static class GraphAnalyzer
     private static Guid? FindNearestByBfs(
         Guid start,
         HashSet<Guid> targets,
-        Dictionary<Guid, List<(Guid Target, string? Outcome)>> forwardAdj)
+        Dictionary<Guid, List<Edge>> forwardAdj)
     {
         var visited = new HashSet<Guid> { start };
         var queue = new Queue<Guid>();
@@ -172,7 +194,7 @@ internal static class GraphAnalyzer
                 continue;
             }
 
-            foreach (var (target, _) in outgoing)
+            foreach (var (target, _, _) in outgoing)
             {
                 if (targets.Contains(target))
                 {
@@ -188,6 +210,18 @@ internal static class GraphAnalyzer
 
         return null;
     }
+
+    /// <summary>
+    /// One outgoing connection, reduced to what graph analysis needs.
+    /// </summary>
+    /// <param name="Target">The step the connection points at.</param>
+    /// <param name="Outcome">The named outcome that activates the connection, if any.</param>
+    /// <param name="SourceHandle">
+    /// The canvas handle the connection leaves from. For containers this distinguishes a body edge
+    /// from a done edge (see <see cref="ContainerHandles"/>); null on connections saved before the
+    /// handles existed.
+    /// </param>
+    private readonly record struct Edge(Guid Target, string? Outcome, string? SourceHandle);
 }
 
 /// <summary>
