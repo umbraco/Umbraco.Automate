@@ -20,6 +20,10 @@ public class OpenIddictDbContext : DbContext
     {
     }
 
+    private static readonly AutomateMigrationsAssemblies MigrationsAssemblies = new(
+        SqlServer: "Umbraco.Automate.OpenIddict.Persistence.SqlServer",
+        Sqlite: "Umbraco.Automate.OpenIddict.Persistence.Sqlite");
+
     /// <summary>
     /// Configures the EF Core database provider with the correct migrations assembly.
     /// </summary>
@@ -27,72 +31,17 @@ public class OpenIddictDbContext : DbContext
         DbContextOptionsBuilder options,
         string connectionString,
         string providerName)
-    {
-        switch (providerName)
-        {
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
-                options.UseSqlServer(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.SqlServer");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                    x.EnableRetryOnFailure();
-                });
-                break;
-
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                options.UseSqlite(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.Sqlite");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
-        }
-    }
+        => AutomateDbProvider.Configure(options, connectionString, providerName, MigrationsAssemblies);
 
     /// <summary>
     /// Configures the EF Core database provider against an already-open connection owned by someone
     /// else — the ambient Umbraco scope — so writes join that connection's transaction.
     /// </summary>
-    /// <remarks>
-    /// Deliberately does not enable retry-on-failure for SQL Server: EF Core's retrying execution
-    /// strategy refuses to run inside a user-initiated transaction, which is exactly what an enlisted
-    /// context always has. Retries are the caller's business here, since the caller owns the
-    /// transaction that any retry would have to restart.
-    /// </remarks>
     internal static void ConfigureProvider(
         DbContextOptionsBuilder options,
         DbConnection connection,
         string providerName)
-    {
-        switch (providerName)
-        {
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLServer:
-                options.UseSqlServer(connection, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.SqlServer");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            case Umbraco.Cms.Core.Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                options.UseSqlite(connection, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.OpenIddict.Persistence.Sqlite");
-                    x.MigrationsHistoryTable(DatabaseConnectionInfo.MigrationsHistoryTable);
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Database provider '{providerName}' is not supported. Supported: SQL Server, SQLite.");
-        }
-    }
+        => AutomateDbProvider.Configure(options, connection, providerName, MigrationsAssemblies);
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
