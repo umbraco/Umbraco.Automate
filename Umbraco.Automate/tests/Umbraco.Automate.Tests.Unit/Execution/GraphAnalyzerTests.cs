@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Shouldly;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
@@ -374,5 +375,80 @@ public class GraphAnalyzerTests
         var scope = result[whileStep];
         scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { a }, ignoreOrder: true);
         scope.ConvergenceStepId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Analyze_MultipleDoneEdges_KeepsFirstAndWarns()
+    {
+        // The canvas allows one connection per handle, so a second done edge can only arrive via
+        // the API. The extra is dropped rather than treated as a body edge — running it per
+        // iteration is never what "done" was drawn to mean — and the drop is logged so the bad
+        // payload is visible instead of silently losing a step.
+        var whileStep = Guid.NewGuid();
+        var body = Guid.NewGuid();
+        var after = Guid.NewGuid();
+        var stray = Guid.NewGuid();
+
+        var connections = new List<StepConnection>
+        {
+            Handled(whileStep, body, "body"),
+            Handled(whileStep, after, "done"),
+            Handled(whileStep, stray, "done"),
+        };
+
+        var logger = new CapturingLogger();
+
+        var result = GraphAnalyzer.Analyze(connections, new HashSet<Guid> { whileStep }, logger);
+
+        var scope = result[whileStep];
+        scope.ConvergenceStepId.ShouldBe(after);
+        scope.BranchEntryStepIds.ShouldBe(new HashSet<Guid> { body }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldBe(new HashSet<Guid> { body }, ignoreOrder: true);
+        scope.BodyMemberStepIds.ShouldNotContain(stray);
+
+        logger.Warnings.ShouldHaveSingleItem();
+        logger.Warnings[0].ShouldContain(whileStep.ToString());
+    }
+
+    [Fact]
+    public void Analyze_SingleDoneEdge_DoesNotWarn()
+    {
+        var whileStep = Guid.NewGuid();
+        var body = Guid.NewGuid();
+        var after = Guid.NewGuid();
+
+        var connections = new List<StepConnection>
+        {
+            Handled(whileStep, body, "body"),
+            Handled(whileStep, after, "done"),
+        };
+
+        var logger = new CapturingLogger();
+
+        GraphAnalyzer.Analyze(connections, new HashSet<Guid> { whileStep }, logger);
+
+        logger.Warnings.ShouldBeEmpty();
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<string> Warnings { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+            {
+                Warnings.Add(formatter(state, exception));
+            }
+        }
     }
 }
