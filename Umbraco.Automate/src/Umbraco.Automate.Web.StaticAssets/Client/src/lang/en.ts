@@ -175,6 +175,8 @@ export default {
             `Are you sure you want to delete ${count} workspace(s)?`,
         serviceAccountKey: "Service Account Key",
         serviceAccountDescription: "The API user identity used when running automations in this workspace.",
+        serviceAccountUnresolved:
+            "The previously configured service account no longer exists (e.g. after a Deploy import that didn't include the API user). Choose one to fix this.",
         userGroups: "User Groups",
         userGroupsDescription: "User groups that have access to automations in this workspace.",
         allowedConnections: "Allowed Connections",
