@@ -22,6 +22,13 @@ public enum AutomationRunStatus
 
     /// <summary>Run was cancelled.</summary>
     Cancelled = 5,
+
+    /// <summary>
+    /// A human refused an approval somewhere in the run. Terminal, and deliberately distinct from
+    /// <see cref="Failed"/>: nothing errored, someone said no. Steps on the rejected path still run,
+    /// so a rejected run may have done real work — a notification, an unpublish — before finishing.
+    /// </summary>
+    Rejected = 6,
 }
 
 /// <summary>
@@ -49,4 +56,11 @@ public enum StepRunStatus
 
     /// <summary>Step is durably sleeping for a configured duration.</summary>
     Sleeping = 6,
+
+    /// <summary>
+    /// An approval step whose decision was a refusal. Terminal and successful in the sense that the
+    /// step did its job — it obtained a decision — so it is not <see cref="Failed"/>. Recorded on the
+    /// step so the run status can be derived without re-reading step output.
+    /// </summary>
+    Rejected = 7,
 }

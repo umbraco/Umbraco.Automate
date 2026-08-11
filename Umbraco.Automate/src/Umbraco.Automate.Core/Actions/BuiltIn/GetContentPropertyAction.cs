@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -38,6 +39,7 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
     private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly IContentValueNormaliser _normaliser;
     private readonly IAutomationActionAuthorizer _authorizer;
+    private readonly IVariationContextAccessor _variationContextAccessor;
     private readonly ILogger<GetContentPropertyAction> _logger;
 
     /// <summary>
@@ -49,6 +51,7 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
         IUmbracoContextFactory umbracoContextFactory,
         IContentValueNormaliser normaliser,
         IAutomationActionAuthorizer authorizer,
+        IVariationContextAccessor variationContextAccessor,
         ILogger<GetContentPropertyAction> logger)
         : base(infrastructure)
     {
@@ -56,6 +59,7 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
         _umbracoContextFactory = umbracoContextFactory;
         _normaliser = normaliser;
         _authorizer = authorizer;
+        _variationContextAccessor = variationContextAccessor;
         _logger = logger;
     }
 
@@ -115,6 +119,11 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
                 Culture = culture,
             });
         }
+
+        // Property reads need an ambient VariationContext to resolve the culture and segment
+        // they were not given. There is none on the automation thread, and a null segment is
+        // rejected by the published cache. See EnterVariationContext.
+        using var variationScope = _variationContextAccessor.EnterVariationContext(culture);
 
         var value = _normaliser.ReadProperty(content, settings.PropertyAlias, culture);
 

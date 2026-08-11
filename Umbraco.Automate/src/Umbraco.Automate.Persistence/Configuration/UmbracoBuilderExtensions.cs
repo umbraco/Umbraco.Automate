@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -42,19 +43,49 @@ public static partial class UmbracoBuilderExtensions
         // Resolve the connection string lazily inside the factory (run time), not here at
         // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
         // ConnectionStrings options pipeline, which has not run yet during AddComposers().
-        builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>((serviceProvider, options, _, _) =>
-        {
-            var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
-                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                serviceProvider.GetRequiredService<IConfiguration>());
-            UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
+        //
+        // shareUmbracoConnection: false — Automate defaults to its own database, and even when it is
+        // pointed at umbracoDbDSN nothing here resolves an IEfCoreScope<UmbracoAutomateDbContext>.
+        // Sharing the ambient connection is handled by AmbientAutomateDbContextFactory below, which
+        // decides per call rather than once at composition time.
+        builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
+            (IServiceProvider serviceProvider, DbContextOptionsBuilder options, string? _, string? _) =>
+            {
+                var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                    serviceProvider.GetRequiredService<IConfiguration>());
+                UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
 
-            // Defer writes on this (DI-resolved) context until Automate's own startup migrations
-            // have completed. The migration handler's own standalone context is configured
-            // separately, via the same ConfigureProvider call, and is deliberately not gated here.
-            options.AddInterceptors(new AutomateReadinessInterceptor(
-                serviceProvider.GetRequiredService<AutomateReadinessSignal>()));
-        });
+                // Defer writes on this (DI-resolved) context until Automate's own startup migrations
+                // have completed. The migration handler's own standalone context is configured
+                // separately, via the same ConfigureProvider call, and is deliberately not gated here.
+                options.AddInterceptors(new AutomateReadinessInterceptor(
+                    serviceProvider.GetRequiredService<AutomateReadinessSignal>()));
+            },
+            shareUmbracoConnection: false);
+
+        // Decorate the pooled factory so that when Automate is pointed at the Umbraco CMS database
+        // (Umbraco:Automate:UseNamedConnectionString: umbracoDbDSN — the required setting on Umbraco
+        // Cloud, where the CMS connection string is not user-editable) its reads and writes join the
+        // ambient Umbraco transaction instead of opening a second connection to the same database.
+        // On SQLite a second connection cannot get the write lock the ambient scope is holding, which
+        // deadlocks any caller that keeps a transaction open across an Automate write — Umbraco
+        // Deploy's restore being the reported case. See AmbientDbContextFactory.
+        builder.Services.EnlistDbContextFactoryInAmbientScope(
+            (serviceProvider, connection, providerName) =>
+            {
+                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
+                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
+
+                // Mirrors the interceptor on the pooled factory, so a write is gated on Automate's
+                // startup migrations whichever path it takes — but with a timeout, because this path
+                // waits while holding the caller's transaction (and on SQLite, its write lock).
+                options.AddInterceptors(new AutomateReadinessInterceptor(
+                    serviceProvider.GetRequiredService<AutomateReadinessSignal>(),
+                    AutomateReadinessInterceptor.EnlistedWaitTimeout));
+
+                return new UmbracoAutomateDbContext(options.Options);
+            });
 
         builder.Services.AddSingleton<AutomationFactory>();
         builder.Services.AddSingleton<ConnectionFactory>();
@@ -77,7 +108,16 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
         builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
 
-        // Run pending EF Core migrations on startup.
+        builder.Services.AddSingleton<IAutomateSchemaInitializer, AutomateSchemaInitializer>();
+
+        // Run pending EF Core migrations during component initialization, which both boot paths do
+        // immediately before publishing UmbracoApplicationStartingNotification. That puts the schema
+        // in place before any Starting handler can query it — notably Umbraco Deploy's boot-time
+        // restore. See AutomateSchemaComponent for why a Started handler was too late.
+        builder.Components().Append<AutomateSchemaComponent>();
+
+        // Safety net for any boot path that does not initialize components first. No-op once the
+        // component above has run.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();
 
         // Recover runs stuck in Running/Pending from the previous process.

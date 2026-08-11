@@ -298,6 +298,7 @@ export default function AutomationCanvas({
                         case "trigger": return "#6366f1";
                         case "if": return "#f59e0b";
                         case "switch": return "#8b5cf6";
+                        case "approval": return "#0ea5e9";
                         default: return "#3b82f6";
                     }
                 }}

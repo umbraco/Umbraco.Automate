@@ -80,7 +80,7 @@ public static class EditableModelSchemaBuilder
             Label = attr?.Label ?? $"#uaFields_{modelKey}{property.Name}Label",
             PropertyType = property.PropertyType,
             Description = attr?.Description ?? $"#uaFields_{modelKey}{property.Name}Description",
-            EditorUiAlias = attr?.EditorUiAlias ?? InferEditorUiAlias(property.PropertyType),
+            EditorUiAlias = attr?.EditorUiAlias ?? InferEditorUiAlias(property.PropertyType, attr?.IsSensitive ?? false),
             EditorConfig = attr?.EditorConfig,
             DefaultValue = defaultValue,
             SortOrder = attr?.SortOrder ?? 0,
@@ -97,15 +97,29 @@ public static class EditableModelSchemaBuilder
     /// Picks a default Umbraco property editor UI alias from the CLR type so settings
     /// without an explicit <see cref="EditableModelFieldAttribute.EditorUiAlias"/> still
     /// render the right editor (numeric fields get a number input, booleans get a toggle,
-    /// dates get a date picker). The attribute always wins when set.
+    /// dates get a date picker, sensitive strings get a masked editor). The attribute
+    /// always wins when set.
     /// </summary>
-    private static string InferEditorUiAlias(Type type)
+    /// <remarks>
+    /// Masking is decided here rather than flagged to the client so the rule lives in one
+    /// testable place and rendering never has to read <c>IsSensitive</c> — the same approach
+    /// already taken for <c>IsRequired</c>. A settings author who wants a sensitive field
+    /// rendered some other way sets <see cref="EditableModelFieldAttribute.EditorUiAlias"/>,
+    /// which the caller checks first and so always wins; that is the escape hatch for a
+    /// sensitive field masking would make unusable, such as the JSON headers on
+    /// <c>HttpRequestSettings</c>.
+    /// </remarks>
+    private static string InferEditorUiAlias(Type type, bool isSensitive)
     {
+        // Registered by the frontend static assets. Kept in step with SENSITIVE_FIELD_UI_ALIAS
+        // in Client/src/core/components/sensitive-field/manifests.ts.
+        const string sensitiveFieldAlias = "Umb.Automate.SensitiveField";
+
         var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
 
         if (underlyingType == typeof(string))
         {
-            return "Umb.PropertyEditorUi.TextBox";
+            return isSensitive ? sensitiveFieldAlias : "Umb.PropertyEditorUi.TextBox";
         }
 
         if (underlyingType == typeof(int) || underlyingType == typeof(long))
@@ -128,7 +142,8 @@ public static class EditableModelSchemaBuilder
             return "Umb.PropertyEditorUi.DatePicker";
         }
 
-        return "Umb.PropertyEditorUi.TextBox";
+        // Anything else falls back to a text box, so keep the sensitive pairing here too.
+        return isSensitive ? sensitiveFieldAlias : "Umb.PropertyEditorUi.TextBox";
     }
 
     private static IEnumerable<ValidationAttribute> InferValidationAttributes(PropertyInfo property)

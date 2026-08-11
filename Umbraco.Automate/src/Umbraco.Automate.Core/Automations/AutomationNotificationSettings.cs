@@ -70,6 +70,9 @@ public enum NotifyOn
     /// <summary>Notify when a suspended run resumes (Suspended → Running).</summary>
     Resumed = 128,
 
+    /// <summary>Notify when a run ends because a human refused an approval.</summary>
+    Rejected = 256,
+
     /// <summary>Notify on both failure and suspension.</summary>
     FailedOrSuspended = Failed | Suspended,
 }
