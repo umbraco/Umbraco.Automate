@@ -1,0 +1,43 @@
+# LOCKED template — the per-repo caller for the loop-dispatch reusable workflow.
+# Commit verbatim to each target repo as `.github/workflows/loop-dispatch.yml`.
+# It declares every loop event (issue labels + PR labels — Actions has no
+# event-type-mixing limit, unlike the routines UI) and calls the reusable workflow in
+# umbraco-ai-ops, which routes at the edge and fires the repo's routine only on a real
+# match. The two secrets carry everything repo-specific.
+#
+# CROSS-REPO ISSUES: commit this in a repo whose issues live in a SEPARATE code repo
+# (e.g. Umbraco.Forms.Issues) and set `with.target_repo` to that code repo — the router
+# then emits `target=<code repo>` and the routine works there while reading the issue
+# here. Same-repo consumers (Automate) omit `target_repo` entirely.
+#
+# PR labels use `pull_request_target`, NOT `pull_request`: `pull_request` resolves the
+# workflow from the PR's BASE branch, and our loop PRs target `dev` (a non-default
+# branch), where GitHub does not fire the `labeled` trigger. `pull_request_target` always
+# runs from the base repo's DEFAULT branch, WITH secrets, regardless of the PR's base — so
+# `ops/auto-merge` / `ops/auto-rework` fire on dev-based PRs. It's safe here because this caller
+# never checks out or executes PR head code — it only forwards event metadata to the
+# reusable workflow, which routes on the payload and checks out trusted umbraco-ai-ops.
+#
+# Requires two secrets on the repo (or the org):
+#   LOOP_DISPATCH_FIRE_URL  — the routine's Fire URL (Routines UI → Call via API)
+#   LOOP_DISPATCH_TOKEN     — the token generated for that routine
+name: loop-dispatch
+
+on:
+  issues:
+    types: [labeled]
+  pull_request_target:
+    types: [labeled]
+
+jobs:
+  dispatch:
+    uses: umbraco/umbraco-ai-ops/.github/workflows/loop-dispatch.yml@main
+    # For a cross-repo issues repo (see header), uncomment and set the code repo:
+    # with:
+    #   target_repo: umbraco/Umbraco.Forms
+    # Pass secrets explicitly rather than `secrets: inherit` — inherit only forwards when
+    # the caller and the reusable workflow share an org, so being explicit keeps this
+    # working even for a consumer in a different org and makes the secret flow visible.
+    secrets:
+      LOOP_DISPATCH_FIRE_URL: ${{ secrets.LOOP_DISPATCH_FIRE_URL }}
+      LOOP_DISPATCH_TOKEN: ${{ secrets.LOOP_DISPATCH_TOKEN }}

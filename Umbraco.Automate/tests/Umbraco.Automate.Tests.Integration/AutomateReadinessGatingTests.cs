@@ -37,11 +37,13 @@ public class AutomateReadinessGatingTests : IDisposable
         context.Database.EnsureCreated();
     }
 
-    private UmbracoAutomateDbContext CreateContext(AutomateReadinessSignal readinessSignal)
+    private UmbracoAutomateDbContext CreateContext(
+        AutomateReadinessSignal readinessSignal,
+        TimeSpan? waitTimeout = null)
     {
         var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>()
             .UseSqlite(_connectionString)
-            .AddInterceptors(new AutomateReadinessInterceptor(readinessSignal))
+            .AddInterceptors(new AutomateReadinessInterceptor(readinessSignal, waitTimeout))
             .Options;
 
         return new UmbracoAutomateDbContext(options);
@@ -58,6 +60,26 @@ public class AutomateReadinessGatingTests : IDisposable
             new ActionCollection(Array.Empty<IAction>),
             new TriggerCollection(Array.Empty<ITrigger>),
             new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
+    }
+
+    /// <summary>
+    /// The enlisted path waits with a timeout, because it waits while holding the caller's transaction
+    /// — and on SQLite that transaction holds the single per-file write lock, so waiting forever there
+    /// stalls every writer on the site instead of one query. Giving up fails the caller's transaction,
+    /// which rolls back and releases the lock.
+    /// </summary>
+    [Fact]
+    public async Task SaveAsync_ShouldGiveUp_WhenAnEnlistedWaitExceedsItsTimeout()
+    {
+        var neverSignalled = new AutomateReadinessSignal();
+        var repository = new EFCoreAutomationRepository(
+            new TestDbContextFactory(() => CreateContext(neverSignalled, TimeSpan.FromMilliseconds(50))),
+            CreateAutomationFactory());
+
+        await Should.ThrowAsync<AutomateNotReadyException>(
+            () => repository.SaveAsync(new AutomationBuilder().WithAlias("timed-out").Build()));
+
+        neverSignalled.IsReady.ShouldBeFalse();
     }
 
     [Fact]

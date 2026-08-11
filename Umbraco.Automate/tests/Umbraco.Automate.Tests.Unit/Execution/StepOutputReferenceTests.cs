@@ -98,6 +98,87 @@ public class StepOutputReferenceTests
         resolved.ShouldBe(stepRunId);
     }
 
+    [Fact]
+    public void CreateInlineOrTriggerMarker_OutputAtThreshold_InlinesTheDictionaryItself()
+    {
+        var json = PadJson("""{"country":"DK"}""", targetBytes: 256);
+        var triggerOutput = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["country"] = "DK" };
+
+        var result = StepOutputReference.CreateInlineOrTriggerMarker(
+            triggerOutput, json, Guid.NewGuid(), maxInlineBytes: 256);
+
+        // Inlined untouched — the same instance, not a serialize/deserialize round-trip.
+        result.ShouldBeSameAs(triggerOutput);
+        result.ShouldNotContainKey(StepOutputReference.TriggerMarkerKey);
+    }
+
+    [Fact]
+    public void CreateInlineOrTriggerMarker_OutputOneByteOverThreshold_StoresMarker()
+    {
+        var runId = Guid.NewGuid();
+        var json = PadJson("""{"country":"DK"}""", targetBytes: 257);
+        var triggerOutput = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["country"] = "DK" };
+
+        var result = StepOutputReference.CreateInlineOrTriggerMarker(
+            triggerOutput, json, runId, maxInlineBytes: 256);
+
+        result.Count.ShouldBe(1);
+        result.ShouldNotContainKey("country");
+        StepOutputReference.TryGetTriggerRunId(result, out var resolved).ShouldBeTrue();
+        resolved.ShouldBe(runId);
+    }
+
+    [Fact]
+    public void TriggerAndStepMarkers_AreNeverMistakenForOneAnother()
+    {
+        // The two marker kinds reference different records (a run vs a step run), so detection
+        // of one must reject the other outright.
+        var stepMarker = StepOutputReference.CreateMarker(Guid.NewGuid());
+        var triggerMarker = StepOutputReference.CreateTriggerMarker(Guid.NewGuid());
+
+        StepOutputReference.TryGetTriggerRunId(stepMarker, out _).ShouldBeFalse();
+        StepOutputReference.TryGetStepRunId(triggerMarker, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TryGetTriggerRunId_RealTriggerOutput_IsNotAMarker()
+    {
+        var triggerOutput = new Dictionary<string, object?> { ["country"] = "DK" };
+
+        StepOutputReference.TryGetTriggerRunId(triggerOutput, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TryGetTriggerRunId_MarkerKeyWithNonGuidValue_IsNotAMarker()
+    {
+        var dict = new Dictionary<string, object?> { [StepOutputReference.TriggerMarkerKey] = "not-a-guid" };
+
+        StepOutputReference.TryGetTriggerRunId(dict, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TriggerMarker_SurvivesWorkflowCorePersistenceRoundTrip()
+    {
+        var settings = new JsonSerializerSettings
+        {
+            TypeNameHandling = TypeNameHandling.All,
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+        };
+
+        var runId = Guid.NewGuid();
+        var data = new AutomationWorkflowData
+        {
+            RunId = runId,
+            TriggerOutput = StepOutputReference.CreateTriggerMarker(runId),
+        };
+
+        var json = JsonConvert.SerializeObject(data, settings);
+        var rehydrated = JsonConvert.DeserializeObject<AutomationWorkflowData>(json, settings)!;
+
+        StepOutputReference.TryGetTriggerRunId(rehydrated.TriggerOutput, out var resolved).ShouldBeTrue();
+        resolved.ShouldBe(runId);
+    }
+
     /// <summary>
     /// Pads a JSON object with a filler property so its UTF-8 byte count lands exactly
     /// on <paramref name="targetBytes"/>.

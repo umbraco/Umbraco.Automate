@@ -142,7 +142,7 @@ export type AutomationRunResponseModel = {
     stepRuns: Array<StepRunResponseModel>;
 };
 
-export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Suspended' | 'Cancelled';
+export type AutomationRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Suspended' | 'Cancelled' | 'Rejected';
 
 export type AutomationStatusModel = 'Draft' | 'Published' | 'Unpublished';
 
@@ -344,7 +344,7 @@ export type NotificationChannelItemResponseModel = {
     settingsSchema?: EditableModelSchemaModel | null;
 };
 
-export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered' | 'Disabled' | 'Warning' | 'ReEnabled' | 'Resumed';
+export type NotifyOnModel = 'Never' | 'Failed' | 'Suspended' | 'FailedOrSuspended' | 'Completed' | 'Recovered' | 'Disabled' | 'Warning' | 'ReEnabled' | 'Resumed' | 'Rejected';
 
 export type PagedAutomationItemResponseModel = {
     total: number;
@@ -454,7 +454,7 @@ export type StepRunResponseModel = {
     durationMs?: number | null;
 };
 
-export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput' | 'Sleeping';
+export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput' | 'Sleeping' | 'Rejected';
 
 export type StepTypeItemResponseModel = {
     alias: string;
