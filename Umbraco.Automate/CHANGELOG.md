@@ -5,6 +5,22 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.3.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@18.2.0...Umbraco.Automate@18.3.0) (2026-08-19)
+
+### feat
+
+* **ui:** Add body and done ports to container control flow nodes ([f352f2b](https://github.com/umbraco/Umbraco.Automate/commit/f352f2b0633abf41056747cdf7b56890a17667cf))
+
+### fix
+
+* **core:** Address Copilot review feedback on startup connection fallback ([5bcefba](https://github.com/umbraco/Umbraco.Automate/commit/5bcefba3e7e4b17bc9c61428586d91594dc8afc7))
+* **core:** Avoid false-alarm error log on workflow lock acquire race ([941819a](https://github.com/umbraco/Umbraco.Automate/commit/941819a5259dab5a3e447111a24fde082542c056)), closes [#224](https://github.com/umbraco/Umbraco.Automate/issues/224)
+* **core:** Derive lock table/column names from EF metadata, not literals ([2eef4a0](https://github.com/umbraco/Umbraco.Automate/commit/2eef4a0f0c116aa8a957b9f64db9c9e0286657ac))
+* **core:** Do not throw when no connection string is configured at startup ([7177b9d](https://github.com/umbraco/Umbraco.Automate/commit/7177b9d0d8fac84acf23af29dfc5b8120df41e1c)), closes [#226](https://github.com/umbraco/Umbraco.Automate/issues/226)
+* **core:** Warn when a container has multiple done connections ([fda76fa](https://github.com/umbraco/Umbraco.Automate/commit/fda76fa59ad9beee684d65859cea7f2d969d0371))
+* **ui:** Allow multiple branches from a Parallel container's body handle ([09152fe](https://github.com/umbraco/Umbraco.Automate/commit/09152fe1921562f5cb71df1641d769f75a8fe595))
+* **ui:** Drop workspace user groups that no longer resolve ([ab2e6fd](https://github.com/umbraco/Umbraco.Automate/commit/ab2e6fd73d944c9f01398ec18ea08aef5260b1d0)), closes [#228](https://github.com/umbraco/Umbraco.Automate/issues/228)
+
 ## [18.2.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@18.1.0...Umbraco.Automate@18.2.0) (2026-08-10)
 
 ### ⚠ BREAKING CHANGE
