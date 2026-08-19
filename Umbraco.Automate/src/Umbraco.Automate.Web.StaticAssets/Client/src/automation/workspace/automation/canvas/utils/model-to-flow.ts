@@ -12,6 +12,7 @@ const DEFAULT_TRIGGER_POSITION = { x: 250, y: 50 };
 const IF_ALIAS = "umbracoAutomate.if";
 const SWITCH_ALIAS = "umbracoAutomate.switch";
 const APPROVAL_ALIAS = "umbracoAutomate.requestApproval";
+export const PARALLEL_ALIAS = "umbracoAutomate.parallel";
 
 /**
  * Control flow steps that own a body of steps. They render as ContainerNode, which carries a
@@ -20,7 +21,7 @@ const APPROVAL_ALIAS = "umbracoAutomate.requestApproval";
 const CONTAINER_ALIASES = new Set([
     "umbracoAutomate.while",
     "umbracoAutomate.forEach",
-    "umbracoAutomate.parallel",
+    PARALLEL_ALIAS,
 ]);
 
 /**
