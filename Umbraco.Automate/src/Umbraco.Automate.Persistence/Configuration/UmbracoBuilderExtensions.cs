@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.Core;
@@ -167,12 +168,15 @@ internal static class AutomatePooledDbContextOptions
         catch (InvalidOperationException ex)
         {
             (connectionString, providerName) = DatabaseConnectionInfo.PlaceholderConnection;
-            serviceProvider.GetRequiredService<ILoggerFactory>()
+
+            // GetService, not GetRequiredService: this catch block exists so a missing connection
+            // string can never crash the host, so logging it must not risk crashing the host either.
+            (serviceProvider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance)
                 .CreateLogger("Umbraco.Automate.Extensions.UmbracoBuilderExtensions")
                 .LogWarning(
                     ex,
                     "Umbraco Automate has no database connection string configured yet. Automate will " +
-                    "remain inactive until one becomes available and the site reaches RuntimeLevel.Run.");
+                    "remain inactive until one is configured and the host restarts into RuntimeLevel.Run.");
         }
 
         UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
