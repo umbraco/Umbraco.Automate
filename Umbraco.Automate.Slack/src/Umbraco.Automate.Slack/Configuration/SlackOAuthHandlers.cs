@@ -41,6 +41,7 @@ internal static class SlackOAuthHandlers
         OverrideAuthorizationEndpoint.Descriptor,
         AttachUserScopeParameter.Descriptor,
         OverrideTokenEndpoint.Descriptor,
+        OverrideTokenEndpointClientAuthenticationMethod.Descriptor,
         DisableBackchannelIdentityToken.Descriptor,
         DisableUserInfoRetrieval.Descriptor,
         ExtractUserAccessToken.Descriptor,
@@ -151,6 +152,41 @@ internal static class SlackOAuthHandlers
             if (IsSlack(context.Registration))
             {
                 context.TokenEndpoint = new Uri("https://slack.com/api/oauth.v2.access", UriKind.Absolute);
+            }
+
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>
+    /// Forces <c>client_secret_post</c> as the token endpoint client authentication method for Slack.
+    /// </summary>
+    /// <remarks>
+    /// The built-in <see cref="OpenIddictClientHandlers.AttachTokenEndpointClientAuthenticationMethod"/>
+    /// negotiates the authentication method from Slack's OIDC discovery document, which still describes
+    /// the abandoned <c>openid.connect.token</c> endpoint and resolves to <c>client_secret_basic</c>.
+    /// <see cref="OverrideTokenEndpoint"/> only redirects the request URL to the V2 REST endpoint
+    /// (<c>oauth.v2.access</c>) — it doesn't re-negotiate the authentication method to match. Slack's V2
+    /// endpoint only reads <c>client_secret</c> from the request body, not from a Basic auth header, so
+    /// the secret is silently dropped and Slack rejects the exchange with <c>bad_client_secret</c> even
+    /// when the configured secret is correct.
+    /// </remarks>
+    internal sealed class OverrideTokenEndpointClientAuthenticationMethod : IOpenIddictClientHandler<ProcessAuthenticationContext>
+    {
+        public static OpenIddictClientHandlerDescriptor Descriptor { get; }
+            = OpenIddictClientHandlerDescriptor.CreateBuilder<ProcessAuthenticationContext>()
+                .UseSingletonHandler<OverrideTokenEndpointClientAuthenticationMethod>()
+                // Run after the built-in negotiation so this overrides its result.
+                .SetOrder(OpenIddictClientHandlers
+                    .AttachTokenEndpointClientAuthenticationMethod.Descriptor.Order + 1)
+                .Build();
+
+        public ValueTask HandleAsync(ProcessAuthenticationContext context)
+        {
+            if (IsSlack(context.Registration))
+            {
+                context.TokenEndpointClientAuthenticationMethod =
+                    OpenIddictConstants.ClientAuthenticationMethods.ClientSecretPost;
             }
 
             return ValueTask.CompletedTask;
