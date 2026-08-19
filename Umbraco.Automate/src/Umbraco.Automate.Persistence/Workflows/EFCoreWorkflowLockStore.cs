@@ -49,27 +49,20 @@ internal sealed class EFCoreWorkflowLockStore : IWorkflowLockStore
         }
 
         // No row affected: either the id is live (held by someone else) or has never been seen
-        // before. Only the latter can be resolved by inserting — the PK guards a race between two
-        // processes both attempting this for the first time.
-        db.WorkflowLocks.Add(new WorkflowLockEntity
-        {
-            LockId = lockId,
-            OwnerToken = ownerToken,
-            AcquiredUtc = nowUtc,
-            ExpiresUtc = expiresUtc,
-        });
+        // before. Only the latter can be resolved by inserting. Two processes can reach this point
+        // for the same never-seen id at once, so the insert is conditional on the row still being
+        // absent rather than a plain INSERT relying on the PK to reject the loser — an EF Core
+        // SaveChangesAsync failure logs at Error before the caller ever sees the exception, which
+        // would turn this ordinary, expected race into a false-alarm error log on every occurrence.
+        var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO [umbracoAutomateWorkflowLock] ([LockId], [AcquiredUtc], [ExpiresUtc], [OwnerToken])
+            SELECT {lockId}, {nowUtc}, {expiresUtc}, {ownerToken}
+            WHERE NOT EXISTS (SELECT 1 FROM [umbracoAutomateWorkflowLock] WHERE [LockId] = {lockId})
+            """,
+            cancellationToken);
 
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            // Row already exists and is live — someone else holds the lock.
-            return false;
-        }
-
-        return true;
+        return inserted > 0;
     }
 
     public async Task ReleaseAsync(string lockId, Guid ownerToken, CancellationToken cancellationToken)
