@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Persistence.Scoping;
 
@@ -49,27 +52,45 @@ internal sealed class EFCoreWorkflowLockStore : IWorkflowLockStore
         }
 
         // No row affected: either the id is live (held by someone else) or has never been seen
-        // before. Only the latter can be resolved by inserting — the PK guards a race between two
-        // processes both attempting this for the first time.
-        db.WorkflowLocks.Add(new WorkflowLockEntity
-        {
-            LockId = lockId,
-            OwnerToken = ownerToken,
-            AcquiredUtc = nowUtc,
-            ExpiresUtc = expiresUtc,
-        });
+        // before. Only the latter can be resolved by inserting. Two processes can reach this point
+        // for the same never-seen id at once, so the insert is conditional on the row still being
+        // absent rather than a plain INSERT relying on the PK to reject the loser — an EF Core
+        // SaveChangesAsync failure logs at Error before the caller ever sees the exception, which
+        // would turn this ordinary, expected race into a false-alarm error log on every occurrence.
+        var sql = BuildConditionalInsertSql(db);
+        var inserted = await db.Database.ExecuteSqlRawAsync(
+            sql, [lockId, nowUtc, expiresUtc, ownerToken], cancellationToken);
 
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            // Row already exists and is live — someone else holds the lock.
-            return false;
-        }
+        return inserted > 0;
+    }
 
-        return true;
+    /// <summary>
+    /// Builds the conditional insert against <see cref="WorkflowLockEntity"/>'s table/column names as
+    /// EF's model currently maps them (rather than hard-coded literals), so a future rename of the
+    /// entity or its mapping cannot silently desync this raw SQL from the schema it targets. Only
+    /// identifiers are spliced into the SQL text; the four values are passed as provider parameters
+    /// via the numbered placeholders that <see cref="DatabaseFacade.ExecuteSqlRawAsync(string, object[], CancellationToken)"/> substitutes.
+    /// </summary>
+    private static string BuildConditionalInsertSql(UmbracoAutomateDbContext db)
+    {
+        var entityType = db.Model.FindEntityType(typeof(WorkflowLockEntity))!;
+        var storeObject = StoreObjectIdentifier.Create(entityType, StoreObjectType.Table)!.Value;
+        var sqlHelper = db.GetService<ISqlGenerationHelper>();
+
+        string Column(string propertyName) =>
+            sqlHelper.DelimitIdentifier(entityType.FindProperty(propertyName)!.GetColumnName(storeObject)!);
+
+        var table = sqlHelper.DelimitIdentifier(entityType.GetTableName()!, entityType.GetSchema());
+        var lockIdColumn = Column(nameof(WorkflowLockEntity.LockId));
+        var acquiredColumn = Column(nameof(WorkflowLockEntity.AcquiredUtc));
+        var expiresColumn = Column(nameof(WorkflowLockEntity.ExpiresUtc));
+        var ownerColumn = Column(nameof(WorkflowLockEntity.OwnerToken));
+
+        return $$"""
+            INSERT INTO {{table}} ({{lockIdColumn}}, {{acquiredColumn}}, {{expiresColumn}}, {{ownerColumn}})
+            SELECT {0}, {1}, {2}, {3}
+            WHERE NOT EXISTS (SELECT 1 FROM {{table}} WHERE {{lockIdColumn}} = {0})
+            """;
     }
 
     public async Task ReleaseAsync(string lockId, Guid ownerToken, CancellationToken cancellationToken)
