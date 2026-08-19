@@ -5,7 +5,7 @@ import { UMB_MODAL_MANAGER_CONTEXT, UMB_CONFIRM_MODAL } from "@umbraco-cms/backo
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
-import { modelToNodes, modelToEdges, TRIGGER_NODE_ID } from "../canvas/utils/model-to-flow.js";
+import { modelToNodes, modelToEdges, TRIGGER_NODE_ID, BODY_HANDLE, PARALLEL_ALIAS } from "../canvas/utils/model-to-flow.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
 import type { CanvasState, CanvasChangeDetail, CatalogueLookupEntry, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
@@ -333,15 +333,23 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             // Auto-connect when the node was created by dragging from a handle.
             if (event.detail.connectFrom) {
                 const { sourceStepId, sourceHandle } = event.detail.connectFrom;
+                const normalisedSourceId = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
                 const newConnection = {
-                    sourceStepId: sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId,
+                    sourceStepId: normalisedSourceId,
                     sourceHandle: sourceHandle ?? null,
                     targetStepId: newStepId,
                     targetHandle: null,
                     outcome: sourceHandle ?? null,
                     filter: null,
                 };
-                const updatedConnections = [...this._model.connections, newConnection];
+                // Each handle carries one outgoing connection, replaced by a new one — except a
+                // Parallel branch, which adds alongside its existing branches instead.
+                const previousConnections = this.#isParallelBranchHandle(sourceStepId, sourceHandle ?? null)
+                    ? this._model.connections
+                    : this._model.connections.filter(
+                          (c) => !(c.sourceStepId === normalisedSourceId && (c.sourceHandle ?? null) === (sourceHandle ?? null)),
+                      );
+                const updatedConnections = [...previousConnections, newConnection];
                 this.#workspaceContext?.updateProperty("connections", updatedConnections);
             } else if (event.detail.insertBetween) {
                 // Splice the new step onto an existing edge: A→B becomes A→new→B.
@@ -441,6 +449,16 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
 
         return `${baseName}${Date.now()}`;
+    }
+
+    /**
+     * Parallel's body handle fans out to many branches, so unlike every other handle (a single
+     * outgoing edge, e.g. done, or an If/Switch case) it must accept more than one connection.
+     */
+    #isParallelBranchHandle(sourceStepId: string, sourceHandle: string | null): boolean {
+        if (sourceHandle !== BODY_HANDLE) return false;
+        const sourceStep = this._model?.steps.find((s) => s.id === sourceStepId);
+        return sourceStep?.actionAlias === PARALLEL_ALIAS;
     }
 
     async #onEdgeFilterOpen(event: CustomEvent<EdgeFilterOpenDetail>) {

@@ -100,3 +100,9 @@ refs/
 # Generated appsettings JSON schemas (build artifacts produced by the
 # GenerateAppsettingsSchema target — never committed so they can't go stale)
 appsettings-schema.Umbraco.Automate*.json
+
+# Superpowers brainstorming scratch
+.superpowers/
+
+# Local before/after screenshots
+.screenshots/
