@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.Core;
@@ -49,19 +51,7 @@ public static partial class UmbracoBuilderExtensions
         // Sharing the ambient connection is handled by AmbientAutomateDbContextFactory below, which
         // decides per call rather than once at composition time.
         builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-            (IServiceProvider serviceProvider, DbContextOptionsBuilder options, string? _, string? _) =>
-            {
-                var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
-                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                    serviceProvider.GetRequiredService<IConfiguration>());
-                UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
-
-                // Defer writes on this (DI-resolved) context until Automate's own startup migrations
-                // have completed. The migration handler's own standalone context is configured
-                // separately, via the same ConfigureProvider call, and is deliberately not gated here.
-                options.AddInterceptors(new AutomateReadinessInterceptor(
-                    serviceProvider.GetRequiredService<AutomateReadinessSignal>()));
-            },
+            AutomatePooledDbContextOptions.Configure,
             shareUmbracoConnection: false);
 
         // Decorate the pooled factory so that when Automate is pointed at the Umbraco CMS database
@@ -125,5 +115,76 @@ public static partial class UmbracoBuilderExtensions
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, StuckRunRecoveryNotificationHandler>();
 
         return builder;
+    }
+}
+
+/// <summary>
+/// Configures the pooled <see cref="UmbracoAutomateDbContext"/> factory's options.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Not nested in <see cref="UmbracoBuilderExtensions"/>: that name is a
+/// <see langword="partial"/> class repeated (as a distinct type) in both
+/// <c>Umbraco.Automate.Core</c> and <c>Umbraco.Automate.Persistence</c>, which is fine for extension
+/// methods invoked through instance syntax but makes a direct, unqualified reference to the type
+/// itself ambiguous for any assembly that ends up referencing both — as the integration tests here
+/// do. A distinctly-named type sidesteps that.
+/// </para>
+/// <para>
+/// Resolve the connection string lazily inside the factory (run time), not at composition time:
+/// hosts like Umbraco Cloud / Deploy synthesise the DSN through the ConnectionStrings options
+/// pipeline, which has not run yet during AddComposers(). But "lazily" only reaches as far as
+/// <c>AddPooledDbContextFactory</c> allows — it builds this delegate's
+/// <see cref="DbContextOptionsBuilder"/> the moment something first resolves
+/// <c>IDbContextFactory&lt;UmbracoAutomateDbContext&gt;</c>, not per <c>CreateDbContext()</c> call.
+/// Automate's own background services (the outbox dispatcher, the WorkflowCore host, ...) are
+/// <c>IHostedService</c>s whose constructors reach that factory, and the generic host resolves every
+/// <c>IHostedService</c>'s constructor graph at <c>Host.StartAsync</c> — before Umbraco's runtime
+/// level is known. A genuinely unconfigured connection string (a fresh, not-yet-installed site; an
+/// ephemeral CI boot serving only <c>swagger.json</c>) must not throw here, unlike
+/// <see cref="AutomateSchemaInitializer"/>, which only ever resolves once <c>RuntimeLevel.Run</c> is
+/// confirmed. Falling back to <see cref="DatabaseConnectionInfo.PlaceholderConnection"/> defers the
+/// failure instead: nothing reads or writes through the resulting context before
+/// <see cref="AutomateReadinessSignal"/> is signalled, which never happens below that level.
+/// See <see href="https://github.com/umbraco/Umbraco.Automate/issues/226"/>.
+/// </para>
+/// </remarks>
+internal static class AutomatePooledDbContextOptions
+{
+    internal static void Configure(
+        IServiceProvider serviceProvider,
+        DbContextOptionsBuilder options,
+        string? cmsConnectionString,
+        string? cmsProviderName)
+    {
+        string connectionString;
+        string providerName;
+        try
+        {
+            (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                serviceProvider.GetRequiredService<IConfiguration>());
+        }
+        catch (InvalidOperationException ex)
+        {
+            (connectionString, providerName) = DatabaseConnectionInfo.PlaceholderConnection;
+
+            // GetService, not GetRequiredService: this catch block exists so a missing connection
+            // string can never crash the host, so logging it must not risk crashing the host either.
+            (serviceProvider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance)
+                .CreateLogger("Umbraco.Automate.Extensions.UmbracoBuilderExtensions")
+                .LogWarning(
+                    ex,
+                    "Umbraco Automate has no database connection string configured yet. Automate will " +
+                    "remain inactive until one is configured and the host restarts into RuntimeLevel.Run.");
+        }
+
+        UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
+
+        // Defer writes on this (DI-resolved) context until Automate's own startup migrations
+        // have completed. The migration handler's own standalone context is configured
+        // separately, via the same ConfigureProvider call, and is deliberately not gated here.
+        options.AddInterceptors(new AutomateReadinessInterceptor(
+            serviceProvider.GetRequiredService<AutomateReadinessSignal>()));
     }
 }

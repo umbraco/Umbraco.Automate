@@ -34,6 +34,26 @@ public static class DatabaseConnectionInfo
     public const string MigrationsHistoryTable = "__UmbracoAutomate_MigrationsHistory";
 
     /// <summary>
+    /// A syntactically valid but inert connection, for composing <c>DbContextOptions</c> when no real
+    /// connection string is available at the moment EF Core needs one.
+    /// </summary>
+    /// <remarks>
+    /// <c>AddPooledDbContextFactory</c> builds a context's <c>DbContextOptions</c> the moment something
+    /// first resolves its <c>IDbContextFactory&lt;TContext&gt;</c> — not lazily per
+    /// <c>CreateDbContext()</c> call. Automate's own background services reach that factory through
+    /// their constructors, and the generic host resolves every <c>IHostedService</c>'s constructor
+    /// graph at <c>Host.StartAsync</c>, before Umbraco's runtime level is known. So a genuinely
+    /// unconfigured connection string (a fresh, not-yet-installed site; an ephemeral CI boot serving
+    /// only <c>swagger.json</c>) must not throw at that point the way <see cref="Resolve(IConfiguration)"/>
+    /// does. Composing against this placeholder instead defers the failure: nothing reads or writes
+    /// through the resulting context before <c>AutomateReadinessSignal</c> is signalled, which never
+    /// happens below <c>RuntimeLevel.Run</c>. See
+    /// <see href="https://github.com/umbraco/Umbraco.Automate/issues/226"/>.
+    /// </remarks>
+    internal static readonly (string ConnectionString, string ProviderName) PlaceholderConnection =
+        ("Data Source=:memory:", Umbraco.Cms.Core.Constants.ProviderNames.SQLLite);
+
+    /// <summary>
     /// Resolves the connection string and provider name, first triggering the
     /// <see cref="ConnectionStrings"/> options pipeline so that hosts which synthesise the
     /// connection string at run time get a chance to populate it.
