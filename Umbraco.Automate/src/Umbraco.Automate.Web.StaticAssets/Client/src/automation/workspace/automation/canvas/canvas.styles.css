@@ -346,6 +346,7 @@
 .ua-node--if { --ua-node-stripe: #f59e0b; }
 .ua-node--switch { --ua-node-stripe: #8b5cf6; }
 .ua-node--approval { --ua-node-stripe: #0ea5e9; }
+.ua-node--container { --ua-node-stripe: #14b8a6; }
 
 /* Handle overrides */
 .react-flow__handle {

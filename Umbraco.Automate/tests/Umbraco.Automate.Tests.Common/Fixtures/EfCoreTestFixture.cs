@@ -28,6 +28,24 @@ public class EfCoreTestFixture : IDisposable
     }
 
     /// <summary>
+    /// Creates a new <see cref="UmbracoAutomateDbContext"/> instance for testing, with extra options
+    /// configuration (e.g. <c>AddInterceptors</c>) applied after the shared connection is wired up —
+    /// for tests that need to observe or inject into a specific context's commands. A separate
+    /// overload (rather than an optional parameter on <see cref="CreateContext()"/>) so existing
+    /// <c>Func&lt;UmbracoAutomateDbContext&gt;</c> method-group usages of the parameterless overload
+    /// keep resolving unambiguously.
+    /// </summary>
+    public UmbracoAutomateDbContext CreateContext(
+        Action<DbContextOptionsBuilder<UmbracoAutomateDbContext>> configure)
+    {
+        var builder = new DbContextOptionsBuilder<UmbracoAutomateDbContext>()
+            .UseSqlite(_connectionString);
+        configure(builder);
+
+        return new UmbracoAutomateDbContext(builder.Options);
+    }
+
+    /// <summary>
     /// Initializes the test fixture with an in-memory SQLite database.
     /// </summary>
     public EfCoreTestFixture()

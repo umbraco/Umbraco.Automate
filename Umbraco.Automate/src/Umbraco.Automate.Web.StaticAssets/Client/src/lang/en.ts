@@ -179,6 +179,10 @@ export default {
             "The previously configured service account no longer exists (e.g. after a Deploy import that didn't include the API user). Choose one to fix this.",
         userGroups: "User Groups",
         userGroupsDescription: "User groups that have access to automations in this workspace.",
+        userGroupsUnresolved: (count: number) =>
+            count === 1
+                ? "1 user group no longer exists on this environment (e.g. after a Deploy import) and was not applied. Add it again if it's still needed."
+                : `${count} user groups no longer exist on this environment (e.g. after a Deploy import) and were not applied. Add them again if they're still needed.`,
         allowedConnections: "Allowed Connections",
         allowedConnectionsDescription: "Connections that automations in this workspace are allowed to use.",
     },
