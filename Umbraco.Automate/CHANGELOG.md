@@ -5,6 +5,22 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.3.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.2.0...Umbraco.Automate@17.3.0) (2026-08-19)
+
+### feat
+
+* **ui:** Add body and done ports to container control flow nodes ([b63df5c](https://github.com/umbraco/Umbraco.Automate/commit/b63df5c27b4f647f1ac2000f11b775c1786053c4))
+
+### fix
+
+* **api:** Guard System.Type Swagger mapping against duplicate registration ([816f1fa](https://github.com/umbraco/Umbraco.Automate/commit/816f1faa4e191c9584c704d41bc4d48d723d60d7)), closes [#225](https://github.com/umbraco/Umbraco.Automate/issues/225)
+* **core:** Address Copilot review feedback on startup connection fallback ([984c54c](https://github.com/umbraco/Umbraco.Automate/commit/984c54c31914bb5a5d624e8c4c7cafb4f0f947e3)), closes [#236](https://github.com/umbraco/Umbraco.Automate/issues/236)
+* **core:** Avoid false-alarm error log on workflow lock acquire race ([dd7c1bf](https://github.com/umbraco/Umbraco.Automate/commit/dd7c1bf5fba363b15bb1e1202d1a654df6fdd083)), closes [#224](https://github.com/umbraco/Umbraco.Automate/issues/224) [#234](https://github.com/umbraco/Umbraco.Automate/issues/234) [#224](https://github.com/umbraco/Umbraco.Automate/issues/224)
+* **core:** Do not throw when no connection string is configured at startup ([bb7779b](https://github.com/umbraco/Umbraco.Automate/commit/bb7779b382cfbc17ea01a7d9fb2f1e686257a8e1)), closes [#226](https://github.com/umbraco/Umbraco.Automate/issues/226)
+* **core:** Warn when a container has multiple done connections ([f880d5b](https://github.com/umbraco/Umbraco.Automate/commit/f880d5bd1e193ad493c2b6ffce4689225f6e3a50))
+* **ui:** Allow multiple branches from a Parallel container's body handle ([49ab1a1](https://github.com/umbraco/Umbraco.Automate/commit/49ab1a101b2893068866bcf72a459f69b50aa1f2))
+* **ui:** Drop workspace user groups that no longer resolve ([214bf9f](https://github.com/umbraco/Umbraco.Automate/commit/214bf9f8e37bdc7700e30133af875a960d1d8896)), closes [#228](https://github.com/umbraco/Umbraco.Automate/issues/228)
+
 ## [17.2.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.1.0...Umbraco.Automate@17.2.0) (2026-08-10)
 
 ### ⚠ BREAKING CHANGE
