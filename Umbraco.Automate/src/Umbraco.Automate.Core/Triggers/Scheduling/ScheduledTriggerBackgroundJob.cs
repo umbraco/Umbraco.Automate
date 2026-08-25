@@ -169,6 +169,13 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                 {
                     TriggerAlias = automation.Trigger.TriggerAlias,
                     InitiatorType = TriggerInitiatorType.Scheduled,
+                    // This loop already resolved the schedule for one specific automation, so the
+                    // event is addressed to it. Without a target, TriggerEventHandler fans the
+                    // event out to every published automation sharing the trigger alias — each of
+                    // N scheduled automations due on the same tick would then run N times, and an
+                    // automation would also run on another automation's tick, since the fan-out
+                    // never re-checks the recipient's own CRON.
+                    TargetAutomationId = automationId,
                     IdempotencyKey = $"scheduled:{automationId}:{nextOccurrence:O}",
                     Output = new ScheduledTriggerOutput
                     {

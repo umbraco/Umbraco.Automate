@@ -123,7 +123,9 @@ public class ScheduledTriggerBackgroundJobTests
 
         _dispatcher.Verify(
             d => d.DispatchAsync(
-                It.Is<TriggerEvent>(e => e.TriggerAlias == ScheduledTriggerAlias && e.InitiatorType == "scheduled"),
+                It.Is<TriggerEvent>(e => e.TriggerAlias == ScheduledTriggerAlias
+                                         && e.InitiatorType == "scheduled"
+                                         && e.TargetAutomationId == automationId),
                 It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -439,5 +441,53 @@ public class ScheduledTriggerBackgroundJobTests
         _dispatcher.Verify(
             d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_TwoAutomationsDueOnTheSameTick_EachEventTargetsItsOwnAutomation()
+    {
+        // Regression: the job resolves each automation's CRON individually, so every event must be
+        // addressed to that automation. Leaving TargetAutomationId null makes TriggerEventHandler
+        // fan each event out to every published automation sharing the alias — two automations due
+        // on the same tick would produce four runs, two of each.
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (firstId, 1), (secondId, 1) });
+
+        foreach (var id in new[] { firstId, secondId })
+        {
+            _automationService.Setup(s => s.GetAutomationAsync(id, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Automation
+                {
+                    Alias = $"test-{id}",
+                    Name = "Test",
+                    Status = AutomationStatus.Published,
+                    Trigger = new TriggerConfiguration
+                    {
+                        TriggerAlias = ScheduledTriggerAlias,
+                        Settings = [],
+                    },
+                });
+
+            _stateStore.Setup(s => s.GetLastFiredAsync(id, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(DateTime.UtcNow.AddMinutes(-2));
+        }
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        var dispatched = new List<TriggerEvent>();
+        _dispatcher.Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((e, _) => dispatched.Add(e))
+            .Returns(Task.CompletedTask);
+
+        await _job.PerformExecuteAsync(null);
+
+        dispatched.Count.ShouldBe(2);
+        dispatched.Select(e => e.TargetAutomationId).ShouldBe(new Guid?[] { firstId, secondId }, ignoreOrder: true);
     }
 }
