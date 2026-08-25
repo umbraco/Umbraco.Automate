@@ -23,15 +23,21 @@ public class ParallelContainerStepBodyTests
         return new ParallelContainerStepBody(stepConfig, new ForEachCollectionCache(evaluator, hydrationCache), hydrationCache, conditionEvaluator, branchEdges ?? Array.Empty<ContainerBranchEdge>());
     }
 
-    [Fact]
-    public void Run_WithChildren_BranchesOnePerChild()
+    // WorkflowCore spawns one child pointer per (branch value × child step) pair, so the branch
+    // count must stay at one however many children there are — otherwise each parallel branch
+    // runs once per branch. See ParallelContainerStepBody.Run.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(5)]
+    public void Run_WithChildren_BranchesExactlyOnce(int childCount)
     {
         var body = CreateBody();
-        var context = CreateContext(childCount: 3);
+        var context = CreateContext(childCount);
         var result = body.Run(context);
 
         result.BranchValues.ShouldNotBeNull();
-        result.BranchValues.Count.ShouldBe(3);
+        result.BranchValues.Count.ShouldBe(1);
         var persistence = result.PersistenceData as ControlPersistenceData;
         persistence.ShouldNotBeNull();
         persistence.ChildrenActive.ShouldBeTrue();
@@ -49,17 +55,20 @@ public class ParallelContainerStepBodyTests
     }
 
     [Fact]
-    public void Run_BranchValues_ContainIterationContext()
+    public void Run_BranchValue_IsSingleContainerScopedIterationContext()
     {
-        var body = CreateBody();
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.parallel").WithName("Parallel");
+
+        var body = CreateBody(stepConfig: stepConfig);
         var context = CreateContext(childCount: 2);
         var result = body.Run(context);
 
-        var branch0 = (ForEachIterationContext)result.BranchValues![0];
-        var branch1 = (ForEachIterationContext)result.BranchValues[1];
+        var branch = (ForEachIterationContext)result.BranchValues!.Single();
 
-        branch0.Index.ShouldBe(0);
-        branch1.Index.ShouldBe(1);
+        branch.Index.ShouldBe(0);
+        branch.ContainerStepId.ShouldBe(stepConfig.Id);
+        branch.ScopePath.ShouldBe($"{stepConfig.Id:N}:0");
     }
 
     [Fact]
@@ -82,7 +91,7 @@ public class ParallelContainerStepBodyTests
     }
 
     [Fact]
-    public void Run_AnyEdgeFilterPasses_BranchesAllChildren()
+    public void Run_AnyEdgeFilterPasses_Branches()
     {
         var alwaysTrue = new ConditionSet
         {
@@ -97,7 +106,8 @@ public class ParallelContainerStepBodyTests
         var result = body.Run(context);
 
         result.BranchValues.ShouldNotBeNull();
-        result.BranchValues.Count.ShouldBe(3);
+        result.BranchValues.Count.ShouldBe(1);
+        result.Proceed.ShouldBeFalse();
     }
 
     [Fact]

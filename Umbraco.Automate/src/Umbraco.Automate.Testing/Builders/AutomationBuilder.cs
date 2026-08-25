@@ -120,12 +120,13 @@ public class AutomationBuilder
             ["logLevel"] = logLevel,
         });
 
-    public AutomationBuilder WithConnection(Guid sourceStepId, Guid targetStepId, string? outcome = null, ConditionSet? filter = null)
+    public AutomationBuilder WithConnection(Guid sourceStepId, Guid targetStepId, string? outcome = null, ConditionSet? filter = null, string? sourceHandle = null)
     {
         _connections.Add(new StepConnection
         {
             SourceStepId = sourceStepId,
             TargetStepId = targetStepId,
+            SourceHandle = sourceHandle,
             Outcome = outcome,
             Filter = filter,
         });
