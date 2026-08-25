@@ -127,6 +127,97 @@ public class ContentPublishedTriggerTests
         output.Cultures.ShouldBe(new[] { "en-US" });
     }
 
+    [Fact]
+    public void MapEvent_VariantContent_PrefersNotificationPublishedCultures()
+    {
+        // The authoritative per-document delta the CMS now reports (PR #23313) must win over the
+        // change-tracking heuristic: dirty tracking would say "en-US", the notification says otherwise.
+        var key = Guid.NewGuid();
+        var content = CreateContent(
+            key,
+            "Page",
+            "blogPost",
+            variations: ContentVariation.Culture,
+            publishCultureInfos: BuildCultureInfos(dirty: new[] { "en-US" }));
+
+        var publishedCultures = new Dictionary<Guid, IReadOnlyCollection<string>>
+        {
+            [key] = new[] { "da-DK", "de-DE" },
+        };
+        var notification = new ContentPublishedNotification(
+            new[] { content },
+            new EventMessages(),
+            includeDescendants: false,
+            publishedCultures: publishedCultures,
+            unpublishedCultures: null);
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBe(new[] { "da-DK", "de-DE" });
+    }
+
+    [Fact]
+    public void MapEvent_VariantContent_FallsBackToChangeTracking_WhenNotificationHasNoEntryForItem()
+    {
+        // A descendant re-published as a side effect of publishing an ancestor is omitted from the
+        // CMS map (umbraco/Umbraco-CMS#23288). The helper must then fall back to change tracking.
+        var key = Guid.NewGuid();
+        var content = CreateContent(
+            key,
+            "Page",
+            "blogPost",
+            variations: ContentVariation.Culture,
+            publishCultureInfos: BuildCultureInfos(dirty: new[] { "en-US" }, clean: new[] { "fr-FR" }));
+
+        // populated, but only for some OTHER document
+        var publishedCultures = new Dictionary<Guid, IReadOnlyCollection<string>>
+        {
+            [Guid.NewGuid()] = new[] { "da-DK" },
+        };
+        var notification = new ContentPublishedNotification(
+            new[] { content },
+            new EventMessages(),
+            includeDescendants: true,
+            publishedCultures: publishedCultures,
+            unpublishedCultures: null);
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBe(new[] { "en-US" });
+    }
+
+    [Fact]
+    public void MapEvent_InvariantContent_IgnoresNotificationCultures()
+    {
+        // The CMS reports invariant content as the "*" marker; Automate's contract keeps invariant as null.
+        var key = Guid.NewGuid();
+        var content = CreateContent(key, "Page", "blogPost");
+
+        var publishedCultures = new Dictionary<Guid, IReadOnlyCollection<string>>
+        {
+            [key] = new[] { "*" },
+        };
+        var notification = new ContentPublishedNotification(
+            new[] { content },
+            new EventMessages(),
+            includeDescendants: false,
+            publishedCultures: publishedCultures,
+            unpublishedCultures: null);
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>()
+            .Output;
+
+        output.Cultures.ShouldBeNull();
+    }
+
     internal static IContent CreateContent(
         Guid key,
         string name,
