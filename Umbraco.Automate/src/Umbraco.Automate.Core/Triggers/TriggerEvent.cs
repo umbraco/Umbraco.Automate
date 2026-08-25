@@ -23,9 +23,10 @@ public class TriggerEvent
     /// <summary>
     /// Gets an optional target automation. When set, the event runs exactly this automation
     /// rather than fanning out to every published automation subscribed to
-    /// <see cref="TriggerAlias"/>. Used by imperative, per-automation entry points (e.g. the
-    /// webhook endpoint, which is addressed by automation ID). <c>null</c> for pub/sub triggers
-    /// (content events, scheduled) that should dispatch to all subscribers.
+    /// <see cref="TriggerAlias"/>. Set by entry points that already know which automation the
+    /// event belongs to: the webhook endpoint (addressed by automation ID) and the scheduled
+    /// trigger job (which evaluates each automation's CRON individually). <c>null</c> for genuine
+    /// pub/sub triggers — content and entity events — that should dispatch to all subscribers.
     /// </summary>
     public Guid? TargetAutomationId { get; init; }
 
