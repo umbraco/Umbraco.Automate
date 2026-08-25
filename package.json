@@ -3,6 +3,9 @@
     "version": "1.0.0",
     "private": true,
     "description": "Root package for Umbraco.Automate frontend development",
+    "engines": {
+        "node": ">=22"
+    },
     "workspaces": [
         "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Client",
         "Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/Client"
