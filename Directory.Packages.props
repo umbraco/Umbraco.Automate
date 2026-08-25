@@ -48,8 +48,8 @@
 
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
-    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.4.0, 7.999.999)" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.4.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.6.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.6.0, 7.999.999)" />
   </ItemGroup>
 
 <!-- Shared dependencies -->
