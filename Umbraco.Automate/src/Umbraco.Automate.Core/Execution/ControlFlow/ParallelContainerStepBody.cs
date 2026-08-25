@@ -52,9 +52,11 @@ internal sealed class ParallelContainerStepBody : ContainerStepBody
             return ExecutionResult.Next();
         }
 
-        // Create one branch per child step. WorkflowCore's executor uses the branch list
-        // combined with step.Children to spawn parallel execution pointers.
-        // Each item in the branch list becomes context.Item for the child execution.
+        // Fan-out comes from step.Children, not from the branch list. WorkflowCore's
+        // ExecutionResultProcessor spawns one child pointer per (branch value × child step)
+        // pair, so a branch value per child would run every branch once per branch — three
+        // parallel branches would execute nine times. WorkflowCore's own Sequence primitive
+        // branches with a single value for exactly this reason, and we mirror it.
         var childCount = context.Step.Children.Count;
 
         if (childCount == 0)
@@ -73,10 +75,13 @@ internal sealed class ParallelContainerStepBody : ContainerStepBody
             return ExecutionResult.Next();
         }
 
-        var branches = Enumerable.Range(0, childCount)
-            .Select(i => (object)new ForEachIterationContext(null, i, _stepConfig.Id, parentIteration))
-            .ToList();
+        // One context, shared by every branch. WorkflowCore carries it to each child pointer
+        // as ContextItem, giving the whole fan-out a single iteration scope that
+        // PruneContainerScopes clears on convergence. Branches therefore share the scoped
+        // `previous` pointer — a fan-out has no per-branch predecessor to track, so steps
+        // inside a branch should reference each other by alias rather than via `previous`.
+        var branch = new ForEachIterationContext(null, 0, _stepConfig.Id, parentIteration);
 
-        return ExecutionResult.Branch(branches, new ControlPersistenceData { ChildrenActive = true });
+        return ExecutionResult.Branch([branch], new ControlPersistenceData { ChildrenActive = true });
     }
 }
