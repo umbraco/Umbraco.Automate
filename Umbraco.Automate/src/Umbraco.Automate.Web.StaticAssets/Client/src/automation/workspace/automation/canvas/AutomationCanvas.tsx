@@ -17,7 +17,8 @@ import {
 } from "@xyflow/react";
 import { nodeTypes } from "./nodes/node-types.js";
 import AutomationEdge from "./edges/AutomationEdge.js";
-import type { CanvasChangeDetail, AddNodeRequestDetail } from "./types.js";
+import type { CanvasChangeDetail, AddNodeRequestDetail, ActionNodeData } from "./types.js";
+import { BODY_HANDLE, PARALLEL_ALIAS } from "./utils/model-to-flow.js";
 
 const edgeTypes = {
     automation: AutomationEdge,
@@ -118,10 +119,23 @@ export default function AutomationCanvas({
         [onEdgesChange, setNodes, setEdges, emitChange],
     );
 
-    // Keep a ref to the latest edges so isValidConnection can read them
+    // Keep refs to the latest edges/nodes so isValidConnection and onConnect can read them
     // without useStore (which requires being inside the ReactFlow provider).
     const edgesRef = useRef(edges);
     edgesRef.current = edges;
+    const nodesRef = useRef(nodes);
+    nodesRef.current = nodes;
+
+    // Parallel's body handle fans out to many branches, so unlike every other handle it must
+    // accept more than one outgoing edge — the branches it spawns, not a single replaceable path.
+    const isParallelBranchHandle = useCallback(
+        (sourceId: string | null | undefined, sourceHandle: string | null | undefined) => {
+            if (sourceHandle !== BODY_HANDLE) return false;
+            const sourceNode = nodesRef.current.find((n) => n.id === sourceId);
+            return (sourceNode?.data as ActionNodeData | undefined)?.actionAlias === PARALLEL_ALIAS;
+        },
+        [],
+    );
 
     // Prevent self-loops and cycles. For branching nodes (If/Switch), each source handle
     // can have one outgoing edge. For regular nodes, only one outgoing edge total.
@@ -130,10 +144,14 @@ export default function AutomationCanvas({
             if (connection.source === connection.target) return false;
 
             // Walk the edge chain from target forward — if we reach source, it's a cycle.
-            // Exclude edges that would be replaced by this connection (same source+handle or same target).
+            // Exclude edges that would be replaced by this connection (same source+handle or same target),
+            // unless this is another Parallel branch, which coexists with the others instead of replacing them.
+            const replacesSourceHandle = isParallelBranchHandle(connection.source, connection.sourceHandle)
+                ? false
+                : (e: Edge) => e.source === connection.source && (e.sourceHandle ?? null) === (connection.sourceHandle ?? null);
             const remaining = edgesRef.current.filter(
                 (e) =>
-                    !(e.source === connection.source && (e.sourceHandle ?? null) === (connection.sourceHandle ?? null)) &&
+                    !(replacesSourceHandle && replacesSourceHandle(e)) &&
                     e.target !== connection.target,
             );
             let current: string | null = connection.target;
@@ -147,17 +165,21 @@ export default function AutomationCanvas({
             }
             return true;
         },
-        [],
+        [isParallelBranchHandle],
     );
 
     const onConnect: OnConnect = useCallback(
         (params) => {
             setEdges((eds) => {
                 // Remove any existing edge from the same source+handle or to the same target.
-                // For branching nodes (If/Switch), each handle can have one connection.
+                // For branching nodes (If/Switch), each handle can have one connection. A Parallel
+                // branch is the exception — it adds a new branch alongside the existing ones.
+                const replacesSourceHandle = isParallelBranchHandle(params.source, params.sourceHandle)
+                    ? false
+                    : (e: Edge) => e.source === params.source && (e.sourceHandle ?? null) === (params.sourceHandle ?? null);
                 const filtered = eds.filter(
                     (e) =>
-                        !(e.source === params.source && (e.sourceHandle ?? null) === (params.sourceHandle ?? null)) &&
+                        !(replacesSourceHandle && replacesSourceHandle(e)) &&
                         e.target !== params.target,
                 );
 
@@ -171,7 +193,7 @@ export default function AutomationCanvas({
                 return updated;
             });
         },
-        [setEdges, setNodes, emitChange],
+        [setEdges, setNodes, emitChange, isParallelBranchHandle],
     );
 
     // Track the source of a connection drag for drop-to-add.
@@ -298,6 +320,7 @@ export default function AutomationCanvas({
                         case "trigger": return "#6366f1";
                         case "if": return "#f59e0b";
                         case "switch": return "#8b5cf6";
+                        case "approval": return "#0ea5e9";
                         default: return "#3b82f6";
                     }
                 }}

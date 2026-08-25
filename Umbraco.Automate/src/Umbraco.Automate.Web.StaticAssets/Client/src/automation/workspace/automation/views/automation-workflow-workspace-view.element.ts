@@ -5,7 +5,7 @@ import { UMB_MODAL_MANAGER_CONTEXT, UMB_CONFIRM_MODAL } from "@umbraco-cms/backo
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
-import { modelToNodes, modelToEdges, TRIGGER_NODE_ID } from "../canvas/utils/model-to-flow.js";
+import { modelToNodes, modelToEdges, TRIGGER_NODE_ID, BODY_HANDLE, PARALLEL_ALIAS } from "../canvas/utils/model-to-flow.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
 import type { CanvasState, CanvasChangeDetail, CatalogueLookupEntry, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
@@ -160,14 +160,19 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
     }
 
-    async #openTriggerSettingsModal() {
-        if (!this._model?.trigger) return;
+    /**
+     * Opens the trigger settings modal. Returns `true` when the settings were saved or there was
+     * nothing to configure (no settings schema), and `false` when the modal was opened and then
+     * dismissed. Callers adding a brand-new trigger use the return value to roll back the add.
+     */
+    async #openTriggerSettingsModal(): Promise<boolean> {
+        if (!this._model?.trigger) return true;
 
         const catalogueItem = await this.#getTriggerCatalogueItem(this._model.trigger.triggerAlias);
-        if (!catalogueItem) return;
+        if (!catalogueItem) return true;
 
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-        if (!modalManager) return;
+        if (!modalManager) return true;
 
         const modal = modalManager.open(this, UA_TRIGGER_SETTINGS_MODAL, {
             data: {
@@ -184,21 +189,28 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 ...this._model!.trigger!,
                 settings,
             });
+            return true;
         } catch {
             // Modal was dismissed
+            return false;
         }
     }
 
-    async #openNodeSettingsModal(stepId: string) {
-        if (!this._model) return;
+    /**
+     * Opens the node (action) settings modal. Returns `true` when the settings were saved or there
+     * was nothing to configure (no settings schema), and `false` when the modal was opened and then
+     * dismissed. Callers adding a brand-new step use the return value to roll back the add.
+     */
+    async #openNodeSettingsModal(stepId: string): Promise<boolean> {
+        if (!this._model) return true;
         const step = this._model.steps.find((s) => s.id === stepId);
-        if (!step) return;
+        if (!step) return true;
 
         const catalogueItem = await this.#getActionCatalogueItem(step.actionAlias);
-        if (!catalogueItem) return;
+        if (!catalogueItem) return true;
 
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
-        if (!modalManager) return;
+        if (!modalManager) return true;
 
         const modal = modalManager.open(this, UA_NODE_SETTINGS_MODAL, {
             data: {
@@ -223,8 +235,10 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 s.id === stepId ? { ...s, settings, connectionId } : s,
             );
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
+            return true;
         } catch {
             // Modal was dismissed
+            return false;
         }
     }
 
@@ -293,6 +307,11 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             const { item } = await modal.onSubmit();
             if (!item || !this._model) return;
 
+            // Snapshot state before inserting so we can roll back the whole add (step plus any
+            // auto-connected/spliced edges) if the settings modal is closed without saving.
+            const previousSteps = this._model.steps;
+            const previousConnections = this._model.connections;
+
             const newStepId = crypto.randomUUID();
             const newStep = {
                 id: newStepId,
@@ -314,15 +333,23 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             // Auto-connect when the node was created by dragging from a handle.
             if (event.detail.connectFrom) {
                 const { sourceStepId, sourceHandle } = event.detail.connectFrom;
+                const normalisedSourceId = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
                 const newConnection = {
-                    sourceStepId: sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId,
+                    sourceStepId: normalisedSourceId,
                     sourceHandle: sourceHandle ?? null,
                     targetStepId: newStepId,
                     targetHandle: null,
                     outcome: sourceHandle ?? null,
                     filter: null,
                 };
-                const updatedConnections = [...this._model.connections, newConnection];
+                // Each handle carries one outgoing connection, replaced by a new one — except a
+                // Parallel branch, which adds alongside its existing branches instead.
+                const previousConnections = this.#isParallelBranchHandle(sourceStepId, sourceHandle ?? null)
+                    ? this._model.connections
+                    : this._model.connections.filter(
+                          (c) => !(c.sourceStepId === normalisedSourceId && (c.sourceHandle ?? null) === (sourceHandle ?? null)),
+                      );
+                const updatedConnections = [...previousConnections, newConnection];
                 this.#workspaceContext?.updateProperty("connections", updatedConnections);
             } else if (event.detail.insertBetween) {
                 // Splice the new step onto an existing edge: A→B becomes A→new→B.
@@ -351,7 +378,15 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 this.#workspaceContext?.updateProperty("connections", updatedConnections);
             }
 
-            await this.#openNodeSettingsModal(newStepId);
+            const saved = await this.#openNodeSettingsModal(newStepId);
+            if (!saved) {
+                // Settings modal closed without saving: discard the just-added step and restore
+                // any connections the add rewired.
+                this.#workspaceContext?.updateProperties({
+                    steps: previousSteps,
+                    connections: previousConnections,
+                });
+            }
         } catch {
             // Modal was dismissed
         }
@@ -368,12 +403,20 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             const { item } = await modal.onSubmit();
             if (!item) return;
 
+            // Snapshot the trigger (null when adding to the placeholder) so we can roll back if the
+            // settings modal is closed without saving.
+            const previousTrigger = this._model?.trigger ?? null;
+
             this.#workspaceContext?.updateProperty("trigger", {
                 triggerAlias: item.alias,
                 settings: {},
             });
 
-            await this.#openTriggerSettingsModal();
+            const saved = await this.#openTriggerSettingsModal();
+            if (!saved) {
+                // Settings modal closed without saving: discard the just-added trigger.
+                this.#workspaceContext?.updateProperty("trigger", previousTrigger);
+            }
         } catch {
             // Modal was dismissed
         }
@@ -406,6 +449,16 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
 
         return `${baseName}${Date.now()}`;
+    }
+
+    /**
+     * Parallel's body handle fans out to many branches, so unlike every other handle (a single
+     * outgoing edge, e.g. done, or an If/Switch case) it must accept more than one connection.
+     */
+    #isParallelBranchHandle(sourceStepId: string, sourceHandle: string | null): boolean {
+        if (sourceHandle !== BODY_HANDLE) return false;
+        const sourceStep = this._model?.steps.find((s) => s.id === sourceStepId);
+        return sourceStep?.actionAlias === PARALLEL_ALIAS;
     }
 
     async #onEdgeFilterOpen(event: CustomEvent<EdgeFilterOpenDetail>) {

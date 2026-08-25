@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -5,6 +6,7 @@ using Microsoft.OpenApi;
 using OpenIddict.Client;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Automate.Core.Persistence;
+using Umbraco.Automate.Extensions;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.OpenIddict;
 using Umbraco.Automate.OpenIddict.Credentials;
@@ -90,13 +92,33 @@ public static class UmbracoBuilderExtensions
         // Resolve the connection string lazily inside the factory (run time), not here at
         // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
         // ConnectionStrings options pipeline, which has not run yet during AddComposers().
-        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>((serviceProvider, options, _, _) =>
-        {
-            var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
-                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                serviceProvider.GetRequiredService<IConfiguration>());
-            OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
-        });
+        //
+        // shareUmbracoConnection: false — nothing here resolves an IEfCoreScope<OpenIddictDbContext>.
+        // Sharing the ambient connection is handled by AmbientDbContextFactory below, which decides
+        // per call rather than once at composition time.
+        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>(
+            (IServiceProvider serviceProvider, DbContextOptionsBuilder options, string? _, string? _) =>
+            {
+                var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                    serviceProvider.GetRequiredService<IConfiguration>());
+                OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
+            },
+            shareUmbracoConnection: false);
+
+        // Same reasoning as Umbraco.Automate's own persistence: this DbContext resolves the same
+        // Automate connection string, so when that points at the Umbraco CMS database a second
+        // connection would compete with the ambient scope for it — and on SQLite, which permits one
+        // writer per database file, deadlock against a caller holding the write lock across the write.
+        // See AmbientDbContextFactory.
+        builder.Services.EnlistDbContextFactoryInAmbientScope(
+            (_, connection, providerName) =>
+            {
+                var options = new DbContextOptionsBuilder<OpenIddictDbContext>();
+                OpenIddictDbContext.ConfigureProvider(options, connection, providerName);
+
+                return new OpenIddictDbContext(options.Options);
+            });
 
         builder.Services.AddSingleton<OAuthCredentialsFactory>();
         builder.Services.AddSingleton<IOAuthCredentialsRepository, EFCoreOAuthCredentialsRepository>();

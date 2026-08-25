@@ -94,7 +94,8 @@ internal sealed class RunFinalizer
         _hydrationCache.EvictRun(data.RunId);
 
         var run = await _runRepository.GetAsync(data.RunId, cancellationToken);
-        if (run is null || run.Status is AutomationRunStatus.Completed or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
+        if (run is null || run.Status is AutomationRunStatus.Completed or AutomationRunStatus.Failed
+            or AutomationRunStatus.Cancelled or AutomationRunStatus.Rejected)
         {
             return;
         }
@@ -111,10 +112,17 @@ internal sealed class RunFinalizer
         }
 
         var hasFailedStep = run.StepRuns.Any(sr => sr.Status == StepRunStatus.Failed);
+        var hasRejectedStep = run.StepRuns.Any(sr => sr.Status == StepRunStatus.Rejected);
 
-        run.Status = workflow.Status == WorkflowStatus.Terminated || hasFailedStep
-            ? AutomationRunStatus.Failed
-            : AutomationRunStatus.Completed;
+        // Precedence: a real error outranks a refusal. If something broke on the rejected path, the
+        // run is Failed — that is the more urgent truth and the one alerting should act on. Only when
+        // nothing failed does a refusal surface as Rejected, which is terminal but not an error.
+        run.Status = (workflow.Status == WorkflowStatus.Terminated || hasFailedStep, hasRejectedStep) switch
+        {
+            (true, _) => AutomationRunStatus.Failed,
+            (false, true) => AutomationRunStatus.Rejected,
+            _ => AutomationRunStatus.Completed,
+        };
 
         run.CompletedUtc = now;
 
@@ -139,7 +147,9 @@ internal sealed class RunFinalizer
             scope.Complete();
         }
 
-        if (run.Status == AutomationRunStatus.Completed)
+        // A rejected run is not a failed run — counting it as one would make an automation working
+        // exactly as designed look unreliable on the dashboard and in the failure metric.
+        if (run.Status is AutomationRunStatus.Completed or AutomationRunStatus.Rejected)
         {
             _metrics.RunCompleted(data.AutomationAlias);
         }

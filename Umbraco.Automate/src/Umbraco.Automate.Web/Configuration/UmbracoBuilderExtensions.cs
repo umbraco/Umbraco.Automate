@@ -133,8 +133,13 @@ public static partial class UmbracoBuilderExtensions
 
             options.OperationFilter<UmbracoAutomateManagementApiBackOfficeSecurityRequirementsOperationFilter>(Constants.ManagementApi.ApiName);
 
-            // Map System.Type to string in OpenAPI schema (JsonStringTypeConverter handles serialization)
-            options.MapType<Type>(() => new OpenApiSchema { Type = JsonSchemaType.String });
+            // Map System.Type to string in OpenAPI schema (JsonStringTypeConverter handles serialization).
+            // Guard against other packages (e.g. Umbraco.AI.Web) registering the same mapping on the
+            // shared SwaggerGenOptions — MapType() throws if the key already exists.
+            if (!options.SchemaGeneratorOptions.CustomTypeMappings.ContainsKey(typeof(Type)))
+            {
+                options.MapType<Type>(() => new OpenApiSchema { Type = JsonSchemaType.String });
+            }
         });
 
         builder.Services.AddSingleton<IOperationIdHandler, UmbracoAutomateApiOperationIdHandler>();

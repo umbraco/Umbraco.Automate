@@ -1,6 +1,10 @@
+using System.Text.Json;
 using Shouldly;
+using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Dispatch;
+using Umbraco.Automate.Core.Execution;
 
 namespace Umbraco.Automate.Tests.Unit.Conditions;
 
@@ -377,6 +381,68 @@ public class ConditionEvaluatorTests
         // Falls back to string comparison when not numeric
         var set = BuildSingleCondition("banana", ConditionOperator.GreaterThan, "apple");
         _evaluator.Evaluate(set, EmptyData).ShouldBeTrue(); // "banana" > "apple" lexically
+    }
+
+    #endregion
+
+    #region Approval Output — the shape an If step branches on
+
+    // These run the real serialisation path ActionStepBody uses when an approval resumes, so they
+    // catch a regression in either direction: an enum leaking through as 0/1, or a bool that no
+    // longer stringifies to something `equals true` matches.
+
+    [Theory]
+    [InlineData(ApprovalOutcome.Approved, "true", true)]
+    [InlineData(ApprovalOutcome.Approved, "false", false)]
+    [InlineData(ApprovalOutcome.Rejected, "true", false)]
+    [InlineData(ApprovalOutcome.Rejected, "false", true)]
+    public void Approved_Binding_ComparesAgainstBooleanLiteral(
+        ApprovalOutcome outcome, string rightOperand, bool expected)
+    {
+        var data = BuildApprovalBindingData(outcome);
+        var set = BuildSingleCondition("${ steps.approval.approved }", ConditionOperator.Equals, rightOperand);
+
+        _evaluator.Evaluate(set, data).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(ApprovalOutcome.Approved, "Approved", true)]
+    [InlineData(ApprovalOutcome.Approved, "approved", true)]
+    [InlineData(ApprovalOutcome.Rejected, "Rejected", true)]
+    [InlineData(ApprovalOutcome.Rejected, "Approved", false)]
+    public void Outcome_Binding_ComparesAgainstOutcomeName(
+        ApprovalOutcome outcome, string rightOperand, bool expected)
+    {
+        var data = BuildApprovalBindingData(outcome);
+        var set = BuildSingleCondition("${ steps.approval.outcome }", ConditionOperator.Equals, rightOperand);
+
+        _evaluator.Evaluate(set, data).ShouldBe(expected);
+    }
+
+    /// <summary>
+    /// Mirrors what ActionStepBody stores when an approval step resumes: the output POCO through
+    /// the dispatch serialiser, then unwrapped back into the dictionary bindings resolve against.
+    /// </summary>
+    private static Dictionary<string, object?> BuildApprovalBindingData(ApprovalOutcome outcome)
+    {
+        var output = new ApprovalDecisionOutput
+        {
+            Approved = outcome == ApprovalOutcome.Approved,
+            Outcome = outcome.ToString(),
+            Comment = "Looks good",
+            DecisionUtc = DateTime.UtcNow,
+        };
+
+        var json = JsonSerializer.Serialize(output, JsonOptions.Default);
+        var unwrapped = StepOutputReference.CreateInlineOrMarker(json, Guid.NewGuid(), int.MaxValue);
+
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["steps"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["approval"] = unwrapped,
+            },
+        };
     }
 
     #endregion

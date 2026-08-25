@@ -37,9 +37,23 @@ public class EditableModelFieldAttribute : Attribute
     public int SortOrder { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the field contains sensitive data.
-    /// When true, the value is encrypted at rest and masked in run logs.
+    /// Gets or sets a value indicating whether the field holds a secret
+    /// (an API key, client secret, shared signing key).
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Marking a field sensitive has four effects: the value is encrypted at rest, it is masked
+    /// in run logs, it is stripped when the owning entity is exported or transferred, and it is
+    /// the only kind of field permitted to reference a secret configuration key (see
+    /// <c>AutomateOptions.SecretConfigurationKeyPrefixes</c>). It also renders with a masked
+    /// editor carrying a reveal toggle, instead of a plain text box.
+    /// </para>
+    /// <para>
+    /// Set <see cref="EditorUiAlias"/> to opt out of the masked editor — masking a multi-line or
+    /// structured field, such as a JSON headers blob, would make it unusable. Sensitive values
+    /// should be strings; only string values are encrypted.
+    /// </para>
+    /// </remarks>
     public bool IsSensitive { get; set; }
 
     /// <summary>

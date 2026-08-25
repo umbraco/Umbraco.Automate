@@ -1,66 +1,41 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Umbraco.Automate.Core;
-using Umbraco.Automate.Core.Persistence;
-using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
 
 namespace Umbraco.Automate.Persistence.Notifications;
 
 /// <summary>
-/// Notification handler that runs pending EF Core migrations on application startup.
+/// Safety net that ensures Automate's schema has been migrated before the remaining
+/// <see cref="UmbracoApplicationStartedNotification"/> handlers run.
 /// </summary>
+/// <remarks>
+/// The migration itself normally happens earlier, during component initialization
+/// (<c>AutomateSchemaComponent</c>), because a Started handler is too late for callers that run on
+/// <see cref="UmbracoApplicationStartingNotification"/> — see
+/// <see href="https://github.com/umbraco/Umbraco.Automate/issues/198"/>. This handler is kept so
+/// that the schema is still initialized on any boot path that does not initialize components first,
+/// and is a no-op once it has been.
+/// </remarks>
+/// <remarks>
+/// Unlike the component, this notification is published even below <c>RuntimeLevel.Run</c>, so it can
+/// run at a point where there is no database to migrate against. It does not guard on the runtime
+/// level itself: <see cref="IAutomateSchemaInitializer"/> owns that check, precisely so this handler
+/// cannot record a failed attempt that the component would then skip past on the restart that follows
+/// an install.
+/// </remarks>
 public class RunAutomateMigrationNotificationHandler
     : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
-    private readonly IConfiguration _configuration;
-    private readonly IOptionsMonitor<ConnectionStrings> _connectionStrings;
-    private readonly AutomateReadinessSignal _readinessSignal;
-    private readonly ILogger<RunAutomateMigrationNotificationHandler> _logger;
+    private readonly IAutomateSchemaInitializer _schemaInitializer;
 
     /// <summary>
     /// Initializes a new instance of <see cref="RunAutomateMigrationNotificationHandler"/>.
     /// </summary>
-    public RunAutomateMigrationNotificationHandler(
-        IConfiguration configuration,
-        IOptionsMonitor<ConnectionStrings> connectionStrings,
-        AutomateReadinessSignal readinessSignal,
-        ILogger<RunAutomateMigrationNotificationHandler> logger)
-    {
-        _configuration = configuration;
-        _connectionStrings = connectionStrings;
-        _readinessSignal = readinessSignal;
-        _logger = logger;
-    }
+    public RunAutomateMigrationNotificationHandler(IAutomateSchemaInitializer schemaInitializer)
+        => _schemaInitializer = schemaInitializer;
 
     /// <inheritdoc />
-    public async Task HandleAsync(
+    public Task HandleAsync(
         UmbracoApplicationStartedNotification notification,
         CancellationToken cancellationToken)
-    {
-        // Create a standalone DbContext rather than using IDbContextFactory. Umbraco's EFCoreScope
-        // infrastructure shares NPoco connections (wrapped with MiniProfiler's ProfiledDbConnection)
-        // onto pooled EF Core contexts via SetDbConnection(). These tainted contexts cause
-        // NullReferenceException in SqliteDatabaseCreator.Exists() when the ProfiledDbConnection's
-        // inner connection is disposed. Creating the context directly avoids the pooled factory.
-        // See: https://github.com/umbraco/Umbraco-CMS/issues/22124
-        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(_connectionStrings, _configuration);
-        var optionsBuilder = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-        UmbracoAutomateDbContext.ConfigureProvider(optionsBuilder, connectionString, providerName);
-
-        await using UmbracoAutomateDbContext dbContext = new UmbracoAutomateDbContext(optionsBuilder.Options);
-
-        IEnumerable<string> pending = await dbContext.Database.GetPendingMigrationsAsync(cancellationToken);
-        if (pending.Any())
-        {
-            _logger.LogInformation("Running {Count} pending Automate migrations", pending.Count());
-            await dbContext.Database.MigrateAsync(cancellationToken);
-            _logger.LogInformation("Automate migrations completed successfully");
-        }
-
-        _readinessSignal.Signal();
-    }
+        => _schemaInitializer.EnsureMigratedAsync(cancellationToken);
 }

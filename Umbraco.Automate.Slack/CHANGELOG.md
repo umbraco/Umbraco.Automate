@@ -5,6 +5,24 @@ All notable changes to Umbraco.Automate.Slack will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.0.4](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@17.0.3...Umbraco.Automate.Slack@17.0.4) (2026-08-19)
+
+### fix
+
+* **provider:** Force client_secret_post for Slack OAuth token exchange ([c15f8bc](https://github.com/umbraco/Umbraco.Automate/commit/c15f8bc6f4da3cc1b13f6b41dd6d6ac6d3e57e2b)), closes [#218](https://github.com/umbraco/Umbraco.Automate/issues/218)
+
+## [17.0.3](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@17.0.1...Umbraco.Automate.Slack@17.0.3) (2026-08-10)
+
+### Internal
+
+* Bump to align with Umbraco.Automate 17.2.0 and Umbraco.Automate.OpenIddict 17.1.2.
+
+## [17.0.1](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@17.0.0...Umbraco.Automate.Slack@17.0.1) (2026-07-22)
+
+### Internal
+
+* Bump to align with Umbraco.Automate 17.1.0 and Umbraco.Automate.OpenIddict 17.1.0.
+
 ## [17.0.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@17.0.0-beta.1...Umbraco.Automate.Slack@17.0.0) (2026-07-08)
 
 ### Miscellaneous

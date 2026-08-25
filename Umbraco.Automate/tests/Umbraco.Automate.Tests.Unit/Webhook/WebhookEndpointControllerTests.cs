@@ -27,7 +27,7 @@ public class WebhookEndpointControllerTests
     public WebhookEndpointControllerTests()
     {
         var configuration = new ConfigurationBuilder().Build();
-        var modelResolver = new EditableModelResolver(configuration);
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(configuration));
         var triggers = new TriggerCollection(() =>
         {
             var deps = new TriggerInfrastructure(modelResolver);

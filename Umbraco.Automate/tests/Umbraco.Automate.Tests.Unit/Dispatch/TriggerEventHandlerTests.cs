@@ -45,7 +45,7 @@ public class TriggerEventHandlerTests
         _nodeAuthorizer.Setup(a => a.AuthorizeMediaAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(AutomationAuthorizationResult.Success);
 
-        var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(new ConfigurationBuilder().Build()));
         _triggers = new TriggerCollection(() =>
         {
             var infra = new TriggerInfrastructure(modelResolver);
@@ -739,7 +739,7 @@ public class TriggerEventHandlerTests
         var first = new RecordingAuthorizer(deny: true, reason: "first");
         var second = new RecordingAuthorizer(deny: true, reason: "second");
 
-        var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(new ConfigurationBuilder().Build()));
         var triggers = new TriggerCollection(() => new ITrigger[]
         {
             new ContentSavedTrigger(new TriggerInfrastructure(modelResolver)),
@@ -783,7 +783,7 @@ public class TriggerEventHandlerTests
         // Section gate is enough on its own: with no authorisers registered, a trigger that
         // passes section access (or has no section requirements) should dispatch normally.
         // Matches the manual / scheduled trigger code path where no node-scoping applies.
-        var modelResolver = new EditableModelResolver(new ConfigurationBuilder().Build());
+        var modelResolver = new EditableModelResolver(new ConfigurationReferenceResolver(new ConfigurationBuilder().Build()));
         var triggers = new TriggerCollection(() => new ITrigger[]
         {
             new ContentSavedTrigger(new TriggerInfrastructure(modelResolver)),

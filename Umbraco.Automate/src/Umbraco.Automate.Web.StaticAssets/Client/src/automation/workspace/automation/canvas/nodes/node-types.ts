@@ -4,6 +4,8 @@ import TriggerPlaceholderNode from "./TriggerPlaceholderNode.js";
 import ActionNode from "./ActionNode.js";
 import IfNode from "./IfNode.js";
 import SwitchNode from "./SwitchNode.js";
+import ApprovalNode from "./ApprovalNode.js";
+import ContainerNode from "./ContainerNode.js";
 
 export const nodeTypes: NodeTypes = {
     trigger: TriggerNode,
@@ -11,4 +13,6 @@ export const nodeTypes: NodeTypes = {
     action: ActionNode,
     if: IfNode,
     switch: SwitchNode,
+    approval: ApprovalNode,
+    container: ContainerNode,
 };

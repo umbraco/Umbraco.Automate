@@ -5,6 +5,70 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.3.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.2.0...Umbraco.Automate@17.3.0) (2026-08-19)
+
+### feat
+
+* **ui:** Add body and done ports to container control flow nodes ([b63df5c](https://github.com/umbraco/Umbraco.Automate/commit/b63df5c27b4f647f1ac2000f11b775c1786053c4))
+
+### fix
+
+* **api:** Guard System.Type Swagger mapping against duplicate registration ([816f1fa](https://github.com/umbraco/Umbraco.Automate/commit/816f1faa4e191c9584c704d41bc4d48d723d60d7)), closes [#225](https://github.com/umbraco/Umbraco.Automate/issues/225)
+* **core:** Address Copilot review feedback on startup connection fallback ([984c54c](https://github.com/umbraco/Umbraco.Automate/commit/984c54c31914bb5a5d624e8c4c7cafb4f0f947e3)), closes [#236](https://github.com/umbraco/Umbraco.Automate/issues/236)
+* **core:** Avoid false-alarm error log on workflow lock acquire race ([dd7c1bf](https://github.com/umbraco/Umbraco.Automate/commit/dd7c1bf5fba363b15bb1e1202d1a654df6fdd083)), closes [#224](https://github.com/umbraco/Umbraco.Automate/issues/224) [#234](https://github.com/umbraco/Umbraco.Automate/issues/234) [#224](https://github.com/umbraco/Umbraco.Automate/issues/224)
+* **core:** Do not throw when no connection string is configured at startup ([bb7779b](https://github.com/umbraco/Umbraco.Automate/commit/bb7779b382cfbc17ea01a7d9fb2f1e686257a8e1)), closes [#226](https://github.com/umbraco/Umbraco.Automate/issues/226)
+* **core:** Warn when a container has multiple done connections ([f880d5b](https://github.com/umbraco/Umbraco.Automate/commit/f880d5bd1e193ad493c2b6ffce4689225f6e3a50))
+* **ui:** Allow multiple branches from a Parallel container's body handle ([49ab1a1](https://github.com/umbraco/Umbraco.Automate/commit/49ab1a101b2893068866bcf72a459f69b50aa1f2))
+* **ui:** Drop workspace user groups that no longer resolve ([214bf9f](https://github.com/umbraco/Umbraco.Automate/commit/214bf9f8e37bdc7700e30133af875a960d1d8896)), closes [#228](https://github.com/umbraco/Umbraco.Automate/issues/228)
+
+## [17.2.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.1.0...Umbraco.Automate@17.2.0) (2026-08-10)
+
+### ⚠ BREAKING CHANGE
+
+* **action:** an approval step configured with StepErrorBehavior.Terminate no
+longer stops the run on a refusal. It follows the rejected path, or completes if
+nothing is wired there, and the run reports Rejected rather than Failed.
+* **action:** step output `outcome` is now "Approved"/"Rejected" rather than
+0/1. Any condition written against the numeric value needs updating. The field
+was absent from the binding picker, so this is expected to affect nobody.
+
+### feat
+
+* **action:** Add approved and rejected outcome handles to Request Approval (v17 backport) ([edaf6b1](https://github.com/umbraco/Umbraco.Automate/commit/edaf6b11fbe72d7cba98bae2ed45da120bd9455d)), closes [#200](https://github.com/umbraco/Umbraco.Automate/issues/200)
+* **action:** Declare an output type for the Request Approval step (v17 backport) ([326be27](https://github.com/umbraco/Umbraco.Automate/commit/326be271f884a2a8018b6abf12061d361cb2425b)), closes [#199](https://github.com/umbraco/Umbraco.Automate/issues/199)
+* **frontend:** Mask sensitive settings fields as password input ([3de0802](https://github.com/umbraco/Umbraco.Automate/commit/3de0802a6d2ee775319867c66c31a951ce6e597b)), closes [#161](https://github.com/umbraco/Umbraco.Automate/issues/161)
+* **settings:** Mask sensitive fields with a dedicated masked editor ([057d081](https://github.com/umbraco/Umbraco.Automate/commit/057d081e41aa188b3c1dfe7a55fce639be273437)), closes [#161](https://github.com/umbraco/Umbraco.Automate/issues/161)
+
+### fix
+
+* **action:** Set a VariationContext when reading published property values ([861202e](https://github.com/umbraco/Umbraco.Automate/commit/861202ed90a41482a16aa6e70c92a653af3e941d)), closes [#205](https://github.com/umbraco/Umbraco.Automate/issues/205)
+* **core:** Enlist Automate's DbContext in the ambient Umbraco transaction on a shared database ([8139016](https://github.com/umbraco/Umbraco.Automate/commit/8139016b06c2c07d82859a9e363135185fa03f7f)), closes [#197](https://github.com/umbraco/Umbraco.Automate/issues/197)
+* **core:** Migrate Automate's schema before Deploy's boot-time restore ([2d9541b](https://github.com/umbraco/Umbraco.Automate/commit/2d9541bb2dbbb5ad1af2e6cd1d425626a7000b6c)), closes [#198](https://github.com/umbraco/Umbraco.Automate/issues/198)
+* **core:** Move the schema migration runtime-level guard into the initializer ([300a32f](https://github.com/umbraco/Umbraco.Automate/commit/300a32f55578fbcb85af4798c2b4a834437ca04b))
+* **ui:** Guard against stale service account resolution responses ([1bd07a1](https://github.com/umbraco/Umbraco.Automate/commit/1bd07a19cffc3224c2e85dae39c71c3e8e11ad96))
+* **ui:** Handle unresolved workspace service account in picker ([2da1562](https://github.com/umbraco/Umbraco.Automate/commit/2da15626e58e31f415fd7e58a3767dfdcd662cdf)), closes [#214](https://github.com/umbraco/Umbraco.Automate/issues/214)
+
+### perf
+
+* **core:** Offload large trigger outputs from the workflow blob (v17 backport) (#196) ([a9672fd](https://github.com/umbraco/Umbraco.Automate/commit/a9672fdc0ab6a1f3c37964010424fe0672e84f9e)), closes [#196](https://github.com/umbraco/Umbraco.Automate/issues/196) [#182](https://github.com/umbraco/Umbraco.Automate/issues/182)
+
+## [17.1.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.0.0...Umbraco.Automate@17.1.0) (2026-07-22)
+
+### feat
+
+* **ui:** Allow manual Run now for Scheduled-trigger automations ([0254815](https://github.com/umbraco/Umbraco.Automate/commit/02548156bf7b53bf429942cfbc9febd0b7cec2f5))
+
+### fix
+
+* **core:** Defer Automate database writes until startup migrations finish ([2689d7b](https://github.com/umbraco/Umbraco.Automate/commit/2689d7baa35a9200b23f654ea36b753edc8c98cd))
+* **core:** Degrade gracefully when startup migrations fail ([381f3eb](https://github.com/umbraco/Umbraco.Automate/commit/381f3eb967c8883ee90815988d17dbd90b3d51d6))
+* **core:** Fail fast instead of hanging when startup migrations fail ([5d44d92](https://github.com/umbraco/Umbraco.Automate/commit/5d44d92b8dfa929350a663a3b2e5b03d66ea7fd6))
+* **core:** Populate ScheduledTriggerOutput on real CRON fires ([b3d71d9](https://github.com/umbraco/Umbraco.Automate/commit/b3d71d9d6360db85df05a0c568ca31ab6082a423))
+* **core:** Resolve step-output bindings case-insensitively after persistence round-trip ([b0ac50e](https://github.com/umbraco/Umbraco.Automate/commit/b0ac50e46023ea9158a6b9976e2e23a90a09598d)), closes [#112](https://github.com/umbraco/Umbraco.Automate/issues/112)
+* **settings:** Resolve config references embedded within larger string values ([6e70e30](https://github.com/umbraco/Umbraco.Automate/commit/6e70e30f2e016a09cb393049596ca79782421fc0)), closes [#159](https://github.com/umbraco/Umbraco.Automate/issues/159)
+* **trigger:** Fail closed on trigger dispatch when migrations permanently fail ([1b72483](https://github.com/umbraco/Umbraco.Automate/commit/1b72483385ed1458199fd2877c7e0f8c48f15286))
+* **ui:** Discard unconfigured trigger/action when settings modal is closed ([d57116b](https://github.com/umbraco/Umbraco.Automate/commit/d57116b593f132060f2f1afe6b60e68f12ce039f))
+
 ## [17.0.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.0.0-beta.1...Umbraco.Automate@17.0.0) (2026-07-08)
 
 ### ⚠ BREAKING CHANGE
