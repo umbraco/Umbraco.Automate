@@ -47,8 +47,8 @@
   </ItemGroup>
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
-    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.5.0, 7.999.999)" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.5.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.6.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.6.0, 7.999.999)" />
   </ItemGroup>
   <!-- Shared dependencies -->
   <!-- 10.0.10 floor matches the .NET runtime libraries Umbraco.Cms 18.1.0 bundles; keep in lockstep with the host CMS. -->
