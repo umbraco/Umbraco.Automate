@@ -155,19 +155,29 @@ export async function buildBindingSources(
     const forEachStep = findNearestForEach(steps, predecessorIds);
     if (forEachStep) {
         const itemSchema = resolveLoopItemSchema(forEachStep, triggerOutputSchema, steps, stepSchemas);
-        const loopLeaves: BindingLeaf[] = [{ path: "index", label: "index", type: "integer" }];
 
-        if (itemSchema) {
-            // Always expose the bare `item` so primitive-typed arrays (e.g. string[])
-            // and whole-object pass-through both work from the picker.
-            loopLeaves.push({
+        // Always expose the bare `item` so primitive-typed arrays (e.g. string[])
+        // and whole-object pass-through both work from the picker.
+        const loopLeaves: BindingLeaf[] = [
+            {
                 path: "item",
                 label: "item",
-                type: (itemSchema.type as string) ?? "unknown",
-            });
+                type: (itemSchema?.type as string) ?? "unknown"
+            },
+            {
+                path: "index",
+                label: "index",
+                type: "integer"
+            }
+        ];
 
+        if (itemSchema) {
             for (const leaf of flattenJsonSchema(itemSchema)) {
-                loopLeaves.push({ ...leaf, path: `item.${leaf.path}`, label: leaf.label });
+                loopLeaves.push({
+                    ...leaf,
+                    path: `item.${leaf.path}`,
+                    label: leaf.label
+                });
             }
         }
 
@@ -176,7 +186,7 @@ export async function buildBindingSources(
             label: "Loop",
             icon: "icon-repeat",
             bindingPrefix: "loop",
-            leaves: loopLeaves,
+            leaves: loopLeaves
         });
     }
 
