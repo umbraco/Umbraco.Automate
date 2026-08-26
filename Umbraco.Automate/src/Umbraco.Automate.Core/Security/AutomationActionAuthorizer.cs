@@ -160,6 +160,8 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
         // acceptable; result sets are bounded by the calling action's Limit (default ~50).
         foreach (var key in keys)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var status = await _mediaPermissionService.AuthorizeAccessAsync(user, [key]);
             if (status == MediaAuthorizationStatus.Success)
             {
