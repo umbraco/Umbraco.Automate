@@ -35,9 +35,9 @@ public sealed class FindContentMatch
     /// <summary>Gets the culture the name match was made against, or null for invariant.</summary>
     public string? Culture { get; init; }
 
-    /// <summary>Gets the creation timestamp (UTC). Epoch if unavailable.</summary>
+    /// <summary>Gets the creation timestamp (UTC). Default (0001-01-01) if unavailable.</summary>
     public DateTime CreateDate { get; init; }
 
-    /// <summary>Gets the last-edited timestamp (UTC). Epoch if unavailable.</summary>
+    /// <summary>Gets the last-edited timestamp (UTC). Default (0001-01-01) if unavailable.</summary>
     public DateTime UpdateDate { get; init; }
 }
