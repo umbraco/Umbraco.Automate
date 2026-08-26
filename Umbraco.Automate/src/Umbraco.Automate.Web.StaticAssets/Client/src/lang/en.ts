@@ -110,16 +110,7 @@ export default {
         copyUrl: "Copy URL",
         urlCopied: "Webhook URL copied to clipboard.",
         urlCopyFailed: "Could not copy the URL. Select the value manually.",
-        testHeadline: "Test request",
-        testDescription:
-            "Paste the JSON body an external caller would send. Runs the published automation, so save and publish before testing your latest changes.",
-        testHeadersLabel: "Test request headers",
-        testHeadersDescription:
-            "Optional JSON object, layered over the default Content-Type: application/json.",
-        sendTest: "Send test request",
-        testSent: "Test request sent",
-        testFailed: "Could not send the test request",
-        testHeadersInvalid: "Headers must be a JSON object.",
+        urlLoadFailed: "Could not load the webhook URL.",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
