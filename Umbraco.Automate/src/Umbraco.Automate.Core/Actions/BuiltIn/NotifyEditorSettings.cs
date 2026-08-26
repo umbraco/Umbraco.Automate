@@ -11,7 +11,11 @@ public sealed class NotifyEditorSettings
     /// <summary>
     /// Gets or sets the key (GUID) of the content item whose editor should be notified.
     /// </summary>
-    [Field(Label = "Content Key", Description = "The key of the content item whose editor should be notified.", SupportsBindings = true)]
+    [Field(
+        Label = "Content Key",
+        Description = "The content item whose editor should be notified.",
+        EditorUiAlias = Constants.EditorUiAliases.ContentKeyPicker,
+        SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>

@@ -9,6 +9,7 @@ import { webhookMethodPickerManifests } from "./components/webhook-method-picker
 import { webhookSecretFieldManifests } from "./components/webhook-secret-field/manifests.js";
 import { sensitiveFieldManifests } from "./components/sensitive-field/manifests.js";
 import { editorNotificationSeverityPickerManifests } from "./components/editor-notification-severity-picker/manifests.js";
+import { entityKeyPickerManifests } from "./components/entity-key-picker/manifests.js";
 import { memberTypePickerManifests } from "./components/member-type-picker/manifests.js";
 import { userGroupPickerManifests } from "./components/user-group-picker/manifests.js";
 
@@ -24,6 +25,7 @@ export const manifests: UmbExtensionManifest[] = [
     ...webhookSecretFieldManifests,
     ...sensitiveFieldManifests,
     ...editorNotificationSeverityPickerManifests,
+    ...entityKeyPickerManifests,
     ...memberTypePickerManifests,
     ...userGroupPickerManifests,
 ];

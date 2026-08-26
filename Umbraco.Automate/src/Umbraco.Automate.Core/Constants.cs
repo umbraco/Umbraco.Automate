@@ -16,6 +16,28 @@ public static class Constants
     public const string DatabaseMigrationPrefix = "UmbracoAutomate_";
 
     /// <summary>
+    /// Property editor UI aliases contributed by Umbraco.Automate, for use on
+    /// <see cref="Settings.EditableModelFieldAttribute.EditorUiAlias"/>. Provider packages
+    /// can point their own settings fields at these to get the same editors.
+    /// </summary>
+    public static class EditorUiAliases
+    {
+        /// <summary>
+        /// Editor for a field holding a single document key: a content tree picker with a
+        /// toggle into a <c>${ }</c> binding. Must match the manifest alias in
+        /// core/components/entity-key-picker/manifests.ts.
+        /// </summary>
+        public const string ContentKeyPicker = "Umb.Automate.ContentKeyPicker";
+
+        /// <summary>
+        /// Editor for a field holding a single media key. The media counterpart of
+        /// <see cref="ContentKeyPicker"/>. Must match the manifest alias in
+        /// core/components/entity-key-picker/manifests.ts.
+        /// </summary>
+        public const string MediaKeyPicker = "Umb.Automate.MediaKeyPicker";
+    }
+
+    /// <summary>
     /// Section constants for Umbraco.Automate.
     /// </summary>
     internal static class Sections

@@ -12,7 +12,8 @@ public sealed class UpdateContentPropertySettings
     /// </summary>
     [Field(
         Label = "Content Key",
-        Description = "The key of the content item to update.",
+        Description = "The content item to update.",
+        EditorUiAlias = Constants.EditorUiAliases.ContentKeyPicker,
         SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 

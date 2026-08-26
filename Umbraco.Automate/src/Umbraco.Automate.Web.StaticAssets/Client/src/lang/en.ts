@@ -129,6 +129,10 @@ export default {
         noData: "No binding data available.",
         noResults: "No matching bindings found.",
     },
+    uaEntityPicker: {
+        useBinding: "Use a binding expression",
+        expressionPlaceholder: "${ trigger.contentKey }",
+    },
     uaSettings: {
         noSettings: "This item has no configurable settings.",
     },

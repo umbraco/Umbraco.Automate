@@ -13,7 +13,8 @@ public sealed class GetContentSettings
     /// </summary>
     [Field(
         Label = "Content Key",
-        Description = "The key of the content item to fetch.",
+        Description = "The content item to fetch.",
+        EditorUiAlias = Constants.EditorUiAliases.ContentKeyPicker,
         SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 

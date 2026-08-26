@@ -12,7 +12,8 @@ public sealed class GetContentPropertySettings
     /// </summary>
     [Field(
         Label = "Content Key",
-        Description = "The key of the content item to read from.",
+        Description = "The content item to read from.",
+        EditorUiAlias = Constants.EditorUiAliases.ContentKeyPicker,
         SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
