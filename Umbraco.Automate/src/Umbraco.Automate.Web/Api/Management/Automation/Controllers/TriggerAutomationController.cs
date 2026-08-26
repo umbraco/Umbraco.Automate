@@ -21,6 +21,7 @@ public sealed class TriggerAutomationController : AutomationControllerBase
     private readonly IAutomationExecutor _executor;
     private readonly ICircuitBreakerService _circuitBreaker;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
+    private readonly TriggerCollection _triggers;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TriggerAutomationController"/> class.
@@ -30,13 +31,15 @@ public sealed class TriggerAutomationController : AutomationControllerBase
         IAuthorizationService authorizationService,
         IAutomationExecutor executor,
         ICircuitBreakerService circuitBreaker,
-        IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
+        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        TriggerCollection triggers)
     {
         _automationService = automationService;
         _authorizationService = authorizationService;
         _executor = executor;
         _circuitBreaker = circuitBreaker;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
+        _triggers = triggers;
     }
 
     /// <summary>
@@ -45,6 +48,7 @@ public sealed class TriggerAutomationController : AutomationControllerBase
     [HttpPost("{id:guid}/trigger")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> TriggerAutomation(
@@ -85,11 +89,35 @@ public sealed class TriggerAutomationController : AutomationControllerBase
         // Matches the pattern used by ReplayRunController.
         var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key;
 
+        // Triggers that can be run on demand supply their own stand-in for the payload they
+        // would normally wait on — the webhook trigger builds one from its saved test request,
+        // so an automation can be exercised without an external caller. Triggers that need no
+        // payload return nothing, and ones that never opted in are simply started bare.
+        Dictionary<string, object?>? triggerOutputData = null;
+        var trigger = automation.Trigger is not null ? _triggers.GetByAlias(automation.Trigger.TriggerAlias) : null;
+        if (trigger is ISupportsManualRun runnableTrigger)
+        {
+            var settings = automation.Trigger?.Settings is { Count: > 0 } rawSettings
+                ? trigger.ResolveSettings(rawSettings)
+                : null;
+
+            var manualRunOutput = runnableTrigger.CreateManualRunOutput(settings);
+            if (!manualRunOutput.Success)
+            {
+                return BadRequest(new ProblemDetailsBuilder()
+                    .WithTitle("Trigger settings invalid")
+                    .WithDetail(manualRunOutput.Error!)
+                    .Build());
+            }
+
+            triggerOutputData = manualRunOutput.Data;
+        }
+
         await _executor.ExecuteAsync(
             automation,
             TriggerInitiatorType.User,
             initiatorId: userKey?.ToString(),
-            triggerOutputData: null,
+            triggerOutputData,
             cancellationToken);
 
         return Accepted();

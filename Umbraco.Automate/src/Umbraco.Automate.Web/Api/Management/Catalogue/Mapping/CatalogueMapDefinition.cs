@@ -55,6 +55,9 @@ public class CatalogueMapDefinition : IMapDefinition
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
         target.HasDynamicOutputSchema = source.HasDynamicOutputSchema;
+        // Opting into the capability is what makes "Run now" available for the trigger, so the
+        // backoffice can ask the catalogue rather than keep its own list of runnable aliases.
+        target.SupportsManualRun = source is ISupportsManualRun;
         target.Type = "trigger";
     }
 

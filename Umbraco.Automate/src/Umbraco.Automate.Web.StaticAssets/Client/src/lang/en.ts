@@ -104,6 +104,14 @@ export default {
         disabledBanner:
             "This automation was auto-disabled by the circuit breaker after repeated failures. Fix the configuration, then re-enable it.",
     },
+    uaWebhook: {
+        headline: "Webhook",
+        unsavedHint: "Save this automation to get its webhook URL.",
+        copyUrl: "Copy URL",
+        urlCopied: "Webhook URL copied to clipboard.",
+        urlCopyFailed: "Could not copy the URL. Select the value manually.",
+        urlLoadFailed: "Could not load the webhook URL.",
+    },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
             `Are you sure you want to delete "${label}"?`,
