@@ -8,7 +8,7 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
     Description = "Fires when the automation is triggered manually.",
     Group = "Core",
     Icon = "icon-hand-pointer")]
-public sealed class ManualTrigger : TriggerBase<object, object>
+public sealed class ManualTrigger : TriggerBase<object, object>, ISupportsManualRun
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ManualTrigger"/> class.
@@ -16,4 +16,8 @@ public sealed class ManualTrigger : TriggerBase<object, object>
     public ManualTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
     {
     }
+
+    /// <inheritdoc />
+    /// <remarks>Running on demand <em>is</em> this trigger — there is no payload to stand in for.</remarks>
+    public ManualRunOutput CreateManualRunOutput(object? settings) => ManualRunOutput.None;
 }
