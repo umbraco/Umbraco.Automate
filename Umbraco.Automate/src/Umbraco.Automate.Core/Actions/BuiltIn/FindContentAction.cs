@@ -101,8 +101,9 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
 
         // Picker stores content-type KEYS; Examine indexes only aliases, so resolve here.
         // A key that doesn't resolve is silently dropped — a stale picker selection
-        // shouldn't hard-fail the automation, but if every key is stale the caller ends
-        // up with an empty alias list and gets zero matches, which is the right signal.
+        // shouldn't hard-fail the automation. Note this means a CSV that resolves to zero
+        // aliases (e.g. every key is stale) omits the type filter entirely rather than
+        // matching nothing — BuildQuery only appends the filter clause when non-empty.
         var contentTypeAliases = ResolveContentTypeAliases(settings.ContentTypes);
 
         var indexName = settings.IncludeUnpublished
