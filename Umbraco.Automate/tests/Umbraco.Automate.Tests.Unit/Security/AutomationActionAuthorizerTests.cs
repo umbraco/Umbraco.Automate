@@ -157,6 +157,52 @@ public class AutomationActionAuthorizerTests
         result.Count.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task FilterAuthorizedMediaAsync_returns_empty_for_empty_input()
+    {
+        var (sut, _, _, _) = BuildSut(withUser: true);
+
+        var result = await sut.FilterAuthorizedMediaAsync([], default);
+
+        result.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task FilterAuthorizedMediaAsync_returns_only_authorized_keys()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+        var allowed = Guid.NewGuid();
+        var denied = Guid.NewGuid();
+
+        // Per-key sequential calls — match by the first media key in the IEnumerable.
+        media
+            .Setup(s => s.AuthorizeAccessAsync(
+                It.IsAny<IUser>(),
+                It.Is<IEnumerable<Guid>>(keys => keys.First() == allowed)))
+            .ReturnsAsync(MediaAuthorizationStatus.Success);
+
+        media
+            .Setup(s => s.AuthorizeAccessAsync(
+                It.IsAny<IUser>(),
+                It.Is<IEnumerable<Guid>>(keys => keys.First() == denied)))
+            .ReturnsAsync(MediaAuthorizationStatus.UnauthorizedMissingPathAccess);
+
+        var result = await sut.FilterAuthorizedMediaAsync([allowed, denied], default);
+
+        result.ShouldContain(allowed);
+        result.ShouldNotContain(denied);
+    }
+
+    [Fact]
+    public async Task FilterAuthorizedMediaAsync_returns_empty_when_no_backoffice_identity()
+    {
+        var (sut, _, _, _) = BuildSut(withUser: false);
+
+        var result = await sut.FilterAuthorizedMediaAsync([Guid.NewGuid(), Guid.NewGuid()], default);
+
+        result.Count.ShouldBe(0);
+    }
+
     private static (AutomationActionAuthorizer Sut,
                     Mock<IContentPermissionService> Content,
                     Mock<IMediaPermissionService> Media,

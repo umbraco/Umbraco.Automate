@@ -135,6 +135,41 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
         return authorized;
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlySet<Guid>> FilterAuthorizedMediaAsync(
+        IEnumerable<Guid> mediaKeys,
+        CancellationToken cancellationToken)
+    {
+        var keys = mediaKeys as IReadOnlyCollection<Guid> ?? mediaKeys.ToList();
+        if (keys.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            // Without an identity we cannot authorise anything — fail closed and return empty.
+            return new HashSet<Guid>();
+        }
+
+        var authorized = new HashSet<Guid>();
+
+        // CMS's permission service authorises a *batch* of keys atomically — a single failure
+        // returns failure for the whole call. We need per-key results, so loop. Sequential is
+        // acceptable; result sets are bounded by the calling action's Limit (default ~50).
+        foreach (var key in keys)
+        {
+            var status = await _mediaPermissionService.AuthorizeAccessAsync(user, [key]);
+            if (status == MediaAuthorizationStatus.Success)
+            {
+                authorized.Add(key);
+            }
+        }
+
+        return authorized;
+    }
+
     private Task<ContentAuthorizationStatus> AuthorizeContentKeyAsync(
         IUser user,
         Guid contentKey,

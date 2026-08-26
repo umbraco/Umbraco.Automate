@@ -41,6 +41,16 @@ public interface IAutomationActionAuthorizer
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Filters a set of media keys to only those the ambient service account is authorised
+    /// to access. Used by search/list actions to suppress unauthorised results. Media has no
+    /// per-permission verbs, so unlike <see cref="FilterAuthorizedContentAsync"/> this takes
+    /// no permission set.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> FilterAuthorizedMediaAsync(
+        IEnumerable<Guid> mediaKeys,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Authorises an explicit user for the given content node and permissions. Used by the
     /// trigger dispatcher, which resolves the workspace service account before any action
     /// middleware has had a chance to set the ambient accessor.
