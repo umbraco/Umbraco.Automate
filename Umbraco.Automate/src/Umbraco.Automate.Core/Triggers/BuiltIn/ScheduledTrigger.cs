@@ -9,7 +9,7 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
     Description = "Fires on a configurable CRON schedule.",
     Group = "Core",
     Icon = "icon-time")]
-public sealed class ScheduledTrigger : ScheduledTriggerBase<ScheduledTriggerSettings, ScheduledTriggerOutput>
+public sealed class ScheduledTrigger : ScheduledTriggerBase<ScheduledTriggerSettings, ScheduledTriggerOutput>, ISupportsManualRun
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ScheduledTrigger"/> class.
@@ -17,6 +17,13 @@ public sealed class ScheduledTrigger : ScheduledTriggerBase<ScheduledTriggerSett
     public ScheduledTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
     {
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// An on-demand run is the scheduled run brought forward, so there is no payload to stand
+    /// in for — the schedule itself is the only thing being skipped.
+    /// </remarks>
+    public ManualRunOutput CreateManualRunOutput(object? settings) => ManualRunOutput.None;
 
     /// <inheritdoc />
     public override string GetCronExpression(object? settings)

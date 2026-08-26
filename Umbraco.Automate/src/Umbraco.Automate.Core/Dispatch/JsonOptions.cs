@@ -88,17 +88,11 @@ internal static class JsonOptions
     public static Dictionary<string, object?> DeserializeToUnwrappedDictionary(string json)
     {
         var raw = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, Default);
-        return raw is null
-            ? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-            : UnwrapDictionary(raw);
-    }
+        if (raw is null)
+        {
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
 
-    /// <summary>
-    /// Converts an already-deserialized <see cref="JsonElement"/> dictionary (e.g. one model-bound
-    /// from a request body) into a case-insensitive dictionary with unwrapped primitive values.
-    /// </summary>
-    public static Dictionary<string, object?> UnwrapDictionary(IDictionary<string, JsonElement> raw)
-    {
         var result = new Dictionary<string, object?>(raw.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, element) in raw)
         {

@@ -26,6 +26,7 @@ export const UaCatalogueTypeMapper = {
             settingsSchema: response.settingsSchema ?? null,
             outputSchema: response.outputSchema ?? null,
             hasDynamicOutputSchema: response.hasDynamicOutputSchema,
+            supportsManualRun: response.supportsManualRun,
         };
     },
 

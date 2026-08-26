@@ -13,6 +13,8 @@ export interface UaTriggerCatalogueItemModel extends UaCatalogueItemModel {
     outputSchema: { [key: string]: unknown } | null;
     /** When true, the output schema depends on the step's settings and must be resolved via the catalogue resolve endpoint. */
     hasDynamicOutputSchema: boolean;
+    /** When true, an automation using this trigger can be started on demand ("Run now"). */
+    supportsManualRun: boolean;
 }
 
 export interface UaActionCatalogueItemModel extends UaCatalogueItemModel {

@@ -7,6 +7,10 @@ import { UA_WEBHOOK_TRIGGER_ALIAS } from "../../triggers/constants.js";
 import "../../../core/components/settings-form/settings-form.element.js";
 import "./webhook-trigger-panel.element.js";
 
+/** Keys of the webhook trigger's own settings fields, shown inside the webhook panel's box
+ * (alongside the URL) rather than the main settings form. */
+const UA_WEBHOOK_PANEL_FIELD_KEYS = ["testRequestBody", "testRequestHeaders"];
+
 @customElement("ua-trigger-settings-modal")
 export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
     UaTriggerSettingsModalData,
@@ -25,8 +29,11 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
         this._settings = { ...this.data?.settings };
     }
 
+    // Two independent forms contribute to `_settings` (the main settings form, and the webhook
+    // panel's own nested form for its test-request fields) — merge each one's slice in rather
+    // than replacing, so saving one doesn't drop the other's values.
     #onSettingsChange(event: CustomEvent<SettingsChangeDetail>) {
-        this._settings = event.detail.settings;
+        this._settings = { ...this._settings, ...event.detail.settings };
     }
 
     async #onSubmit() {
@@ -46,21 +53,20 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
     }
 
     /**
-     * Webhook triggers get the endpoint URL and a test request alongside their settings, so the
-     * URL is to hand while configuring the signing secret. The panel reads the allowed method
-     * from the live form values rather than the saved settings.
+     * Webhook triggers get the endpoint URL and their own test-request fields grouped together
+     * in one box, so the URL is to hand right alongside the data used to exercise it.
      */
     #renderWebhookPanel() {
         if (this.data?.triggerAlias !== UA_WEBHOOK_TRIGGER_ALIAS) return nothing;
 
-        // Settings values are untyped, so only trust an actual string — anything else would
-        // stringify into a nonsense method on the attribute.
-        const allowedMethod = this._settings.allowedMethod;
+        const testFields = this.data.schema.fields.filter((f) => UA_WEBHOOK_PANEL_FIELD_KEYS.includes(f.key));
 
         return html`
             <ua-webhook-trigger-panel
                 automation-id=${this.data.automationId}
-                allowed-method=${typeof allowedMethod === "string" && allowedMethod ? allowedMethod : "POST"}
+                .testFields=${testFields}
+                .values=${this._settings}
+                @ua:settings-change=${this.#onSettingsChange}
             ></ua-webhook-trigger-panel>
         `;
     }
@@ -68,12 +74,14 @@ export class UaTriggerSettingsModalElement extends UmbModalBaseElement<
     override render() {
         if (!this.data) return html``;
 
+        const mainFields = this.data.schema.fields.filter((f) => !UA_WEBHOOK_PANEL_FIELD_KEYS.includes(f.key));
+
         return html`
             <umb-body-layout .headline=${this.data.triggerName}>
                 <div id="content">
                     <ua-settings-form
                         label-on-top
-                        .fields=${this.data.schema.fields}
+                        .fields=${mainFields}
                         .values=${this._settings}
                         @ua:settings-change=${this.#onSettingsChange}
                     ></ua-settings-form>
