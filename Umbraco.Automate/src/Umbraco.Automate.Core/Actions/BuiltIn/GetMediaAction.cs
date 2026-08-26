@@ -167,7 +167,7 @@ public sealed class GetMediaAction : ActionBase<GetMediaSettings, GetMediaOutput
         };
 
     // Media items have no Url() extension the way content does — the file URL is read
-    // off the conventional 'umbracoFile' property. GetMediaUrl returns string.Empty when
+    // off the conventional 'umbracoFile' property. MediaUrl() returns string.Empty when
     // that property doesn't exist on the media type, which we normalise to null.
     private string? ResolveUrl(IPublishedContent media, string? culture)
     {
