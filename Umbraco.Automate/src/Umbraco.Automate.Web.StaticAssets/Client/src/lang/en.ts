@@ -118,6 +118,11 @@ export default {
             "This automation is degraded — its recent error rate is high. It will be auto-disabled if errors continue.",
         disabledBanner:
             "This automation was auto-disabled by the circuit breaker after repeated failures. Fix the configuration, then re-enable it.",
+        disconnectedStepsWarningHeadline: "Steps not connected to the trigger",
+        disconnectedStepsWarningOne: (name: string) =>
+            `Step "${name}" isn't connected to the trigger, so it won't run.`,
+        disconnectedStepsWarningMany: (count: number, names: string) =>
+            `${count} steps aren't connected to the trigger, so they won't run: ${names}`,
     },
     uaWebhook: {
         headline: "Webhook",
