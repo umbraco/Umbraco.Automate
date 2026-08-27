@@ -325,8 +325,6 @@
 .ua-edge__label {
     font-size: 11px;
     color: var(--uui-color-text-alt, #6b7280);
-    background: var(--uui-color-surface, #fff);
-    padding: 0 4px;
     white-space: nowrap;
 }
 
