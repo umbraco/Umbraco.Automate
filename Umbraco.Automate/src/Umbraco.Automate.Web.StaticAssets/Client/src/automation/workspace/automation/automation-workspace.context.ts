@@ -118,7 +118,11 @@ export class UaAutomationWorkspaceContext
 
         const { error } = await tryExecute(
             this,
-            AutomationsService.postAutomationsByIdPublish({ path: { id: unique } }),
+            // throwOnError: tryExecute only auto-notifies (toast) and populates `error` on a
+            // rejected promise — the generated SDK client resolves 4xx/5xx responses normally
+            // by default, which would otherwise leave publish failures (e.g. dangling binding
+            // references) silently unreported in the UI.
+            AutomationsService.postAutomationsByIdPublish({ path: { id: unique }, throwOnError: true }),
         );
 
         if (error) throw error;
@@ -133,7 +137,7 @@ export class UaAutomationWorkspaceContext
 
         const { error } = await tryExecute(
             this,
-            AutomationsService.postAutomationsByIdUnpublish({ path: { id: unique } }),
+            AutomationsService.postAutomationsByIdUnpublish({ path: { id: unique }, throwOnError: true }),
         );
 
         if (error) throw error;
