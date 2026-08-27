@@ -8,6 +8,8 @@ import {
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
+import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
+import { UmbLocalizationController } from "@umbraco-cms/backoffice/localization-api";
 import { UmbRequestReloadStructureForEntityEvent } from "@umbraco-cms/backoffice/entity-action";
 import {
     UA_AUTOMATION_WORKSPACE_ALIAS,
@@ -20,6 +22,7 @@ import type { UaAutomationDetailModel } from "../../types.js";
 import { UA_EMPTY_GUID } from "../../../core/index.js";
 import { UaAutomationWorkspaceEditorElement } from "./automation-workspace-editor.element.js";
 import { AutomationsService } from "../../../api/sdk.gen.js";
+import { computeReachableFromTrigger } from "./canvas/utils/model-to-flow.js";
 
 export class UaAutomationWorkspaceContext
     extends UmbEntityDetailWorkspaceContextBase<UaAutomationDetailModel>
@@ -30,6 +33,7 @@ export class UaAutomationWorkspaceContext
     readonly description = this._data.createObservablePartOfCurrent((data) => data?.description);
 
     #eventContext?: typeof UMB_ACTION_EVENT_CONTEXT.TYPE;
+    #localize = new UmbLocalizationController(this);
 
     // Workspace view tabs (UmbWorkspaceViewContext) inherit hints from the parent UmbViewContext
     // — i.e. this workspace's `this.view`. Adding a hint to that controller with the child view's
@@ -110,6 +114,46 @@ export class UaAutomationWorkspaceContext
 
     updateProperties(properties: Partial<UaAutomationDetailModel>) {
         this._data.updateCurrent(properties);
+    }
+
+    /**
+     * Save & Publish calls submit() before publish(), so hooking submit() here covers both the
+     * plain Save action (CMS-default UmbSubmitWorkspaceAction) and Save & Publish with one check.
+     */
+    override async submit() {
+        await this.#warnIfDisconnectedSteps();
+        return super.submit();
+    }
+
+    /**
+     * Non-blocking heads-up for steps with no path back to the trigger. WorkflowCompiler.
+     * TopologicalSort silently drops these from the compiled workflow (see model-to-flow.ts's
+     * computeReachableFromTrigger, which mirrors that same reachability pass), so without this a
+     * step can sit on the canvas looking fully configured while never actually running. Save and
+     * publish still proceed — this only surfaces the toast.
+     */
+    async #warnIfDisconnectedSteps() {
+        const data = this.getData();
+        if (!data?.trigger) return;
+
+        const reachable = computeReachableFromTrigger(data.connections);
+        const disconnectedNames = data.steps.filter((s) => !reachable.has(s.id)).map((s) => s.name);
+        if (disconnectedNames.length === 0) return;
+
+        const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
+        notifications?.peek("warning", {
+            data: {
+                headline: this.#localize.term("uaAutomation_disconnectedStepsWarningHeadline"),
+                message:
+                    disconnectedNames.length === 1
+                        ? this.#localize.term("uaAutomation_disconnectedStepsWarningOne", disconnectedNames[0])
+                        : this.#localize.term(
+                              "uaAutomation_disconnectedStepsWarningMany",
+                              disconnectedNames.length,
+                              disconnectedNames.join(", "),
+                          ),
+            },
+        });
     }
 
     async publish() {
