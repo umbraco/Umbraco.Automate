@@ -274,6 +274,66 @@ public class AutomationServiceTests
     }
 
     [Fact]
+    public async Task PublishAutomationAsync_DanglingStepBindingReference_ThrowsValidationException()
+    {
+        var id = Guid.NewGuid();
+
+        var step = new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithAlias("myStep")
+            .WithSetting("message", "${ steps.renamedAway.value }")
+            .Build();
+
+        var automation = new AutomationBuilder()
+            .WithId(id)
+            .AsDraft()
+            .WithManualTrigger()
+            .AddStep(step)
+            .Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(id));
+
+        ex.Errors.ShouldContain(e => e.Contains("renamedAway"));
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_ValidStepBindingReference_Succeeds()
+    {
+        var id = Guid.NewGuid();
+
+        var sourceStep = new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithAlias("sourceStep")
+            .Build();
+        var dependentStep = new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithAlias("dependentStep")
+            .WithSetting("message", "${ steps.sourceStep.value }")
+            .Build();
+
+        var automation = new AutomationBuilder()
+            .WithId(id)
+            .AsDraft()
+            .WithManualTrigger()
+            .AddStep(sourceStep)
+            .AddStep(dependentStep)
+            .Build();
+
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+        _repo.Setup(r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var result = await _service.PublishAutomationAsync(id);
+
+        result.Status.ShouldBe(AutomationStatus.Published);
+    }
+
+    [Fact]
     public async Task PublishAutomationAsync_AllowedConnection_Succeeds()
     {
         var id = Guid.NewGuid();
