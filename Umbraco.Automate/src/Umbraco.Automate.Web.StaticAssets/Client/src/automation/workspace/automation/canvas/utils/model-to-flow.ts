@@ -139,4 +139,26 @@ export function modelToEdges(
     }));
 }
 
+/**
+ * Steps reachable from the trigger by following connections. Mirrors WorkflowCompiler.
+ * TopologicalSort's own reachability pass on the server — steps not in this set are silently
+ * dropped from the compiled workflow and never run.
+ */
+export function computeReachableFromTrigger(connections: StepConnectionModel[]): Set<string> {
+    const reachable = new Set<string>();
+    const queue = [TRIGGER_NODE_ID];
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        for (const conn of connections) {
+            const source = !conn.sourceStepId || conn.sourceStepId === EMPTY_GUID ? TRIGGER_NODE_ID : conn.sourceStepId;
+            if (source !== current) continue;
+            if (!reachable.has(conn.targetStepId)) {
+                reachable.add(conn.targetStepId);
+                queue.push(conn.targetStepId);
+            }
+        }
+    }
+    return reachable;
+}
+
 export { TRIGGER_NODE_ID, DEFAULT_TRIGGER_POSITION };
