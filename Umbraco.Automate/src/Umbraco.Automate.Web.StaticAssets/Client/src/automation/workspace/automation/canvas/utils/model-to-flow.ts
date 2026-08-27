@@ -145,16 +145,29 @@ export function modelToEdges(
  * dropped from the compiled workflow and never run.
  */
 export function computeReachableFromTrigger(connections: StepConnectionModel[]): Set<string> {
+    // Adjacency map built once so each connection is visited a single time, rather than
+    // rescanning the full connections array per dequeued step.
+    const adjacency = new Map<string, string[]>();
+    for (const conn of connections) {
+        const source = !conn.sourceStepId || conn.sourceStepId === EMPTY_GUID ? TRIGGER_NODE_ID : conn.sourceStepId;
+        const targets = adjacency.get(source);
+        if (targets) {
+            targets.push(conn.targetStepId);
+        } else {
+            adjacency.set(source, [conn.targetStepId]);
+        }
+    }
+
     const reachable = new Set<string>();
+    // Index-based traversal instead of queue.shift(), which is O(n) per call.
     const queue = [TRIGGER_NODE_ID];
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const conn of connections) {
-            const source = !conn.sourceStepId || conn.sourceStepId === EMPTY_GUID ? TRIGGER_NODE_ID : conn.sourceStepId;
-            if (source !== current) continue;
-            if (!reachable.has(conn.targetStepId)) {
-                reachable.add(conn.targetStepId);
-                queue.push(conn.targetStepId);
+    for (let i = 0; i < queue.length; i++) {
+        const targets = adjacency.get(queue[i]);
+        if (!targets) continue;
+        for (const target of targets) {
+            if (!reachable.has(target)) {
+                reachable.add(target);
+                queue.push(target);
             }
         }
     }
