@@ -164,8 +164,31 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
         }
     }
 
+    /**
+     * Guards against maxRetries values that would otherwise be silently mangled: `Number(...)`
+     * on invalid input (e.g. a stray "-") produces `NaN`, which serializes to `null` and quietly
+     * changes the step's behaviour to "retry indefinitely" instead of respecting what was typed.
+     * Blocks submission via the same "server"-type validation-message channel as the alias check.
+     */
+    #checkMaxRetries() {
+        this.#validationContext.messages.removeMessagesByTypeAndPath("server", "$.maxRetries");
+
+        const raw = this._maxRetries.trim();
+        if (!raw) return;
+
+        const parsed = Number.parseInt(raw, 10);
+        if (!Number.isInteger(parsed) || parsed < 0 || String(parsed) !== raw) {
+            this.#validationContext.messages.addMessage(
+                "server",
+                "$.maxRetries",
+                this.localize.term("uaAutomation_stepMaxRetriesInvalid"),
+            );
+        }
+    }
+
     async #onSubmit() {
         this.#checkDuplicateAlias();
+        this.#checkMaxRetries();
 
         try {
             await this.#validationContext.validate();
@@ -181,7 +204,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
             connectionId: this._connectionId,
             errorBehavior: this._errorBehavior,
             retryInterval: this._retryInterval.trim() || null,
-            maxRetries: this._maxRetries.trim() ? Number(this._maxRetries) : null,
+            maxRetries: this._maxRetries.trim() ? Number.parseInt(this._maxRetries, 10) : null,
         };
         this.modalContext?.submit();
     }
@@ -301,6 +324,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                     min="0"
                     .value=${this._maxRetries}
                     @input=${this.#onMaxRetriesChange}
+                    ${umbBindToValidation(this, "$.maxRetries", this._maxRetries)}
                 ></uui-input>
             </umb-property-layout>
         `;

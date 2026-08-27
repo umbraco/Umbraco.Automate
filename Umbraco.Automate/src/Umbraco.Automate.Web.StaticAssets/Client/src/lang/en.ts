@@ -105,6 +105,7 @@ export default {
             "How long to wait before retrying (e.g. 00:00:30 for 30 seconds). Leave blank to use the default.",
         stepMaxRetriesDescription:
             "Maximum number of retry attempts before giving up. Leave blank to retry indefinitely.",
+        stepMaxRetriesInvalid: "Enter a whole number of 0 or more.",
         runNow: "Run now",
         runNowStarted: "Automation triggered",
         runNowFailed: "Could not run this automation",
