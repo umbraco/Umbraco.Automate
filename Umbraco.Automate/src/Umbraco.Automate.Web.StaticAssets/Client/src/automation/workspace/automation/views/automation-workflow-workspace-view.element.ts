@@ -202,7 +202,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
      * was nothing to configure (no settings schema), and `false` when the modal was opened and then
      * dismissed. Callers adding a brand-new step use the return value to roll back the add.
      */
-    async #openNodeSettingsModal(stepId: string): Promise<boolean> {
+    async #openNodeSettingsModal(stepId: string, isNew = false): Promise<boolean> {
         if (!this._model) return true;
         const step = this._model.steps.find((s) => s.id === stepId);
         if (!step) return true;
@@ -218,10 +218,16 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 stepId: step.id,
                 actionAlias: step.actionAlias,
                 actionName: catalogueItem.name,
+                name: step.name,
+                alias: step.alias ?? null,
+                isNew,
                 settings: step.settings,
                 schema: catalogueItem.schema,
                 connectionId: step.connectionId ?? null,
                 workspaceId: this._model.workspaceId,
+                errorBehavior: step.errorBehavior,
+                retryInterval: step.retryInterval ?? null,
+                maxRetries: step.maxRetries ?? null,
                 automationContext: {
                     trigger: this._model.trigger ?? null,
                     steps: this._model.steps,
@@ -231,9 +237,12 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         });
 
         try {
-            const { settings, connectionId } = await modal.onSubmit();
+            const { name, alias, settings, connectionId, errorBehavior, retryInterval, maxRetries } =
+                await modal.onSubmit();
             const updatedSteps = this._model.steps.map((s) =>
-                s.id === stepId ? { ...s, settings, connectionId } : s,
+                s.id === stepId
+                    ? { ...s, name, alias, settings, connectionId, errorBehavior, retryInterval, maxRetries }
+                    : s,
             );
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
             return true;
@@ -379,7 +388,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 this.#workspaceContext?.updateProperty("connections", updatedConnections);
             }
 
-            const saved = await this.#openNodeSettingsModal(newStepId);
+            const saved = await this.#openNodeSettingsModal(newStepId, true);
             if (!saved) {
                 // Settings modal closed without saving: discard the just-added step and restore
                 // any connections the add rewired.

@@ -1,7 +1,9 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
@@ -206,6 +208,7 @@ internal sealed class AutomationService : IAutomationService
         }
 
         AddDisallowedConnectionErrors(automation, workspace, errors);
+        AddDanglingStepReferenceErrors(automation, errors);
 
         if (workspace.ServiceAccountKey != Guid.Empty)
         {
@@ -226,6 +229,70 @@ internal sealed class AutomationService : IAutomationService
         foreach (var connectionId in disallowed)
         {
             errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
+        }
+    }
+
+    /// <summary>
+    /// Flags binding expressions (e.g. <c>${ steps.myAlias.field }</c>) that reference a step
+    /// which no longer exists under that alias or ID — typically left behind after a step's
+    /// alias was renamed without updating the expressions that pointed at the old one. Scans
+    /// step settings/input mappings and connection filters by serializing them to JSON and
+    /// running the binding tokenizer over the resulting text, since step references can be
+    /// nested arbitrarily deep inside control-flow condition settings rather than sitting as
+    /// flat string values.
+    /// </summary>
+    private static void AddDanglingStepReferenceErrors(Automation automation, List<string> errors)
+    {
+        var validReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var step in automation.Steps)
+        {
+            validReferences.Add(step.Id.ToString());
+            if (!string.IsNullOrEmpty(step.Alias))
+            {
+                validReferences.Add(step.Alias);
+            }
+        }
+
+        foreach (var step in automation.Steps)
+        {
+            var haystack = JsonSerializer.Serialize(step.Settings) + " " + string.Join(' ', step.InputMappings.Values);
+            foreach (var reference in FindDanglingStepReferences(haystack, validReferences))
+            {
+                errors.Add($"Step '{step.Name}' has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
+            }
+        }
+
+        foreach (var connection in automation.Connections)
+        {
+            if (connection.Filter is null)
+            {
+                continue;
+            }
+
+            var haystack = JsonSerializer.Serialize(connection.Filter);
+            foreach (var reference in FindDanglingStepReferences(haystack, validReferences))
+            {
+                errors.Add($"A connection filter has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
+            }
+        }
+    }
+
+    private static IEnumerable<string> FindDanglingStepReferences(string haystack, HashSet<string> validReferences)
+    {
+        var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (_, _, content) in BindingTokenizer.FindBindings(haystack))
+        {
+            var segments = BindingTokenizer.Tokenize(content).Path.Split('.');
+            if (segments.Length < 2 || !string.Equals(segments[0], "steps", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var reference = segments[1];
+            if (!validReferences.Contains(reference) && reported.Add(reference))
+            {
+                yield return reference;
+            }
         }
     }
 
