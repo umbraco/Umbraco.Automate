@@ -186,6 +186,21 @@ internal sealed class AutomationRunService : IAutomationRunService
         run.Error ??= "Workflow terminated by user";
         await _runRepository.SaveAsync(run, cancellationToken);
 
+        // A step suspended on WaitForInput (e.g. RequestApprovalAction) has no next step
+        // running, so RunCancellationStepMiddleware never observes it, and RunFinalizer's
+        // terminal sweep only ever looks at steps left in Running. Left alone, the step
+        // would stay WaitingForInput forever and keep showing up on the pending-approvals
+        // dashboard even though its parent run is dead. Close that gap here rather than
+        // faking a real approval decision (Completed/Rejected) that never happened.
+        foreach (var stepRun in run.StepRuns.Where(sr => sr.Status == StepRunStatus.WaitingForInput))
+        {
+            stepRun.Status = StepRunStatus.Cancelled;
+            stepRun.CompletedUtc = run.CompletedUtc;
+            stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
+            stepRun.Error = "Step was awaiting input when the run was terminated by a user";
+            await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
+        }
+
         // TerminateWorkflow is best-effort: it makes a single attempt to acquire the
         // per-workflow lock and returns false if the executor is mid-pass (the common
         // case for an actively executing run). RunCancellationStepMiddleware observes
