@@ -30,6 +30,7 @@ public sealed class HttpRequestSettings
         EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",
         EditorConfig = """
             [
+                { "alias": "language", "value": "plaintext" },
                 { "alias": "height", "value": 150 },
                 { "alias": "wordWrap", "value": true }
             ]
