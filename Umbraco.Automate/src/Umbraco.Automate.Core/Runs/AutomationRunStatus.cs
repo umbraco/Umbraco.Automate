@@ -63,4 +63,12 @@ public enum StepRunStatus
     /// step so the run status can be derived without re-reading step output.
     /// </summary>
     Rejected = 7,
+
+    /// <summary>
+    /// The step was still waiting for external input (e.g. an approval decision) when its parent run
+    /// was terminated by a user. Deliberately distinct from <see cref="Failed"/> (nothing errored) and
+    /// <see cref="Rejected"/> (no human ever made a decision) — the step simply never got to finish
+    /// because the run underneath it was killed.
+    /// </summary>
+    Cancelled = 8,
 }

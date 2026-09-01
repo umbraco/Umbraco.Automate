@@ -164,6 +164,42 @@ public class RunFinalizerTests
     }
 
     [Fact]
+    public async Task Terminated_PersistsFailedStatusForStuckRunningStepRun()
+    {
+        // FinalizeTerminalAsync mutates stepRun.Status in memory for steps stuck in Running
+        // (e.g. from retries that threw before the step status could be updated), then only
+        // calls _runRepository.SaveAsync(run, ...). SaveAsync does not cascade to StepRuns
+        // (see IAutomationRunRepository.SaveAsync's own doc comment and
+        // AutomationRunFactory.UpdateEntity, which only writes the run's own columns) — so
+        // without an explicit per-step persist call, this mutation is silently dropped.
+        var run = BuildRun(AutomationRunStatus.Running);
+        var stepRun = new StepRun
+        {
+            Id = Guid.NewGuid(),
+            RunId = run.Id,
+            StepId = Guid.NewGuid(),
+            ActionAlias = "test.action",
+            Status = StepRunStatus.Running,
+            StartedUtc = DateTime.UtcNow,
+        };
+        run.StepRuns.Add(stepRun);
+
+        _runRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(run);
+        _runRepo
+            .Setup(r => r.UpdateStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
+
+        await _finalizer.TryFinalizeAsync(BuildWorkflow(WorkflowStatus.Terminated, Guid.NewGuid()), CancellationToken.None);
+
+        stepRun.Status.ShouldBe(StepRunStatus.Failed);
+        _runRepo.Verify(
+            r => r.UpdateStepRunAsync(
+                It.Is<StepRun>(s => s.Id == stepRun.Id && s.Status == StepRunStatus.Failed),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Complete_NoOpWhenAlreadyCompleted()
     {
         var run = BuildRun(AutomationRunStatus.Completed);
