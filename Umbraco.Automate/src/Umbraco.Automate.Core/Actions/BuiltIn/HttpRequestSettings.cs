@@ -22,7 +22,18 @@ public sealed class HttpRequestSettings
     /// <summary>
     /// Gets or sets the request body (for POST, PUT, PATCH).
     /// </summary>
-    [Field(Label = "Body", Description = "The request body content.", SortOrder = 2, SupportsBindings = true)]
+    [Field(
+        Label = "Body",
+        Description = "The request body content.",
+        SortOrder = 2,
+        SupportsBindings = true,
+        EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",
+        EditorConfig = """
+            [
+                { "alias": "height", "value": 150 },
+                { "alias": "wordWrap", "value": true }
+            ]
+            """)]
     public string? Body { get; set; }
 
     /// <summary>
@@ -34,6 +45,19 @@ public sealed class HttpRequestSettings
     /// <summary>
     /// Gets or sets custom headers as a JSON object string (key-value pairs).
     /// </summary>
-    [Field(Label = "Headers", Description = "Custom headers as JSON object (e.g. {\"Authorization\": \"Bearer token\"}).", SortOrder = 4, IsSensitive = true, SupportsBindings = true, EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
+    [Field(
+        Label = "Headers",
+        Description = "Custom headers as JSON object (e.g. {\"Authorization\": \"Bearer token\"}).",
+        SortOrder = 4,
+        IsSensitive = true,
+        SupportsBindings = true,
+        EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",
+        EditorConfig = """
+            [
+                { "alias": "language", "value": "json" },
+                { "alias": "height", "value": 120 },
+                { "alias": "wordWrap", "value": true }
+            ]
+            """)]
     public string? Headers { get; set; }
 }
