@@ -101,7 +101,12 @@ internal sealed class RunFinalizer
         }
 
         // Clean up step runs left in Running status (e.g. from retries that threw
-        // before the step status could be updated).
+        // before the step status could be updated). IAutomationRunRepository.SaveAsync
+        // does not cascade to StepRuns (see its own doc comment and
+        // AutomationRunFactory.UpdateEntity, which only writes the run's own columns), so
+        // each mutated step must be persisted explicitly via UpdateStepRunAsync — the same
+        // pattern ActionStepBody and AutomationRunService.TerminateRunAsync use — or the
+        // status change here is silently dropped.
         var now = DateTime.UtcNow;
         foreach (var stepRun in run.StepRuns.Where(sr => sr.Status == StepRunStatus.Running))
         {
@@ -109,6 +114,7 @@ internal sealed class RunFinalizer
             stepRun.CompletedUtc = now;
             stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
             stepRun.Error = "Step was still running when the workflow reached a terminal state";
+            await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
         }
 
         var hasFailedStep = run.StepRuns.Any(sr => sr.Status == StepRunStatus.Failed);
