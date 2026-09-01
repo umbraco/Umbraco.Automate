@@ -6,6 +6,7 @@ import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.j
 import type { BindingSource } from "../../utils/binding-context.utils.js";
 import { BINDING_TEXT_BOX_UI_ALIAS } from "../binding-text-box/manifests.js";
 import { BINDING_TEXT_AREA_UI_ALIAS } from "../binding-text-area/manifests.js";
+import { BINDING_CODE_EDITOR_UI_ALIAS } from "../binding-code-editor/manifests.js";
 import { SENSITIVE_FIELD_UI_ALIAS } from "../sensitive-field/manifests.js";
 
 export interface SettingsChangeDetail {
@@ -147,6 +148,9 @@ export class UaSettingsFormElement extends UmbLitElement {
             }
             if (alias === "Umb.PropertyEditorUi.TextArea") {
                 return BINDING_TEXT_AREA_UI_ALIAS;
+            }
+            if (alias === "Umb.PropertyEditorUi.CodeEditor") {
+                return BINDING_CODE_EDITOR_UI_ALIAS;
             }
             // A sensitive field the schema builder routed to the masked editor still has to
             // render the binding picker, so it takes the same swap. Bindings are pointers the
