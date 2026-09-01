@@ -24,7 +24,14 @@ public sealed class SendEmailSettings
     /// </summary>
     [Field(Label = "Body", Description = "The email body content. HTML is supported.",
         SortOrder = 2, SupportsBindings = true,
-        EditorUiAlias = "Umb.PropertyEditorUi.TextArea")]
+        EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",
+        EditorConfig = """
+            [
+                { "alias": "language", "value": "html" },
+                { "alias": "height", "value": 250 },
+                { "alias": "wordWrap", "value": true }
+            ]
+            """)]
     public string Body { get; set; } = string.Empty;
 
     /// <summary>
