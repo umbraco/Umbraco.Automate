@@ -45,6 +45,10 @@
   <ItemGroup>
     <PackageVersion Include="JsonSchema.Net.Generation" Version="[5.1.1, 5.999.999)" />
   </ItemGroup>
+  <!-- Jint (sandboxed JavaScript execution for the Run Script action) -->
+  <ItemGroup>
+    <PackageVersion Include="Jint" Version="4.11.0" />
+  </ItemGroup>
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
     <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.6.0, 7.999.999)" />

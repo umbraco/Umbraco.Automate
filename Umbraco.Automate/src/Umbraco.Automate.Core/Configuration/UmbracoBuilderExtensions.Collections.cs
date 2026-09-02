@@ -20,6 +20,7 @@ using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Validation;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Scripting;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Workspaces;
@@ -50,6 +51,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate"));
         builder.Services.Configure<ExecutionOptions>(
             builder.Config.GetSection("Umbraco:Automate:Execution"));
+        builder.Services.Configure<ScriptingOptions>(
+            builder.Config.GetSection("Umbraco:Automate:Scripting"));
         builder.Services.Configure<OutboxOptions>(
             builder.Config.GetSection("Umbraco:Automate:Outbox"));
         builder.Services.Configure<VersionCleanupPolicy>(
@@ -181,9 +184,22 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<SettingsBindingResolver>();
         builder.Services.AddSingleton<ConditionEvaluator>();
 
-        // HTTP client for HttpRequestAction — with SSRF protection
-        builder.Services.AddHttpClient("UmbracoAutomate")
+        // Shared outbound HTTP client — with SSRF protection
+        builder.Services.AddHttpClient(Constants.HttpClients.Default)
             .ConfigurePrimaryHttpMessageHandler(_ => SsrfProtectionHandler.Create());
+
+        // Non-redirecting variant used by the Run Script action's fetch() when redirect: "manual".
+        builder.Services.AddHttpClient(Constants.HttpClients.NoRedirect)
+            .ConfigurePrimaryHttpMessageHandler(_ =>
+            {
+                var handler = SsrfProtectionHandler.Create();
+                handler.AllowAutoRedirect = false;
+                return handler;
+            });
+
+        // Sandboxed JavaScript executor + save-time validator for the Run Script action.
+        builder.Services.AddSingleton<IScriptExecutor, ScriptExecutor>();
+        builder.Services.AddSingleton<IScriptValidator, ScriptValidator>();
 
         // Outbox messaging — IOutbox + IOutboxStore registered by Persistence layer
         builder.Services.AddSingleton<IOutbox, DatabaseOutbox>();
