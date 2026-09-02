@@ -5,6 +5,38 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.4.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.3.0...Umbraco.Automate@17.4.0) (2026-09-02)
+
+### feat
+
+* **action:** Add Find Media action ([ac17e99](https://github.com/umbraco/Umbraco.Automate/commit/ac17e99f4c6ab8ad7f82f7fcd4b89c73857d4175)), closes [#253](https://github.com/umbraco/Umbraco.Automate/issues/253)
+* **action:** Add Get Media and Get Media Property actions ([80d1fef](https://github.com/umbraco/Umbraco.Automate/commit/80d1fef19e687ee1ee74b4e05f41336fd94d5109)), closes [#251](https://github.com/umbraco/Umbraco.Automate/issues/251)
+* **action:** Add Run Script action with sandboxed JavaScript ([84f4e4e](https://github.com/umbraco/Umbraco.Automate/commit/84f4e4e538b6703f96d20ed65907a2e3a33fc3d5)), closes [#183](https://github.com/umbraco/Umbraco.Automate/issues/183)
+* **action:** Use code editor for Body/Headers/Message settings fields ([1b91d54](https://github.com/umbraco/Umbraco.Automate/commit/1b91d548b53c7da318e4239225c802f7e13bdcec))
+* **automation:** Warn when saving or publishing with disconnected steps ([c509d50](https://github.com/umbraco/Umbraco.Automate/commit/c509d508de097ade185cbcdb071b05432dfca1f9))
+* **step:** Add name, alias, error behavior and retry controls (#213) ([946a966](https://github.com/umbraco/Umbraco.Automate/commit/946a966841b24831acb7528f6cf7a41362c4fe92)), closes [#213](https://github.com/umbraco/Umbraco.Automate/issues/213)
+* **trigger:** Consume per-document culture deltas from content notifications ([f4a03ef](https://github.com/umbraco/Umbraco.Automate/commit/f4a03ef74bdbdbdb9197843add7a356da1bf14ff)), closes [umbraco/Umbraco-CMS#23288](https://github.com/umbraco/Umbraco-CMS/issues/23288) [umbraco/Umbraco-CMS#23288](https://github.com/umbraco/Umbraco-CMS/issues/23288)
+* **trigger:** Let any trigger run on demand, and resolve the webhook URL server-side ([0bb993c](https://github.com/umbraco/Umbraco.Automate/commit/0bb993cd79fcbbe7a3b3825bc3739416bee022a8)), closes [#85](https://github.com/umbraco/Umbraco.Automate/issues/85)
+* **trigger:** Show webhook URL and send test requests from trigger settings ([d93eac5](https://github.com/umbraco/Umbraco.Automate/commit/d93eac50a26594e1f63b7fe857d2e316ef914ea2)), closes [#85](https://github.com/umbraco/Umbraco.Automate/issues/85)
+
+### fix
+
+* **action:** Address Copilot review feedback on Find Media (v17) ([f484f68](https://github.com/umbraco/Umbraco.Automate/commit/f484f681e01613df850a008d13eafac576beabf9))
+* **action:** Stop HTTP Request Body editor flagging JSON as invalid ([76a6f61](https://github.com/umbraco/Umbraco.Automate/commit/76a6f612d49ad24c78807183f989fbb02623b520))
+* **automation:** Cancel pending approval and stuck steps when a run terminates ([a52ce48](https://github.com/umbraco/Umbraco.Automate/commit/a52ce480a390a0d0c5fc698378b379e14481e41a))
+* **core:** Stop a Parallel container's branches running once per branch ([93d47b3](https://github.com/umbraco/Umbraco.Automate/commit/93d47b36f2a1fc6756625879577f27e663297a93))
+* **frontend:** Add Node engine required by demo setup ([466e7a4](https://github.com/umbraco/Umbraco.Automate/commit/466e7a4f044465c9401f3c224fb918068c11c06e))
+* **trigger:** Address scheduled trigger events to the due automation ([d426d77](https://github.com/umbraco/Umbraco.Automate/commit/d426d778b5dac79d5646626c050c8040def6dde8))
+* **ui:** Fix upside-down edge labels on right-to-left/bottom-to-top connections ([3254e22](https://github.com/umbraco/Umbraco.Automate/commit/3254e22da31a9ddc97255cf54daae873a44c8501))
+* **ui:** Remove unnecessary background from edge label ([dbf7546](https://github.com/umbraco/Umbraco.Automate/commit/dbf75463334e3c9838ece7057e2d48ea8ee5e005))
+* **ui:** Tidy webhook trigger panel spacing and URL field ([1d97b0b](https://github.com/umbraco/Umbraco.Automate/commit/1d97b0b7f968529379495a1f90b5a043cf1a2262))
+* **ui:** Validate max retries as a non-negative integer before submit ([9b4bd6e](https://github.com/umbraco/Umbraco.Automate/commit/9b4bd6e715acbce245f4adfd0704ffe1808b1f9f))
+* **ui:** Wrap long approval prompt text instead of letting it overflow ([fe03d75](https://github.com/umbraco/Umbraco.Automate/commit/fe03d75d141e0bae139d085697fc657e6f1c0cae))
+
+### perf
+
+* **ui:** Avoid O(V*E) rescans in computeReachableFromTrigger ([5e7c435](https://github.com/umbraco/Umbraco.Automate/commit/5e7c435109cdd7e0f3ee5de18b80fc43d8cc4190))
+
 ## [17.3.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.2.0...Umbraco.Automate@17.3.0) (2026-08-19)
 
 ### feat
