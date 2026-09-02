@@ -86,4 +86,28 @@ public class LogMessageActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Success);
     }
+
+    [Theory]
+    [InlineData("Debug", ActionLogLevel.Debug)]
+    [InlineData("Information", ActionLogLevel.Info)]
+    [InlineData("Warning", ActionLogLevel.Warning)]
+    [InlineData("Error", ActionLogLevel.Error)]
+    public async Task ExecuteAsync_RecordsLogEntry_AtExpectedLevel(string logLevel, ActionLogLevel expected)
+    {
+        var context = new ActionContext
+        {
+            AutomationId = Guid.NewGuid(),
+            RunId = Guid.NewGuid(),
+            StepId = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.logMessage",
+            Settings = new LogMessageSettings { Message = "Hello", LogLevel = logLevel },
+            MinimumLogLevel = ActionLogLevel.Debug,
+        };
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(expected);
+        entry.Message.ShouldBe("Hello");
+    }
 }

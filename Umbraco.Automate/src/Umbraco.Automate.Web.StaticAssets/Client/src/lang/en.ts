@@ -54,6 +54,7 @@ export default {
         settings: "Settings",
         webhookUrl: "Webhook URL",
         steps: "Steps",
+        logs: "Logs",
         runInfo: "Run Info",
         search: "Search",
         details: "Details",

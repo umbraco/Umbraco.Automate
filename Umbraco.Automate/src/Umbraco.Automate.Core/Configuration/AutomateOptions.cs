@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -181,6 +182,22 @@ public sealed class ExecutionOptions
     /// error instead of flooding run storage with megabytes of payload. Default: 10 MB.
     /// </summary>
     public long MaxHttpResponseBodyBytes { get; set; } = 10_485_760;
+
+    /// <summary>
+    /// Gets or sets the minimum level of action log entry (see <see cref="ActionLogLevel"/>)
+    /// captured during step execution. Entries below this level are never persisted. Lower
+    /// to <see cref="ActionLogLevel.Debug"/> to troubleshoot a specific automation, or raise
+    /// to <see cref="ActionLogLevel.Warning"/>/<see cref="ActionLogLevel.Error"/> to cut noise.
+    /// Default: <see cref="ActionLogLevel.Info"/>.
+    /// </summary>
+    public ActionLogLevel MinimumLogLevel { get; set; } = ActionLogLevel.Info;
+
+    /// <summary>
+    /// Gets or sets the maximum number of log entries retained per step, guarding against a
+    /// runaway loop spamming entries. Applies independently of <see cref="MinimumLogLevel"/>.
+    /// Default: 200.
+    /// </summary>
+    public int MaxLogEntriesPerStep { get; set; } = 200;
 
     /// <summary>
     /// Gets or sets the execution mode for workflow processing.

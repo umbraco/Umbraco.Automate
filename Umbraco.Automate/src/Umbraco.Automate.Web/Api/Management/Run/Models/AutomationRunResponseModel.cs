@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Runs;
 
 namespace Umbraco.Automate.Web.Api.Management.Run.Models;
@@ -78,4 +79,25 @@ public sealed class StepRunResponseModel
 
     /// <summary>Duration in milliseconds.</summary>
     public double? DurationMs { get; set; }
+
+    /// <summary>The log entries recorded by the action during execution.</summary>
+    public IList<StepRunLogEntryResponseModel> LogEntries { get; set; } = [];
+}
+
+/// <summary>
+/// Response model for a single log entry recorded by an action during execution.
+/// </summary>
+public sealed class StepRunLogEntryResponseModel
+{
+    /// <summary>When the entry was recorded.</summary>
+    [Required]
+    public DateTime TimestampUtc { get; set; }
+
+    /// <summary>The severity of the entry.</summary>
+    [Required]
+    public ActionLogLevel Level { get; set; }
+
+    /// <summary>The log message text.</summary>
+    [Required]
+    public string Message { get; set; } = string.Empty;
 }
