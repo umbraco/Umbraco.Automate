@@ -1,0 +1,362 @@
+using System.Dynamic;
+using System.Globalization;
+using System.Net.Http.Headers;
+using System.Text.Json.Nodes;
+using Jint;
+using Jint.Native;
+using Jint.Runtime;
+using Jint.Runtime.Interop;
+using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.Security;
+
+namespace Umbraco.Automate.Core.Scripting;
+
+/// <summary>
+/// Executes user-authored JavaScript in a sandboxed <see cref="Engine">Jint engine</see>. The
+/// script is loaded as an ES module whose <c>default</c> export is invoked with a single argument
+/// (the supplied data). Resource limits, an optional SSRF-guarded <c>fetch</c>, and a total
+/// execution timeout bound what a script can do.
+/// </summary>
+/// <remarks>
+/// Ported from the Umbraco Headless Orchestration platform's <c>FunctionExecutor</c>. Termination
+/// is defended in layers: the per-statement <c>TimeoutInterval</c>, the statement/memory/recursion
+/// limits, and a cancellation constraint tied to <see cref="ScriptExecutorOptions.TotalExecutionTimeout"/>
+/// that aborts statement execution when the budget is exceeded. Because all of those are only
+/// checked when a statement runs, a script parked on a never-resolving promise (which executes no
+/// statements) cannot be force-terminated at our budget — but Jint's own <c>UnwrapIfPromise</c>
+/// promise-settlement timeout (10s) then aborts it, so the worker thread is reclaimed shortly after
+/// and the engine disposed. The outer <c>Task.Run</c> guarantees the <em>caller</em> stops waiting
+/// at the (smaller) configured budget regardless; it does not stop the engine work, so the engine is
+/// disposed only once its worker task actually completes.
+/// </remarks>
+internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, ILogger<ScriptExecutor> logger) : IScriptExecutor
+{
+    /// <inheritdoc />
+    public async ValueTask<JsonNode?> ExecuteAsync(
+        string scriptName,
+        string script,
+        JsonNode? data,
+        ScriptExecutorOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        // Linked CTS drives both the poll loop and the engine's cancellation constraint, which
+        // aborts statement execution once the total-execution budget is exceeded. Not wrapped in
+        // `using` — it is disposed together with the engine by DisposeWhenIdle so a still-running
+        // (overran) worker task never observes a disposed token.
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(options.TotalExecutionTimeout);
+
+        var engine = new Engine(engineOptions =>
+        {
+            engineOptions.LocalTimeZone(TimeZoneInfo.Utc);
+
+            engineOptions.LimitMemory(options.MaxMemoryBytes);
+            engineOptions.LimitRecursion(options.MaxRecursionDepth);
+            engineOptions.MaxArraySize((uint)options.MaxArraySize);
+            engineOptions.MaxStatements(options.MaxStatements);
+            engineOptions.TimeoutInterval(options.StatementTimeout);
+            engineOptions.CancellationToken(cts.Token);
+
+            engineOptions.Culture = CultureInfo.InvariantCulture;
+            engineOptions.ExperimentalFeatures = ExperimentalFeature.TaskInterop;
+            engineOptions.Strict = true;
+
+            engineOptions.Interop.TrackObjectWrapperIdentity = false;
+
+            engineOptions.CatchClrExceptions(ex => ex is JavaScriptException);
+        });
+
+        Task<JsonNode?>? task = null;
+        try
+        {
+            engine.SetValue("console", new JsConsole
+            {
+                Logger = (level, args) =>
+                {
+                    if (options.OnLogMessage is null)
+                    {
+                        return;
+                    }
+
+                    string message = string.Join(" ", args);
+                    if (level == "trace")
+                    {
+                        message = string.Format(CultureInfo.InvariantCulture, "console.trace() {0}\n{1}", message, engine.Advanced.StackTrace);
+                    }
+
+                    options.OnLogMessage(new(level, message));
+                },
+            });
+
+            engine.SetValue("Headers", TypeReference.CreateTypeReference<Headers>(engine));
+            engine.SetValue("RequestInit", TypeReference.CreateTypeReference<RequestInit>(engine));
+
+            if (options.AllowFetch)
+            {
+                engine.SetValue("fetch", async (string url, RequestInit? requestInit = null) =>
+                    await FetchAsync(engine, url, requestInit, options));
+            }
+
+            JsValue defaultFunction;
+            try
+            {
+                engine.Modules.Add(scriptName, script);
+                var module = engine.Modules.Import(scriptName);
+                defaultFunction = module.Get("default");
+            }
+            catch (JavaScriptException ex)
+            {
+                ReportError(ScriptErrorKind.Compilation, ex.GetJavaScriptErrorString());
+                return null;
+            }
+
+            var dataValue = JsValue.FromObject(engine, data);
+
+            // Run on a background task so the caller can stop waiting at the budget even when the
+            // engine cannot be interrupted (see remarks). Serialize on the same thread while the
+            // engine is still exclusively ours, so the result is JSON-safe before it leaves here.
+            task = Task.Run(
+                () => SerializeResult(engine, engine.Invoke(defaultFunction, dataValue).UnwrapIfPromise()),
+                cts.Token);
+
+            // Wait for the script to finish or the budget to expire — no polling. When the CTS
+            // fires, the infinite delay completes (cancelled) and Task.WhenAny returns without
+            // throwing; the abandoned worker task is dealt with by DisposeWhenIdle.
+            await Task.WhenAny(task, Task.Delay(Timeout.InfiniteTimeSpan, cts.Token));
+
+            if (task.IsCompletedSuccessfully)
+            {
+                return await task;
+            }
+
+            if (task.Exception?.InnerException is JavaScriptException jsex)
+            {
+                ReportError(ScriptErrorKind.Runtime, jsex.GetJavaScriptErrorString());
+            }
+            else if (task.Exception?.InnerException is PromiseRejectedException prex)
+            {
+                // An uncaught rejection from an async default export (e.g. an awaited fetch that threw).
+                ReportError(ScriptErrorKind.Runtime, prex.RejectedValue.ToString());
+            }
+            else if (task.Exception?.InnerException is JintException jex)
+            {
+                // Memory / recursion / statement-count / cancellation-constraint hits.
+                ReportError(ScriptErrorKind.Timeout, jex.Message);
+            }
+            else if (cts.IsCancellationRequested)
+            {
+                ReportError(
+                    ScriptErrorKind.Timeout,
+                    cancellationToken.IsCancellationRequested
+                        ? "Script execution was cancelled."
+                        : "Script execution timed out.");
+            }
+            else if (task.Exception is not null)
+            {
+                LogUnexpectedError(task.Exception);
+                ReportError(ScriptErrorKind.Unexpected, "Unexpected error.");
+            }
+
+            return null;
+        }
+        finally
+        {
+            DisposeWhenIdle(engine, cts, task);
+        }
+
+        void ReportError(ScriptErrorKind kind, string message) => options.OnError?.Invoke(new(kind, message));
+    }
+
+    // Disposes the engine (and its linked CTS) once no worker task is still using it. If the script
+    // overran and its task is still running, disposal is deferred to a continuation, because the
+    // Jint engine is not thread-safe and disposing it under the live thread would race. Statement-
+    // executing runaways are aborted by the cancellation constraint; a pure never-resolving promise
+    // is aborted by Jint's UnwrapIfPromise timeout (~10s) — either way the task eventually completes
+    // and this continuation disposes the engine then (see the ExecuteAsync remarks).
+    private static void DisposeWhenIdle(Engine engine, CancellationTokenSource cts, Task? task)
+    {
+        if (task is null || task.IsCompleted)
+        {
+            engine.Dispose();
+            cts.Dispose();
+            return;
+        }
+
+        task.ContinueWith(
+            t =>
+            {
+                _ = t.Exception; // observe to avoid an unobserved-task-exception
+                engine.Dispose();
+                cts.Dispose();
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private static JsonNode? SerializeResult(Engine engine, JsValue value)
+    {
+        if (value.IsUndefined() || value.IsNull())
+        {
+            return null;
+        }
+
+        // Round-trip through the engine's JSON.stringify so the result obeys JSON semantics:
+        // functions/undefined are dropped, NaN/Infinity become null, dates become ISO strings,
+        // and circular references throw a JavaScriptException we classify as a runtime error.
+        // Invoke the intrinsic directly rather than evaluating a snippet against a temporary
+        // global, which the script itself could read or shadow.
+        var stringify = engine.GetValue("JSON").Get("stringify");
+        var json = engine.Invoke(stringify, value);
+        return json.IsString() ? JsonNode.Parse(json.AsString()) : null;
+    }
+
+    private async Task<Response> FetchAsync(Engine engine, string url, RequestInit? requestInit, ScriptExecutorOptions options)
+    {
+        var requestUri = new Uri(url);
+        if (requestUri.Scheme is not "http" and not "https")
+        {
+            throw new JavaScriptException("url scheme must be http or https");
+        }
+
+        if (options.FetchAllowedHosts.Count > 0
+            && !options.FetchAllowedHosts.Contains(requestUri.Host, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new JavaScriptException($"fetch to host '{requestUri.Host}' is not allowed");
+        }
+
+        requestInit ??= new();
+
+        var request = new HttpRequestMessage
+        {
+            RequestUri = requestUri,
+            Method = HttpMethod.Parse(requestInit.Method),
+        };
+
+        if (requestInit.Body is not null)
+        {
+            request.Content = new StringContent(requestInit.Body);
+        }
+
+        ApplyRequestHeaders(request, requestInit.Headers);
+
+        // When a host allowlist is configured, never auto-follow redirects: a followed redirect
+        // would reach a host the allowlist check (which only validated the initial URL) never
+        // vetted, so the allowlist must bind the host actually contacted.
+        var followRedirects = requestInit.Redirect is "follow" && options.FetchAllowedHosts.Count == 0;
+
+        // Not disposed: the response body is read after this method returns, and a factory client
+        // owns no handler of its own to release anyway.
+        var client = followRedirects
+            ? clientFactory.CreateClient(Constants.HttpClients.Default)
+            : clientFactory.CreateClient(Constants.HttpClients.NoRedirect);
+
+        try
+        {
+            using var cts = new CancellationTokenSource(options.HttpRequestTimeout);
+
+            // Stream the response so MaxResponseBodyBytes is enforced while the body is read
+            // (see HttpResponseBodyReader) rather than after HttpClient has already buffered the
+            // whole payload into the host process.
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+
+            if (requestInit.Redirect is "error" && IsRedirect(response))
+            {
+                response.Dispose();
+                throw new JavaScriptException("http request was redirected");
+            }
+
+            return new Response(requestUri, response, engine, options.MaxResponseBodyBytes);
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is SsrfException)
+        {
+            throw new JavaScriptException("http request was blocked");
+        }
+        catch (TaskCanceledException)
+        {
+            throw new JavaScriptException("http request timed out");
+        }
+    }
+
+    private static void ApplyRequestHeaders(HttpRequestMessage request, object? headers)
+    {
+        switch (headers)
+        {
+            // new Headers(...)
+            case Headers headersObject:
+                foreach (var (header, values) in headersObject.AllHeaders)
+                {
+                    foreach (var value in values)
+                    {
+                        AddHeader(request, header, value);
+                    }
+                }
+
+                break;
+
+            // { 'Content-Type': 'text/json' }
+            case ExpandoObject expandoHeaders:
+                foreach (var (header, value) in expandoHeaders)
+                {
+                    AddHeader(request, header, value);
+                }
+
+                break;
+
+            // [['Content-Type', 'text/json']]
+            case object[] headerList:
+                foreach (var pair in headerList)
+                {
+                    if (pair is object[] { Length: 2 } header && header[0]?.ToString() is { } key)
+                    {
+                        AddHeader(request, key, header[1]);
+                    }
+                }
+
+                break;
+        }
+    }
+
+    private static bool IsRedirect(HttpResponseMessage response) => (int)response.StatusCode is >= 300 and <= 399;
+
+    private static void AddHeader(HttpRequestMessage request, string key, object? value)
+    {
+        // Which collection a header belongs to is HttpClient's own classification, not a name
+        // prefix — "Expires" is a content header, and a request without a body has nowhere to put
+        // content headers at all. Try the content first, fall back to the request, and report a
+        // header neither collection accepts instead of dropping it silently.
+        if (request.Content is not null && TryAddHeader(request.Content.Headers, key, value?.ToString()))
+        {
+            return;
+        }
+
+        if (!TryAddHeader(request.Headers, key, value?.ToString()))
+        {
+            throw new JavaScriptException($"header '{key}' cannot be set on this request");
+        }
+    }
+
+    private static bool TryAddHeader(HttpHeaders headers, string key, string? value)
+    {
+        // A header can only appear once here, so remove any existing value first.
+        headers.Remove(key);
+
+        try
+        {
+            headers.Add(key, value);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // This collection does not accept the header — the caller tries the other one.
+            return false;
+        }
+        catch (FormatException)
+        {
+            throw new JavaScriptException($"header '{key}' has an invalid value");
+        }
+    }
+
+    [LoggerMessage(LogLevel.Error, "Unexpected error while executing script")]
+    private partial void LogUnexpectedError(Exception ex);
+}
