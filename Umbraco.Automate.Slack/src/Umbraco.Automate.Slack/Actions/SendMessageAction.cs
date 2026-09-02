@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Automate.Slack.Connection;
@@ -74,7 +75,7 @@ public sealed class SendMessageAction : ActionBase<SendMessageSettings, SendMess
         }
 
         // Call the Slack chat.postMessage API.
-        using var client = _httpClientFactory.CreateClient("UmbracoAutomate");
+        using var client = _httpClientFactory.CreateClient(Constants.HttpClients.Default);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         var payload = new { channel = settings.Channel, text = settings.Message };

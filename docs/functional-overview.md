@@ -40,7 +40,7 @@ It is the first CMS-embedded automation engine in the .NET ecosystem.
 
 | Group | Triggers | Actions |
 |-------|----------|---------|
-| **Core** | Manual, Scheduled (CRON), Webhook Received | HTTP Request, Delay, Log Message, Set Variable |
+| **Core** | Manual, Scheduled (CRON), Webhook Received | HTTP Request, Run Script, Delay, Log Message, Set Variable |
 | **Content** | Content Published, Unpublished, Saved, Deleted, Moved | Publish, Unpublish, Create, Update, Delete Content |
 | **Media** | Media Uploaded, Media Deleted | Upload Media, Delete Media |
 | **Members** | Member Created, Approved, Locked Out | Create Member, Update Member, Assign Group |

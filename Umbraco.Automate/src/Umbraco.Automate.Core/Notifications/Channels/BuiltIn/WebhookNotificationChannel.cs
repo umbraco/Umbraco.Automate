@@ -42,7 +42,7 @@ public sealed class WebhookNotificationChannel : NotificationChannelBase<Webhook
             return;
         }
 
-        var client = _httpClientFactory.CreateClient("UmbracoAutomate");
+        var client = _httpClientFactory.CreateClient(Constants.HttpClients.Default);
         var payload = JsonSerializer.Serialize(message.Data ?? message);
 
         var request = new HttpRequestMessage(HttpMethod.Post, settings.Url)
