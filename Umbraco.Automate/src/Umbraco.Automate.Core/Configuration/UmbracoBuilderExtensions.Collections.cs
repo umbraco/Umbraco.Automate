@@ -198,7 +198,7 @@ public static partial class UmbracoBuilderExtensions
             });
 
         // Sandboxed JavaScript executor + save-time validator for the Run Script action.
-        builder.Services.AddSingleton<ScriptExecutor>();
+        builder.Services.AddSingleton<IScriptExecutor, ScriptExecutor>();
         builder.Services.AddSingleton<IScriptValidator, ScriptValidator>();
 
         // Outbox messaging — IOutbox + IOutboxStore registered by Persistence layer

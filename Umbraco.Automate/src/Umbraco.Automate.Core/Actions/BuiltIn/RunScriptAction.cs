@@ -11,7 +11,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
 /// <summary>
 /// A built-in action that runs a user-authored JavaScript function against the step inputs and
-/// returns its result. The script is executed in a sandboxed Jint engine via <see cref="ScriptExecutor"/>.
+/// returns its result. The script is executed in a sandboxed Jint engine via <see cref="IScriptExecutor"/>.
 /// </summary>
 [Action("umbracoAutomate.runScript", "Run Script",
     Description = "Runs a JavaScript function against the step inputs and returns its result.",
@@ -25,7 +25,7 @@ public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOut
     /// </summary>
     public const string ResultPropertyName = "result";
 
-    private readonly ScriptExecutor _executor;
+    private readonly IScriptExecutor _executor;
     private readonly IScriptValidator _validator;
     private readonly IOptions<ScriptingOptions> _scriptingOptions;
     private readonly IOptions<ExecutionOptions> _executionOptions;
@@ -36,7 +36,7 @@ public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOut
     /// </summary>
     public RunScriptAction(
         ActionInfrastructure infrastructure,
-        ScriptExecutor executor,
+        IScriptExecutor executor,
         IScriptValidator validator,
         IOptions<ScriptingOptions> scriptingOptions,
         IOptions<ExecutionOptions> executionOptions,
