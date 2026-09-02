@@ -1,4 +1,5 @@
 using Json.Schema;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -8,14 +9,24 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
+using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 
 public class ContentBatchPublishedTriggerTests
 {
-    private readonly ContentBatchPublishedTrigger _trigger = new(
-        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
+    private readonly Mock<IUserService> _userService = new();
+    private readonly ContentBatchPublishedTrigger _trigger;
+
+    public ContentBatchPublishedTriggerTests()
+    {
+        _trigger = new ContentBatchPublishedTrigger(
+            new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()),
+            _userService.Object,
+            Mock.Of<ILogger<ContentBatchPublishedTrigger>>());
+    }
 
     [Fact]
     public void HasCorrectAlias()
@@ -143,13 +154,42 @@ public class ContentBatchPublishedTriggerTests
         batch.Items[1].Cultures.ShouldBe(new[] { "en-US" });
     }
 
+    [Fact]
+    public void MapEvent_StampsPublisherPerItem_ResolvingEachPublisherOnce()
+    {
+        var user = new Mock<IUser>();
+        user.SetupGet(u => u.Kind).Returns(UserKind.Default);
+        _userService.Setup(s => s.GetUserById(7)).Returns(user.Object);
+
+        var notification = new ContentPublishedNotification(
+            new[]
+            {
+                CreateContent(Guid.NewGuid(), "By Editor", "blogPost", publisherId: 7),
+                CreateContent(Guid.NewGuid(), "Also By Editor", "article", publisherId: 7),
+                CreateContent(Guid.NewGuid(), "By Scheduler", "article", publisherId: -1),
+            },
+            new EventMessages());
+
+        var batch = _trigger.MapEvent(notification).ToList()
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<BatchTriggerOutput<ContentPublishedTriggerOutput>>>()
+            .Output;
+
+        batch.Items[0].PublisherId.ShouldBe(7);
+        batch.Items[0].PublisherKind.ShouldBe(ContentPublisherKind.User);
+        batch.Items[1].PublisherKind.ShouldBe(ContentPublisherKind.User);
+        batch.Items[2].PublisherKind.ShouldBe(ContentPublisherKind.System);
+        _userService.Verify(s => s.GetUserById(7), Times.Once);
+    }
+
     private static IContent CreateContent(
         Guid key,
         string name,
         string contentTypeAlias,
         Guid? contentTypeKey = null,
         ContentVariation variations = ContentVariation.Nothing,
-        ContentCultureInfosCollection? publishCultureInfos = null)
+        ContentCultureInfosCollection? publishCultureInfos = null,
+        int? publisherId = null)
     {
         var contentType = new Mock<ISimpleContentType>();
         contentType.SetupGet(ct => ct.Alias).Returns(contentTypeAlias);
@@ -161,6 +201,7 @@ public class ContentBatchPublishedTriggerTests
         content.SetupGet(c => c.Name).Returns(name);
         content.SetupGet(c => c.ContentType).Returns(contentType.Object);
         content.SetupGet(c => c.PublishCultureInfos).Returns(publishCultureInfos);
+        content.SetupGet(c => c.PublisherId).Returns(publisherId);
 
         return content.Object;
     }
