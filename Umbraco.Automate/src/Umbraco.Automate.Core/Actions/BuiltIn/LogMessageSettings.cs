@@ -10,7 +10,17 @@ public sealed class LogMessageSettings
     /// <summary>
     /// Gets or sets the message to log.
     /// </summary>
-    [Field(Label = "Message", Description = "The message to write to the log.", SupportsBindings = true)]
+    [Field(
+        Label = "Message",
+        Description = "The message to write to the log.",
+        SupportsBindings = true,
+        EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",
+        EditorConfig = """
+            [
+                { "alias": "language", "value": "plaintext" },
+                { "alias": "wordWrap", "value": true }
+            ]
+            """)]
     public string Message { get; set; } = string.Empty;
 
     /// <summary>

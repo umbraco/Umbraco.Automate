@@ -56,6 +56,10 @@ export default {
         steps: "Steps",
         runInfo: "Run Info",
         search: "Search",
+        details: "Details",
+        errorBehavior: "Error Behavior",
+        retryInterval: "Retry Interval",
+        maxRetries: "Max Retries",
     },
     uaFieldGroups: {
         advancedLabel: "Advanced",
@@ -91,6 +95,17 @@ export default {
         stepConnectionDescription:
             "Choose which of the workspace's connections this step should use. Leave as auto-resolve to pick one that matches the action automatically.",
         stepConnectionAutoResolve: "Auto-resolve",
+        stepErrorBehaviorRetry: "Retry",
+        stepErrorBehaviorSuspend: "Suspend",
+        stepErrorBehaviorTerminate: "Terminate",
+        stepErrorBehaviorCompensate: "Compensate",
+        stepErrorBehaviorDescription: "What happens when this step fails.",
+        stepAliasDuplicate: "Another step already uses this alias. Choose a different one.",
+        stepRetryIntervalDescription:
+            "How long to wait before retrying (e.g. 00:00:30 for 30 seconds). Leave blank to use the default.",
+        stepMaxRetriesDescription:
+            "Maximum number of retry attempts before giving up. Leave blank to retry indefinitely.",
+        stepMaxRetriesInvalid: "Enter a whole number of 0 or more.",
         runNow: "Run now",
         runNowStarted: "Automation triggered",
         runNowFailed: "Could not run this automation",
@@ -103,6 +118,19 @@ export default {
             "This automation is degraded — its recent error rate is high. It will be auto-disabled if errors continue.",
         disabledBanner:
             "This automation was auto-disabled by the circuit breaker after repeated failures. Fix the configuration, then re-enable it.",
+        disconnectedStepsWarningHeadline: "Steps not connected to the trigger",
+        disconnectedStepsWarningOne: (name: string) =>
+            `Step "${name}" isn't connected to the trigger, so it won't run.`,
+        disconnectedStepsWarningMany: (count: number, names: string) =>
+            `${count} steps aren't connected to the trigger, so they won't run: ${names}`,
+    },
+    uaWebhook: {
+        headline: "Webhook",
+        unsavedHint: "Save this automation to get its webhook URL.",
+        copyUrl: "Copy URL",
+        urlCopied: "Webhook URL copied to clipboard.",
+        urlCopyFailed: "Could not copy the URL. Select the value manually.",
+        urlLoadFailed: "Could not load the webhook URL.",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>

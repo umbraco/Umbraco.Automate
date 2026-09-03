@@ -43,7 +43,7 @@ public sealed class ContentSavedTrigger
                     ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
                     IsNew = content.CreateDate == content.UpdateDate,
-                    Cultures = ContentCultureHelpers.GetSavedCultures(content),
+                    Cultures = ContentCultureHelpers.GetSavedCultures(content, notification.SavedCultures),
                 },
             };
         }

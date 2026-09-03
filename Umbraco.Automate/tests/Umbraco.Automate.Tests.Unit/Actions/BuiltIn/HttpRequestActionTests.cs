@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Moq.Protected;
 using Shouldly;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Configuration;
@@ -193,7 +194,7 @@ public class HttpRequestActionTests
 
         var client = new HttpClient(handler.Object);
         var factory = new Mock<IHttpClientFactory>();
-        factory.Setup(f => f.CreateClient("UmbracoAutomate")).Returns(client);
+        factory.Setup(f => f.CreateClient(Constants.HttpClients.Default)).Returns(client);
 
         var options = new ExecutionOptions();
         if (maxResponseBodyBytes.HasValue)

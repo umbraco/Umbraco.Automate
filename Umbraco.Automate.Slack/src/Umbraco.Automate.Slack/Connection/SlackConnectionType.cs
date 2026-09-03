@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.OpenIddict.ConnectionTypes;
 using Umbraco.Automate.OpenIddict.Credentials;
@@ -53,7 +54,7 @@ public sealed class SlackConnectionType : OAuthConnectionTypeBase<SlackConnectio
         var credentialsId = ((SlackConnectionSettings)settings!).OAuthCredentialsId!.Value;
         var token = await CredentialsService.GetValidAccessTokenAsync(credentialsId, cancellationToken);
 
-        using var client = _httpClientFactory.CreateClient("UmbracoAutomate");
+        using var client = _httpClientFactory.CreateClient(Constants.HttpClients.Default);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         SlackAuthTestResponse? response;

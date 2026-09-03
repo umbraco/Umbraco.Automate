@@ -1,7 +1,9 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
@@ -109,6 +111,7 @@ internal sealed class AutomationService : IAutomationService
         }
 
         EnsureStepAliases(automation);
+        await ValidateForSaveAsync(automation, cancellationToken);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -133,6 +136,7 @@ internal sealed class AutomationService : IAutomationService
     public async Task<Automation> UpdateAutomationAsync(Automation automation, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         EnsureStepAliases(automation);
+        await ValidateForSaveAsync(automation, cancellationToken);
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
@@ -196,7 +200,7 @@ internal sealed class AutomationService : IAutomationService
         if (workspace is null)
         {
             errors.Add($"Workspace '{automation.WorkspaceId}' not found.");
-            ThrowIfErrors(automation, errors);
+            ThrowIfErrors(automation, errors, "publish");
             return;
         }
 
@@ -206,13 +210,14 @@ internal sealed class AutomationService : IAutomationService
         }
 
         AddDisallowedConnectionErrors(automation, workspace, errors);
+        AddDanglingStepReferenceErrors(automation, errors);
 
         if (workspace.ServiceAccountKey != Guid.Empty)
         {
             await AddSectionAccessErrorsAsync(automation, workspace, errors, cancellationToken);
         }
 
-        ThrowIfErrors(automation, errors);
+        ThrowIfErrors(automation, errors, "publish");
     }
 
     private static void AddDisallowedConnectionErrors(Automation automation, Workspace workspace, List<string> errors)
@@ -226,6 +231,70 @@ internal sealed class AutomationService : IAutomationService
         foreach (var connectionId in disallowed)
         {
             errors.Add($"Connection '{connectionId}' is not allowed in workspace '{workspace.Name}'.");
+        }
+    }
+
+    /// <summary>
+    /// Flags binding expressions (e.g. <c>${ steps.myAlias.field }</c>) that reference a step
+    /// which no longer exists under that alias or ID — typically left behind after a step's
+    /// alias was renamed without updating the expressions that pointed at the old one. Scans
+    /// step settings/input mappings and connection filters by serializing them to JSON and
+    /// running the binding tokenizer over the resulting text, since step references can be
+    /// nested arbitrarily deep inside control-flow condition settings rather than sitting as
+    /// flat string values.
+    /// </summary>
+    private static void AddDanglingStepReferenceErrors(Automation automation, List<string> errors)
+    {
+        var validReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var step in automation.Steps)
+        {
+            validReferences.Add(step.Id.ToString());
+            if (!string.IsNullOrEmpty(step.Alias))
+            {
+                validReferences.Add(step.Alias);
+            }
+        }
+
+        foreach (var step in automation.Steps)
+        {
+            var haystack = JsonSerializer.Serialize(step.Settings) + " " + string.Join(' ', step.InputMappings.Values);
+            foreach (var reference in FindDanglingStepReferences(haystack, validReferences))
+            {
+                errors.Add($"Step '{step.Name}' has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
+            }
+        }
+
+        foreach (var connection in automation.Connections)
+        {
+            if (connection.Filter is null)
+            {
+                continue;
+            }
+
+            var haystack = JsonSerializer.Serialize(connection.Filter);
+            foreach (var reference in FindDanglingStepReferences(haystack, validReferences))
+            {
+                errors.Add($"A connection filter has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
+            }
+        }
+    }
+
+    private static IEnumerable<string> FindDanglingStepReferences(string haystack, HashSet<string> validReferences)
+    {
+        var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (_, _, content) in BindingTokenizer.FindBindings(haystack))
+        {
+            var segments = BindingTokenizer.Tokenize(content).Path.Split('.');
+            if (segments.Length < 2 || !string.Equals(segments[0], "steps", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var reference = segments[1];
+            if (!validReferences.Contains(reference) && reported.Add(reference))
+            {
+                yield return reference;
+            }
         }
     }
 
@@ -272,13 +341,56 @@ internal sealed class AutomationService : IAutomationService
         }
     }
 
-    private static void ThrowIfErrors(Automation automation, List<string> errors)
+    private static void ThrowIfErrors(Automation automation, List<string> errors, string operation)
     {
         if (errors.Count > 0)
         {
             throw new AutomationValidationException(
-                $"Cannot publish automation '{automation.Name}'.",
+                $"Cannot {operation} automation '{automation.Name}'.",
                 errors);
+        }
+    }
+
+    private async Task ValidateForSaveAsync(Automation automation, CancellationToken cancellationToken)
+    {
+        var errors = new List<string>();
+
+        await AddStepSettingsErrorsAsync(automation, errors, cancellationToken);
+
+        ThrowIfErrors(automation, errors, "save");
+    }
+
+    /// <summary>
+    /// Collects a message for every step whose action opts into <see cref="IValidatableStepType"/>
+    /// (e.g. the Run Script action compiling its script) and reports invalid settings.
+    /// </summary>
+    private async Task AddStepSettingsErrorsAsync(
+        Automation automation,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        foreach (var step in automation.Steps)
+        {
+            if (_actions.GetByAlias(step.ActionAlias) is not IValidatableStepType validatable)
+            {
+                continue;
+            }
+
+            object? resolved;
+            try
+            {
+                resolved = ((IStepType)validatable).ResolveSettings(step.Settings);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Step '{step.Name}' has invalid settings: {ex.Message}");
+                continue;
+            }
+
+            foreach (var error in await validatable.ValidateSettingsAsync(resolved, cancellationToken))
+            {
+                errors.Add($"Step '{step.Name}': {error}");
+            }
         }
     }
 

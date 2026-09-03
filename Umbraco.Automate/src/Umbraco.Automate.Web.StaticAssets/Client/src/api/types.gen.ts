@@ -473,6 +473,7 @@ export type TriggerConfigurationModel = {
 };
 
 export type TriggerItemResponseModel = {
+    supportsManualRun: boolean;
     alias: string;
     name: string;
     description?: null | string;
@@ -535,6 +536,10 @@ export type WebhookAuthenticatorItemResponseModel = {
     name: string;
     description?: null | string;
     settingsSchema?: null | EditableModelSchemaModel;
+};
+
+export type WebhookUrlResponseModel = {
+    url: string;
 };
 
 export type WorkspaceGroupResponseModel = {
@@ -1023,6 +1028,10 @@ export type PostAutomationsByIdTriggerData = {
 
 export type PostAutomationsByIdTriggerErrors = {
     /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
@@ -1085,6 +1094,45 @@ export type PostAutomationsByIdUnpublishResponses = {
      */
     200: unknown;
 };
+
+export type GetAutomationsByIdWebhookUrlData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/webhook-url';
+};
+
+export type GetAutomationsByIdWebhookUrlErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have access to this resource
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Service Unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetAutomationsByIdWebhookUrlError = GetAutomationsByIdWebhookUrlErrors[keyof GetAutomationsByIdWebhookUrlErrors];
+
+export type GetAutomationsByIdWebhookUrlResponses = {
+    /**
+     * OK
+     */
+    200: WebhookUrlResponseModel;
+};
+
+export type GetAutomationsByIdWebhookUrlResponse = GetAutomationsByIdWebhookUrlResponses[keyof GetAutomationsByIdWebhookUrlResponses];
 
 export type GetAutomationsGroupsByGroupIdData = {
     body?: never;

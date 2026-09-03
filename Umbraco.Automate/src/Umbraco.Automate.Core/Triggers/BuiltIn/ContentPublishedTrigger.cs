@@ -41,7 +41,7 @@ public sealed class ContentPublishedTrigger
                     ContentName = content.Name,
                     ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
-                    Cultures = ContentCultureHelpers.GetPublishedCultures(content),
+                    Cultures = ContentCultureHelpers.GetPublishedCultures(content, notification.PublishedCultures),
                 },
             };
         }

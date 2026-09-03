@@ -158,6 +158,48 @@ public class AutomationRunServiceTests
     }
 
     [Fact]
+    public async Task TerminateRun_WithWaitingForInputStep_MarksStepCancelled()
+    {
+        // A "Request Approval" step suspended on WaitForInput has no next step running, so
+        // RunCancellationStepMiddleware never observes it, and RunFinalizer only ever sweeps
+        // steps left in Running — WaitingForInput falls through both nets. TerminateRunAsync
+        // must close this gap itself so the step doesn't haunt the pending-approvals dashboard
+        // forever after its parent run is dead.
+        var run = BuildRun(AutomationRunStatus.Running);
+        var stepRun = new StepRun
+        {
+            Id = Guid.NewGuid(),
+            RunId = run.Id,
+            StepId = Guid.NewGuid(),
+            ActionAlias = "Umbraco.Automate.RequestApproval",
+            Status = StepRunStatus.WaitingForInput,
+            StartedUtc = DateTime.UtcNow,
+        };
+        run.StepRuns.Add(stepRun);
+
+        _runRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(run);
+        _runRepo
+            .Setup(r => r.UpdateStepRunAsync(It.IsAny<StepRun>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StepRun sr, CancellationToken _) => sr);
+
+        var result = await _service.TerminateRunAsync(Guid.NewGuid());
+
+        result.ShouldBe(RunLifecycleResult.Success);
+
+        // Not left dangling, and not silently faked as a real approval outcome.
+        stepRun.Status.ShouldBe(StepRunStatus.Cancelled);
+        stepRun.Status.ShouldNotBe(StepRunStatus.WaitingForInput);
+        stepRun.Status.ShouldNotBe(StepRunStatus.Completed);
+        stepRun.CompletedUtc.ShouldNotBeNull();
+
+        _runRepo.Verify(
+            r => r.UpdateStepRunAsync(
+                It.Is<StepRun>(s => s.Id == stepRun.Id && s.Status == StepRunStatus.Cancelled),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task TerminateRun_WritesCancelledBeforeCallingWorkflowHost()
     {
         // If we called TerminateWorkflow first, RunFinalizer would observe the run as

@@ -28,7 +28,15 @@ export class UaApprovalDashboardElement extends UmbLitElement {
 
     private _columns: UmbTableColumn[] = [
         { name: this.localize.term("uaLabels_name"), alias: "automationName" },
-        { name: this.localize.term("uaApproval_promptLabel"), alias: "prompt" },
+        {
+            name: this.localize.term("uaApproval_promptLabel"),
+            alias: "prompt",
+            // Prompts can contain long resolved binding values (e.g. an HTTP response body). Clip to a
+            // single line here so rows stay compact; uui-table-cell shows the full text via its
+            // auto-managed title attribute on hover. The decision modal is the authoritative place to
+            // read the full prompt before approving/rejecting.
+            clipText: true,
+        },
         { name: this.localize.term("uaLabels_requestedAt"), alias: "requestedUtc" },
         { name: "", alias: "actions" },
     ];

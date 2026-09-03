@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Web.Authorization;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.Builders;
@@ -92,6 +93,23 @@ public abstract class UmbracoAutomateManagementControllerBase : ControllerBase
         => Conflict(new ProblemDetailsBuilder()
             .WithTitle("Concurrency conflict")
             .WithDetail($"The {entityName} was modified by another request. Reload and try again.")
+            .Build());
+
+    /// <summary>
+    /// Returns a 422 Unprocessable Entity response for an automation validation failure.
+    /// Uses <see cref="ProblemDetailsBuilder"/> (rather than constructing <see cref="ProblemDetails"/>
+    /// directly) so the response carries a <c>type</c> field — without it, the backoffice client's
+    /// <c>isProblemDetailsLike</c> check fails to recognise the response, and the specific error
+    /// message is replaced with a generic "fatal server error" notification.
+    /// <c>detail</c> surfaces the actual validation error(s) rather than the exception's generic
+    /// "Cannot publish/unpublish..." message, so the reason is visible on the toast itself instead
+    /// of requiring the user to open "Full Error Message".
+    /// </summary>
+    protected IActionResult ValidationFailed(AutomationValidationException exception)
+        => UnprocessableEntity(new ProblemDetailsBuilder()
+            .WithTitle("Validation failed")
+            .WithDetail(exception.Errors.Count > 0 ? string.Join(" ", exception.Errors) : exception.Message)
+            .WithExtension("errors", exception.Errors)
             .Build());
 
     /// <summary>

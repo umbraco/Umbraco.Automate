@@ -13,24 +13,25 @@
     <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.4.3" PrivateAssets="all" />
   </ItemGroup>
   <!-- Umbraco CMS -->
-  <!-- Tracking 18.0.0-rc2 during development; flip the floor to 18.0.0 before the release branch is cut. -->
+  <!-- 18.1.0 floor: ships ContentPublishedNotification.PublishedCultures / ContentSavedNotification.SavedCultures /
+       ContentUnpublishedNotification.UnpublishedCultures (umbraco/Umbraco-CMS#23313), which the content triggers consume. -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Cms.Core" Version="18.0.0" />
-    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="18.0.0" />
-    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="18.0.0" />
-    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="18.0.0" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="18.0.0" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="18.0.0" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="18.0.0" />
+    <PackageVersion Include="Umbraco.Cms.Core" Version="18.1.0" />
+    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="18.1.0" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="18.1.0" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="18.1.0" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="18.1.0" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="18.1.0" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="18.1.0" />
   </ItemGroup>
   <!-- OpenAPI (replaces Swashbuckle, which CMS v18 no longer ships transitively) -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[10.0.7, 10.999.999)" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[10.0.10, 10.999.999)" />
   </ItemGroup>
   <!-- Inter-product (Umbraco.Automate) -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.3.0, 18.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[18.1.3, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.4.0, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[18.1.4, 18.999.999)" />
   </ItemGroup>
   <!-- WorkflowCore (automation engine) -->
   <ItemGroup>
@@ -44,17 +45,21 @@
   <ItemGroup>
     <PackageVersion Include="JsonSchema.Net.Generation" Version="[5.1.1, 5.999.999)" />
   </ItemGroup>
+  <!-- Jint (sandboxed JavaScript execution for the Run Script action) -->
+  <ItemGroup>
+    <PackageVersion Include="Jint" Version="4.11.0" />
+  </ItemGroup>
   <!-- OpenIddict (Client + WebIntegration for OAuth flows) -->
   <ItemGroup>
-    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.5.0, 7.999.999)" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.5.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.Client.WebIntegration" Version="[7.6.0, 7.999.999)" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.6.0, 7.999.999)" />
   </ItemGroup>
   <!-- Shared dependencies -->
-  <!-- 10.0.7 floor matches the .NET runtime libraries Umbraco.Cms 18.0.0-rc2 bundles; keep in lockstep with the host CMS. -->
+  <!-- 10.0.10 floor matches the .NET runtime libraries Umbraco.Cms 18.1.0 bundles; keep in lockstep with the host CMS. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.7, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.7, 10.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.7, 10.999.999)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[10.0.10, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[10.0.10, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="[10.0.10, 10.999.999)" />
   </ItemGroup>
   <!-- Test dependencies -->
   <ItemGroup>

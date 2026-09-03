@@ -125,6 +125,11 @@ export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
             .prompt-text {
                 margin: 0;
                 color: var(--uui-color-text);
+                /* Resolved bindings can produce long, unbroken tokens (e.g. a raw JSON response body
+                   with no spaces). Without this, such text overflows its container instead of
+                   wrapping, making the rest of the prompt unreadable and unreachable. */
+                overflow-wrap: break-word;
+                word-break: break-word;
             }
 
             uui-textarea {
