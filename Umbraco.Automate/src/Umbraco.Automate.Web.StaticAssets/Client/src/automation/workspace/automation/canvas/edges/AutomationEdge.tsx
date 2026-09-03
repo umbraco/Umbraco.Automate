@@ -82,17 +82,22 @@ function AutomationEdge({
         <>
             <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} interactionWidth={20} />
             {label && (
-                <text>
-                    <textPath
-                        href={`#${id}`}
-                        startOffset="50%"
-                        textAnchor="middle"
-                        dominantBaseline="central"
+                // Rendered as a plain HTML label rather than an SVG <textPath> along the edge —
+                // textPath follows the path's actual draw direction, so a path running right-to-left
+                // or bottom-to-top (e.g. a container's body handle looping back to an earlier node)
+                // renders the text upside down. A fixed-position label sidesteps that entirely.
+                <EdgeLabelRenderer>
+                    <div
                         className="ua-edge__label"
+                        style={{
+                            position: "absolute",
+                            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+                            pointerEvents: "none",
+                        }}
                     >
                         {label}
-                    </textPath>
-                </text>
+                    </div>
+                </EdgeLabelRenderer>
             )}
             <EdgeLabelRenderer>
                 <div

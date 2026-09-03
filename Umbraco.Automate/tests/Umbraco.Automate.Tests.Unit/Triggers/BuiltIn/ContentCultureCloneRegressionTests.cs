@@ -85,7 +85,8 @@ public class ContentCultureCloneRegressionTests
     {
         var content = CreatePublishedContentWithOneChangedCulture();
 
-        var cultures = ContentCultureHelpers.GetPublishedCultures(content);
+        // publishedCultures: null => no notification delta, so the change-tracking path is exercised
+        var cultures = ContentCultureHelpers.GetPublishedCultures(content, publishedCultures: null);
 
         cultures.ShouldBe(new[] { "en-US" });
     }
@@ -99,7 +100,7 @@ public class ContentCultureCloneRegressionTests
         var content = CreatePublishedContentWithOneChangedCulture();
         var clone = (IContent)content.DeepClone();
 
-        var cultures = ContentCultureHelpers.GetPublishedCultures(clone);
+        var cultures = ContentCultureHelpers.GetPublishedCultures(clone, publishedCultures: null);
 
         cultures.ShouldBe(new[] { "en-US", "fr-FR" }, ignoreOrder: true);
     }
@@ -109,7 +110,7 @@ public class ContentCultureCloneRegressionTests
     {
         var content = CreateSavedContentWithOneChangedCulture();
 
-        var cultures = ContentCultureHelpers.GetSavedCultures(content);
+        var cultures = ContentCultureHelpers.GetSavedCultures(content, savedCultures: null);
 
         cultures.ShouldBe(new[] { "en-US" });
     }
@@ -122,7 +123,7 @@ public class ContentCultureCloneRegressionTests
         var content = CreateSavedContentWithOneChangedCulture();
         var clone = (IContent)content.DeepClone();
 
-        var cultures = ContentCultureHelpers.GetSavedCultures(clone);
+        var cultures = ContentCultureHelpers.GetSavedCultures(clone, savedCultures: null);
 
         cultures.ShouldBe(new[] { "en-US", "fr-FR" }, ignoreOrder: true);
     }

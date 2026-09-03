@@ -60,13 +60,7 @@ public sealed class UnpublishAutomationController : AutomationControllerBase
         }
         catch (AutomationValidationException ex)
         {
-            return UnprocessableEntity(new ProblemDetails
-            {
-                Title = "Validation failed",
-                Detail = ex.Message,
-                Status = StatusCodes.Status422UnprocessableEntity,
-                Extensions = { ["errors"] = ex.Errors },
-            });
+            return ValidationFailed(ex);
         }
 
         return Ok();

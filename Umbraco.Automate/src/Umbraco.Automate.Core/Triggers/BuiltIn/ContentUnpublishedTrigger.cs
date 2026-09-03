@@ -42,7 +42,7 @@ public sealed class ContentUnpublishedTrigger
                     ContentName = content.Name,
                     ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
-                    Cultures = ContentCultureHelpers.GetUnpublishedCultures(content),
+                    Cultures = ContentCultureHelpers.GetUnpublishedCultures(content, notification.UnpublishedCultures),
                 },
             };
         }
