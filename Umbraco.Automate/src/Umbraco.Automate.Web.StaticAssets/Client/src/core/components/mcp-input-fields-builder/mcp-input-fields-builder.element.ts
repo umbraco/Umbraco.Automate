@@ -22,7 +22,7 @@ function createEmptyField(): McpToolInputFieldRow {
 
 @customElement("ua-mcp-input-fields-builder")
 export class UaMcpInputFieldsBuilderElement extends UmbLitElement implements UmbPropertyEditorUiElement {
-    @property({ type: Array })
+    @property({ attribute: false })
     value: McpToolInputFieldRow[] = [];
 
     #cloneValue(): McpToolInputFieldRow[] {
