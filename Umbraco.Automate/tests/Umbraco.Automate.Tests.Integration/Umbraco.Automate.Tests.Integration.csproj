@@ -25,12 +25,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- McpEndpointWiringTests only: a real Microsoft.AspNetCore.TestHost TestServer, deliberately
+         scoped to this one test class rather than adopted repo-wide. -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
     <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence\Umbraco.Automate.Persistence.csproj" />
     <!-- Holds the SQLite migrations. Referenced so AutomateSchemaInitializerTests can exercise a real
          Database.MigrateAsync — EF Core loads the migrations assembly by name at run time, so it has
          to be present in the test output. -->
     <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence.Sqlite\Umbraco.Automate.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\Umbraco.Automate.Web\Umbraco.Automate.Web.csproj" />
     <ProjectReference Include="..\Umbraco.Automate.Tests.Common\Umbraco.Automate.Tests.Common.csproj" />
   </ItemGroup>
 

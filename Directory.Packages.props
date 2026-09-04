@@ -74,5 +74,9 @@
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- ASP.NET Core in-memory test server for McpEndpointWiringTests — the only integration test
+         in this repo that spins up a real request pipeline instead of a hand-built ServiceProvider. -->
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="[10.0.10, 10.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="[10.0.10, 10.999.999)" />
   </ItemGroup>
 </Project>

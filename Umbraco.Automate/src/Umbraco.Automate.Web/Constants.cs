@@ -205,5 +205,10 @@ public class Constants
         /// The rate limiter policy name applied to MCP endpoints.
         /// </summary>
         public const string RateLimitPolicy = "automate-mcp-rate-limit";
+
+        /// <summary>
+        /// The route template for the MCP endpoint, relative to the app root.
+        /// </summary>
+        public const string RouteTemplate = "automate/mcp/{automationId}";
     }
 }
