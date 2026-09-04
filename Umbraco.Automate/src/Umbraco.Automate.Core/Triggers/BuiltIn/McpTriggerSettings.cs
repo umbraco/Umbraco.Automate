@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -9,7 +10,8 @@ public sealed class McpTriggerSettings
 {
     [Field(
         Label = "Tool Name",
-        Description = "The name the AI agent sees for this tool.")]
+        Description = "The name the AI agent sees for this tool. Letters, numbers, hyphens, and underscores only.")]
+    [RegularExpression("^[a-zA-Z0-9_-]{1,64}$", ErrorMessage = "Tool name may only contain letters, numbers, hyphens, and underscores.")]
     public string ToolName { get; set; } = string.Empty;
 
     [Field(
