@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Api.Mcp;
 
 namespace Umbraco.Automate.Tests.Integration;
@@ -106,8 +108,25 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
                 webHost.Configure(app =>
                 {
                     app.UseRouting();
-                    app.UseMiddleware<McpAuthenticationMiddleware>();
-                    app.UseEndpoints(endpoints => endpoints.MapMcp("mcp/{automationId}"));
+
+                    // Mirrors AddUmbracoAutomateMcpApi's production wiring exactly (UseWhen
+                    // scoped to Constants.McpApi.PathPrefix, not an unscoped UseMiddleware call)
+                    // so RegularRoute_IsNotInterceptedByMcpAuthMiddleware below actually proves
+                    // the fix for the global-404 regression this task found via manual testing —
+                    // not just a hand-picked, differently-shaped stand-in.
+                    app.UseWhen(
+                        context => context.Request.Path.StartsWithSegments(Constants.McpApi.PathPrefix),
+                        branch => branch.UseMiddleware<McpAuthenticationMiddleware>());
+
+                    app.UseEndpoints(endpoints =>
+                    {
+                        endpoints.MapMcp(Constants.McpApi.RouteTemplate);
+
+                        // An unrelated route outside the MCP path prefix, mapped through the same
+                        // pipeline. If McpAuthenticationMiddleware were ever wired unscoped again
+                        // (the exact bug this task fixed), this route would start 404ing too.
+                        endpoints.MapGet("/some-other-route", () => Results.Ok("ok"));
+                    });
                 });
             })
             .StartAsync();
@@ -126,7 +145,7 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
     [Fact]
     public async Task ListTools_ReturnsTheAutomationsOwnTool()
     {
-        var initializeResponse = await _client.PostAsJsonAsync($"mcp/{_automationId}", new
+        var initializeResponse = await _client.PostAsJsonAsync($"{Constants.McpApi.PathPrefix}/{_automationId}", new
         {
             jsonrpc = "2.0",
             id = 0,
@@ -140,7 +159,7 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
         });
         initializeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var response = await _client.PostAsJsonAsync($"mcp/{_automationId}", new
+        var response = await _client.PostAsJsonAsync($"{Constants.McpApi.PathPrefix}/{_automationId}", new
         {
             jsonrpc = "2.0",
             id = 1,
@@ -155,7 +174,7 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
     [Fact]
     public async Task UnknownAutomation_Returns404()
     {
-        var response = await _client.PostAsJsonAsync($"mcp/{Guid.NewGuid()}", new
+        var response = await _client.PostAsJsonAsync($"{Constants.McpApi.PathPrefix}/{Guid.NewGuid()}", new
         {
             jsonrpc = "2.0",
             id = 1,
@@ -163,6 +182,24 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// Regression test for the global-404 outage this task found via manual demo-site testing:
+    /// wiring <see cref="McpAuthenticationMiddleware"/> in with an unscoped
+    /// <c>app.UseMiddleware&lt;McpAuthenticationMiddleware&gt;()</c> made it 404 every request in
+    /// the app, not just MCP requests, because it 404s whenever "automationId" isn't present in
+    /// route values — true for every non-MCP route. This test's host wires the middleware through
+    /// the same <c>UseWhen</c>-scoped form <c>AddUmbracoAutomateMcpApi</c> uses in production
+    /// (see <see cref="InitializeAsync"/>), so a regression back to the unscoped form would fail
+    /// this test rather than only surfacing against a real running app.
+    /// </summary>
+    [Fact]
+    public async Task RegularRoute_IsNotInterceptedByMcpAuthMiddleware()
+    {
+        var response = await _client.GetAsync("/some-other-route");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     public async Task DisposeAsync()

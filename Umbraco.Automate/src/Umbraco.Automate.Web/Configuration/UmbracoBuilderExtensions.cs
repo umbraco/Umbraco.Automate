@@ -171,8 +171,10 @@ public static partial class UmbracoBuilderExtensions
             // rather than once per long-lived session, which is what makes per-automation tool
             // resolution correct without needing session affinity across Automate's own app
             // instances. Confirmed via reflection against the installed 2.2.0 package that
-            // HttpServerTransportOptions exposes this bool property (not the older SessionMode
-            // enum some versions use instead).
+            // HttpServerTransportOptions exposes BOTH this bool property and the older
+            // SessionMode enum; Stateless is the current/recommended one and already defaults
+            // to true in 2.2.0, so this assignment is defensive/documentation rather than
+            // load-bearing.
             options.Stateless = true;
 
             options.ConfigureSessionOptions = (httpContext, mcpOptions, _) =>
@@ -217,12 +219,12 @@ public static partial class UmbracoBuilderExtensions
     }
 
     /// <summary>
-    /// The static path prefix of <see cref="Constants.McpApi.RouteTemplate"/> (everything before
-    /// its <c>{automationId}</c> segment), used to scope <see cref="McpAuthenticationMiddleware"/>
-    /// to MCP requests only.
+    /// Used to scope <see cref="McpAuthenticationMiddleware"/> to MCP requests only. Backed by
+    /// <see cref="Constants.McpApi.PathPrefix"/> — its own literal source of truth, not derived
+    /// from <see cref="Constants.McpApi.RouteTemplate"/> — so a future change to the route
+    /// template's shape can't silently break or widen this scoping.
     /// </summary>
-    private static readonly PathString McpApiPathPrefix =
-        "/" + Constants.McpApi.RouteTemplate[..Constants.McpApi.RouteTemplate.IndexOf('{')].TrimEnd('/');
+    private static readonly PathString McpApiPathPrefix = Constants.McpApi.PathPrefix;
 
     /// <summary>
     /// Registers the MCP rate limit policy only — the rate limiter middleware itself

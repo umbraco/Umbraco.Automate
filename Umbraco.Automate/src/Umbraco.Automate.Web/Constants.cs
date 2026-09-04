@@ -207,6 +207,15 @@ public class Constants
         public const string RateLimitPolicy = "automate-mcp-rate-limit";
 
         /// <summary>
+        /// The static path prefix (everything before the <c>{automationId}</c> segment) of
+        /// <see cref="RouteTemplate"/>, with a leading slash. Kept as its own literal constant
+        /// rather than derived from <see cref="RouteTemplate"/> at run time, so scoping
+        /// <c>McpAuthenticationMiddleware</c> to MCP requests only can never silently break or
+        /// widen to match every request if <see cref="RouteTemplate"/>'s shape ever changes.
+        /// </summary>
+        public const string PathPrefix = "/automate/mcp";
+
+        /// <summary>
         /// The route template for the MCP endpoint, relative to the app root.
         /// </summary>
         public const string RouteTemplate = "automate/mcp/{automationId}";
