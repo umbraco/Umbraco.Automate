@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -66,7 +65,7 @@ public sealed class McpAuthenticationMiddlewareTests
             .WithId(automationId)
             .WithTrigger(McpTrigger.WellKnownAlias, new Dictionary<string, object?>
             {
-                ["toolName"] = "Do Thing",
+                ["toolName"] = "DoThing",
                 ["toolDescription"] = "Does the thing.",
             });
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
@@ -77,6 +76,52 @@ public sealed class McpAuthenticationMiddlewareTests
 
         _nextCalled.ShouldBeTrue();
         context.Items[McpHttpContextItems.AutomationKey].ShouldNotBeNull();
+        context.Items[McpHttpContextItems.SettingsKey].ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_SecretConfigured_MissingAuthorizationHeader_Returns401()
+    {
+        var automationId = Guid.NewGuid();
+        var automation = new AutomationBuilder()
+            .WithId(automationId)
+            .WithTrigger(McpTrigger.WellKnownAlias, new Dictionary<string, object?>
+            {
+                ["toolName"] = "DoThing",
+                ["toolDescription"] = "Does the thing.",
+                ["secret"] = "correct-secret",
+            });
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation)automation);
+        var (middleware, context) = Build(automationId);
+
+        await middleware.InvokeAsync(context, _automationService.Object, _triggers);
+
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
+        _nextCalled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_SecretConfigured_NonBearerScheme_Returns401()
+    {
+        var automationId = Guid.NewGuid();
+        var automation = new AutomationBuilder()
+            .WithId(automationId)
+            .WithTrigger(McpTrigger.WellKnownAlias, new Dictionary<string, object?>
+            {
+                ["toolName"] = "DoThing",
+                ["toolDescription"] = "Does the thing.",
+                ["secret"] = "correct-secret",
+            });
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation)automation);
+        var (middleware, context) = Build(automationId);
+        context.Request.Headers.Authorization = "Basic xyz";
+
+        await middleware.InvokeAsync(context, _automationService.Object, _triggers);
+
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
+        _nextCalled.ShouldBeFalse();
     }
 
     [Fact]
@@ -87,7 +132,7 @@ public sealed class McpAuthenticationMiddlewareTests
             .WithId(automationId)
             .WithTrigger(McpTrigger.WellKnownAlias, new Dictionary<string, object?>
             {
-                ["toolName"] = "Do Thing",
+                ["toolName"] = "DoThing",
                 ["toolDescription"] = "Does the thing.",
                 ["secret"] = "correct-secret",
             });
@@ -110,7 +155,7 @@ public sealed class McpAuthenticationMiddlewareTests
             .WithId(automationId)
             .WithTrigger(McpTrigger.WellKnownAlias, new Dictionary<string, object?>
             {
-                ["toolName"] = "Do Thing",
+                ["toolName"] = "DoThing",
                 ["toolDescription"] = "Does the thing.",
                 ["secret"] = "correct-secret",
             });
