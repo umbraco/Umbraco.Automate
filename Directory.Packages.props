@@ -28,6 +28,10 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[10.0.10, 10.999.999)" />
   </ItemGroup>
+  <!-- MCP (Model Context Protocol) server support for the MCP trigger endpoint -->
+  <ItemGroup>
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+  </ItemGroup>
   <!-- Inter-product (Umbraco.Automate) -->
   <ItemGroup>
     <PackageVersion Include="Umbraco.Automate.Core" Version="[18.4.0, 18.999.999)" />

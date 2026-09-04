@@ -61,6 +61,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:RunCleanup"));
         builder.Services.Configure<WebhookOptions>(
             builder.Config.GetSection("Umbraco:Automate:Webhook"));
+        builder.Services.Configure<McpOptions>(
+            builder.Config.GetSection("Umbraco:Automate:Mcp"));
         builder.Services.Configure<ScheduledTriggerOptions>(
             builder.Config.GetSection("Umbraco:Automate:ScheduledTrigger"));
         builder.Services.Configure<RateLimitingOptions>(
