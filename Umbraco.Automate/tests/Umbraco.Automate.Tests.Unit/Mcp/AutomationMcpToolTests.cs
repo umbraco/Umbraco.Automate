@@ -116,6 +116,47 @@ public sealed class AutomationMcpToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_CircuitBreakerTripped_ReturnsErrorImmediately()
+    {
+        _executor
+            .Setup(e => e.ExecuteAsync(It.IsAny<Umbraco.Automate.Core.Automations.Automation>(), TriggerInitiatorType.AiAgent, null, It.IsAny<Dictionary<string, object?>?>(), It.IsAny<CancellationToken>(), null))
+            .ReturnsAsync(Guid.Empty);
+        var tool = BuildTool(new McpTriggerSettings { TimeoutSeconds = 5 });
+
+        var result = await tool.InvokeAsync(Request("{}"));
+
+        result.IsError.ShouldBe(true);
+        result.Content.OfType<TextContentBlock>().Single().Text.ShouldContain("circuit breaker");
+        _runService.Verify(s => s.GetRunAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RunCancelled_ReturnsErrorWithCancelledMessage()
+    {
+        var runId = Guid.NewGuid();
+        _executor
+            .Setup(e => e.ExecuteAsync(It.IsAny<Umbraco.Automate.Core.Automations.Automation>(), TriggerInitiatorType.AiAgent, null, It.IsAny<Dictionary<string, object?>?>(), It.IsAny<CancellationToken>(), null))
+            .ReturnsAsync(runId);
+        _runService
+            .Setup(s => s.GetRunAsync(runId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AutomationRun
+            {
+                AutomationId = Guid.NewGuid(),
+                AutomationVersion = 1,
+                WorkspaceId = Guid.NewGuid(),
+                ServiceAccountKey = Guid.NewGuid(),
+                InitiatedBy = TriggerInitiatorType.AiAgent,
+                Status = AutomationRunStatus.Cancelled,
+            });
+        var tool = BuildTool(new McpTriggerSettings { TimeoutSeconds = 5 });
+
+        var result = await tool.InvokeAsync(Request("{}"));
+
+        result.IsError.ShouldBe(true);
+        result.Content.OfType<TextContentBlock>().Single().Text.ShouldContain("Cancelled");
+    }
+
+    [Fact]
     public async Task InvokeAsync_RunStillRunningAtTimeout_ReturnsNonErrorStillRunningResult()
     {
         var runId = Guid.NewGuid();

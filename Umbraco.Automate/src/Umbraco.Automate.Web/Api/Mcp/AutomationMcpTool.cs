@@ -74,6 +74,11 @@ internal sealed class AutomationMcpTool : McpServerTool
             triggerOutputData,
             cancellationToken);
 
+        if (runId == Guid.Empty)
+        {
+            return ErrorResult("This automation has been auto-disabled by the circuit breaker. Re-enable it to run.");
+        }
+
         var deadline = DateTime.UtcNow.AddSeconds(_settings.TimeoutSeconds);
         AutomationRun? run;
         while (true)
@@ -104,7 +109,7 @@ internal sealed class AutomationMcpTool : McpServerTool
             };
         }
 
-        if (run.Status is AutomationRunStatus.Failed or AutomationRunStatus.Rejected)
+        if (run.Status is AutomationRunStatus.Failed or AutomationRunStatus.Rejected or AutomationRunStatus.Cancelled)
         {
             return ErrorResult(run.Error ?? $"Run ended as {run.Status}.");
         }
