@@ -192,16 +192,6 @@ public class Constants
     public static class McpApi
     {
         /// <summary>
-        /// The API name used for Swagger doc and JSON options.
-        /// </summary>
-        public const string ApiName = "automate-mcp";
-
-        /// <summary>
-        /// The API title.
-        /// </summary>
-        public const string ApiTitle = "Umbraco Automate MCP API";
-
-        /// <summary>
         /// The rate limiter policy name applied to MCP endpoints.
         /// </summary>
         public const string RateLimitPolicy = "automate-mcp-rate-limit";
