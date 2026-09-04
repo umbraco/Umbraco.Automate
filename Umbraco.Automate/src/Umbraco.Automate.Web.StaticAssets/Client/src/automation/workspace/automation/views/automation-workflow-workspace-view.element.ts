@@ -99,7 +99,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             lookup.set(a.alias, {
                 name: a.name,
                 icon: a.icon ?? undefined,
-                hasSettings: (a.settingsSchema?.fields?.length ?? 0) > 0,
+                hasSettings: (a.settingsSchema?.fields?.length ?? 0) > 0 || !!a.connectionTypeAlias,
             });
         }
         for (const cf of controlFlows.data ?? []) {
@@ -263,7 +263,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         // Check actions first, then control flows
         const { data: actions } = await this.#catalogueRepository.requestActions();
         const action = actions?.find((a) => a.alias === alias);
-        if (action?.settingsSchema) return { name: action.name, schema: action.settingsSchema };
+        if (action) return { name: action.name, schema: action.settingsSchema ?? { fields: []}};
 
         const { data: controlFlows } = await this.#catalogueRepository.requestControlFlows();
         const cf = controlFlows?.find((c) => c.alias === alias);
