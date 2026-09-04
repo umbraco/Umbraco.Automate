@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -44,6 +45,16 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
             {
                 ["toolName"] = "Echo",
                 ["toolDescription"] = "Echoes input back.",
+                ["inputFields"] = new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["name"] = "message",
+                        ["type"] = "Text",
+                        ["description"] = "The message to echo.",
+                        ["required"] = true,
+                    },
+                },
             });
 
         var automationService = new Mock<IAutomationService>();
@@ -168,7 +179,65 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadAsStringAsync();
-        body.ShouldContain("Echo");
+        using var document = ParseJsonRpcBody(body);
+        var tools = document.RootElement.GetProperty("result").GetProperty("tools");
+        tools.GetArrayLength().ShouldBe(1);
+        tools[0].GetProperty("name").GetString().ShouldBe("Echo");
+    }
+
+    [Fact]
+    public async Task CallTool_ExecutesAndReturnsResult()
+    {
+        var initializeResponse = await _client.PostAsJsonAsync($"{Constants.McpApi.PathPrefix}/{_automationId}", new
+        {
+            jsonrpc = "2.0",
+            id = 0,
+            method = "initialize",
+            @params = new
+            {
+                protocolVersion = "2024-11-05",
+                capabilities = new { },
+                clientInfo = new { name = "test-client", version = "1.0.0" },
+            },
+        });
+        initializeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var response = await _client.PostAsJsonAsync($"{Constants.McpApi.PathPrefix}/{_automationId}", new
+        {
+            jsonrpc = "2.0",
+            id = 1,
+            method = "tools/call",
+            @params = new
+            {
+                name = "Echo",
+                arguments = new { message = "hello" },
+            },
+        });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        using var document = ParseJsonRpcBody(body);
+        var result = document.RootElement.GetProperty("result");
+        (!result.TryGetProperty("isError", out var isError) || isError.GetBoolean() == false).ShouldBeTrue();
+        var content = result.GetProperty("content");
+        content.GetArrayLength().ShouldBeGreaterThan(0);
+        content[0].GetProperty("text").GetString().ShouldBe("Automation completed.");
+    }
+
+    /// <summary>
+    /// The MCP Streamable HTTP transport may reply with a plain JSON body or with an SSE-framed
+    /// body (lines like <c>event: message</c> / <c>data: {...}</c>), depending on negotiation.
+    /// Tests assert on the JSON-RPC payload either way, so this unwraps the SSE framing when present.
+    /// </summary>
+    private static JsonDocument ParseJsonRpcBody(string body)
+    {
+        var dataLine = body
+            .Split('\n')
+            .Select(line => line.TrimEnd('\r'))
+            .FirstOrDefault(line => line.StartsWith("data:", StringComparison.Ordinal));
+
+        var json = dataLine is not null ? dataLine["data:".Length..].Trim() : body;
+        return JsonDocument.Parse(json);
     }
 
     [Fact]
