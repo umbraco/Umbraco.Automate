@@ -54,43 +54,52 @@ export class UaMcpInputFieldsBuilderElement extends UmbLitElement implements Umb
 
     override render() {
         return html`
-            ${repeat(
-                this.value ?? [],
-                (_field, index) => index,
-                (field, index) => html`
-                    <uui-box class="row">
-                        <uui-input
-                            label="Name"
-                            placeholder="Argument name"
-                            .value=${field.name}
-                            @input=${(e: InputEvent) => this.#updateField(index, { name: (e.target as HTMLInputElement).value })}
-                        ></uui-input>
-                        <uui-select
-                            .options=${[
-                                { name: "Text", value: "Text", selected: field.type === "Text" },
-                                { name: "Number", value: "Number", selected: field.type === "Number" },
-                                { name: "Boolean", value: "Boolean", selected: field.type === "Boolean" },
-                            ]}
-                            @change=${(e: CustomEvent) =>
-                                this.#updateField(index, { type: (e.target as HTMLSelectElement).value as McpToolInputFieldRow["type"] })}
-                        ></uui-select>
-                        <uui-input
-                            label="Description"
-                            placeholder="Tells the agent what this argument is for"
-                            .value=${field.description ?? ""}
-                            @input=${(e: InputEvent) => this.#updateField(index, { description: (e.target as HTMLInputElement).value })}
-                        ></uui-input>
-                        <uui-toggle
-                            label="Required"
-                            ?checked=${field.required}
-                            @change=${(e: Event) => this.#updateField(index, { required: (e.target as HTMLInputElement).checked })}
-                        ></uui-toggle>
-                        <uui-button compact look="secondary" label="Remove field" @click=${() => this.#removeField(index)}>
-                            <uui-icon name="icon-trash"></uui-icon>
-                        </uui-button>
-                    </uui-box>
-                `,
-            )}
+            <div class="fields">
+                ${repeat(
+                    this.value ?? [],
+                    (_field, index) => index,
+                    (field, index) => html`
+                        <uui-box class="field">
+                            <div class="field-header">
+                                <uui-input
+                                    class="name-input"
+                                    label="Name"
+                                    placeholder="Argument name"
+                                    .value=${field.name}
+                                    @input=${(e: InputEvent) => this.#updateField(index, { name: (e.target as HTMLInputElement).value })}
+                                ></uui-input>
+                                <uui-select
+                                    class="type-select"
+                                    .options=${[
+                                        { name: "Text", value: "Text", selected: field.type === "Text" },
+                                        { name: "Number", value: "Number", selected: field.type === "Number" },
+                                        { name: "Boolean", value: "Boolean", selected: field.type === "Boolean" },
+                                    ]}
+                                    @change=${(e: CustomEvent) =>
+                                        this.#updateField(index, {
+                                            type: (e.target as HTMLSelectElement).value as McpToolInputFieldRow["type"],
+                                        })}
+                                ></uui-select>
+                                <uui-button compact look="secondary" label="Remove field" @click=${() => this.#removeField(index)}>
+                                    <uui-icon name="icon-trash"></uui-icon>
+                                </uui-button>
+                            </div>
+                            <uui-input
+                                class="description-input"
+                                label="Description"
+                                placeholder="Tells the agent what this argument is for"
+                                .value=${field.description ?? ""}
+                                @input=${(e: InputEvent) => this.#updateField(index, { description: (e.target as HTMLInputElement).value })}
+                            ></uui-input>
+                            <uui-toggle
+                                label="Required"
+                                ?checked=${field.required}
+                                @change=${(e: Event) => this.#updateField(index, { required: (e.target as HTMLInputElement).checked })}
+                            ></uui-toggle>
+                        </uui-box>
+                    `,
+                )}
+            </div>
             <uui-button look="secondary" label="Add field" @click=${() => this.#addField()}>
                 <uui-icon name="icon-add"></uui-icon>
                 Add field
@@ -104,19 +113,41 @@ export class UaMcpInputFieldsBuilderElement extends UmbLitElement implements Umb
                 display: block;
             }
 
-            .row {
+            .fields {
                 display: flex;
-                align-items: center;
+                flex-direction: column;
                 gap: var(--uui-size-space-3);
                 margin-bottom: var(--uui-size-space-3);
             }
 
-            .row uui-input:first-child {
+            uui-box {
+                --uui-box-default-padding: var(--uui-size-space-4);
+            }
+
+            .field {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-space-3);
+            }
+
+            .field-header {
+                display: flex;
+                align-items: flex-end;
+                gap: var(--uui-size-space-3);
+            }
+
+            .name-input {
                 flex: 1;
             }
 
-            .row uui-input:nth-child(3) {
-                flex: 2;
+            .type-select {
+                width: 8rem;
+                flex: none;
+            }
+
+            .description-input {
+                width: 100%;
+                margin-top: var(--uui-size-space-2);
             }
         `,
     ];
