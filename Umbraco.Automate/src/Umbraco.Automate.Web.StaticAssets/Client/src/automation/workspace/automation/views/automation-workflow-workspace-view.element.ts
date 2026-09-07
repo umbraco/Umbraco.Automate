@@ -263,7 +263,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         // Check actions first, then control flows
         const { data: actions } = await this.#catalogueRepository.requestActions();
         const action = actions?.find((a) => a.alias === alias);
-        if (action) return { name: action.name, schema: action.settingsSchema ?? { fields: []}};
+        if (action) return { name: action.name, schema: action.settingsSchema ?? { fields: [] } };
 
         const { data: controlFlows } = await this.#catalogueRepository.requestControlFlows();
         const cf = controlFlows?.find((c) => c.alias === alias);
