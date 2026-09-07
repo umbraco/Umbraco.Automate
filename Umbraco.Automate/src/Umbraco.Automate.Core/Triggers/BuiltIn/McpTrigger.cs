@@ -9,7 +9,7 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 [Trigger(WellKnownAlias, "MCP Tool",
     Description = "Fires when an AI agent calls this automation's MCP tool.",
     Group = "Core",
-    Icon = "icon-plug")]
+    Icon = "icon-wall-plug")]
 public sealed class McpTrigger : TriggerBase<McpTriggerSettings, McpTriggerOutput>, ISupportsManualRun
 {
     public const string WellKnownAlias = "umbracoAutomate.mcp";
