@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -44,6 +45,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// distinctive sentinel and the body steps never echo them, so asserting the sentinel is
 /// absent from the serialised pointers proves items are not persisted per pointer.
 /// </summary>
+[Collection("WorkflowHost")]
 public class ForEachIterationStateTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;
@@ -244,8 +246,8 @@ public class ForEachIterationStateTests : IAsyncLifetime
         };
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        var instance = await WaitForWorkflowCompleteAsync(run, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowCompleteAsync(run, TestTimeouts.WorkflowWait);
 
         // Items resolved correctly per inner iteration, in depth-first order.
         var completed = await _runRepository.GetAsync(run.Id);
@@ -332,8 +334,8 @@ public class ForEachIterationStateTests : IAsyncLifetime
         var body = JsonSerializer.Serialize(triggerMessage, JsonOptions.Default);
         await _handler.HandleAsync(body, CancellationToken.None);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        return await WaitForWorkflowCompleteAsync(run, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        return await WaitForWorkflowCompleteAsync(run, TestTimeouts.WorkflowWait);
     }
 
     private void AssertNoIterationState(WorkflowInstance instance, string sentinel)

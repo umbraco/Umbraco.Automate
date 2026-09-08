@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -39,6 +40,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// End-to-end test: a Manual Trigger executes a Run Script action, and the script's returned
 /// value is persisted as the step's output through the real execution pipeline.
 /// </summary>
+[Collection("WorkflowHost")]
 public class ManualTriggerRunScriptTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;
@@ -166,7 +168,7 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
 
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
 
-        var completedRun = await WaitForStepRunAsync(TimeSpan.FromSeconds(10));
+        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait);
 
         completedRun.StepRuns.ShouldNotBeEmpty();
         var stepRun = completedRun.StepRuns.First();
