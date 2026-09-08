@@ -13,6 +13,7 @@ using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
+[Collection("Scripting")]
 public class RunScriptActionTests
 {
     [Fact]
