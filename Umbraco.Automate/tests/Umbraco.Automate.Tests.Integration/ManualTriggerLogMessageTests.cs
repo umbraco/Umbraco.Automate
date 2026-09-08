@@ -27,6 +27,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -39,6 +40,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// End-to-end smoke test: fires a Manual Trigger that executes a Log Message action.
 /// Verifies the full execution pipeline without the outbox dispatcher loop.
 /// </summary>
+[Collection("WorkflowHost")]
 public class ManualTriggerLogMessageTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;
@@ -185,7 +187,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
 
         // Assert — poll for the step run to complete.
         // WorkflowCore processes steps asynchronously in its background thread.
-        var runs = await WaitForRunAsync(_automation.Id, timeout: TimeSpan.FromSeconds(10));
+        var runs = await WaitForRunAsync(_automation.Id, timeout: TestTimeouts.WorkflowWait);
 
         runs.Items.ShouldNotBeEmpty();
 
@@ -194,7 +196,7 @@ public class ManualTriggerLogMessageTests : IAsyncLifetime
         run.InitiatedBy.ShouldBe("system");
 
         // Wait for the step run to be recorded.
-        var completedRun = await WaitForStepRunAsync(run.Id, timeout: TimeSpan.FromSeconds(10));
+        var completedRun = await WaitForStepRunAsync(run.Id, timeout: TestTimeouts.WorkflowWait);
 
         completedRun.ShouldNotBeNull();
         completedRun.StepRuns.ShouldNotBeEmpty();
