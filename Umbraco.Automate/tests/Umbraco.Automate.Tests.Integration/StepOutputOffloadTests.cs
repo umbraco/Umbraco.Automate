@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -47,6 +48,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// outputs stay inline exactly as before, which also keeps the pending-approvals prompt flow
 /// working.
 /// </summary>
+[Collection("WorkflowHost")]
 public class StepOutputOffloadTests : IAsyncLifetime
 {
     /// <summary>Inline threshold used by these tests: big payloads offload, approval prompts stay inline.</summary>
@@ -178,8 +180,8 @@ public class StepOutputOffloadTests : IAsyncLifetime
         var automation = BuildAutomation("test-offload-large-output", bigStep, readerStep);
         await TriggerAsync(automation);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
 
         // The later step resolved the real value through the offloaded output.
         var completed = await _runRepository.GetAsync(run.Id);
@@ -207,8 +209,8 @@ public class StepOutputOffloadTests : IAsyncLifetime
         var automation = BuildAutomation("test-offload-small-output", smallStep, readerStep);
         await TriggerAsync(automation);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
 
         var completed = await _runRepository.GetAsync(run.Id);
         var readerRun = completed!.StepRuns.Single(s => s.StepId == readerStep.Id);
@@ -255,8 +257,8 @@ public class StepOutputOffloadTests : IAsyncLifetime
             .Build();
         await TriggerAsync(automation);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
 
         // Each iteration's reader saw its own iteration's offloaded output.
         var completed = await _runRepository.GetAsync(run.Id);
@@ -291,12 +293,12 @@ public class StepOutputOffloadTests : IAsyncLifetime
         var automation = BuildAutomation("test-offload-approval-prompt", bigStep, approvalStep);
         await TriggerAsync(automation);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
 
         // The pending-approvals API reads the prompt from StepRun.OutputData — which always
         // holds the full output regardless of offloading. (The workflow instance itself stays
         // Runnable while waiting for the approval event, so wait on the step run instead.)
-        var approvalRun = await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.WaitingForInput, TimeSpan.FromSeconds(15));
+        var approvalRun = await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.WaitingForInput, TestTimeouts.WorkflowWait);
         using (var doc = JsonDocument.Parse(approvalRun.OutputData!))
         {
             doc.RootElement.GetProperty("prompt").GetString().ShouldBe(prompt);
@@ -320,8 +322,8 @@ public class StepOutputOffloadTests : IAsyncLifetime
         var automation = BuildAutomation("test-offload-trigger-output", readerStep, tailStep);
         await TriggerAsync(automation, new Dictionary<string, object?> { ["recordFieldsJson"] = payload });
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
 
         // A step binding into the trigger still resolved the real value, via hydration.
         var completed = await _runRepository.GetAsync(run.Id);
@@ -353,8 +355,8 @@ public class StepOutputOffloadTests : IAsyncLifetime
         var automation = BuildAutomation("test-offload-small-trigger-output", readerStep, tailStep);
         await TriggerAsync(automation, new Dictionary<string, object?> { ["country"] = country });
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
 
         var completed = await _runRepository.GetAsync(run.Id);
         ReadMessage(completed!.StepRuns.Single(s => s.StepId == readerStep.Id).OutputData!)

@@ -26,7 +26,9 @@ public interface IScriptValidator
 /// </summary>
 internal sealed class ScriptValidator : IScriptValidator
 {
-    private static readonly TimeSpan CompileTimeout = TimeSpan.FromSeconds(2);
+    // Wall-clock backstop covering engine construction and parsing, not script execution.
+    // The Jint TimeoutInterval below bounds execution separately.
+    private static readonly TimeSpan CompileTimeout = TimeSpan.FromSeconds(5);
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<string>> ValidateScriptAsync(string? script, CancellationToken cancellationToken = default)

@@ -27,6 +27,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -47,6 +48,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// Whether such an edge is still taken when the step returns a *named* outcome is WorkflowCore's
 /// behaviour, not ours — so it is asserted rather than assumed.
 /// </remarks>
+[Collection("WorkflowHost")]
 public class ApprovalOutcomeTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;
@@ -176,7 +178,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
 
         var run = await RunToApprovalAsync(automation, approvalStep);
         await SubmitDecisionAsync(run.Id, approvalStep.Id, outcome);
-        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TimeSpan.FromSeconds(15));
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
 
         var completed = await _runRepository.GetAsync(run.Id);
 
@@ -218,7 +220,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         var run = await RunToApprovalAsync(automation, approvalStep);
         await SubmitDecisionAsync(run.Id, approvalStep.Id, outcome);
 
-        var nextRun = await WaitForStepRunStatusAsync(run, nextStep.Id, StepRunStatus.Completed, TimeSpan.FromSeconds(15));
+        var nextRun = await WaitForStepRunStatusAsync(run, nextStep.Id, StepRunStatus.Completed, TestTimeouts.WorkflowWait);
         ReadMessage(nextRun.OutputData!).ShouldBe("continued");
     }
 
@@ -240,7 +242,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
 
         var run = await RunToApprovalAsync(automation, approvalStep);
         await SubmitDecisionAsync(run.Id, approvalStep.Id, ApprovalOutcome.Rejected, "not this time");
-        await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.Rejected, TimeSpan.FromSeconds(15));
+        await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.Rejected, TestTimeouts.WorkflowWait);
 
         var completed = await _runRepository.GetAsync(run.Id);
         var approvalRun = completed!.StepRuns.Single(s => s.StepId == approvalStep.Id);
@@ -286,8 +288,8 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         };
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.WaitingForInput, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.WaitingForInput, TestTimeouts.WorkflowWait);
         return run;
     }
 
