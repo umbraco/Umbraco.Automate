@@ -124,6 +124,20 @@ public sealed class WebhookOptions
 }
 
 /// <summary>
+/// Configuration options for the MCP trigger endpoint.
+/// Bound to <c>Umbraco:Automate:Mcp</c> in appsettings.json.
+/// </summary>
+public sealed class McpOptions
+{
+    /// <summary>
+    /// Gets or sets the maximum number of MCP tool calls per automation per minute.
+    /// Requests exceeding this limit are rejected with <c>429 Too Many Requests</c>.
+    /// Default: 60.
+    /// </summary>
+    public int RateLimitPerMinute { get; set; } = 60;
+}
+
+/// <summary>
 /// Configuration options for automation execution.
 /// Bound to <c>Umbraco:Automate:Execution</c> in appsettings.json.
 /// </summary>
