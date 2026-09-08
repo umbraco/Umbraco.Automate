@@ -26,6 +26,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -42,6 +43,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// cancelled at the step boundary. The body action sleeps per iteration so the lock is
 /// reliably held when the terminate is issued, mirroring a user cancelling a long loop.
 /// </summary>
+[Collection("WorkflowHost")]
 public class RunCancellationTests : IAsyncLifetime
 {
     private const int CollectionSize = 150;
@@ -210,14 +212,14 @@ public class RunCancellationTests : IAsyncLifetime
 
         // Wait until the run is actively executing: workflow instance assigned and a few
         // body iterations already recorded, so the terminate lands mid-loop.
-        var run = await WaitForActiveExecutionAsync(minBodySteps: 3, TimeSpan.FromSeconds(30));
+        var run = await WaitForActiveExecutionAsync(minBodySteps: 3, TestTimeouts.Cancellation);
 
         var result = await _runService.TerminateRunAsync(run.Id);
         result.ShouldBe(RunLifecycleResult.Success);
 
         // The engine should stop promptly: the workflow instance must leave Runnable via
         // Terminated — not run the remaining ~145 iterations to completion.
-        var instance = await WaitForWorkflowToStopAsync(run.WorkflowInstanceId!, TimeSpan.FromSeconds(30));
+        var instance = await WaitForWorkflowToStopAsync(run.WorkflowInstanceId!, TestTimeouts.Cancellation);
         instance.Status.ShouldBe(WorkflowStatus.Terminated);
 
         var finalRun = await _runRepository.GetAsync(run.Id);
