@@ -2,7 +2,7 @@ import { sectionMenuManifests } from "./menu/manifests.js";
 import { sectionSidebarManifests } from "./sidebar/manifests.js";
 import { dashboardManifests } from "./dashboard/manifests.js";
 import { conditionManifests } from "./conditions/manifests.js";
-import { UA_SECTION_ALIAS } from "./constants.js";
+import { UA_SECTION_ALIAS, UA_SECTION_PATHNAME } from "./constants.js";
 
 const section: UmbExtensionManifest = {
     type: "section",
@@ -10,7 +10,7 @@ const section: UmbExtensionManifest = {
     name: "Automate Section",
     meta: {
         label: "#uaSections_automate",
-        pathname: "automate",
+        pathname: UA_SECTION_PATHNAME,
     },
     conditions: [
         {
