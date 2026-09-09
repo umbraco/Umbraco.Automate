@@ -48,4 +48,21 @@ public abstract class NotificationTriggerBase<TSettings, TOutput, TNotification>
     /// <param name="updateDate">The entity's <c>UpdateDate</c> captured at save time.</param>
     protected string GenerateIdempotencyKey(Guid entityKey, int versionId, DateTime updateDate)
         => IdempotencyKeyFactory.ForEntitySaveEvent(Alias, entityKey, versionId, updateDate);
+
+    /// <summary>
+    /// Generates a deterministic idempotency key for a save trigger event on an
+    /// entity without a CMS version id.
+    /// </summary>
+    /// <param name="entityKey">The Umbraco entity's unique key.</param>
+    /// <param name="updateDate">The entity's <c>UpdateDate</c> captured at save time.</param>
+    protected string GenerateVersionlessIdempotencyKey(Guid entityKey, DateTime updateDate)
+        => IdempotencyKeyFactory.ForVersionlessEntitySaveEvent(Alias, entityKey, updateDate);
+
+    /// <summary>
+    /// Generates a deterministic idempotency key for an event on an entity without
+    /// a CMS version id, such as a delete event.
+    /// </summary>
+    /// <param name="entityKey">The Umbraco entity's unique key.</param>
+    protected string GenerateVersionlessIdempotencyKey(Guid entityKey)
+        => IdempotencyKeyFactory.ForVersionlessEntityEvent(Alias, entityKey);
 }
