@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Logging;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -15,18 +17,38 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class ContentPublishedTrigger
     : NotificationTriggerBase<ContentPublishedTriggerSettings, ContentPublishedTriggerOutput, ContentPublishedNotification>
 {
+    private readonly IUserService _userService;
+    private readonly ILogger<ContentPublishedTrigger> _logger;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ContentPublishedTrigger"/> class.
     /// </summary>
-    public ContentPublishedTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
+    public ContentPublishedTrigger(
+        TriggerInfrastructure infrastructure,
+        IUserService userService,
+        ILogger<ContentPublishedTrigger> logger)
+        : base(infrastructure)
     {
+        _userService = userService;
+        _logger = logger;
     }
 
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(ContentPublishedNotification notification)
     {
+        // Bulk/branch publishes share one publisher across many entities — classify each
+        // distinct publisher id once per notification.
+        var kindByPublisher = new Dictionary<int, string?>();
+
         foreach (var content in notification.PublishedEntities)
         {
+            string? publisherKind = null;
+            if (content.PublisherId is { } publisherId && !kindByPublisher.TryGetValue(publisherId, out publisherKind))
+            {
+                publisherKind = ContentPublisherResolver.Resolve(_userService, publisherId, _logger);
+                kindByPublisher[publisherId] = publisherKind;
+            }
+
             yield return new TriggerEvent<ContentPublishedTriggerOutput>
             {
                 TriggerAlias = Alias,
@@ -42,6 +64,8 @@ public sealed class ContentPublishedTrigger
                     ContentTypeKey = content.ContentType?.Key,
                     ContentTypeAlias = content.ContentType?.Alias,
                     Cultures = ContentCultureHelpers.GetPublishedCultures(content, notification.PublishedCultures),
+                    PublisherId = content.PublisherId,
+                    PublisherKind = publisherKind,
                 },
             };
         }
@@ -49,5 +73,6 @@ public sealed class ContentPublishedTrigger
 
     /// <inheritdoc />
     protected override bool CanHandle(ContentPublishedTriggerOutput output, ContentPublishedTriggerSettings? settings)
-        => EntityTypesFilter.Matches(output.ContentTypeKey, settings?.ContentTypes);
+        => EntityTypesFilter.Matches(output.ContentTypeKey, settings?.ContentTypes)
+           && PublisherKindFilter.Matches(output.PublisherKind, settings?.PublishedBy);
 }

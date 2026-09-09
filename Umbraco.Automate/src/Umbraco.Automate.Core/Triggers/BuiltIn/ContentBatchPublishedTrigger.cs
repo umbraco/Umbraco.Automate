@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Logging;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -15,11 +17,20 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 public sealed class ContentBatchPublishedTrigger
     : NotificationTriggerBase<ContentPublishedTriggerSettings, BatchTriggerOutput<ContentPublishedTriggerOutput>, ContentPublishedNotification>
 {
+    private readonly IUserService _userService;
+    private readonly ILogger<ContentBatchPublishedTrigger> _logger;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ContentBatchPublishedTrigger"/> class.
     /// </summary>
-    public ContentBatchPublishedTrigger(TriggerInfrastructure infrastructure) : base(infrastructure)
+    public ContentBatchPublishedTrigger(
+        TriggerInfrastructure infrastructure,
+        IUserService userService,
+        ILogger<ContentBatchPublishedTrigger> logger)
+        : base(infrastructure)
     {
+        _userService = userService;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -31,13 +42,29 @@ public sealed class ContentBatchPublishedTrigger
             yield break;
         }
 
-        var items = entities.Select(content => new ContentPublishedTriggerOutput
+        // Bulk/branch publishes share one publisher across many entities — classify each
+        // distinct publisher id once per notification.
+        var kindByPublisher = new Dictionary<int, string?>();
+
+        var items = entities.Select(content =>
         {
-            ContentKey = content.Key,
-            ContentName = content.Name,
-            ContentTypeKey = content.ContentType?.Key,
-            ContentTypeAlias = content.ContentType?.Alias,
-            Cultures = ContentCultureHelpers.GetPublishedCultures(content, notification.PublishedCultures),
+            string? publisherKind = null;
+            if (content.PublisherId is { } publisherId && !kindByPublisher.TryGetValue(publisherId, out publisherKind))
+            {
+                publisherKind = ContentPublisherResolver.Resolve(_userService, publisherId, _logger);
+                kindByPublisher[publisherId] = publisherKind;
+            }
+
+            return new ContentPublishedTriggerOutput
+            {
+                ContentKey = content.Key,
+                ContentName = content.Name,
+                ContentTypeKey = content.ContentType?.Key,
+                ContentTypeAlias = content.ContentType?.Alias,
+                Cultures = ContentCultureHelpers.GetPublishedCultures(content, notification.PublishedCultures),
+                PublisherId = content.PublisherId,
+                PublisherKind = publisherKind,
+            };
         }).ToList();
 
         // Hash the (key, publishedVersionId) tuples so a duplicate notification for the same
@@ -61,18 +88,14 @@ public sealed class ContentBatchPublishedTrigger
 
     /// <inheritdoc />
     // Match-if-any semantics: the batch fires whole when at least one item matches the
-    // configured filter. Automations needing strict per-item filtering should use a
+    // configured filters. Automations needing strict per-item filtering should use a
     // filter step inside the workflow.
     protected override bool CanHandle(BatchTriggerOutput<ContentPublishedTriggerOutput> output, ContentPublishedTriggerSettings? settings)
     {
-        if (string.IsNullOrWhiteSpace(settings?.ContentTypes))
-        {
-            return true;
-        }
-
         foreach (var item in output.Items)
         {
-            if (EntityTypesFilter.Matches(item.ContentTypeKey, settings.ContentTypes))
+            if (EntityTypesFilter.Matches(item.ContentTypeKey, settings?.ContentTypes)
+                && PublisherKindFilter.Matches(item.PublisherKind, settings?.PublishedBy))
             {
                 return true;
             }

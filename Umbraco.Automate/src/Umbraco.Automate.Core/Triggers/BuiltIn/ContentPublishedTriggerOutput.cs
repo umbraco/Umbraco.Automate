@@ -34,5 +34,18 @@ public sealed class ContentPublishedTriggerOutput : IContentScopedTriggerOutput
     /// </summary>
     public string[]? Cultures { get; init; }
 
+    /// <summary>
+    /// Gets the id of the user who performed the publish (<c>IContent.PublisherId</c>).
+    /// -1 is the super user — how scheduled publishing and in-process code publish.
+    /// </summary>
+    public int? PublisherId { get; init; }
+
+    /// <summary>
+    /// Gets the publisher's classification — one of the <see cref="ContentPublisherKind"/>
+    /// constants, or null when the publisher could not be resolved (including events
+    /// produced before this field existed).
+    /// </summary>
+    public string? PublisherKind { get; init; }
+
     Guid? IContentScopedTriggerOutput.GetContentKey() => ContentKey;
 }

@@ -1,4 +1,5 @@
 using Json.Schema;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -8,14 +9,24 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
+using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 
 public class ContentPublishedTriggerTests
 {
-    private readonly ContentPublishedTrigger _trigger = new(
-        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
+    private readonly Mock<IUserService> _userService = new();
+    private readonly ContentPublishedTrigger _trigger;
+
+    public ContentPublishedTriggerTests()
+    {
+        _trigger = new ContentPublishedTrigger(
+            new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()),
+            _userService.Object,
+            Mock.Of<ILogger<ContentPublishedTrigger>>());
+    }
 
     [Fact]
     public void HasCorrectAlias()
@@ -39,6 +50,7 @@ public class ContentPublishedTriggerTests
         var schema = _trigger.GetSettingsSchema();
         schema.ShouldNotBeNull();
         schema.Fields.ShouldContain(f => f.PropertyName == "ContentTypes");
+        schema.Fields.ShouldContain(f => f.PropertyName == "PublishedBy");
     }
 
     [Fact]
@@ -218,13 +230,104 @@ public class ContentPublishedTriggerTests
         output.Cultures.ShouldBeNull();
     }
 
+    [Fact]
+    public void MapEvent_BackofficePublisher_ClassifiedAsUser()
+    {
+        var user = new Mock<IUser>();
+        user.SetupGet(u => u.Kind).Returns(UserKind.Default);
+        _userService.Setup(s => s.GetUserById(7)).Returns(user.Object);
+
+        var content = CreateContent(Guid.NewGuid(), "Page", "blogPost", publisherId: 7);
+        var notification = new ContentPublishedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>()
+            .Output;
+
+        output.PublisherId.ShouldBe(7);
+        output.PublisherKind.ShouldBe(ContentPublisherKind.User);
+    }
+
+    [Fact]
+    public void MapEvent_ApiUserPublisher_ClassifiedAsApi()
+    {
+        var user = new Mock<IUser>();
+        user.SetupGet(u => u.Kind).Returns(UserKind.Api);
+        _userService.Setup(s => s.GetUserById(9)).Returns(user.Object);
+
+        var content = CreateContent(Guid.NewGuid(), "Page", "blogPost", publisherId: 9);
+        var notification = new ContentPublishedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>()
+            .Output;
+
+        output.PublisherKind.ShouldBe(ContentPublisherKind.Api);
+    }
+
+    [Fact]
+    public void MapEvent_SuperUserPublisher_ClassifiedAsSystemWithoutLookup()
+    {
+        var content = CreateContent(Guid.NewGuid(), "Page", "blogPost", publisherId: -1);
+        var notification = new ContentPublishedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>()
+            .Output;
+
+        output.PublisherKind.ShouldBe(ContentPublisherKind.System);
+        _userService.Verify(s => s.GetUserById(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public void MapEvent_UnresolvablePublisher_KindIsNull()
+    {
+        _userService.Setup(s => s.GetUserById(99)).Returns((IUser?)null);
+
+        var content = CreateContent(Guid.NewGuid(), "Page", "blogPost", publisherId: 99);
+        var notification = new ContentPublishedNotification(new[] { content }, new EventMessages());
+
+        var output = _trigger.MapEvent(notification)
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TriggerEvent<ContentPublishedTriggerOutput>>()
+            .Output;
+
+        output.PublisherId.ShouldBe(99);
+        output.PublisherKind.ShouldBeNull();
+    }
+
+    [Fact]
+    public void MapEvent_SharedPublisher_ResolvesOncePerNotification()
+    {
+        var user = new Mock<IUser>();
+        user.SetupGet(u => u.Kind).Returns(UserKind.Default);
+        _userService.Setup(s => s.GetUserById(7)).Returns(user.Object);
+
+        var notification = new ContentPublishedNotification(
+            new[]
+            {
+                CreateContent(Guid.NewGuid(), "Page One", "blogPost", publisherId: 7),
+                CreateContent(Guid.NewGuid(), "Page Two", "article", publisherId: 7),
+            },
+            new EventMessages());
+
+        var events = _trigger.MapEvent(notification).ToList();
+
+        events.Count.ShouldBe(2);
+        _userService.Verify(s => s.GetUserById(7), Times.Once);
+    }
+
     internal static IContent CreateContent(
         Guid key,
         string name,
         string contentTypeAlias,
         ContentVariation variations = ContentVariation.Nothing,
         ContentCultureInfosCollection? publishCultureInfos = null,
-        ContentCultureInfosCollection? cultureInfos = null)
+        ContentCultureInfosCollection? cultureInfos = null,
+        int? publisherId = null)
     {
         var contentType = new Mock<ISimpleContentType>();
         contentType.SetupGet(ct => ct.Alias).Returns(contentTypeAlias);
@@ -236,6 +339,7 @@ public class ContentPublishedTriggerTests
         content.SetupGet(c => c.ContentType).Returns(contentType.Object);
         content.SetupGet(c => c.PublishCultureInfos).Returns(publishCultureInfos);
         content.SetupGet(c => c.CultureInfos).Returns(cultureInfos);
+        content.SetupGet(c => c.PublisherId).Returns(publisherId);
 
         return content.Object;
     }

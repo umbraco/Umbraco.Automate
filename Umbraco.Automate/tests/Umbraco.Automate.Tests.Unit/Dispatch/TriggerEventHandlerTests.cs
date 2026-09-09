@@ -15,6 +15,7 @@ using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Dispatch;
 
@@ -52,7 +53,7 @@ public class TriggerEventHandlerTests
             return new ITrigger[]
             {
                 new ContentSavedTrigger(infra),
-                new ContentPublishedTrigger(infra),
+                new ContentPublishedTrigger(infra, Mock.Of<IUserService>(), Mock.Of<ILogger<ContentPublishedTrigger>>()),
             };
         });
 
@@ -398,6 +399,61 @@ public class TriggerEventHandlerTests
             It.IsAny<string?>(),
             It.IsAny<Dictionary<string, object?>?>(),
             It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_PublishedByFilter_SkipsNonMatchingAutomation()
+    {
+        var humanOnly = new AutomationBuilder()
+            .WithTrigger("umbracoAutomate.contentPublished", new Dictionary<string, object?>
+            {
+                ["publishedBy"] = nameof(PublishedByFilter.User),
+            })
+            .Build();
+
+        var systemOnly = new AutomationBuilder()
+            .WithTrigger("umbracoAutomate.contentPublished", new Dictionary<string, object?>
+            {
+                ["publishedBy"] = nameof(PublishedByFilter.System),
+            })
+            .Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { humanOnly, systemOnly });
+
+        // Publish performed by an automation service account (API user).
+        var output = new ContentPublishedTriggerOutput
+        {
+            ContentKey = Guid.NewGuid(),
+            ContentName = "Page",
+            ContentTypeKey = Guid.NewGuid(),
+            ContentTypeAlias = "blogPost",
+            PublisherId = 42,
+            PublisherKind = ContentPublisherKind.Api,
+        };
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.contentPublished",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(output, JsonOptions.Default),
+        });
+
+        await _handler.HandleAsync(body, CancellationToken.None);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            systemOnly,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            humanOnly,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
     }
 
     [Fact]
