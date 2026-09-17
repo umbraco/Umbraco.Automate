@@ -319,6 +319,70 @@ public class EditableModelSerializerTests
         result.GetProperty("enabled").GetBoolean().ShouldBeTrue();
     }
 
+    [Fact]
+    public void Deserialize_WithEncryptedFieldInsideArray_DecryptsValue()
+    {
+        var json =
+            """
+        {
+          "steps": [
+            {
+              "settings": {
+                "headers": "ENC:{\"User-Agent\":\"Mozilla/5.0\"}"
+              }
+            }
+          ]
+        }
+        """;
+
+        var result = _serializer.Deserialize(json);
+
+        var headers = result
+            .GetProperty("steps")[0]
+            .GetProperty("settings")
+            .GetProperty("headers")
+            .GetString();
+
+        headers.ShouldBe("""{"User-Agent":"Mozilla/5.0"}""");
+
+        _protectorMock.Verify(
+            protector => protector.Unprotect(
+                """ENC:{"User-Agent":"Mozilla/5.0"}"""),
+            Times.Once);
+    }
+
+    [Fact]
+    public void Deserialize_WithEncryptedFieldsInsideNestedArrays_DecryptsValues()
+    {
+        var json =
+            """
+        {
+          "groups": [
+            {
+              "steps": [
+                {
+                  "settings": {
+                    "secret": "ENC:secret-value"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var result = _serializer.Deserialize(json);
+
+        var secret = result
+            .GetProperty("groups")[0]
+            .GetProperty("steps")[0]
+            .GetProperty("settings")
+            .GetProperty("secret")
+            .GetString();
+
+        secret.ShouldBe("secret-value");
+    }
+
     #endregion
 
     #region Round Trip
