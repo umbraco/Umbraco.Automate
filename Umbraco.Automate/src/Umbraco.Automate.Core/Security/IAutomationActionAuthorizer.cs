@@ -31,6 +31,14 @@ public interface IAutomationActionAuthorizer
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for the
+    /// media root. Distinct from <see cref="AuthorizeMediaAsync(Guid, CancellationToken)"/>
+    /// because the root is not a node and has no key: an account with a media start node is
+    /// confined to that subtree and cannot write to the root at all.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeMediaRootAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Filters a set of content keys to only those the ambient service account is
     /// authorised to access for the given permission letters. Used by search/list actions to
     /// suppress unauthorised results.

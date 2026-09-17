@@ -183,6 +183,14 @@ public sealed class ExecutionOptions
     public long MaxHttpResponseBodyBytes { get; set; } = 10_485_760;
 
     /// <summary>
+    /// Gets or sets the maximum size, in bytes, of a file the Create Media action will download
+    /// and store. Separate from <see cref="MaxHttpResponseBodyBytes"/>: that caps a payload held
+    /// in run storage, whereas this caps a file written to the media filesystem, so a site that
+    /// imports large assets can raise one without loosening the other. Default: 10 MB.
+    /// </summary>
+    public long MaxMediaFileBytes { get; set; } = 10_485_760;
+
+    /// <summary>
     /// Gets or sets the execution mode for workflow processing.
     /// </summary>
     /// <remarks>
