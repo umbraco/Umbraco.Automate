@@ -69,7 +69,22 @@ export class UaSettingsFormElement extends UmbLitElement {
             return false;
         }
 
-        return lastKeys.every((key) => this.#lastEmittedSettings![key] === incoming[key]);
+        // Strict `===` breaks for array/object-valued fields (e.g. a List<> settings
+        // property): every pass through the form rebuilds a new reference for them even
+        // when the content is unchanged, so a reference check never recognises the echo,
+        // the guard never fires, and typing in an unrelated field (like a code editor)
+        // resets on every keystroke. Compare by value instead.
+        return lastKeys.every((key) => this.#valuesEqual(this.#lastEmittedSettings![key], incoming[key]));
+    }
+
+    #valuesEqual(a: unknown, b: unknown): boolean {
+        if (a === b) {
+            return true;
+        }
+        if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
+            return false;
+        }
+        return JSON.stringify(a) === JSON.stringify(b);
     }
 
     override updated(changedProperties: Map<string, unknown>) {

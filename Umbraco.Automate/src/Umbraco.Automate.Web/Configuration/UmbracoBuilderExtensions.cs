@@ -11,8 +11,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Realtime;
+using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Triggers.BuiltIn;
+using Umbraco.Automate.Web.Api.Mcp;
 using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Realtime;
@@ -47,6 +52,7 @@ public static partial class UmbracoBuilderExtensions
         builder.AddUmbracoAutomateAuthorization();
         builder.AddUmbracoAutomateManagementApi();
         builder.AddUmbracoAutomateWebhookApi();
+        builder.AddUmbracoAutomateMcpApi();
         builder.AddUmbracoAutomateMapDefinitions();
         builder.AddUmbracoAutomateRealtime();
 
@@ -153,6 +159,102 @@ public static partial class UmbracoBuilderExtensions
             }));
 
         builder.AddUmbracoAutomateWebhookRateLimiting();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateMcpApi(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddMcpServer().WithHttpTransport(options =>
+        {
+            // Stateless is required so ConfigureSessionOptions below runs on every request
+            // rather than once per long-lived session, which is what makes per-automation tool
+            // resolution correct without needing session affinity across Automate's own app
+            // instances. Confirmed via reflection against the installed 2.2.0 package that
+            // HttpServerTransportOptions exposes BOTH this bool property and the older
+            // SessionMode enum; Stateless is the current/recommended one and already defaults
+            // to true in 2.2.0, so this assignment is defensive/documentation rather than
+            // load-bearing.
+            options.Stateless = true;
+
+            options.ConfigureSessionOptions = (httpContext, mcpOptions, _) =>
+            {
+                if (httpContext.Items[McpHttpContextItems.AutomationKey] is Automation automation
+                    && httpContext.Items[McpHttpContextItems.SettingsKey] is McpTriggerSettings settings)
+                {
+                    var executor = httpContext.RequestServices.GetRequiredService<IAutomationExecutor>();
+                    var runService = httpContext.RequestServices.GetRequiredService<IAutomationRunService>();
+
+                    mcpOptions.ToolCollection = [new AutomationMcpTool(automation, settings, executor, runService)];
+                }
+
+                return Task.CompletedTask;
+            };
+        });
+
+        builder.AddUmbracoAutomateMcpRateLimiting();
+
+        builder.Services.Configure<UmbracoPipelineOptions>(options =>
+        {
+            options.AddFilter(new UmbracoPipelineFilter("UmbracoAutomateMcp")
+            {
+                // Runs after routing (so {automationId} is in RouteValues) and before the MCP
+                // handler mapped below. PostRouting filters apply to EVERY request in the app,
+                // not just this endpoint, so McpAuthenticationMiddleware — which 404s whenever
+                // "automationId" isn't present in RouteValues — must be scoped with UseWhen to
+                // only the MCP path. Without this, every other route in the site (the backoffice,
+                // content, other APIs) would 404 too, since none of them carry that route value.
+                PostRouting = app => app.UseWhen(
+                    context => context.Request.Path.StartsWithSegments(McpApiPathPrefix),
+                    branch => branch.UseMiddleware<McpAuthenticationMiddleware>()),
+                Endpoints = app => app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapMcp(Constants.McpApi.RouteTemplate)
+                        .RequireRateLimiting(Constants.McpApi.RateLimitPolicy);
+                }),
+            });
+        });
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Used to scope <see cref="McpAuthenticationMiddleware"/> to MCP requests only. Backed by
+    /// <see cref="Constants.McpApi.PathPrefix"/> — its own literal source of truth, not derived
+    /// from <see cref="Constants.McpApi.RouteTemplate"/> — so a future change to the route
+    /// template's shape can't silently break or widen this scoping.
+    /// </summary>
+    private static readonly PathString McpApiPathPrefix = Constants.McpApi.PathPrefix;
+
+    /// <summary>
+    /// Registers the MCP rate limit policy only — the rate limiter middleware itself
+    /// (<c>UseRateLimiter()</c>) is already installed globally by
+    /// <see cref="AddUmbracoAutomateWebhookRateLimiting"/>. If that method's filter is ever
+    /// removed, this policy will stop being enforced; the two are coupled on purpose to avoid
+    /// registering the same middleware twice.
+    /// </summary>
+    private static IUmbracoBuilder AddUmbracoAutomateMcpRateLimiting(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.AddPolicy(Constants.McpApi.RateLimitPolicy, context =>
+            {
+                var mcpOptions = context.RequestServices
+                    .GetRequiredService<IOptions<McpOptions>>().Value;
+
+                var partitionKey = context.Request.RouteValues["automationId"]?.ToString() ?? "global";
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: partitionKey,
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = mcpOptions.RateLimitPerMinute,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                    });
+            });
+        });
 
         return builder;
     }

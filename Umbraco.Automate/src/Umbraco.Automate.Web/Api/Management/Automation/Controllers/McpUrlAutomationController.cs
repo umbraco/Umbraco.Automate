@@ -11,10 +11,10 @@ using Umbraco.Cms.Core.Hosting;
 namespace Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 
 /// <summary>
-/// Gets the public webhook endpoint URL for an automation.
+/// Gets the public MCP endpoint URL for an automation.
 /// </summary>
 [ApiVersion("1.0")]
-public sealed class WebhookUrlAutomationController : AutomationControllerBase
+public sealed class McpUrlAutomationController : AutomationControllerBase
 {
     private readonly IAutomationService _automationService;
     private readonly IAuthorizationService _authorizationService;
@@ -22,9 +22,9 @@ public sealed class WebhookUrlAutomationController : AutomationControllerBase
     private readonly IOptionsMonitor<WebRoutingSettings> _webRoutingSettings;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="WebhookUrlAutomationController"/> class.
+    /// Initializes a new instance of the <see cref="McpUrlAutomationController"/> class.
     /// </summary>
-    public WebhookUrlAutomationController(
+    public McpUrlAutomationController(
         IAutomationService automationService,
         IAuthorizationService authorizationService,
         IHostingEnvironment hostingEnvironment,
@@ -37,17 +37,16 @@ public sealed class WebhookUrlAutomationController : AutomationControllerBase
     }
 
     /// <summary>
-    /// Gets the absolute URL an external caller should send webhook requests to for this
-    /// automation.
+    /// Gets the absolute URL an MCP client should connect to for this automation's tool.
     /// </summary>
     /// <remarks>
     /// See <see cref="ApplicationUrlResolver"/> for how the host is resolved.
     /// </remarks>
-    [HttpGet("{id:guid}/webhook-url")]
+    [HttpGet("{id:guid}/mcp-url")]
     [MapToApiVersion("1.0")]
-    [ProducesResponseType(typeof(WebhookUrlResponseModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(McpUrlResponseModel), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetWebhookUrl(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetMcpUrl(Guid id, CancellationToken cancellationToken = default)
     {
         var automation = await _automationService.GetAutomationAsync(id, cancellationToken);
         if (automation is null)
@@ -61,9 +60,9 @@ public sealed class WebhookUrlAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        var path = _hostingEnvironment.ToAbsolute($"/automate/webhook/{id}");
+        var path = _hostingEnvironment.ToAbsolute($"/automate/mcp/{id}");
         var url = ApplicationUrlResolver.Resolve(Request, _webRoutingSettings, path);
 
-        return Ok(new WebhookUrlResponseModel { Url = url.ToString() });
+        return Ok(new McpUrlResponseModel { Url = url.ToString() });
     }
 }
