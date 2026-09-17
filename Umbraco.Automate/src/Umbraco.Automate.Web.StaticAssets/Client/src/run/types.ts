@@ -1,8 +1,15 @@
 import type { UmbEntityModel } from "@umbraco-cms/backoffice/entity";
 import type {
+    ActionLogLevelModel,
     AutomationRunStatusModel,
     StepRunStatusModel,
 } from "../api/types.gen.js";
+
+export interface UaStepRunLogEntryModel {
+    timestampUtc: string;
+    level: ActionLogLevelModel;
+    message: string;
+}
 
 export interface UaStepRunModel {
     id: string;
@@ -14,6 +21,7 @@ export interface UaStepRunModel {
     error: string | null;
     retryCount: number;
     durationMs: number | null;
+    logEntries: UaStepRunLogEntryModel[];
 }
 
 export interface UaRunDetailModel extends UmbEntityModel {
