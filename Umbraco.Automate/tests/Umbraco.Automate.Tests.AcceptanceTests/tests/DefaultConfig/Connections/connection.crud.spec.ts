@@ -22,7 +22,7 @@ test.describe('Connections', () => {
     try {
       // Act
       await umbracoUi.goToBackOffice();
-      await umbracoAutomateUi.automate.goToUrl(
+      await umbracoAutomateUi.goToUrl(
         umbracoAutomateUi.automate.connectionCreateUrl(CONNECTION_TYPE.toLowerCase())
       );
       await umbracoAutomateUi.automate.waitForWorkspaceEditor();
@@ -47,7 +47,7 @@ test.describe('Connections', () => {
     try {
       // Arrange
       await umbracoUi.goToBackOffice();
-      await umbracoAutomateUi.automate.goToUrl(
+      await umbracoAutomateUi.goToUrl(
         umbracoAutomateUi.automate.connectionCreateUrl(CONNECTION_TYPE.toLowerCase())
       );
       await umbracoAutomateUi.automate.waitForWorkspaceEditor();
@@ -58,7 +58,7 @@ test.describe('Connections', () => {
       const created = await umbracoAutomateApi.connections.getByName(originalName);
 
       // Act
-      await umbracoAutomateUi.automate.goToUrl(umbracoAutomateUi.automate.connectionEditUrl(created.id));
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.connectionEditUrl(created.id));
       await umbracoAutomateUi.automate.waitForWorkspaceEditor();
       await umbracoAutomateUi.automate.enterName(newName);
       await umbracoAutomateUi.automate.clickSave();
@@ -82,7 +82,7 @@ test.describe('Connections', () => {
     try {
       // Arrange
       await umbracoUi.goToBackOffice();
-      await umbracoAutomateUi.automate.goToUrl(
+      await umbracoAutomateUi.goToUrl(
         umbracoAutomateUi.automate.connectionCreateUrl(CONNECTION_TYPE.toLowerCase())
       );
       await umbracoAutomateUi.automate.waitForWorkspaceEditor();
@@ -91,7 +91,7 @@ test.describe('Connections', () => {
       await expect.poll(async () => await umbracoAutomateApi.connections.existsByName(name)).toBe(true);
 
       // Act
-      await umbracoAutomateUi.automate.goToUrl(umbracoAutomateUi.automate.connectionRootUrl());
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.connectionRootUrl());
 
       // Assert
       await expect(umbracoAutomateUi.page.getByRole('link', { name, exact: true })).toBeVisible();

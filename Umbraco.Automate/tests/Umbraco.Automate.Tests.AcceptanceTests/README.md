@@ -3,7 +3,8 @@
 Playwright end-to-end tests that drive a **running** Umbraco site with Umbraco.Automate
 installed, through the backoffice.
 
-Local development only for now. There is no CI stage yet.
+Runs locally, and in CI via the `AcceptanceTests` stage in `azure-pipelines.yml`. That stage
+depends on `Build`, so it gates pull requests as well as pushes.
 
 ## Prerequisites
 

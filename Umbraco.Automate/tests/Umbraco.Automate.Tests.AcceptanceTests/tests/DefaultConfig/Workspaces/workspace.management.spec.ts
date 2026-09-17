@@ -16,7 +16,7 @@ test.describe('Workspace management', () => {
   }) => {
     // Act
     await umbracoUi.goToBackOffice();
-    await umbracoAutomateUi.automate.goToUrl(umbracoAutomateUi.automate.workspaceRootUrl());
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.workspaceRootUrl());
 
     // Assert — the table renders name and alias as separate columns.
     const row = umbracoAutomateUi.page.getByRole('row', { name: new RegExp(automateWorkspace.name) });
@@ -36,7 +36,7 @@ test.describe('Workspace management', () => {
 
     // Act
     await umbracoUi.goToBackOffice();
-    await umbracoAutomateUi.automate.goToUrl(
+    await umbracoAutomateUi.goToUrl(
       umbracoAutomateUi.automate.workspaceEditUrl(automateServiceAccountWorkspace.id)
     );
     await umbracoAutomateUi.automate.waitForWorkspaceEditor();
@@ -57,7 +57,7 @@ test.describe('Workspace management', () => {
   }) => {
     // Act
     await umbracoUi.goToBackOffice();
-    await umbracoAutomateUi.automate.goToUrl(
+    await umbracoAutomateUi.goToUrl(
       umbracoAutomateUi.automate.workspaceEditUrl(automateServiceAccountWorkspace.id)
     );
     await umbracoAutomateUi.automate.waitForWorkspaceEditor();
@@ -75,7 +75,7 @@ test.describe('Workspace management', () => {
     try {
       // Act
       await umbracoUi.goToBackOffice();
-      await umbracoAutomateUi.automate.goToUrl(umbracoAutomateUi.automate.workspaceEditUrl(workspace.id));
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.workspaceEditUrl(workspace.id));
       await umbracoAutomateUi.automate.waitForWorkspaceEditor();
       await umbracoAutomateUi.automate.clickAction('Delete');
       await umbracoAutomateUi.automate.confirmDialog();

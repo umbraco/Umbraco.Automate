@@ -42,6 +42,10 @@ export class AutomateUiHelper {
     return `${this.sectionPath()}/workspace/ua:connection/edit/${id}`;
   }
 
+  sectionUrl(): string {
+    return this.sectionPath();
+  }
+
   connectionRootUrl(): string {
     return `${this.sectionPath()}/workspace/ua:connection-root/edit/null`;
   }

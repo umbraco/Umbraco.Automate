@@ -19,7 +19,7 @@ test.describe('Automation lifecycle', () => {
 
     // Act
     await umbracoUi.goToBackOffice();
-    await umbracoAutomateUi.automate.goToUrl(
+    await umbracoAutomateUi.goToUrl(
       umbracoAutomateUi.automate.automationCreateUrl(ConstantHelper.entityTypes.workspace, automateWorkspace.id)
     );
     await umbracoAutomateUi.automate.waitForWorkspaceEditor();
@@ -47,7 +47,7 @@ test.describe('Automation lifecycle', () => {
 
     // Act
     await umbracoUi.goToBackOffice();
-    await umbracoAutomateUi.automate.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
     await umbracoAutomateUi.automate.waitForWorkspaceEditor();
     await umbracoAutomateUi.automate.enterName(newName);
     await umbracoAutomateUi.automate.clickSave();
@@ -69,7 +69,7 @@ test.describe('Automation lifecycle', () => {
 
     // Act
     await umbracoUi.goToBackOffice();
-    await umbracoAutomateUi.automate.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
     await umbracoAutomateUi.automate.waitForWorkspaceEditor();
     await umbracoAutomateUi.automate.clickAction('Delete');
     await umbracoAutomateUi.automate.confirmDialog();

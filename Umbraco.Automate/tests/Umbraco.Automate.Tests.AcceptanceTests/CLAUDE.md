@@ -5,7 +5,8 @@ Playwright end-to-end tests that drive a **running** demo site
 `@umbraco-cms/acceptance-test-helpers`. Specs live under `tests/DefaultConfig/`; auth is
 bootstrapped by `tests/auth.setup.ts`. Commands are in [README.md](README.md).
 
-**Local only.** There is no CI stage. See "Wiring this into CI" below before adding one.
+Runs locally and in CI. The `AcceptanceTests` stage in `azure-pipelines.yml` depends on
+`Build`, so it gates pull requests too — see "How the CI stage works" below.
 
 ---
 
@@ -172,23 +173,56 @@ The visible symptom is that the Connections and Workspaces **collection views ha
 button** — you have to use the sidebar tree. Do not write a spec that clicks a create button in
 a collection view until this is fixed.
 
+## The session dies mid-run — navigate through `goToUrl`
+
+The CMS rotates refresh tokens. When the shared `umbracoApi` helper hits an expired token it
+performs a **full re-login**, which invalidates the token the browser page is holding, and the
+next UI navigation lands on the login screen. A spec that calls the API before driving the UI
+never notices; a spec that only drives the UI fails with a bare `waitFor` timeout and a page
+snapshot showing the login form. That is how the Overview dashboard smoke test failed while
+every test around it passed.
+
+`UiHelpers.goToUrl` handles it: navigate, detect the login form, re-authenticate, navigate
+again. **Route every UI navigation through it** rather than calling `page.goto` or
+`AutomateUiHelper.goToUrl` directly from a spec.
+
+Two details that make the detection work, both of which caught me out:
+
+- The backoffice answers with a redirect chain, so the outcome is not decided at
+  `domcontentloaded`. Race the login form against `section-links` before deciding.
+- `isVisible()` is immediate and **ignores** a `timeout` option. Checking it straight after
+  navigating always reported "not on the login screen", so the repair silently never ran.
+
 ## Local vs CI config diverges
 
-`playwright.config.ts`: locally 30s timeout + 0 retries; CI 60s + 2 retries. Once CI exists, a
-flake that only bites in one place is usually this divergence, not a product bug.
+`playwright.config.ts`: locally 30s timeout + 0 retries; CI 60s + 2 retries. A flake that only
+bites in one place is usually this divergence, not a product bug.
 
-## Wiring this into CI (not done)
+## How the CI stage works
 
-When the time comes, mirror Forms rather than committing a test site. Forms' CI **ignores** its
-committed TestSite and scaffolds a throwaway one instead:
+The `AcceptanceTests` stage in `azure-pipelines.yml`:
 
-1. Depend on the `Pack` stage (that is where Automate's nupkgs land), not `Build`.
-2. `dotnet new umbraco`, add `Umbraco.Automate` at the build version, restore, build.
-3. **Add the `umbracoAutomateDbDSN` connection string.** Forms has no equivalent step and
-   Automate will not boot without it. See `scripts/install-package-test-site.ps1` for the exact
-   shape.
-4. Set the unattended-install env vars so `auth.setup.ts` has a user.
-5. Start with `dotnet run`, wait on the URL, then run Playwright.
+- **Depends on `Build`, not `Pack`.** `Pack` is restricted to pushes on `vN/main`, `vN/dev`,
+  `vN/hotfix/*` and `vN/release/*`, so depending on it would mean the suite never ran on a pull
+  request — useless as a gate. The trade-off is that CI exercises **project references**, not a
+  published package.
+- **Scaffolds the site with `scripts/install-demo-site.sh`**, the same script developers run, so
+  the CI leg and the local workflow cannot drift apart. No test site is committed.
+- **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to
+  register and every UI spec fails with element-not-found.
+- **Stays on `ubuntu-latest`.** The demo uses SQLite, so there is no LocalDB leg to add. Forms
+  needs Windows for that; Automate does not.
+- **Sets `CI: true` explicitly.** Azure does not set it, and the Playwright config keys its
+  junit reporter, retries and timeouts off it — as does `postinstall.js`, which would otherwise
+  try to run the interactive config prompt.
+- On failure it publishes `results/` (traces, screenshots, video) and the demo site log. A UI
+  failure is rarely diagnosable from the error text alone.
 
-Automate's demo uses SQLite, so an acceptance leg can stay on `ubuntu-latest`. Forms needs
-Windows for LocalDB; Automate does not.
+Two things to know if you edit that stage. Azure macro-expands `$(name)` before bash sees the
+script, so use backticks for command substitution and `expr` rather than `$((...))`. And
+`config.js` is deliberately **not** used in CI: it discovers a dynamic port from a named pipe,
+which is a local-development affordance, whereas CI fixes the URL via `ASPNETCORE_URLS` and
+writes `.env` directly.
+
+`Pack` does **not** depend on this stage. Acceptance failures therefore do not block packaging;
+wire that up only if you want UI flakes to be able to hold a release.
