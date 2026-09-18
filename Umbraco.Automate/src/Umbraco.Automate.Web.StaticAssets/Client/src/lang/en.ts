@@ -278,6 +278,14 @@ export default {
         caseName: "Case name",
         defaultInfo: "Cases are evaluated in order. The first matching case wins. A 'default' outcome handles unmatched conditions.",
     },
+    uaKeyValueEditor: {
+        key: "Key",
+        value: "Value",
+        keyPlaceholder: "Name",
+        valuePlaceholder: "Value",
+        addRow: "Add row",
+        removeRow: "Remove row",
+    },
     uaVersionHistory: {
         history: "History",
         compare: "Compare",
