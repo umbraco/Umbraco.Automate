@@ -7,6 +7,10 @@ export interface BindingLeaf {
     label: string;
     /** JSON Schema type (e.g. "string", "integer", "boolean") */
     type: string;
+    /** Optional description of what the value means, from the schema's `description` keyword */
+    description?: string;
+    /** Optional allowed values, from the schema's `enum` keyword */
+    enum?: unknown[];
 }
 
 const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
@@ -15,10 +19,7 @@ const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
  * Recursively walks a JSON Schema `properties` object and produces flat leaf entries.
  * Nested objects are dot-joined (e.g. `response.statusCode`).
  */
-export function flattenJsonSchema(
-    schema: Record<string, unknown> | null | undefined,
-    prefix = "",
-): BindingLeaf[] {
+export function flattenJsonSchema(schema: Record<string, unknown> | null | undefined, prefix = ""): BindingLeaf[] {
     if (!schema) return [];
 
     const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
@@ -29,12 +30,20 @@ export function flattenJsonSchema(
     for (const [key, prop] of Object.entries(properties)) {
         const fullPath = prefix ? `${prefix}.${key}` : key;
         const type = (prop.type as string) ?? "unknown";
+        const description = prop.description as string | undefined;
+        const enumValues = prop.enum as unknown[] | undefined;
 
         if (type === "object" && prop.properties) {
             // Recurse into nested objects
             leaves.push(...flattenJsonSchema(prop as Record<string, unknown>, fullPath));
         } else {
-            leaves.push({ path: fullPath, label: key, type });
+            leaves.push({
+                path: fullPath,
+                label: key,
+                type,
+                ...(description ? { description } : {}),
+                ...(enumValues && enumValues.length > 0 ? { enum: enumValues } : {}),
+            });
         }
     }
 
