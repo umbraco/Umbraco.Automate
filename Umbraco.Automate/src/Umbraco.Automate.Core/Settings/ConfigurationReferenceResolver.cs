@@ -62,10 +62,10 @@ internal sealed class ConfigurationReferenceResolver : IConfigurationReferenceRe
         // ConfigurationReferenceScanner.
         //
         // Limitation: the resolved value is spliced verbatim into the surrounding string. When
-        // that string is later re-parsed as JSON (e.g. an HTTP Request action's Headers field),
-        // a resolved value containing '"' or '\' can produce malformed JSON, which downstream
-        // parsing may swallow silently. Structured (per-value) header modelling would avoid this
-        // entirely — tracked under #161.
+        // that string is later re-parsed as JSON, a resolved value containing '"' or '\' can
+        // produce malformed JSON. The HTTP Request action's headers no longer go through such a
+        // re-parse — they are rows, each value resolved on its own — but any settings field that
+        // holds hand-written JSON still carries this caveat.
         var resolved = ConfigurationReferenceScanner.Scan(
             strValue,
             _allowedConfigKeyPrefixes,

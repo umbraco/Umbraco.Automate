@@ -151,6 +151,171 @@ public class HttpRequestActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithHeaderRows_SendsEveryHeader()
+    {
+        HttpRequestMessage? sent = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req => sent = req);
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "GET",
+            Headers =
+            [
+                new HttpRequestKeyValue { Key = "Authorization", Value = "Bearer token" },
+                new HttpRequestKeyValue { Key = "X-Correlation-Id", Value = "abc-123" },
+
+                // The key/value editor leaves an empty row behind whenever one is added and
+                // not filled in; it must not fail the step.
+                new HttpRequestKeyValue { Key = "", Value = "" },
+            ],
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sent.ShouldNotBeNull();
+        sent.Headers.GetValues("Authorization").ShouldBe(["Bearer token"]);
+        sent.Headers.GetValues("X-Correlation-Id").ShouldBe(["abc-123"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithHeaderValueButNoName_ReturnsValidationFailure()
+    {
+        // The old JSON blob swallowed malformed header input and sent the request without it.
+        var action = CreateAction();
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Headers = [new HttpRequestKeyValue { Key = "  ", Value = "Bearer token" }],
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithUnusableHeaderName_ReturnsValidationFailure()
+    {
+        var action = CreateAction();
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Headers = [new HttpRequestKeyValue { Key = "Bad Header", Value = "x" }],
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        result.Exception!.Message.ShouldContain("Bad Header");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithContentTypeHeaderRow_AppliesItToTheBody()
+    {
+        // Content headers belong on the body, not on the request header collection, and an
+        // explicitly configured one wins over the Content Type setting.
+        HttpRequestMessage? sent = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req => sent = req);
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            Body = "<xml />",
+            ContentType = "application/json",
+            Headers = [new HttpRequestKeyValue { Key = "Content-Type", Value = "application/xml" }],
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        sent!.Content!.Headers.ContentType!.ToString().ShouldBe("application/xml");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FormBodyMode_SendsUrlEncodedBodyAndSetsContentType()
+    {
+        string? sentBody = null;
+        string? sentContentType = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req =>
+        {
+            sentBody = req.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            sentContentType = req.Content?.Headers.ContentType?.ToString();
+        });
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            BodyMode = HttpRequestBodyMode.Form,
+
+            // Deliberately left at its default: a form post must not require the author to
+            // also set the Content-Type by hand.
+            ContentType = "application/json",
+            FormFields =
+            [
+                new HttpRequestKeyValue { Key = "name", Value = "a b" },
+                new HttpRequestKeyValue { Key = "note", Value = "x&y" },
+                new HttpRequestKeyValue { Key = "", Value = "dropped" },
+            ],
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sentBody.ShouldBe("name=a+b&note=x%26y");
+        sentContentType.ShouldBe("application/x-www-form-urlencoded");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FormBodyMode_IgnoresTheRawBody()
+    {
+        string? sentBody = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req =>
+            sentBody = req.Content?.ReadAsStringAsync().GetAwaiter().GetResult());
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            BodyMode = HttpRequestBodyMode.Form,
+            Body = "{\"ignored\":true}",
+            FormFields = [new HttpRequestKeyValue { Key = "a", Value = "b" }],
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sentBody.ShouldBe("a=b");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DefaultBodyMode_IsRaw()
+    {
+        // Automations saved before the body mode existed deserialize to the default, and must
+        // keep posting their raw body exactly as before.
+        new HttpRequestSettings().BodyMode.ShouldBe(HttpRequestBodyMode.Raw);
+
+        string? sentBody = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req =>
+            sentBody = req.Content?.ReadAsStringAsync().GetAwaiter().GetResult());
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            Body = "{\"hello\":\"world\"}",
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sentBody.ShouldBe("{\"hello\":\"world\"}");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_MissingUrl_ReturnsValidationFailure()
     {
         var action = CreateAction();

@@ -321,6 +321,124 @@ public class EditableModelSerializerTests
 
     #endregion
 
+    #region Sensitive lists
+
+    [Fact]
+    public void Serialize_WithSensitiveListOfRows_EncryptsEachValueButNotTheKeys()
+    {
+        // A sensitive field whose editor stores rows rather than a scalar (the HTTP Request
+        // action's headers). Before rows existed the whole field was a string and was encrypted;
+        // it must stay encrypted now that it is a list, or the change is a security regression.
+        var model = new HeaderModel
+        {
+            Headers =
+            [
+                new HeaderRow { Key = "Authorization", Value = "Bearer secret" },
+                new HeaderRow { Key = "X-Api-Key", Value = "another-secret" },
+            ],
+        };
+
+        var result = _serializer.Serialize(model, SensitiveHeadersSchema());
+
+        result.ShouldContain("\"key\":\"Authorization\"");
+        result.ShouldContain("\"value\":\"ENC:Bearer secret\"");
+        result.ShouldContain("\"key\":\"X-Api-Key\"");
+        result.ShouldContain("\"value\":\"ENC:another-secret\"");
+        _protectorMock.Verify(p => p.Protect("Authorization"), Times.Never);
+    }
+
+    [Fact]
+    public void Serialize_WithConfigReferenceInRowValue_DoesNotEncryptThatRow()
+    {
+        var model = new HeaderModel
+        {
+            Headers =
+            [
+                new HeaderRow { Key = "Authorization", Value = "Bearer $Umbraco:Automate:Secrets:ApiKey" },
+                new HeaderRow { Key = "X-Api-Key", Value = "literal-secret" },
+            ],
+        };
+
+        var result = _serializer.Serialize(model, SensitiveHeadersSchema());
+
+        result.ShouldContain("\"value\":\"Bearer $Umbraco:Automate:Secrets:ApiKey\"");
+        result.ShouldContain("\"value\":\"ENC:literal-secret\"");
+        _protectorMock.Verify(p => p.Protect("Bearer $Umbraco:Automate:Secrets:ApiKey"), Times.Never);
+    }
+
+    [Fact]
+    public void Serialize_WithNonSensitiveListOfRows_LeavesValuesInClear()
+    {
+        var model = new HeaderModel
+        {
+            Headers = [new HeaderRow { Key = "name", Value = "value" }],
+        };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "headers", PropertyName = "Headers", Label = "Headers", PropertyType = typeof(List<HeaderRow>), IsSensitive = false },
+            new EditableModelFieldDescriptor { Key = "other", PropertyName = "Other", Label = "Other", PropertyType = typeof(string), IsSensitive = true });
+
+        var result = _serializer.Serialize(model, schema);
+
+        result.ShouldContain("\"value\":\"value\"");
+        _protectorMock.Verify(p => p.Protect(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void SerializeAndDeserialize_WithSensitiveListOfRows_RoundTripsEachRow()
+    {
+        var model = new HeaderModel
+        {
+            Headers =
+            [
+                new HeaderRow { Key = "Authorization", Value = "Bearer secret" },
+                new HeaderRow { Key = "X-Blank", Value = null },
+            ],
+        };
+
+        var serialized = _serializer.Serialize(model, SensitiveHeadersSchema());
+        var deserialized = _serializer.Deserialize<HeaderModel>(serialized);
+
+        deserialized.ShouldNotBeNull();
+        deserialized.Headers.Count.ShouldBe(2);
+        deserialized.Headers[0].Key.ShouldBe("Authorization");
+        deserialized.Headers[0].Value.ShouldBe("Bearer secret");
+        deserialized.Headers[1].Key.ShouldBe("X-Blank");
+        deserialized.Headers[1].Value.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Serialize_WithSensitiveRowsFromTheEditorPayload_EncryptsWhateverCaseTheRowsUse()
+    {
+        // Step settings are stored as the dictionary the editor posted, so the row members keep
+        // the editor's casing rather than the serializer's camelCase policy. A case-sensitive
+        // lookup would silently store the secret in clear.
+        var settings = new Dictionary<string, object?>
+        {
+            ["headers"] = JsonSerializer.Deserialize<JsonElement>(
+                """[{"Key":"Authorization","Value":"Bearer secret"}]"""),
+        };
+
+        var result = _serializer.Serialize(settings, SensitiveHeadersSchema());
+
+        result.ShouldContain("\"Value\":\"ENC:Bearer secret\"");
+        result.ShouldContain("\"Key\":\"Authorization\"");
+    }
+
+    [Fact]
+    public void Serialize_WithSensitiveListOfStrings_EncryptsEachItem()
+    {
+        var model = new TokenModel { Tokens = ["first", "second"] };
+        var schema = CreateSchema(
+            new EditableModelFieldDescriptor { Key = "tokens", PropertyName = "Tokens", Label = "Tokens", PropertyType = typeof(List<string>), IsSensitive = true });
+
+        var result = _serializer.Serialize(model, schema);
+
+        result.ShouldContain("\"ENC:first\"");
+        result.ShouldContain("\"ENC:second\"");
+    }
+
+    #endregion
+
     #region Round Trip
 
     [Fact]
@@ -374,6 +492,35 @@ public class EditableModelSerializerTests
         public string? AccessKeyId { get; set; }
         public string? SecretAccessKey { get; set; }
         public string? Region { get; set; }
+    }
+
+    private static EditableModelSchema SensitiveHeadersSchema()
+        => CreateSchema(new EditableModelFieldDescriptor
+        {
+            Key = "headers",
+            PropertyName = "Headers",
+            Label = "Headers",
+            PropertyType = typeof(List<HeaderRow>),
+            IsSensitive = true,
+        });
+
+    private class HeaderModel
+    {
+        public List<HeaderRow> Headers { get; set; } = [];
+
+        public string? Other { get; set; }
+    }
+
+    private class HeaderRow
+    {
+        public string Key { get; set; } = string.Empty;
+
+        public string? Value { get; set; }
+    }
+
+    private class TokenModel
+    {
+        public List<string> Tokens { get; set; } = [];
     }
 
     #endregion
