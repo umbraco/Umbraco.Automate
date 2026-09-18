@@ -38,10 +38,16 @@ Execute the requested demo site operation.
 2. Detect demo site path:
     - Read `Directory.Packages.props` and extract the major from the `Umbraco.Cms.Core` version (range lower bound or fixed, e.g. `[18.0.0, …)` or `18.0.0` → `18`)
     - Demo site path: `demos/v{major}/Umbraco.Automate.DemoSite`
-3. If not running, start in background: `cd demos/v{major}/Umbraco.Automate.DemoSite && dotnet run --launch-profile DemoSite-Claude`
-4. Wait 15-20 seconds for startup
-5. Query site address endpoint via named pipe to get port and pipe name (see "Query site address via named pipe" section)
-6. Report:
+3. Ensure the frontend assets exist (a fresh clone or worktree has none, and the Automate section then renders blank with no error):
+    - Run `pwsh -NoProfile -File scripts/build-frontend.ps1` (Windows) or `bash scripts/build-frontend.sh` (macOS/Linux) from the repo root
+    - Safe to run every start: it is a no-op when both `wwwroot` folders are already populated
+    - On a fresh worktree it runs `npm ci` + `npm run build` at the repo root and can take a few minutes - allow a long timeout and never run npm by hand instead
+    - It handles the Node version itself (reads `engines.node`, and prepends an installed nvm-for-windows version to PATH for that process only - never run `nvm use`)
+    - If it exits non-zero, stop and report its message: starting the site anyway gives a blank section with no error
+4. If not running, start in background: `cd demos/v{major}/Umbraco.Automate.DemoSite && dotnet run --launch-profile DemoSite-Claude`
+5. Wait 15-20 seconds for startup
+6. Query site address endpoint via named pipe to get port and pipe name (see "Query site address via named pipe" section)
+7. Report:
     - Task ID for later stopping (save this for future commands)
     - Port number (from site address endpoint)
     - Pipe name (format: umbraco.demosite.{branch-or-worktree})
@@ -199,6 +205,15 @@ The demo site uses HTTP over named pipes for automatic port discovery:
 - Main branch: `umbraco.demosite.<branch-name>`
 - Worktree: `umbraco.demosite.<worktree-name>`
 - No git: `umbraco.demosite.default`
+
+### Automate section renders blank
+
+- The frontend build output is missing. Both folders are gitignored `npm run build` output, so a fresh clone or worktree has neither and the .NET build never produces them:
+    - `Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/wwwroot` - missing means the whole Automate section is blank
+    - `Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/wwwroot` - missing means only the OAuth connection editors break
+- The site still starts and reports success, so there is no error to find in the logs
+- Solution: `pwsh -NoProfile -File scripts/build-frontend.ps1`, then restart the site
+- A worktree seeded by `.worktreeinclude` gets a copy of whatever the main checkout last built: rerun with `-Force` after changing frontend code
 
 ## Success Criteria
 

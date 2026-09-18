@@ -19,30 +19,8 @@ Write-Host "=== Umbraco.Automate Demo Site Setup ===" -ForegroundColor Cyan
 Write-Host "Working directory: $RepoRoot" -ForegroundColor Gray
 Write-Host ""
 
-# Toolchain check — required Node version comes from package.json's engines.node, so this
-# stays in lockstep with the npm-side enforcement and the .nvmrc.
-$packageJson = Get-Content (Join-Path $RepoRoot "package.json") -Raw | ConvertFrom-Json
-$requiredNodeRange = $packageJson.engines.node
-if ($requiredNodeRange -match '(\d+)') {
-    $requiredNodeMajor = [int]$matches[1]
-} else {
-    Write-Host "ERROR: Could not parse engines.node ('$requiredNodeRange') from package.json." -ForegroundColor Red
-    exit 1
-}
-
-$nodeVersionRaw = (node --version 2>$null) -replace '^v', ''
-if (-not $nodeVersionRaw) {
-    Write-Host "ERROR: Node.js is not installed or not on PATH. package.json requires '$requiredNodeRange'." -ForegroundColor Red
-    Write-Host "Install Node $requiredNodeMajor+ (e.g. 'nvm install $requiredNodeMajor && nvm use $requiredNodeMajor') and re-run." -ForegroundColor Yellow
-    exit 1
-}
-$nodeMajor = [int]($nodeVersionRaw -split '\.')[0]
-if ($nodeMajor -lt $requiredNodeMajor) {
-    Write-Host "ERROR: Node $nodeVersionRaw detected; package.json requires '$requiredNodeRange'." -ForegroundColor Red
-    Write-Host "Run 'nvm install $requiredNodeMajor && nvm use $requiredNodeMajor' (or equivalent) before re-running this script." -ForegroundColor Yellow
-    exit 1
-}
-Write-Host "Node $nodeVersionRaw detected (satisfies '$requiredNodeRange')." -ForegroundColor Gray
+# Toolchain check (shared with build-frontend.ps1). Dot-sourced so a PATH fix sticks.
+. (Join-Path $ScriptDir "require-node.ps1") -RepoRoot $RepoRoot
 Write-Host ""
 
 # Detect template version and major from Directory.Packages.props.
