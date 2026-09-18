@@ -35,6 +35,10 @@ public class MoveContentActionTests
             .Setup(a => a.AuthorizeContentAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(AutomationAuthorizationResult.Success);
 
+        _authorizer
+            .Setup(a => a.AuthorizeContentParentAsync(It.IsAny<Guid?>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
         _action = new MoveContentAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _contentEditingService.Object,
@@ -192,6 +196,51 @@ public class MoveContentActionTests
 
         var context = CreateContext(
             new MoveContentSettings { ContentKey = contentKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+        _contentEditingService.Verify(
+            x => x.MoveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<Guid>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnauthorisedTargetParent_ReturnsAuthenticationErrorNotCrash()
+    {
+        var contentKey = Guid.NewGuid();
+        var targetParentKey = Guid.NewGuid();
+
+        _authorizer
+            .Setup(a => a.AuthorizeContentParentAsync(targetParentKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("no access to target parent"));
+
+        var context = CreateContext(
+            new MoveContentSettings { ContentKey = contentKey.ToString(), TargetParentKey = targetParentKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+        _contentEditingService.Verify(
+            x => x.MoveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<Guid>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnauthorisedTargetRoot_ReturnsAuthenticationErrorNotCrash()
+    {
+        var contentKey = Guid.NewGuid();
+
+        _authorizer
+            .Setup(a => a.AuthorizeContentParentAsync(null, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("no access to root"));
+
+        var context = CreateContext(
+            new MoveContentSettings { ContentKey = contentKey.ToString(), TargetParentKey = "" },
             Guid.NewGuid());
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);

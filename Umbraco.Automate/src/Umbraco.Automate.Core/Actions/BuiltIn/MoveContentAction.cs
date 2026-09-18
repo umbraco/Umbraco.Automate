@@ -63,9 +63,17 @@ public sealed class MoveContentAction : ActionBase<MoveContentSettings, MoveCont
             return parseFailure;
         }
 
-        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } sourceFailure)
         {
-            return failure;
+            return sourceFailure;
+        }
+
+        // Authorise the destination too — checking only the source would let a service account
+        // scoped to one subtree relocate content into an unrelated, unauthorised subtree (or
+        // the root) it was never granted access to.
+        if (await _authorizer.AuthorizeContentParentOrFailAsync(targetParentKey, RequiredPermissions, cancellationToken) is { } parentFailure)
+        {
+            return parentFailure;
         }
 
         _logger.LogDebug(

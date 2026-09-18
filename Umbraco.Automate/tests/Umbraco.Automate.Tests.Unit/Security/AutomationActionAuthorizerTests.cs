@@ -203,6 +203,138 @@ public class AutomationActionAuthorizerTests
         result.Count.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task AuthorizeContentParentAsync_returns_success_when_cms_authorises_the_parent_node()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        var parentKey = Guid.NewGuid();
+
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.Success);
+
+        var result = await sut.AuthorizeContentParentAsync(parentKey, new HashSet<string> { "Umb.Document.Move" }, default);
+
+        result.Authorized.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeContentParentAsync_returns_failure_when_parent_outside_start_node()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        var parentKey = Guid.NewGuid();
+
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.UnauthorizedMissingPathAccess);
+
+        var result = await sut.AuthorizeContentParentAsync(parentKey, new HashSet<string> { "Umb.Document.Move" }, default);
+
+        result.Authorized.ShouldBeFalse();
+        result.FailureReason.ShouldContain("start-node path");
+    }
+
+    [Fact]
+    public async Task AuthorizeContentParentAsync_checksRootAccess_whenParentKeyIsNull()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+
+        content
+            .Setup(s => s.AuthorizeRootAccessAsync(It.IsAny<IUser>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.Success);
+
+        var result = await sut.AuthorizeContentParentAsync(null, new HashSet<string> { "Umb.Document.Move" }, default);
+
+        result.Authorized.ShouldBeTrue();
+        content.Verify(
+            s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task AuthorizeContentParentAsync_returns_failure_when_root_denied()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+
+        content
+            .Setup(s => s.AuthorizeRootAccessAsync(It.IsAny<IUser>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.UnauthorizedMissingRootAccess);
+
+        var result = await sut.AuthorizeContentParentAsync(null, new HashSet<string> { "Umb.Document.Move" }, default);
+
+        result.Authorized.ShouldBeFalse();
+        result.FailureReason.ShouldContain("content root");
+    }
+
+    [Fact]
+    public async Task AuthorizeContentParentAsync_returns_failure_when_no_backoffice_identity()
+    {
+        var (sut, _, _, _) = BuildSut(withUser: false);
+
+        var result = await sut.AuthorizeContentParentAsync(Guid.NewGuid(), new HashSet<string>(), default);
+
+        result.Authorized.ShouldBeFalse();
+        result.FailureReason.ShouldContain("No backoffice identity");
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaParentAsync_returns_success_when_cms_authorises_the_parent_node()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+        var parentKey = Guid.NewGuid();
+
+        media
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(MediaAuthorizationStatus.Success);
+
+        var result = await sut.AuthorizeMediaParentAsync(parentKey, default);
+
+        result.Authorized.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaParentAsync_checksRootAccess_whenParentKeyIsNull()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+
+        media
+            .Setup(s => s.AuthorizeRootAccessAsync(It.IsAny<IUser>()))
+            .ReturnsAsync(MediaAuthorizationStatus.Success);
+
+        var result = await sut.AuthorizeMediaParentAsync(null, default);
+
+        result.Authorized.ShouldBeTrue();
+        media.Verify(
+            s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaParentAsync_returns_failure_when_root_denied()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+
+        media
+            .Setup(s => s.AuthorizeRootAccessAsync(It.IsAny<IUser>()))
+            .ReturnsAsync(MediaAuthorizationStatus.UnauthorizedMissingRootAccess);
+
+        var result = await sut.AuthorizeMediaParentAsync(null, default);
+
+        result.Authorized.ShouldBeFalse();
+        result.FailureReason.ShouldContain("media root");
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaParentAsync_returns_failure_when_no_backoffice_identity()
+    {
+        var (sut, _, _, _) = BuildSut(withUser: false);
+
+        var result = await sut.AuthorizeMediaParentAsync(Guid.NewGuid(), default);
+
+        result.Authorized.ShouldBeFalse();
+        result.FailureReason.ShouldContain("No backoffice identity");
+    }
+
     private static (AutomationActionAuthorizer Sut,
                     Mock<IContentPermissionService> Content,
                     Mock<IMediaPermissionService> Media,

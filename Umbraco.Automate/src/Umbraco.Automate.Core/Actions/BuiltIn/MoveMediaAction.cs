@@ -62,9 +62,17 @@ public sealed class MoveMediaAction : ActionBase<MoveMediaSettings, MoveMediaOut
             return parseFailure;
         }
 
-        if (await _authorizer.AuthorizeMediaOrFailAsync(mediaKey, cancellationToken) is { } failure)
+        if (await _authorizer.AuthorizeMediaOrFailAsync(mediaKey, cancellationToken) is { } sourceFailure)
         {
-            return failure;
+            return sourceFailure;
+        }
+
+        // Authorise the destination too — checking only the source would let a service account
+        // scoped to one subtree relocate media into an unrelated, unauthorised subtree (or the
+        // root) it was never granted access to.
+        if (await _authorizer.AuthorizeMediaParentOrFailAsync(targetParentKey, cancellationToken) is { } parentFailure)
+        {
+            return parentFailure;
         }
 
         _logger.LogDebug(

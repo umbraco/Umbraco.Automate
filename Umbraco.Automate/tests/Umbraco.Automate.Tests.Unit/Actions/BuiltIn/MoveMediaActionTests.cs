@@ -35,6 +35,10 @@ public class MoveMediaActionTests
             .Setup(a => a.AuthorizeMediaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(AutomationAuthorizationResult.Success);
 
+        _authorizer
+            .Setup(a => a.AuthorizeMediaParentAsync(It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
         _action = new MoveMediaAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _mediaEditingService.Object,
@@ -175,6 +179,51 @@ public class MoveMediaActionTests
 
         var context = CreateContext(
             new MoveMediaSettings { MediaKey = mediaKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+        _mediaEditingService.Verify(
+            x => x.MoveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<Guid>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnauthorisedTargetParent_ReturnsAuthenticationErrorNotCrash()
+    {
+        var mediaKey = Guid.NewGuid();
+        var targetParentKey = Guid.NewGuid();
+
+        _authorizer
+            .Setup(a => a.AuthorizeMediaParentAsync(targetParentKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("no access to target parent"));
+
+        var context = CreateContext(
+            new MoveMediaSettings { MediaKey = mediaKey.ToString(), TargetParentKey = targetParentKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+        _mediaEditingService.Verify(
+            x => x.MoveAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<Guid>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnauthorisedTargetRoot_ReturnsAuthenticationErrorNotCrash()
+    {
+        var mediaKey = Guid.NewGuid();
+
+        _authorizer
+            .Setup(a => a.AuthorizeMediaParentAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("no access to root"));
+
+        var context = CreateContext(
+            new MoveMediaSettings { MediaKey = mediaKey.ToString(), TargetParentKey = "" },
             Guid.NewGuid());
 
         var result = await _action.ExecuteAsync(context, CancellationToken.None);
