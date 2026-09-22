@@ -32,6 +32,8 @@ public sealed class LogMessageAction : ActionBase<LogMessageSettings, LogMessage
         _logger.Log(level, "Automation {AutomationId} / Run {RunId}: {Message}",
             context.AutomationId, context.RunId, settings.Message);
 
+        context.Log(ToActionLogLevel(level), settings.Message);
+
         return Task.FromResult(Success(new LogMessageOutput { Message = settings.Message }));
     }
 
@@ -42,5 +44,14 @@ public sealed class LogMessageAction : ActionBase<LogMessageSettings, LogMessage
             "warning" => LogLevel.Warning,
             "error" => LogLevel.Error,
             _ => LogLevel.Information,
+        };
+
+    private static ActionLogLevel ToActionLogLevel(LogLevel level)
+        => level switch
+        {
+            LogLevel.Debug => ActionLogLevel.Debug,
+            LogLevel.Warning => ActionLogLevel.Warning,
+            LogLevel.Error or LogLevel.Critical => ActionLogLevel.Error,
+            _ => ActionLogLevel.Info,
         };
 }

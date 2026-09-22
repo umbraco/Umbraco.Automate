@@ -26,6 +26,11 @@ export const UaRunTypeMapper = {
                     error: sr.error ?? null,
                     retryCount: sr.retryCount,
                     durationMs: sr.durationMs ?? null,
+                    logEntries: sr.logEntries.map((entry) => ({
+                        timestampUtc: entry.timestampUtc,
+                        level: entry.level,
+                        message: entry.message,
+                    })),
                 }),
             ),
         };

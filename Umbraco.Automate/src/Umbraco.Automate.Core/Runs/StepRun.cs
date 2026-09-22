@@ -85,4 +85,9 @@ public sealed class StepRun : IAutomateEntity
     /// Gets or sets the total iteration count (for ForEach/While container steps).
     /// </summary>
     public int? IterationTotal { get; set; }
+
+    /// <summary>
+    /// Gets or sets the log entries recorded by the action during execution.
+    /// </summary>
+    public IReadOnlyList<ActionLogEntry> LogEntries { get; set; } = [];
 }
