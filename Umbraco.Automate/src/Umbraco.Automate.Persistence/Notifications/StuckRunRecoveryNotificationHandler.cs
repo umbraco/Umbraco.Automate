@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
@@ -26,15 +27,18 @@ internal sealed class StuckRunRecoveryNotificationHandler
 
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly IServerRoleAccessor _serverRoleAccessor;
+    private readonly AutomateReadinessSignal _readinessSignal;
     private readonly ILogger<StuckRunRecoveryNotificationHandler> _logger;
 
     public StuckRunRecoveryNotificationHandler(
         IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
         IServerRoleAccessor serverRoleAccessor,
+        AutomateReadinessSignal readinessSignal,
         ILogger<StuckRunRecoveryNotificationHandler> logger)
     {
         _dbContextFactory = dbContextFactory;
         _serverRoleAccessor = serverRoleAccessor;
+        _readinessSignal = readinessSignal;
         _logger = logger;
     }
 
@@ -47,6 +51,14 @@ internal sealed class StuckRunRecoveryNotificationHandler
             _logger.LogDebug(
                 "Stuck run recovery skipped — this node ({ServerRole}) is a subscriber",
                 _serverRoleAccessor.CurrentServerRole);
+            return;
+        }
+
+        if (!await _readinessSignal.WaitUntilReadyAsync(cancellationToken))
+        {
+            _logger.LogError(
+                "Automate startup migrations failed; stuck run recovery was skipped. " +
+                "Resolve the migration failure and restart.");
             return;
         }
 
