@@ -151,22 +151,25 @@ else
 fi
 popd > /dev/null
 
-# Step 3.2: Set fixed port for consistent development
-echo "Configuring fixed port (44380)..."
+# Step 3.2: Install the launch profile (the dev port itself is assigned in step 3.3)
+echo "Installing launch profile..."
 mkdir -p "$DEMO_SITE_DIR/Properties"
 cp "$SCRIPT_DIR/templates/launchSettings.json" "$DEMO_SITE_DIR/Properties/launchSettings.json"
 
-# Step 3.3: Add NamedPipeListenerComposer for HTTP over named pipes
-echo "Adding NamedPipeListenerComposer for HTTP over named pipes..."
-mkdir -p "$DEMO_SITE_DIR/Composers"
-cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "$DEMO_SITE_DIR/Composers/NamedPipeListenerComposer.cs"
+# Step 3.3: Add Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port
+echo "Adding Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port..."
+pushd "$DEMO_SITE_DIR" > /dev/null
+dotnet add package Umbraco.Community.WorktreeDevPort
+popd > /dev/null
 
-# Step 3.4: Point Umbraco.Automate at the CMS database
+# Step 3.4: Point Umbraco.Automate at the CMS database, and keep 44380 for the main checkout
 # Automate needs its own connection string (defaults to umbracoAutomateDbDSN) or it throws
 # on first run. For the demo we reuse the CMS SQLite connection (umbracoDbDSN) via
 # UseNamedConnectionString so a single database backs both CMS and Automate. This must be
 # configured before the first run, otherwise startup fails. Node is guaranteed present by the
 # toolchain check above, so we use it to edit the JSON robustly (no jq dependency).
+# WorktreeDevPort:MainWorktreePort keeps the familiar 44380 for the main checkout; linked
+# worktrees get their own port from the 44300+ pool and never take 44380.
 echo "Configuring Umbraco.Automate to share the CMS database..."
 DEV_SETTINGS_PATH="$DEMO_SITE_DIR/appsettings.Development.json"
 node -e '
@@ -176,6 +179,8 @@ const s = JSON.parse(fs.readFileSync(p, "utf8"));
 s.Umbraco = s.Umbraco || {};
 s.Umbraco.Automate = s.Umbraco.Automate || {};
 s.Umbraco.Automate.UseNamedConnectionString = "umbracoDbDSN";
+s.WorktreeDevPort = s.WorktreeDevPort || {};
+s.WorktreeDevPort.MainWorktreePort = 44380;
 fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
 ' "$DEV_SETTINGS_PATH"
 
