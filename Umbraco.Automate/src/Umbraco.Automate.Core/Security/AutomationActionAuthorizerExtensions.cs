@@ -47,6 +47,40 @@ public static class AutomationActionAuthorizerExtensions
     }
 
     /// <summary>
+    /// Authorises the service account for the content root with the given permission letters and
+    /// returns a failed <see cref="ActionResult"/> when access is denied. Returns <c>null</c> on
+    /// success.
+    /// </summary>
+    public static async Task<ActionResult?> AuthorizeContentRootOrFailAsync(
+        this IAutomationActionAuthorizer authorizer,
+        IReadOnlyList<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var result = await authorizer.AuthorizeContentRootAsync(ToSet(permissions), cancellationToken);
+        return result.Authorized
+            ? null
+            : ActionResult.Failed(
+                new UnauthorizedAccessException(result.FailureReason),
+                StepRunErrorCategory.Authentication);
+    }
+
+    /// <summary>
+    /// Authorises the service account for the media root and returns a failed
+    /// <see cref="ActionResult"/> when access is denied. Returns <c>null</c> on success.
+    /// </summary>
+    public static async Task<ActionResult?> AuthorizeMediaRootOrFailAsync(
+        this IAutomationActionAuthorizer authorizer,
+        CancellationToken cancellationToken)
+    {
+        var result = await authorizer.AuthorizeMediaRootAsync(cancellationToken);
+        return result.Authorized
+            ? null
+            : ActionResult.Failed(
+                new UnauthorizedAccessException(result.FailureReason),
+                StepRunErrorCategory.Authentication);
+    }
+
+    /// <summary>
     /// Authorises the service account against a target parent content node (or the content
     /// root when <paramref name="parentKey"/> is <c>null</c>) for the given permission letters,
     /// and returns a failed <see cref="ActionResult"/> when access is denied. Returns
