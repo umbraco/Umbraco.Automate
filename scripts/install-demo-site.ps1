@@ -127,25 +127,26 @@ if ($cleanVersion) {
 }
 Pop-Location
 
-# Step 3.2: Set fixed port for consistent development
-Write-Host "Configuring fixed port (44380)..." -ForegroundColor Green
+# Step 3.2: Install the launch profile (the dev port itself is assigned in step 3.3)
+Write-Host "Installing launch profile..." -ForegroundColor Green
 $launchSettingsSource = Join-Path $ScriptDir "templates\launchSettings.json"
 $launchSettingsPath = "$DemoSiteDir\Properties\launchSettings.json"
 New-Item -ItemType Directory -Path (Split-Path $launchSettingsPath) -Force | Out-Null
 Copy-Item -Path $launchSettingsSource -Destination $launchSettingsPath -Force
 
-# Step 3.3: Add NamedPipeListenerComposer for HTTP over named pipes
-Write-Host "Adding NamedPipeListenerComposer for HTTP over named pipes..." -ForegroundColor Green
-$composerSourcePath = Join-Path $ScriptDir "templates\NamedPipeListenerComposer.cs"
-$composerDestPath = "$DemoSiteDir\Composers\NamedPipeListenerComposer.cs"
-New-Item -ItemType Directory -Path (Split-Path $composerDestPath) -Force | Out-Null
-Copy-Item -Path $composerSourcePath -Destination $composerDestPath -Force
+# Step 3.3: Add Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port
+Write-Host "Adding Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port..." -ForegroundColor Green
+Push-Location $DemoSiteDir
+dotnet add package Umbraco.Community.WorktreeDevPort
+Pop-Location
 
-# Step 3.4: Point Umbraco.Automate at the CMS database
+# Step 3.4: Point Umbraco.Automate at the CMS database, and keep 44380 for the main checkout
 # Automate needs its own connection string (defaults to umbracoAutomateDbDSN) or it throws
 # on first run. For the demo we reuse the CMS SQLite connection (umbracoDbDSN) via
 # UseNamedConnectionString so a single database backs both CMS and Automate. This must be
 # configured before the first run, otherwise startup fails.
+# WorktreeDevPort:MainWorktreePort keeps the familiar 44380 for the main checkout; linked
+# worktrees get their own port from the 44300+ pool and never take 44380.
 Write-Host "Configuring Umbraco.Automate to share the CMS database..." -ForegroundColor Green
 $devSettingsPath = "$DemoSiteDir\appsettings.Development.json"
 $devSettings = Get-Content $devSettingsPath -Raw | ConvertFrom-Json
@@ -156,6 +157,10 @@ if (-not $devSettings.Umbraco.Automate) {
     $devSettings.Umbraco | Add-Member -NotePropertyName "Automate" -NotePropertyValue ([PSCustomObject]@{})
 }
 $devSettings.Umbraco.Automate | Add-Member -NotePropertyName "UseNamedConnectionString" -NotePropertyValue "umbracoDbDSN" -Force
+if (-not $devSettings.WorktreeDevPort) {
+    $devSettings | Add-Member -NotePropertyName "WorktreeDevPort" -NotePropertyValue ([PSCustomObject]@{})
+}
+$devSettings.WorktreeDevPort | Add-Member -NotePropertyName "MainWorktreePort" -NotePropertyValue 44380 -Force
 $devSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $devSettingsPath -Encoding utf8 -Force
 
 # Step 4: Create unified solution
