@@ -64,6 +64,22 @@ public static class AutomationActionAuthorizerExtensions
                 StepRunErrorCategory.Authentication);
     }
 
+    /// <summary>
+    /// Authorises the service account for the media root and returns a failed
+    /// <see cref="ActionResult"/> when access is denied. Returns <c>null</c> on success.
+    /// </summary>
+    public static async Task<ActionResult?> AuthorizeMediaRootOrFailAsync(
+        this IAutomationActionAuthorizer authorizer,
+        CancellationToken cancellationToken)
+    {
+        var result = await authorizer.AuthorizeMediaRootAsync(cancellationToken);
+        return result.Authorized
+            ? null
+            : ActionResult.Failed(
+                new UnauthorizedAccessException(result.FailureReason),
+                StepRunErrorCategory.Authentication);
+    }
+
     private static IReadOnlySet<string> ToSet(IReadOnlyList<string> permissions)
         => permissions.Count == 0
             ? EmptyPermissionSet

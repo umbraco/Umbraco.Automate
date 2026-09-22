@@ -197,6 +197,9 @@ public static partial class UmbracoBuilderExtensions
                 return handler;
             });
 
+        // Downloads media files from a URL for the Create Media action.
+        builder.Services.AddSingleton<IMediaFileDownloader, MediaFileDownloader>();
+
         // Sandboxed JavaScript executor + save-time validator for the Run Script action.
         builder.Services.AddSingleton<IScriptExecutor, ScriptExecutor>();
         builder.Services.AddSingleton<IScriptValidator, ScriptValidator>();
