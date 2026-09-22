@@ -32,6 +32,14 @@ export class UaSettingsFormElement extends UmbLitElement {
     @property({ type: Array })
     bindingSources: BindingSource[] = [];
 
+    /**
+     * Id of the workspace that owns the automation being edited. Injected into every
+     * field's editor config so workspace-scoped pickers (e.g. the automation picker)
+     * can narrow their listing.
+     */
+    @property({ attribute: "workspace-id" })
+    workspaceId?: string;
+
     @state()
     private _propertyValues: UmbPropertyValueData[] = [];
 
@@ -172,6 +180,10 @@ export class UaSettingsFormElement extends UmbLitElement {
         // binding text box can render its picker button.
         if (field.supportsBindings && this.bindingSources.length > 0) {
             config.push({ alias: "bindingSources", value: this.bindingSources });
+        }
+
+        if (this.workspaceId) {
+            config.push({ alias: "workspaceId", value: this.workspaceId });
         }
 
         return config;

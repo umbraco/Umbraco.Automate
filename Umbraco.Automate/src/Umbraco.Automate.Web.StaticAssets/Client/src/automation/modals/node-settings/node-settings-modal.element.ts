@@ -256,6 +256,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                 .fields=${this.data!.schema.fields}
                 .values=${this._settings}
                 .bindingSources=${this._bindingSources}
+                .workspaceId=${this.data!.workspaceId}
                 @ua:settings-change=${this.#onSettingsChange}
             ></ua-settings-form>
         `;
