@@ -32,6 +32,16 @@ public interface IAutomationActionAuthorizer
 
     /// <summary>
     /// Authorises the service account currently set on the ambient backoffice accessor for the
+    /// content root. Distinct from <see cref="AuthorizeContentAsync(Guid, IReadOnlySet{string}, CancellationToken)"/>
+    /// because the root is not a node and has no key: an account with a content start node is
+    /// confined to that subtree and cannot write to the root at all.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeContentRootAsync(
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for the
     /// media root. Distinct from <see cref="AuthorizeMediaAsync(Guid, CancellationToken)"/>
     /// because the root is not a node and has no key: an account with a media start node is
     /// confined to that subtree and cannot write to the root at all.

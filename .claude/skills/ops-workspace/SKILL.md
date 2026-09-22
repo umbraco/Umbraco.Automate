@@ -4,8 +4,8 @@ description: >-
   An isolated place to build and test one change in Umbraco.Automate — a git worktree under
   `.claude/worktrees/`, rooted on the target line's integration branch, with the local config
   files a build needs — and the teardown that removes it. Prepared and torn down by
-  `ops-change`, never by a loop. Called by name with (action, context-json). Not model-invoked.
-disable-model-invocation: true
+  `ops-change`, never by a loop. Called by name with (action, context-json). NOT for direct use — never select it from a
+  description match.
 ---
 
 # ops-workspace

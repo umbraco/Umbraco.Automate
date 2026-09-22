@@ -19,30 +19,8 @@ Write-Host "=== Umbraco.Automate Demo Site Setup ===" -ForegroundColor Cyan
 Write-Host "Working directory: $RepoRoot" -ForegroundColor Gray
 Write-Host ""
 
-# Toolchain check — required Node version comes from package.json's engines.node, so this
-# stays in lockstep with the npm-side enforcement and the .nvmrc.
-$packageJson = Get-Content (Join-Path $RepoRoot "package.json") -Raw | ConvertFrom-Json
-$requiredNodeRange = $packageJson.engines.node
-if ($requiredNodeRange -match '(\d+)') {
-    $requiredNodeMajor = [int]$matches[1]
-} else {
-    Write-Host "ERROR: Could not parse engines.node ('$requiredNodeRange') from package.json." -ForegroundColor Red
-    exit 1
-}
-
-$nodeVersionRaw = (node --version 2>$null) -replace '^v', ''
-if (-not $nodeVersionRaw) {
-    Write-Host "ERROR: Node.js is not installed or not on PATH. package.json requires '$requiredNodeRange'." -ForegroundColor Red
-    Write-Host "Install Node $requiredNodeMajor+ (e.g. 'nvm install $requiredNodeMajor && nvm use $requiredNodeMajor') and re-run." -ForegroundColor Yellow
-    exit 1
-}
-$nodeMajor = [int]($nodeVersionRaw -split '\.')[0]
-if ($nodeMajor -lt $requiredNodeMajor) {
-    Write-Host "ERROR: Node $nodeVersionRaw detected; package.json requires '$requiredNodeRange'." -ForegroundColor Red
-    Write-Host "Run 'nvm install $requiredNodeMajor && nvm use $requiredNodeMajor' (or equivalent) before re-running this script." -ForegroundColor Yellow
-    exit 1
-}
-Write-Host "Node $nodeVersionRaw detected (satisfies '$requiredNodeRange')." -ForegroundColor Gray
+# Toolchain check (shared with build-frontend.ps1). Dot-sourced so a PATH fix sticks.
+. (Join-Path $ScriptDir "require-node.ps1") -RepoRoot $RepoRoot
 Write-Host ""
 
 # Detect template version and major from Directory.Packages.props.
@@ -149,25 +127,26 @@ if ($cleanVersion) {
 }
 Pop-Location
 
-# Step 3.2: Set fixed port for consistent development
-Write-Host "Configuring fixed port (44380)..." -ForegroundColor Green
+# Step 3.2: Install the launch profile (the dev port itself is assigned in step 3.3)
+Write-Host "Installing launch profile..." -ForegroundColor Green
 $launchSettingsSource = Join-Path $ScriptDir "templates\launchSettings.json"
 $launchSettingsPath = "$DemoSiteDir\Properties\launchSettings.json"
 New-Item -ItemType Directory -Path (Split-Path $launchSettingsPath) -Force | Out-Null
 Copy-Item -Path $launchSettingsSource -Destination $launchSettingsPath -Force
 
-# Step 3.3: Add NamedPipeListenerComposer for HTTP over named pipes
-Write-Host "Adding NamedPipeListenerComposer for HTTP over named pipes..." -ForegroundColor Green
-$composerSourcePath = Join-Path $ScriptDir "templates\NamedPipeListenerComposer.cs"
-$composerDestPath = "$DemoSiteDir\Composers\NamedPipeListenerComposer.cs"
-New-Item -ItemType Directory -Path (Split-Path $composerDestPath) -Force | Out-Null
-Copy-Item -Path $composerSourcePath -Destination $composerDestPath -Force
+# Step 3.3: Add Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port
+Write-Host "Adding Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port..." -ForegroundColor Green
+Push-Location $DemoSiteDir
+dotnet add package Umbraco.Community.WorktreeDevPort
+Pop-Location
 
-# Step 3.4: Point Umbraco.Automate at the CMS database
+# Step 3.4: Point Umbraco.Automate at the CMS database, and keep 44380 for the main checkout
 # Automate needs its own connection string (defaults to umbracoAutomateDbDSN) or it throws
 # on first run. For the demo we reuse the CMS SQLite connection (umbracoDbDSN) via
 # UseNamedConnectionString so a single database backs both CMS and Automate. This must be
 # configured before the first run, otherwise startup fails.
+# WorktreeDevPort:MainWorktreePort keeps the familiar 44380 for the main checkout; linked
+# worktrees get their own port from the 44300+ pool and never take 44380.
 Write-Host "Configuring Umbraco.Automate to share the CMS database..." -ForegroundColor Green
 $devSettingsPath = "$DemoSiteDir\appsettings.Development.json"
 $devSettings = Get-Content $devSettingsPath -Raw | ConvertFrom-Json
@@ -178,6 +157,10 @@ if (-not $devSettings.Umbraco.Automate) {
     $devSettings.Umbraco | Add-Member -NotePropertyName "Automate" -NotePropertyValue ([PSCustomObject]@{})
 }
 $devSettings.Umbraco.Automate | Add-Member -NotePropertyName "UseNamedConnectionString" -NotePropertyValue "umbracoDbDSN" -Force
+if (-not $devSettings.WorktreeDevPort) {
+    $devSettings | Add-Member -NotePropertyName "WorktreeDevPort" -NotePropertyValue ([PSCustomObject]@{})
+}
+$devSettings.WorktreeDevPort | Add-Member -NotePropertyName "MainWorktreePort" -NotePropertyValue 44380 -Force
 $devSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $devSettingsPath -Encoding utf8 -Force
 
 # Step 4: Create unified solution
