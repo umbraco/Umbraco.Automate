@@ -5,7 +5,7 @@
     "scripts": {
         "watch": "tsc && vite build --watch",
         "build": "tsc && vite build",
-        "generate-client": "node scripts/generate-openapi.js https://localhost:44380/umbraco/swagger/automate-management/swagger.json"
+        "generate-client": "node scripts/generate-openapi.js automate-management"
     },
     "dependencies": {
         "@umbraco-cms/backoffice": "^17.4.0",
@@ -19,8 +19,8 @@
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.1.4",
         "chalk": "^5.4.1",
-        "node-fetch": "^3.3.2",
         "typescript": "^5.9.2",
-        "vite": "^8.0.16"
+        "vite": "^8.0.16",
+        "worktree-dev-port": "^0.3.0"
     }
 }
