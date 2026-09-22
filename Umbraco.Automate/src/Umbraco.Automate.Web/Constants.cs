@@ -185,4 +185,29 @@ public class Constants
         /// </summary>
         public const string RateLimitPolicy = "automate-webhook-rate-limit";
     }
+
+    /// <summary>
+    /// Constants for the Automate MCP API (public, secret-authenticated per automation).
+    /// </summary>
+    public static class McpApi
+    {
+        /// <summary>
+        /// The rate limiter policy name applied to MCP endpoints.
+        /// </summary>
+        public const string RateLimitPolicy = "automate-mcp-rate-limit";
+
+        /// <summary>
+        /// The static path prefix (everything before the <c>{automationId}</c> segment) of
+        /// <see cref="RouteTemplate"/>, with a leading slash. Kept as its own literal constant
+        /// rather than derived from <see cref="RouteTemplate"/> at run time, so scoping
+        /// <c>McpAuthenticationMiddleware</c> to MCP requests only can never silently break or
+        /// widen to match every request if <see cref="RouteTemplate"/>'s shape ever changes.
+        /// </summary>
+        public const string PathPrefix = "/automate/mcp";
+
+        /// <summary>
+        /// The route template for the MCP endpoint, relative to the app root.
+        /// </summary>
+        public const string RouteTemplate = "automate/mcp/{automationId}";
+    }
 }
