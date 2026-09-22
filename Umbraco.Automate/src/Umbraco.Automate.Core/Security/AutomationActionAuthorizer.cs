@@ -100,6 +100,33 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
     }
 
     /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeContentRootAsync(
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage);
+        }
+
+        var permissionSet = new HashSet<string>(permissions, StringComparer.Ordinal);
+        var status = await _contentPermissionService.AuthorizeRootAccessAsync(user, permissionSet);
+
+        if (status == ContentAuthorizationStatus.Success)
+        {
+            return AutomationAuthorizationResult.Success;
+        }
+
+        _logger.LogDebug(
+            "Content root authorisation denied for service account {UserKey} (permissions [{Permissions}]): {Status}",
+            user.Key, string.Join(", ", permissions), status);
+
+        return AutomationAuthorizationResult.Fail(
+            "Service account is not allowed to create at the content root. Pick a parent inside its start node instead.");
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlySet<Guid>> FilterAuthorizedContentAsync(
         IEnumerable<Guid> contentKeys,
         IReadOnlySet<string> permissions,
