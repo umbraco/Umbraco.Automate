@@ -1,3 +1,5 @@
+using Json.Schema.Generation;
+
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
 /// <summary>
@@ -18,6 +20,7 @@ public sealed class ApprovalDecisionOutput
     /// <c>${ steps.approval.approved }</c> equals <c>true</c> reads better in a condition than a
     /// string comparison, and cannot be broken by a typo in an outcome name.
     /// </summary>
+    [Description("Whether the approval was granted.")]
     public bool Approved { get; init; }
 
     /// <summary>
@@ -31,20 +34,24 @@ public sealed class ApprovalDecisionOutput
     /// would surface in bindings as its numeric value (<c>0</c>/<c>1</c>) and force conditions to
     /// compare against a magic number.
     /// </remarks>
+    [Description("The decision outcome, as its name (\"Approved\" or \"Rejected\").")]
     public required string Outcome { get; init; }
 
     /// <summary>
     /// Gets the optional comment left by the approver.
     /// </summary>
+    [Description("The optional comment left by the approver.")]
     public string? Comment { get; init; }
 
     /// <summary>
     /// Gets the user key of the approver.
     /// </summary>
+    [Description("The unique key of the back-office user who made the decision.")]
     public Guid? ApprovedByUserKey { get; init; }
 
     /// <summary>
     /// Gets the UTC time the decision was made.
     /// </summary>
+    [Description("The UTC date and time the decision was made.")]
     public DateTime DecisionUtc { get; init; }
 }
