@@ -66,14 +66,30 @@ convenience, and a re-fired routine will ask twice.
 
 ### Steps
 
-1. **In a cloud routine, do nothing.** The session already has its own isolated checkout and no
-   sibling work to collide with. Return that checkout's path with `reused: true`,
-   `fidelity: "ci-parity"`, and a note saying the session checkout was used. Do **not** nest a
-   worktree inside it. Detect this the plain way: read the repo's main worktree root with
+1. **In a cloud routine, reuse the session checkout — once the SDK is confirmed.** The session
+   already has its own isolated checkout and no sibling work to collide with, so do **not** nest
+   a worktree inside it. Detect cloud the plain way: read the repo's main worktree root with
    `git rev-parse --path-format=absolute --git-common-dir` and drop the trailing `.git`; if that
    root is not the developer's `D:/DXP/Automate/Umbraco.Automate` checkout, assume cloud. Never
    decide cloud-versus-local from the current directory alone — a local run legitimately starts
    inside a worktree under `.claude/worktrees/`.
+
+   **Then read `~/env-manifest.md` before claiming anything.** The engine's environment setup
+   writes it on every build. Its heading says `ready` only when the .NET SDK the environment was
+   asked for is installed, and a failed install says so in a warning at the top.
+
+   - **Heading says `ready`** → return the session checkout with `reused: true`,
+     `fidelity: "ci-parity"`, and a note naming the SDK version from the manifest.
+   - **Heading says `NOT ready`** → return `{"ok": false, ...}` with the manifest's reason in
+     `notes`. Without the SDK nothing here can build, and a workspace reported as `ci-parity`
+     over a missing SDK turns every verify after it into a failure the change did not cause.
+     The caller reports that as blocked.
+   - **No manifest** → the environment was built by something other than the engine's stub.
+     Say so in `notes`, check `dotnet --list-sdks` for a `10.0` SDK yourself, and decide on
+     that rather than assuming.
+
+   The manifest also offers `run-umbraco.sh` for booting a site. **This repo does not use it**:
+   see "No database to provision" above. Nothing a loop does here needs a running site.
 
 2. **Work out the slug and path** from the branch, per the convention above. If
    `.claude/worktrees/<slug>` already exists, return it with `reused: true` and stop.
