@@ -7,6 +7,12 @@ export interface UaCatalogueItemModel {
     group: string | null;
     icon: string | null;
     settingsSchema: EditableModelSchemaModel | null;
+    /**
+     * Set by pickers when the item is listed but cannot be chosen in the current context
+     * (e.g. the workspace has no allowed connection of the type the action needs).
+     * A human-readable explanation shown alongside the disabled item.
+     */
+    unavailableReason?: string;
 }
 
 export interface UaTriggerCatalogueItemModel extends UaCatalogueItemModel {
