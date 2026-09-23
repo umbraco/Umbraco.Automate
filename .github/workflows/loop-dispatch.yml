@@ -28,9 +28,23 @@ on:
     types: [labeled]
   pull_request_target:
     types: [labeled]
+  # A CI run finishing. The merge loop waits at most 15 minutes for CI in one run, so a PR
+  # labelled `ops/auto-merge` while a longer build ran would otherwise sit green and labelled
+  # until something else woke it. The edge fires the merge loop only for a GREEN run on a PR
+  # that carries the landing label, so every other build costs nothing. GitHub fires this only
+  # from the default branch's copy of this file, and never for a suite GitHub Actions created,
+  # so this workflow's own runs cannot wake it.
+  check_suite:
+    types: [completed]
 
 jobs:
   dispatch:
+    # Read a PR's labels for the check_suite route. A reusable workflow gets at most what its
+    # caller grants, so without `pull-requests: read` here every CI-finished event routes to
+    # nothing and says so in a warning.
+    permissions:
+      contents: read
+      pull-requests: read
     uses: umbraco/umbraco-ai-ops/.github/workflows/loop-dispatch.yml@main
     # For a cross-repo issues repo (see header), uncomment and set the code repo:
     # with:
