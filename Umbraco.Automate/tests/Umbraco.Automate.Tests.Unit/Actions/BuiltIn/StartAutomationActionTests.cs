@@ -334,6 +334,70 @@ public class StartAutomationActionTests
         errors.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateSettingsForPublishAsync_BlankKey_ReturnsError(string automationKey)
+    {
+        var errors = await CreateAction().ValidateSettingsForPublishAsync(
+            new StartAutomationSettings { AutomationKey = automationKey }, CreateParentAutomation());
+
+        errors.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task ValidateSettingsForPublishAsync_MissingAutomation_ReturnsError()
+    {
+        var errors = await CreateAction().ValidateSettingsForPublishAsync(
+            new StartAutomationSettings { AutomationKey = Guid.NewGuid().ToString() }, CreateParentAutomation());
+
+        errors.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task ValidateSettingsForPublishAsync_AutomationInOtherWorkspace_ReturnsSameErrorAsMissing()
+    {
+        var foreign = new AutomationBuilder().WithWorkspaceId(Guid.NewGuid()).Build();
+        SetupAutomation(foreign);
+        var missingKey = Guid.NewGuid();
+
+        var foreignErrors = await CreateAction().ValidateSettingsForPublishAsync(
+            new StartAutomationSettings { AutomationKey = foreign.Id.ToString() }, CreateParentAutomation());
+        var missingErrors = await CreateAction().ValidateSettingsForPublishAsync(
+            new StartAutomationSettings { AutomationKey = missingKey.ToString() }, CreateParentAutomation());
+
+        // Same wording either way, so publish does not reveal automations in other workspaces.
+        foreignErrors.ShouldHaveSingleItem()
+            .ShouldBe(missingErrors.ShouldHaveSingleItem().Replace(missingKey.ToString(), foreign.Id.ToString()));
+    }
+
+    [Fact]
+    public async Task ValidateSettingsForPublishAsync_SelfReference_ReturnsError()
+    {
+        var parent = CreateParentAutomation();
+
+        var errors = await CreateAction().ValidateSettingsForPublishAsync(
+            new StartAutomationSettings { AutomationKey = parent.Id.ToString() }, parent);
+
+        errors.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task ValidateSettingsForPublishAsync_UnpublishedTargetInSameWorkspace_ReturnsNoErrors()
+    {
+        // The parent may be published before its child; the run-time check covers an unpublished target.
+        var target = new AutomationBuilder().WithWorkspaceId(_workspaceId).AsDraft().Build();
+        SetupAutomation(target);
+
+        var errors = await CreateAction().ValidateSettingsForPublishAsync(
+            new StartAutomationSettings { AutomationKey = target.Id.ToString() }, CreateParentAutomation());
+
+        errors.ShouldBeEmpty();
+    }
+
+    private Automation CreateParentAutomation()
+        => new AutomationBuilder().WithWorkspaceId(_workspaceId).Build();
+
     private Automation CreateTargetAutomation(Guid? id = null)
         => new AutomationBuilder()
             .WithId(id ?? Guid.NewGuid())

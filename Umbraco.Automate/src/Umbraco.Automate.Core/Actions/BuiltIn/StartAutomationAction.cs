@@ -25,7 +25,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     Description = "Starts another automation from the same workspace, optionally passing along trigger data.",
     Group = "Core",
     Icon = "icon-directions-alt")]
-public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, StartAutomationOutput>, IValidatableStepType
+public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, StartAutomationOutput>, IValidatableStepType, IPublishValidatableStepType
 {
     private readonly IAutomationService _automationService;
     private readonly IEntityVersionService _versionService;
@@ -194,7 +194,7 @@ public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, 
 
         // This runs on every draft save, so only reject what is malformed. A blank key (step not
         // configured yet) or a target that no longer exists must not block saving the rest of the
-        // automation — both fail the step at run time with a terminal error instead.
+        // automation — both are rejected at publish instead (see ValidateSettingsForPublishAsync).
         if (!string.IsNullOrWhiteSpace(typed.AutomationKey) && !Guid.TryParse(typed.AutomationKey, out _))
         {
             errors.Add($"'{typed.AutomationKey}' is not a valid automation key.");
@@ -219,6 +219,45 @@ public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, 
         }
 
         return Task.FromResult<IReadOnlyList<string>>(errors);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ValidateSettingsForPublishAsync(
+        object? settings,
+        Automation automation,
+        CancellationToken cancellationToken = default)
+    {
+        if (settings is not StartAutomationSettings typed)
+        {
+            return [];
+        }
+
+        if (string.IsNullOrWhiteSpace(typed.AutomationKey))
+        {
+            return ["An automation to start must be selected."];
+        }
+
+        // A malformed key is already rejected when the draft is saved.
+        if (!Guid.TryParse(typed.AutomationKey, out var automationKey))
+        {
+            return [];
+        }
+
+        if (automationKey == automation.Id)
+        {
+            return ["An automation cannot start itself."];
+        }
+
+        // One message for both cases, so the check does not reveal whether an automation
+        // exists in a workspace the author may not belong to. The target does not need to be
+        // published yet: authors may publish the parent first, and the step checks at run time.
+        var target = await _automationService.GetAutomationAsync(automationKey, cancellationToken);
+        if (target is null || target.WorkspaceId != automation.WorkspaceId)
+        {
+            return [$"Automation '{automationKey}' was not found in this workspace."];
+        }
+
+        return [];
     }
 
     /// <summary>
