@@ -1,3 +1,5 @@
+using Json.Schema.Generation;
+
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
@@ -8,31 +10,37 @@ public sealed class MemberSavedTriggerOutput
     /// <summary>
     /// Gets the member's unique key.
     /// </summary>
+    [Description("The member's unique key.")]
     public Guid MemberKey { get; init; }
 
     /// <summary>
     /// Gets the member's display name.
     /// </summary>
+    [Description("The member's display name.")]
     public string? MemberName { get; init; }
 
     /// <summary>
     /// Gets the member's username.
     /// </summary>
+    [Description("The member's username.")]
     public string? Username { get; init; }
 
     /// <summary>
     /// Gets the member's email address.
     /// </summary>
+    [Description("The member's email address.")]
     public string? Email { get; init; }
 
     /// <summary>
     /// Gets the member type's unique key.
     /// </summary>
+    [Description("The member type's unique key.")]
     public Guid? MemberTypeKey { get; init; }
 
     /// <summary>
     /// Gets the member type alias.
     /// </summary>
+    [Description("The member type alias.")]
     public string? MemberTypeAlias { get; init; }
 
     /// <summary>
@@ -40,6 +48,7 @@ public sealed class MemberSavedTriggerOutput
     /// at dispatch time so the group filter can run synchronously in <c>CanHandle</c> and
     /// downstream automations can branch on group membership without an extra lookup.
     /// </summary>
+    [Description("The keys of the member groups this member belongs to.")]
     public IReadOnlyList<Guid> MemberGroupKeys { get; init; } = Array.Empty<Guid>();
 
     /// <summary>
@@ -48,5 +57,6 @@ public sealed class MemberSavedTriggerOutput
     /// database date precision may vary, so downstream automations needing a hard
     /// guarantee should re-fetch.
     /// </summary>
+    [Description("Whether this save represents a newly-created member.")]
     public bool IsNew { get; init; }
 }

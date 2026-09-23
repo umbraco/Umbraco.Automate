@@ -5,7 +5,14 @@ import { UMB_MODAL_MANAGER_CONTEXT, UMB_CONFIRM_MODAL } from "@umbraco-cms/backo
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
-import { modelToNodes, modelToEdges, TRIGGER_NODE_ID, BODY_HANDLE, PARALLEL_ALIAS } from "../canvas/utils/model-to-flow.js";
+import {
+    modelToNodes,
+    modelToEdges,
+    getContinuationSourceHandle,
+    TRIGGER_NODE_ID,
+    BODY_HANDLE,
+    PARALLEL_ALIAS,
+} from "../canvas/utils/model-to-flow.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
 import type { CanvasState, CanvasChangeDetail, CatalogueLookupEntry, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
@@ -13,9 +20,21 @@ import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-setti
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
 import { UA_EDGE_FILTER_MODAL } from "../../../modals/edge-filter/edge-filter-modal.token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import type { EditableModelSchemaModel } from "../../../../api/types.gen.js";
+import type {
+    EditableModelSchemaModel,
+    StepConfigurationModel,
+    StepConnectionModel,
+} from "../../../../api/types.gen.js";
 import { UA_EMPTY_GUID } from "../../../../core/index.js";
 import "../canvas/ua-automation-canvas.element.js";
+
+/**
+ * Room reserved for a step spliced into an existing connection. Node heights are content-driven
+ * and not known until React Flow measures the new node, so this is a generous estimate that covers
+ * the tallest freshly-added node (a container or branching step with its bottom handles).
+ */
+const INSERTED_NODE_HEIGHT = 140;
+const INSERTED_NODE_GAP = 60;
 
 @customElement("ua-automation-workflow-workspace-view")
 export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
@@ -367,6 +386,10 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 // branch labels and conditions stay attached to the source.
                 const { sourceStepId, sourceHandle, targetStepId, targetHandle } = event.detail.insertBetween;
                 const normalisedSource = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
+                // The downstream half leaves the new step through the handle that continues the
+                // original flow. A null handle only suits plain actions: on a container it would be
+                // read as a body edge, and If/Switch/Approval have no unnamed output at all.
+                const continuationHandle = getContinuationSourceHandle(newStep.actionAlias, newStep.settings);
                 const updatedConnections = this._model.connections.flatMap((conn) => {
                     const matchesSource = conn.sourceStepId === normalisedSource
                         && (conn.sourceHandle ?? null) === (sourceHandle ?? null);
@@ -377,15 +400,18 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                         { ...conn, targetStepId: newStepId, targetHandle: null },
                         {
                             sourceStepId: newStepId,
-                            sourceHandle: null,
+                            sourceHandle: continuationHandle,
                             targetStepId,
                             targetHandle: targetHandle ?? null,
-                            outcome: null,
+                            outcome: continuationHandle,
                             filter: null,
                         },
                     ];
                 });
-                this.#workspaceContext?.updateProperty("connections", updatedConnections);
+                this.#workspaceContext?.updateProperties({
+                    steps: this.#shiftDownstreamSteps(updatedSteps, updatedConnections, newStep, normalisedSource, targetStepId),
+                    connections: updatedConnections,
+                });
             }
 
             const saved = await this.#openNodeSettingsModal(newStepId, true);
@@ -459,6 +485,45 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
 
         return `${baseName}${Date.now()}`;
+    }
+
+    /**
+     * Makes room for a step spliced into an existing connection. The new step is placed at the
+     * connection's midpoint, which is usually closer to the downstream step than a node is tall,
+     * so the downstream step and everything reachable from it move down together until it sits
+     * below the new step. Nodes upstream of the insert point never move.
+     */
+    #shiftDownstreamSteps(
+        steps: StepConfigurationModel[],
+        connections: StepConnectionModel[],
+        insertedStep: StepConfigurationModel,
+        upstreamStepId: string,
+        downstreamStepId: string,
+    ): StepConfigurationModel[] {
+        const downstreamStep = steps.find((s) => s.id === downstreamStepId);
+        if (!downstreamStep) return steps;
+
+        const requiredTop = insertedStep.position.y + INSERTED_NODE_HEIGHT + INSERTED_NODE_GAP;
+        const shift = requiredTop - downstreamStep.position.y;
+        if (shift <= 0) return steps;
+
+        // Walk from the downstream step. The inserted step and the step it was inserted after are
+        // excluded, so a cycle back up the graph cannot drag them (or anything above them) down.
+        const toShift = new Set<string>([downstreamStepId]);
+        const queue = [downstreamStepId];
+        for (let i = 0; i < queue.length; i++) {
+            for (const conn of connections) {
+                if (conn.sourceStepId !== queue[i]) continue;
+                const target = conn.targetStepId;
+                if (target === insertedStep.id || target === upstreamStepId || toShift.has(target)) continue;
+                toShift.add(target);
+                queue.push(target);
+            }
+        }
+
+        return steps.map((s) =>
+            toShift.has(s.id) ? { ...s, position: { ...s.position, y: s.position.y + shift } } : s,
+        );
     }
 
     /**

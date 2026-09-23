@@ -112,9 +112,38 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     }
 
     #onNameAliasChange(event: UmbChangeEvent) {
-        const target = event.target as HTMLElement & { value?: string; alias: string };
+        const target = event.target as HTMLElement & {
+            value?: string;
+            alias: string;
+            autoGenerateAlias?: boolean;
+        };
+        const nameChanged = (target.value ?? "") !== this._name;
         this._name = target.value ?? "";
         this._alias = target.alias;
+
+        // The input regenerates the alias from the name on every keystroke, which would replace the
+        // unique alias the workspace assigned and trip the duplicate check when two steps share a
+        // name. Keep auto-generated aliases unique; a hand-typed alias is left as entered.
+        if (nameChanged && target.autoGenerateAlias) {
+            this._alias = this.#makeAliasUnique(this._alias);
+            target.alias = this._alias;
+        }
+    }
+
+    #makeAliasUnique(alias: string): string {
+        if (!alias) return alias;
+
+        const usedAliases = new Set(
+            (this.data?.automationContext?.steps ?? [])
+                .filter((s) => s.id !== this.data?.stepId)
+                .map((s) => s.alias?.toLowerCase())
+                .filter(Boolean),
+        );
+        if (!usedAliases.has(alias.toLowerCase())) return alias;
+
+        let suffix = 2;
+        while (usedAliases.has(`${alias}${suffix}`.toLowerCase())) suffix++;
+        return `${alias}${suffix}`;
     }
 
     #onErrorBehaviorChange(event: UUISelectEvent) {
@@ -256,6 +285,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                 .fields=${this.data!.schema.fields}
                 .values=${this._settings}
                 .bindingSources=${this._bindingSources}
+                .workspaceId=${this.data!.workspaceId}
                 @ua:settings-change=${this.#onSettingsChange}
             ></ua-settings-form>
         `;

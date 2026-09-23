@@ -142,6 +142,8 @@ export default {
         searchPlaceholder: "Search...",
         noResults: "No items found",
         loadError: "Failed to load catalogue items",
+        connectionRequired: (connectionTypeName: string) =>
+            `Needs a ${connectionTypeName} connection in this workspace's Allowed Connections.`,
     },
     uaBindings: {
         insertExpression: "Insert Binding Expression",

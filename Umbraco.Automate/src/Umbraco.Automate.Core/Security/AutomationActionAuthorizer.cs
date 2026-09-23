@@ -100,6 +100,118 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
     }
 
     /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeContentRootAsync(
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage);
+        }
+
+        var permissionSet = new HashSet<string>(permissions, StringComparer.Ordinal);
+        var status = await _contentPermissionService.AuthorizeRootAccessAsync(user, permissionSet);
+
+        if (status == ContentAuthorizationStatus.Success)
+        {
+            return AutomationAuthorizationResult.Success;
+        }
+
+        _logger.LogDebug(
+            "Content root authorisation denied for service account {UserKey} (permissions [{Permissions}]): {Status}",
+            user.Key, string.Join(", ", permissions), status);
+
+        return AutomationAuthorizationResult.Fail(
+            "Service account is not allowed to create at the content root. Pick a parent inside its start node instead.");
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeMediaRootAsync(CancellationToken cancellationToken)
+    {
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage);
+        }
+
+        var status = await _mediaPermissionService.AuthorizeRootAccessAsync(user);
+
+        if (status == MediaAuthorizationStatus.Success)
+        {
+            return AutomationAuthorizationResult.Success;
+        }
+
+        _logger.LogDebug(
+            "Media root authorisation denied for service account {UserKey}: {Status}",
+            user.Key, status);
+
+        return AutomationAuthorizationResult.Fail(
+            "Service account is not allowed to create at the media root. Pick a parent folder inside its start node instead.");
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeContentParentAsync(
+        Guid? parentKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage);
+        }
+
+        var permissionSet = new HashSet<string>(permissions, StringComparer.Ordinal);
+
+        var status = parentKey.HasValue
+            ? await _contentPermissionService.AuthorizeAccessAsync(user, [parentKey.Value], permissionSet)
+            : await _contentPermissionService.AuthorizeRootAccessAsync(user, permissionSet);
+
+        if (status == ContentAuthorizationStatus.Success)
+        {
+            return AutomationAuthorizationResult.Success;
+        }
+
+        _logger.LogDebug(
+            "Content authorisation denied for service account {UserKey} on target parent {ParentKey} (permissions [{Permissions}]): {Status}",
+            user.Key, parentKey?.ToString() ?? "<root>", string.Join(", ", permissions), status);
+
+        return AutomationAuthorizationResult.Fail(parentKey.HasValue
+            ? MapContentReason(status, parentKey.Value, permissions)
+            : MapContentRootReason(status, permissions));
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeMediaParentAsync(
+        Guid? parentKey,
+        CancellationToken cancellationToken)
+    {
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage);
+        }
+
+        var status = parentKey.HasValue
+            ? await _mediaPermissionService.AuthorizeAccessAsync(user, [parentKey.Value])
+            : await _mediaPermissionService.AuthorizeRootAccessAsync(user);
+
+        if (status == MediaAuthorizationStatus.Success)
+        {
+            return AutomationAuthorizationResult.Success;
+        }
+
+        _logger.LogDebug(
+            "Media authorisation denied for service account {UserKey} on target parent {ParentKey}: {Status}",
+            user.Key, parentKey?.ToString() ?? "<root>", status);
+
+        return AutomationAuthorizationResult.Fail(parentKey.HasValue
+            ? MapMediaReason(status, parentKey.Value)
+            : MapMediaRootReason(status));
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlySet<Guid>> FilterAuthorizedContentAsync(
         IEnumerable<Guid> contentKeys,
         IReadOnlySet<string> permissions,
@@ -203,6 +315,16 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             _ => $"Service account is not authorised to access content node '{contentKey}'.",
         };
 
+    private static string MapContentRootReason(ContentAuthorizationStatus status, IReadOnlySet<string> permissions)
+        => status switch
+        {
+            ContentAuthorizationStatus.UnauthorizedMissingPermissionAccess =>
+                $"Service account lacks the required permissions ({string.Join(", ", permissions)}) on the content root.",
+            ContentAuthorizationStatus.UnauthorizedMissingRootAccess =>
+                "Service account is not allowed to access the content root.",
+            _ => "Service account is not authorised to access the content root.",
+        };
+
     private static string MapMediaReason(MediaAuthorizationStatus status, Guid mediaKey)
         => status switch
         {
@@ -215,5 +337,13 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             MediaAuthorizationStatus.UnauthorizedMissingBinAccess =>
                 "Service account is not allowed to access the media recycle bin.",
             _ => $"Service account is not authorised to access media node '{mediaKey}'.",
+        };
+
+    private static string MapMediaRootReason(MediaAuthorizationStatus status)
+        => status switch
+        {
+            MediaAuthorizationStatus.UnauthorizedMissingRootAccess =>
+                "Service account is not allowed to access the media root.",
+            _ => "Service account is not authorised to access the media root.",
         };
 }
