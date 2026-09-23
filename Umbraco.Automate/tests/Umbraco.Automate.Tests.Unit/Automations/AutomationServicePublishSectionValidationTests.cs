@@ -112,6 +112,22 @@ public class AutomationServicePublishSectionValidationTests
         ex.Errors.ShouldContain(e => e.Contains("Service account") && e.Contains("not found"));
     }
 
+    [Fact]
+    public async Task Publish_fails_when_step_publish_validation_returns_errors()
+    {
+        var (service, repo) = BuildService(
+            triggers: [new UniversalTrigger(TriggerDeps)],
+            actions: [new PublishCheckedAction(ActionDeps)],
+            allowedSections: ["content"]);
+
+        var automation = SetupAutomation(repo, "test.universalTrigger", ["test.publishCheckedAction"]);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain(e => e == $"Step 'Step 1': {PublishCheckedAction.Error}");
+    }
+
     private static Automation SetupAutomation(Mock<IAutomationRepository> repo, string triggerAlias, string[] actionAliases)
     {
         var automation = new AutomationBuilder()
@@ -227,6 +243,20 @@ public class AutomationServicePublishSectionValidationTests
     {
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => throw new NotImplementedException();
+    }
+
+    [Action("test.publishCheckedAction", "Publish Checked Action")]
+    private sealed class PublishCheckedAction(ActionInfrastructure infrastructure)
+        : ActionBase<object, object>(infrastructure), IPublishValidatableStepType
+    {
+        public const string Error = "Not ready to publish.";
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<string>> ValidateSettingsForPublishAsync(
+            object? settings, Automation automation, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<string>>([Error]);
     }
 
     #endregion

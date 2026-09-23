@@ -211,6 +211,7 @@ internal sealed class AutomationService : IAutomationService
 
         AddDisallowedConnectionErrors(automation, workspace, errors);
         AddDanglingStepReferenceErrors(automation, errors);
+        await AddStepPublishSettingsErrorsAsync(automation, errors, cancellationToken);
 
         if (workspace.ServiceAccountKey != Guid.Empty)
         {
@@ -388,6 +389,41 @@ internal sealed class AutomationService : IAutomationService
             }
 
             foreach (var error in await validatable.ValidateSettingsAsync(resolved, cancellationToken))
+            {
+                errors.Add($"Step '{step.Name}': {error}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Collects a message for every step whose action opts into <see cref="IPublishValidatableStepType"/>
+    /// (e.g. the Start Automation action requiring a target) and reports settings that are not
+    /// ready to publish.
+    /// </summary>
+    private async Task AddStepPublishSettingsErrorsAsync(
+        Automation automation,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        foreach (var step in automation.Steps)
+        {
+            if (_actions.GetByAlias(step.ActionAlias) is not IPublishValidatableStepType validatable)
+            {
+                continue;
+            }
+
+            object? resolved;
+            try
+            {
+                resolved = ((IStepType)validatable).ResolveSettings(step.Settings);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Step '{step.Name}' has invalid settings: {ex.Message}");
+                continue;
+            }
+
+            foreach (var error in await validatable.ValidateSettingsForPublishAsync(resolved, automation, cancellationToken))
             {
                 errors.Add($"Step '{step.Name}': {error}");
             }
