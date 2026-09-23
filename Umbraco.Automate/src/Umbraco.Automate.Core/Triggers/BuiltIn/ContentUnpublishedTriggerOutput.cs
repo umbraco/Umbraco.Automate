@@ -1,3 +1,4 @@
+using Json.Schema.Generation;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -10,27 +11,32 @@ public sealed class ContentUnpublishedTriggerOutput : IContentScopedTriggerOutpu
     /// <summary>
     /// Gets the content item's unique key.
     /// </summary>
+    [Description("The content item's unique key.")]
     public Guid ContentKey { get; init; }
 
     /// <summary>
     /// Gets the content item's name.
     /// </summary>
+    [Description("The content item's name.")]
     public string? ContentName { get; init; }
 
     /// <summary>
     /// Gets the content type's unique key.
     /// </summary>
+    [Description("The content type's unique key.")]
     public Guid? ContentTypeKey { get; init; }
 
     /// <summary>
     /// Gets the content type alias.
     /// </summary>
+    [Description("The content type alias.")]
     public string? ContentTypeAlias { get; init; }
 
     /// <summary>
     /// Gets the cultures that were published before the item was unpublished.
     /// Null for invariant content (the whole item was unpublished).
     /// </summary>
+    [Description("The cultures that were published before the item was unpublished. Null for invariant content.")]
     public string[]? Cultures { get; init; }
 
     Guid? IContentScopedTriggerOutput.GetContentKey() => ContentKey;

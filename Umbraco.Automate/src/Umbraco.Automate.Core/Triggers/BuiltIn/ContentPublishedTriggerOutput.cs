@@ -1,3 +1,4 @@
+using Json.Schema.Generation;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -10,21 +11,25 @@ public sealed class ContentPublishedTriggerOutput : IContentScopedTriggerOutput
     /// <summary>
     /// Gets the content item's unique key.
     /// </summary>
+    [Description("The content item's unique key.")]
     public Guid ContentKey { get; init; }
 
     /// <summary>
     /// Gets the content item's name.
     /// </summary>
+    [Description("The content item's name.")]
     public string? ContentName { get; init; }
 
     /// <summary>
     /// Gets the content type's unique key.
     /// </summary>
+    [Description("The content type's unique key.")]
     public Guid? ContentTypeKey { get; init; }
 
     /// <summary>
     /// Gets the content type alias.
     /// </summary>
+    [Description("The content type alias.")]
     public string? ContentTypeAlias { get; init; }
 
     /// <summary>
@@ -32,6 +37,7 @@ public sealed class ContentPublishedTriggerOutput : IContentScopedTriggerOutput
     /// Reports the cultures that changed where that is determinable, and falls back to all
     /// currently-published cultures otherwise (e.g. bulk/branch publishes).
     /// </summary>
+    [Description("The cultures published in this event. Null for invariant content.")]
     public string[]? Cultures { get; init; }
 
     Guid? IContentScopedTriggerOutput.GetContentKey() => ContentKey;

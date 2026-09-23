@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Json.Schema.Generation;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
@@ -11,5 +12,6 @@ public sealed class RunScriptOutput
     /// Gets the value returned by the script's default export, as JSON (objects, arrays, and
     /// primitives) that downstream steps can bind to.
     /// </summary>
+    [Description("The value returned by the script's default export, as JSON that downstream steps can bind to.")]
     public JsonNode? Result { get; init; }
 }
