@@ -1,3 +1,4 @@
+using System.Collections;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
@@ -119,11 +120,73 @@ internal sealed class EditableModelResolver : IEditableModelResolver
                 .GetCustomAttribute<EditableModelFieldAttribute>()?.IsSensitive ?? false;
 
             var value = property.GetValue(obj);
+
+            // A field whose editor stores rows (the HTTP Request action's headers, for one) keeps
+            // its references inside the rows. Walking one level in means a "$Umbraco:Automate:
+            // Secrets:Token" saved against a header value still resolves after the field stopped
+            // being a single string.
+            if (value is IList list)
+            {
+                ResolveConfigurationVariablesInList(list, isSensitiveField);
+                continue;
+            }
+
             var resolvedValue = _configReferenceResolver.Resolve(value, property.PropertyType, isSensitiveField);
 
             if (!Equals(value, resolvedValue))
             {
                 property.SetValue(obj, resolvedValue);
+            }
+        }
+    }
+
+    private void ResolveConfigurationVariablesInList(IList list, bool isSensitiveField)
+    {
+        var isReadOnly = list.IsReadOnly;
+
+        for (var i = 0; i < list.Count; i++)
+        {
+            switch (list[i])
+            {
+                case string item when !isReadOnly:
+                    var resolved = _configReferenceResolver.Resolve(item, typeof(string), isSensitiveField);
+                    if (!Equals(item, resolved))
+                    {
+                        list[i] = resolved;
+                    }
+
+                    break;
+
+                case null or string:
+                    break;
+
+                // A row object: its own string properties are resolved with the owning field's
+                // sensitivity, so a secret key stays restricted to sensitive fields.
+                case { } item when !item.GetType().IsPrimitive:
+                    ResolveConfigurationVariablesInRow(item, isSensitiveField);
+                    break;
+            }
+        }
+    }
+
+    private void ResolveConfigurationVariablesInRow(object row, bool isSensitiveField)
+    {
+        foreach (var property in row.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (property.PropertyType != typeof(string)
+                || !property.CanRead
+                || !property.CanWrite
+                || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            var value = property.GetValue(row);
+            var resolved = _configReferenceResolver.Resolve(value, typeof(string), isSensitiveField);
+
+            if (!Equals(value, resolved))
+            {
+                property.SetValue(row, resolved);
             }
         }
     }
