@@ -1,6 +1,7 @@
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
@@ -8,6 +9,7 @@ using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Testing.Builders;
+using static Umbraco.Automate.Tests.Unit.Automations.SensitiveSettingsTestHelper;
 
 namespace Umbraco.Automate.Tests.Unit.Persistence;
 
@@ -27,9 +29,12 @@ public class AutomationFactoryTests
 
         _factory = new AutomationFactory(
             serializerMock.Object,
-            new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>),
-            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
+            new AutomationSettingsProtector(
+                serializerMock.Object,
+                new ActionCollection(Array.Empty<IAction>),
+                new TriggerCollection(Array.Empty<ITrigger>),
+                new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
+                new NotificationChannelCollection(Array.Empty<INotificationChannel>)));
     }
 
     private static AutomationFactory CreatePassthroughFactory()
@@ -42,9 +47,12 @@ public class AutomationFactoryTests
 
         return new AutomationFactory(
             serializer,
-            new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>),
-            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
+            new AutomationSettingsProtector(
+                serializer,
+                new ActionCollection(Array.Empty<IAction>),
+                new TriggerCollection(Array.Empty<ITrigger>),
+                new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
+                new NotificationChannelCollection(Array.Empty<INotificationChannel>)));
     }
 
     [Fact]
@@ -164,9 +172,12 @@ public class AutomationFactoryTests
 
         var factory = new AutomationFactory(
             serializer,
-            new ActionCollection(Array.Empty<IAction>),
-            triggers,
-            authenticators);
+            new AutomationSettingsProtector(
+                serializer,
+                new ActionCollection(Array.Empty<IAction>),
+                triggers,
+                authenticators,
+                new NotificationChannelCollection(Array.Empty<INotificationChannel>)));
 
         var automation = new AutomationBuilder()
             .WithAlias("webhookTest")
@@ -221,5 +232,94 @@ public class AutomationFactoryTests
         entity.Name.ShouldBe("Updated");
         entity.DateCreated.ShouldBe(originalCreated);
         entity.CreatedByUserId.ShouldBe(originalCreatedBy);
+    }
+
+    private static AutomationFactory CreateProtectingFactory()
+    {
+        var serializer = CreateSerializer();
+        return new AutomationFactory(serializer, CreateSettingsProtector(serializer));
+    }
+
+    private static AutomationEntity EntityWithDefinition(string definition) => new()
+    {
+        Id = Guid.NewGuid(),
+        Alias = "stored",
+        Name = "Stored",
+        Definition = definition,
+    };
+
+    [Fact]
+    public void BuildEntity_EncryptsNotificationChannelSecret_AndBuildDomainDecryptsIt()
+    {
+        var factory = CreateProtectingFactory();
+        Automation automation = new AutomationBuilder().WithAlias("notify").WithName("Notify");
+        automation.Steps = [Step("ENC:already-encrypted")];
+        automation.NotificationSettings = Channels("hmac-key");
+
+        var entity = factory.BuildEntity(automation);
+
+        entity.Definition.ShouldNotBeNull();
+        entity.Definition.ShouldContain("ENC:hmac-key");
+        entity.Definition.ShouldNotContain("\"hmac-key\"");
+
+        var roundTripped = factory.BuildDomain(entity);
+        ReadString(roundTripped.NotificationSettings!.Channels[0].Settings[ChannelSecretKey]).ShouldBe("hmac-key");
+    }
+
+    [Fact]
+    public void ReprotectDefinition_EncryptsPlaintextSecrets()
+    {
+        var factory = CreateProtectingFactory();
+        var definition = System.Text.Json.JsonSerializer.Serialize(
+            new AutomationDefinitionDto
+            {
+                Steps = [Step("step-plain")],
+                NotificationSettings = Channels("channel-plain"),
+            },
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        var entity = EntityWithDefinition(definition);
+
+        factory.ReprotectDefinition(entity).ShouldBeTrue();
+
+        entity.Definition.ShouldNotBeNull();
+        entity.Definition.ShouldContain("ENC:step-plain");
+        entity.Definition.ShouldContain("ENC:channel-plain");
+        entity.Definition.ShouldNotContain("\"channel-plain\"");
+    }
+
+    [Fact]
+    public void ReprotectDefinition_WhenAlreadyProtected_ReturnsFalse()
+    {
+        var factory = CreateProtectingFactory();
+        Automation automation = new AutomationBuilder().WithAlias("done").WithName("Done");
+        automation.Steps = [Step("step-plain")];
+        automation.NotificationSettings = Channels("channel-plain");
+        var entity = factory.BuildEntity(automation);
+        var stored = entity.Definition;
+
+        factory.ReprotectDefinition(entity).ShouldBeFalse();
+
+        entity.Definition.ShouldBe(stored);
+    }
+
+    [Fact]
+    public void ReprotectDefinition_NeverDecryptsValuesItCannotReEncrypt()
+    {
+        // An uninstalled action has no schema, so a decrypt-then-encrypt pass would write its
+        // secret back in plaintext. The repair must leave encrypted values exactly as stored.
+        var factory = CreateProtectingFactory();
+        var definition = System.Text.Json.JsonSerializer.Serialize(
+            new AutomationDefinitionDto
+            {
+                Steps = [Step("ENC:kept", actionAlias: "uninstalled.action"), Step("step-plain")],
+            },
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        var entity = EntityWithDefinition(definition);
+
+        factory.ReprotectDefinition(entity).ShouldBeTrue();
+
+        entity.Definition.ShouldNotBeNull();
+        entity.Definition.ShouldContain("ENC:kept");
+        entity.Definition.ShouldNotContain("\"kept\"");
     }
 }

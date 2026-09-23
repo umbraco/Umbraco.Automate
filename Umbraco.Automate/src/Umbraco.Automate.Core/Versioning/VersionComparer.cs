@@ -19,13 +19,27 @@ internal static class VersionComparer
     }
 
     /// <summary>
+    /// The placeholder shown in place of a sensitive value in comparison output.
+    /// </summary>
+    public const string MaskedValue = "********";
+
+    /// <summary>
     /// Compares two <c>Dictionary&lt;string, object?&gt;</c> instances key-by-key.
     /// </summary>
+    /// <param name="changes">The list to add changes to.</param>
+    /// <param name="prefix">The path prefix for each change.</param>
+    /// <param name="from">The older values.</param>
+    /// <param name="to">The newer values.</param>
+    /// <param name="sensitiveKeys">
+    /// Keys whose values must not appear in the output. A change to one of these is still reported,
+    /// but both sides show <see cref="MaskedValue"/> (or <c>null</c> when the value is absent).
+    /// </param>
     public static void CompareObjectDictionary(
         List<ValueChange> changes,
         string prefix,
         IDictionary<string, object?>? from,
-        IDictionary<string, object?>? to)
+        IDictionary<string, object?>? to,
+        IReadOnlySet<string>? sensitiveKeys = null)
     {
         from ??= new Dictionary<string, object?>();
         to ??= new Dictionary<string, object?>();
@@ -36,7 +50,23 @@ internal static class VersionComparer
         {
             from.TryGetValue(key, out var oldVal);
             to.TryGetValue(key, out var newVal);
-            CompareScalar(changes, $"{prefix}.{key}", Stringify(oldVal), Stringify(newVal));
+
+            var oldText = Stringify(oldVal);
+            var newText = Stringify(newVal);
+
+            if (sensitiveKeys?.Contains(key) != true)
+            {
+                CompareScalar(changes, $"{prefix}.{key}", oldText, newText);
+                continue;
+            }
+
+            if (oldText != newText)
+            {
+                changes.Add(new ValueChange(
+                    $"{prefix}.{key}",
+                    oldText is null ? null : MaskedValue,
+                    newText is null ? null : MaskedValue));
+            }
         }
     }
 

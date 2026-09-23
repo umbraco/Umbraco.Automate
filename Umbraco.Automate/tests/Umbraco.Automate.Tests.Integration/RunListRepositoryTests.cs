@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
@@ -120,9 +122,12 @@ public class RunListRepositoryTests : IDisposable
 
         return new AutomationFactory(
             serializer,
-            new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>),
-            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
+            new AutomationSettingsProtector(
+                serializer,
+                new ActionCollection(Array.Empty<IAction>),
+                new TriggerCollection(Array.Empty<ITrigger>),
+                new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
+                new NotificationChannelCollection(Array.Empty<INotificationChannel>)));
     }
 
     public void Dispose()
