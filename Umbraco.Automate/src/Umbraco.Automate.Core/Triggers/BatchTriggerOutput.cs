@@ -1,3 +1,5 @@
+using Json.Schema.Generation;
+
 namespace Umbraco.Automate.Core.Triggers;
 
 /// <summary>
@@ -10,10 +12,12 @@ public sealed class BatchTriggerOutput<TItem> where TItem : class
     /// <summary>
     /// Gets the collection of items from the notification.
     /// </summary>
+    [Description("The collection of items from the notification.")]
     public List<TItem> Items { get; init; } = [];
 
     /// <summary>
     /// Gets the total number of items in the collection.
     /// </summary>
+    [Description("The total number of items in the collection.")]
     public int Count { get; init; }
 }

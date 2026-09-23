@@ -1,3 +1,4 @@
+using Json.Schema.Generation;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -10,21 +11,25 @@ public sealed class ContentSavedTriggerOutput : IContentScopedTriggerOutput
     /// <summary>
     /// Gets the content item's unique key.
     /// </summary>
+    [Description("The content item's unique key.")]
     public Guid ContentKey { get; init; }
 
     /// <summary>
     /// Gets the content item's name.
     /// </summary>
+    [Description("The content item's name.")]
     public string? ContentName { get; init; }
 
     /// <summary>
     /// Gets the content type's unique key.
     /// </summary>
+    [Description("The content type's unique key.")]
     public Guid? ContentTypeKey { get; init; }
 
     /// <summary>
     /// Gets the content type alias.
     /// </summary>
+    [Description("The content type alias.")]
     public string? ContentTypeAlias { get; init; }
 
     /// <summary>
@@ -33,6 +38,7 @@ public sealed class ContentSavedTriggerOutput : IContentScopedTriggerOutput
     /// database date precision may vary, so downstream automations needing a hard
     /// guarantee should re-fetch.
     /// </summary>
+    [Description("Whether this save represents a newly-created content item.")]
     public bool IsNew { get; init; }
 
     /// <summary>
@@ -40,6 +46,7 @@ public sealed class ContentSavedTriggerOutput : IContentScopedTriggerOutput
     /// Reports the cultures that changed where that is determinable, and falls back to all
     /// available cultures otherwise (e.g. a cloned instance).
     /// </summary>
+    [Description("The cultures edited in this save. Null for invariant content.")]
     public string[]? Cultures { get; init; }
 
     Guid? IContentScopedTriggerOutput.GetContentKey() => ContentKey;
