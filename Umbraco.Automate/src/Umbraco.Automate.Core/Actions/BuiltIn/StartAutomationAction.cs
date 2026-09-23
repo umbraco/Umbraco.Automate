@@ -183,22 +183,21 @@ public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, 
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<string>> ValidateSettingsAsync(object? settings, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<string>> ValidateSettingsAsync(object? settings, CancellationToken cancellationToken = default)
     {
         if (settings is not StartAutomationSettings typed)
         {
-            return [];
+            return Task.FromResult<IReadOnlyList<string>>([]);
         }
 
         var errors = new List<string>();
 
-        if (string.IsNullOrWhiteSpace(typed.AutomationKey) || !Guid.TryParse(typed.AutomationKey, out var automationKey))
+        // This runs on every draft save, so only reject what is malformed. A blank key (step not
+        // configured yet) or a target that no longer exists must not block saving the rest of the
+        // automation — both fail the step at run time with a terminal error instead.
+        if (!string.IsNullOrWhiteSpace(typed.AutomationKey) && !Guid.TryParse(typed.AutomationKey, out _))
         {
             errors.Add($"'{typed.AutomationKey}' is not a valid automation key.");
-        }
-        else if (await _automationService.GetAutomationAsync(automationKey, cancellationToken) is null)
-        {
-            errors.Add($"Automation '{automationKey}' does not exist.");
         }
 
         // Trigger data can only be checked when it is a literal — bindings resolve at run time.
@@ -219,7 +218,7 @@ public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, 
             }
         }
 
-        return errors;
+        return Task.FromResult<IReadOnlyList<string>>(errors);
     }
 
     /// <summary>

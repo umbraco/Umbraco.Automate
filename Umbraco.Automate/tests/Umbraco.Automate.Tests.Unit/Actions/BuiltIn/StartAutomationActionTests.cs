@@ -261,13 +261,29 @@ public class StartAutomationActionTests
         errors.ShouldHaveSingleItem();
     }
 
-    [Fact]
-    public async Task ValidateSettingsAsync_MissingAutomation_ReturnsError()
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateSettingsAsync_BlankKey_ReturnsNoErrors(string automationKey)
     {
+        // A freshly added step has no automation picked yet; that must not block saving the draft.
+        var errors = await CreateAction().ValidateSettingsAsync(
+            new StartAutomationSettings { AutomationKey = automationKey });
+
+        errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ValidateSettingsAsync_MissingAutomation_ReturnsNoErrors()
+    {
+        // A deleted target must not lock the parent automation against unrelated edits; the step
+        // fails at run time instead.
         var errors = await CreateAction().ValidateSettingsAsync(
             new StartAutomationSettings { AutomationKey = Guid.NewGuid().ToString() });
 
-        errors.ShouldHaveSingleItem();
+        errors.ShouldBeEmpty();
+        _automationService.Verify(
+            s => s.GetAutomationAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
