@@ -102,6 +102,178 @@ stages:
                       publishLocation: pipeline
 
     # ============================================================
+    # Acceptance Tests - Playwright end-to-end against a real running site
+    #
+    # Depends on Build, NOT Pack, so this also gates pull requests: Pack is
+    # restricted to pushes on vN/main, vN/dev, vN/hotfix/*, vN/release/*.
+    # The site is scaffolded from source by scripts/install-demo-site.sh, the
+    # same script developers run, so the leg exercises project references
+    # rather than a published package and matches the local workflow exactly.
+    # SQLite means this stays on Linux; there is no LocalDB leg to add.
+    # ============================================================
+    - stage: AcceptanceTests
+      displayName: Acceptance Tests
+      dependsOn: Build
+      condition: succeeded()
+      jobs:
+          - job: AcceptanceTests
+            displayName: Run Playwright Acceptance Tests
+            timeoutInMinutes: 40
+            pool:
+                vmImage: "ubuntu-latest"
+            variables:
+                # Makes playwright.config.ts pick its CI profile (junit reporter,
+                # retries, longer timeouts) and makes postinstall.js skip the
+                # interactive config prompt.
+                CI: "true"
+                ASPNETCORE_ENVIRONMENT: Development
+                ASPNETCORE_URLS: https://localhost:44380
+                PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
+                acceptanceDir: $(Build.SourcesDirectory)/Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
+            steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - task: UseDotNet@2
+                  displayName: Setup .NET
+                  inputs:
+                      useGlobalJson: true
+
+                - task: UseNode@1
+                  displayName: Setup Node.js
+                  inputs:
+                      version: $(NODE_VERSION)
+
+                # Builds the wwwroot bundles the demo site serves. Without this the
+                # Automate section silently fails to register and every UI spec fails
+                # with element-not-found, which looks like a product bug but is not.
+                - script: |
+                      npm ci --include=optional
+                      npm run build
+                  displayName: Build frontend
+
+                - script: bash scripts/install-demo-site.sh
+                  displayName: Scaffold demo site
+
+                # The demo lives under demos/vN where N comes from Umbraco.Cms.Core in
+                # Directory.Packages.props, so resolve it rather than hard-coding a major.
+                # Backticks, not $(...), for command substitution: Azure macro-expands
+                # $(name) before bash ever sees the script.
+                - script: |
+                      set -e
+                      demoProject=`find demos -name 'Umbraco.Automate.DemoSite.csproj' | head -1`
+                      if [ -z "$demoProject" ]; then
+                        echo "##vso[task.logissue type=error]Demo site project not found under demos/"
+                        exit 1
+                      fi
+                      echo "Demo project: $demoProject"
+                      echo "##vso[task.setvariable variable=demoProject]$demoProject"
+                  displayName: Resolve demo site path
+
+                - script: dotnet dev-certs https
+                  displayName: Trust HTTPS development certificate
+
+                - script: dotnet build "$(demoProject)" --configuration Release
+                  displayName: Build demo site
+
+                # Keyed on the acceptance package-lock, which pins the Playwright
+                # version that determines the required browser build.
+                - task: Cache@2
+                  displayName: Cache Playwright browsers
+                  inputs:
+                      key: 'playwright | "$(Agent.OS)" | $(acceptanceDir)/package-lock.json'
+                      restoreKeys: |
+                          playwright | "$(Agent.OS)"
+                      path: $(PLAYWRIGHT_BROWSERS_PATH)
+
+                - script: npm ci --no-fund --no-audit
+                  displayName: Restore acceptance test packages
+                  workingDirectory: $(acceptanceDir)
+
+                # --with-deps because the hosted Linux image lacks the browser's OS
+                # libraries. On a cache hit the download is skipped.
+                - script: npx playwright install --with-deps chromium
+                  displayName: Install Playwright Chromium
+                  workingDirectory: $(acceptanceDir)
+
+                # config.js is interactive and discovers the port from a named pipe,
+                # which is a local-development affordance. In CI the URL is fixed by
+                # ASPNETCORE_URLS, and the credentials are the ones the scaffold
+                # installs unattended, so write .env directly.
+                - script: |
+                      set -e
+                      cat > .env <<ENVEOF
+                      UMBRACO_USER_LOGIN=admin@example.com
+                      UMBRACO_USER_PASSWORD=password1234
+                      URL=$(ASPNETCORE_URLS)
+                      ENVEOF
+                      echo "Wrote .env targeting $(ASPNETCORE_URLS)"
+                  displayName: Generate .env
+                  workingDirectory: $(acceptanceDir)
+
+                - script: |
+                      set -e
+                      nohup dotnet run --project "$(demoProject)" --configuration Release --no-build --no-launch-profile > "$(Build.ArtifactStagingDirectory)/demo-site.log" 2>&1 &
+                      echo "##vso[task.setvariable variable=demoSitePid]$!"
+                      echo "Demo site starting as PID $!"
+                  displayName: Start demo site
+
+                # First boot runs the unattended install and the Automate schema
+                # migrations, so allow generous time before calling it a failure.
+                - script: |
+                      set -e
+                      # expr rather than $((...)): Azure's macro parser also reacts to
+                      # a leading "$(", so arithmetic expansion is best avoided here.
+                      i=0
+                      while [ $i -lt 90 ]; do
+                        if curl -ksSf "$(ASPNETCORE_URLS)/umbraco" -o /dev/null; then
+                          echo "Demo site is up (attempt $i)"
+                          exit 0
+                        fi
+                        i=`expr $i + 1`
+                        sleep 10
+                      done
+                      echo "##vso[task.logissue type=error]Demo site did not respond within 15 minutes"
+                      tail -100 "$(Build.ArtifactStagingDirectory)/demo-site.log" || true
+                      exit 1
+                  displayName: Wait for demo site
+
+                - script: npx playwright test DefaultConfig
+                  displayName: Run acceptance tests
+                  workingDirectory: $(acceptanceDir)
+
+                - script: kill $(demoSitePid) || true
+                  displayName: Stop demo site
+                  condition: always()
+
+                - task: PublishTestResults@2
+                  displayName: Publish acceptance test results
+                  condition: always()
+                  inputs:
+                      testResultsFormat: JUnit
+                      testResultsFiles: "$(acceptanceDir)/results/results.xml"
+                      testRunTitle: Acceptance Tests
+                      mergeTestResults: true
+
+                # Traces, screenshots and video for every failed test, plus the site
+                # log, because a UI failure is rarely diagnosable from the error alone.
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload failure diagnostics
+                  condition: failed()
+                  inputs:
+                      targetPath: $(acceptanceDir)/results
+                      artifact: acceptance-test-results
+                      publishLocation: pipeline
+
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload demo site log
+                  condition: failed()
+                  inputs:
+                      targetPath: $(Build.ArtifactStagingDirectory)/demo-site.log
+                      artifact: acceptance-demo-site-log
+                      publishLocation: pipeline
+
+    # ============================================================
     # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
     # Generates per-product SBOMs and uploads to Dependency-Track
     # ============================================================
