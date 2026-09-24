@@ -113,30 +113,45 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
         }
     }
 
-    private void DecryptFields(JsonObject jsonObject)
+    private void DecryptFields(JsonNode? node)
     {
-        foreach (var property in jsonObject.ToList())
+        switch (node)
         {
-            if (property.Value is JsonValue jsonValue)
-            {
-                try
+            case JsonObject jsonObject:
+                foreach (var property in jsonObject.ToList())
                 {
-                    var stringValue = jsonValue.GetValue<string>();
-                    if (_protector.IsProtected(stringValue))
+                    if (property.Value is JsonValue jsonValue)
                     {
-                        var decrypted = _protector.Unprotect(stringValue);
-                        jsonObject[property.Key] = decrypted;
+                        try
+                        {
+                            var stringValue = jsonValue.GetValue<string>();
+
+                            if (_protector.IsProtected(stringValue))
+                            {
+                                jsonObject[property.Key] =
+                                    _protector.Unprotect(stringValue);
+                            }
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            // Not a string value, skip.
+                        }
+                    }
+                    else
+                    {
+                        DecryptFields(property.Value);
                     }
                 }
-                catch (InvalidOperationException)
+
+                break;
+
+            case JsonArray jsonArray:
+                foreach (var item in jsonArray)
                 {
-                    // Not a string value, skip.
+                    DecryptFields(item);
                 }
-            }
-            else if (property.Value is JsonObject nestedObject)
-            {
-                DecryptFields(nestedObject);
-            }
+
+                break;
         }
     }
 
