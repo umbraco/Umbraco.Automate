@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Settings;
@@ -6,6 +7,7 @@ using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Strings;
 
 namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
@@ -27,7 +29,9 @@ namespace Umbraco.Automate.Tests.Unit.Triggers.BuiltIn;
 public class ContentCultureCloneRegressionTests
 {
     private readonly ContentPublishedTrigger _publishedTrigger = new(
-        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
+        new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()),
+        Mock.Of<IUserService>(),
+        Mock.Of<ILogger<ContentPublishedTrigger>>());
 
     private readonly ContentSavedTrigger _savedTrigger = new(
         new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()));
