@@ -48,6 +48,36 @@ public class CredentialsPersistenceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetIdsNotModifiedSince_ReturnsOnlyCredentialsUntouchedSinceCutoff()
+    {
+        var cutoff = new DateTime(2026, 9, 27, 12, 0, 0, DateTimeKind.Utc);
+
+        var stale = await SaveAsync(created: cutoff.AddHours(-2), modified: cutoff.AddHours(-1));
+        var refreshed = await SaveAsync(created: cutoff.AddDays(-10), modified: cutoff.AddMinutes(5));
+        var recent = await SaveAsync(created: cutoff.AddMinutes(1), modified: cutoff.AddMinutes(1));
+
+        var ids = await _repository.GetIdsNotModifiedSinceAsync(cutoff);
+
+        ids.ShouldContain(stale);
+        ids.ShouldNotContain(refreshed);
+        ids.ShouldNotContain(recent);
+
+        async Task<Guid> SaveAsync(DateTime created, DateTime modified)
+        {
+            var credentials = new OAuthCredentials
+            {
+                Id = Guid.NewGuid(),
+                Provider = "Slack",
+                AccessToken = "token",
+                DateCreated = created,
+                DateModified = modified,
+            };
+            await _repository.SaveAsync(credentials);
+            return credentials.Id;
+        }
+    }
+
+    [Fact]
     public async Task Save_UpdatesExistingCredentials()
     {
         var credentials = new OAuthCredentials

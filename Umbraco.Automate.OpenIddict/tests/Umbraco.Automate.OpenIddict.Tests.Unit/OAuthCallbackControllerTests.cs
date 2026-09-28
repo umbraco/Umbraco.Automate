@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,11 +22,12 @@ public class OAuthCallbackControllerTests
 {
     private readonly Mock<IOAuthCredentialsService> _credentialsService = new();
     private readonly Mock<IAuthenticationService> _authenticationService = new();
+    private readonly EphemeralDataProtectionProvider _dataProtectionProvider = new();
     private readonly OAuthCallbackController _controller;
 
     public OAuthCallbackControllerTests()
     {
-        _controller = new OAuthCallbackController(_credentialsService.Object);
+        _controller = new OAuthCallbackController(_credentialsService.Object, _dataProtectionProvider, TimeProvider.System);
 
         var services = new ServiceCollection();
         services.AddSingleton(_authenticationService.Object);
@@ -101,11 +104,17 @@ public class OAuthCallbackControllerTests
         var result = (await _controller.Callback("slack")).ShouldBeOfType<ContentResult>();
 
         result.Content.ShouldContain("oauth-complete");
-        result.Content.ShouldContain(id.ToString());
+        result.Content.ShouldNotContain(id.ToString());
+
+        var token = Regex.Match(result.Content!, "\"credentialToken\":\"([^\"]+)\"").Groups[1].Value;
+        var handoff = Protector().Unprotect(token);
+        handoff.Status.ShouldBe(OAuthCredentialsHandoffStatus.Valid);
+        handoff.CredentialId.ShouldBe(id);
+        handoff.Provider.ShouldBe("Slack");
     }
 
     [Fact]
-    public async Task Callback_RedirectsToReturnUrl_WithCredentialIdInFragment_WhenReturnUrlRoundTripped()
+    public async Task Callback_RedirectsToReturnUrl_WithCredentialTokenInFragment_WhenReturnUrlRoundTripped()
     {
         const string returnUrl = "/umbraco/section/automate/workspace/connection/edit/abc";
         SetUpSuccessfulAuthentication("Slack", returnUrl);
@@ -114,7 +123,13 @@ public class OAuthCallbackControllerTests
 
         var result = (await _controller.Callback("slack")).ShouldBeOfType<RedirectResult>();
 
-        result.Url.ShouldBe($"{returnUrl}#automate-oauth=1&provider=Slack&nonce=nonce-1&credentialId={id}");
+        var prefix = $"{returnUrl}#automate-oauth=1&provider=Slack&nonce=nonce-1&credentialToken=";
+        result.Url.ShouldStartWith(prefix);
+        result.Url.ShouldNotContain(id.ToString());
+
+        var handoff = Protector().Unprotect(Uri.UnescapeDataString(result.Url[prefix.Length..]));
+        handoff.Status.ShouldBe(OAuthCredentialsHandoffStatus.Valid);
+        handoff.CredentialId.ShouldBe(id);
     }
 
     [Fact]
@@ -157,6 +172,8 @@ public class OAuthCallbackControllerTests
 
         result.Url.ShouldBe("/umbraco#automate-oauth=1&provider=slack&nonce=nonce-1&error=Authentication%20failed.");
     }
+
+    private OAuthCredentialsHandoffProtector Protector() => new(_dataProtectionProvider, TimeProvider.System);
 
     private void SetUpCreateReturningId(Guid id) =>
         _credentialsService
