@@ -36,7 +36,7 @@ public class AutomateOptions
     public string UseNamedConnectionString { get; set; } = "umbracoAutomateDbDSN";
 
     /// <summary>
-    /// Gets or sets the <see cref="Microsoft.Extensions.Configuration.IConfiguration"/> key
+    /// Gets or sets the <c>IConfiguration</c> key
     /// prefixes that automation settings may dereference via the <c>$Key:Path</c> syntax.
     /// </summary>
     /// <remarks>
@@ -189,6 +189,28 @@ public sealed class ExecutionOptions
     /// imports large assets can raise one without loosening the other. Default: 10 MB.
     /// </summary>
     public long MaxMediaFileBytes { get; set; } = 10_485_760;
+
+    /// <summary>
+    /// Gets or sets whether outbound HTTP requests made by automations (HTTP Request, Run Script
+    /// <c>fetch()</c>, Create Media downloads, webhook notification channels) may be routed through
+    /// the system or environment-configured proxy. Default: <c>true</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Outbound requests are checked against a blocklist of private and reserved network ranges.
+    /// For a direct connection the check runs at connect time against the address actually
+    /// connected to. When a request goes through a proxy, the connection is made to the proxy
+    /// instead, so the destination host is validated by a DNS lookup before the request (and
+    /// every redirect hop) is sent, and rejected if any resolved address is blocked. A short
+    /// DNS-rebinding window remains between that lookup and the proxy's own lookup of the host,
+    /// so the proxy should still deny access to internal networks.
+    /// </para>
+    /// <para>
+    /// Set to <c>false</c> to ignore any configured proxy and always connect directly, with the
+    /// destination validated at connect time.
+    /// </para>
+    /// </remarks>
+    public bool AllowOutboundHttpProxy { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the execution mode for workflow processing.

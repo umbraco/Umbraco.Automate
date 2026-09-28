@@ -1,6 +1,7 @@
 using System.Dynamic;
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text.Json.Nodes;
 using Jint;
 using Jint.Native;
@@ -93,8 +94,8 @@ internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, I
 
             if (options.AllowFetch)
             {
-                engine.SetValue("fetch", async (string url, RequestInit? requestInit = null) =>
-                    await FetchAsync(engine, url, requestInit, options));
+                engine.SetValue("fetch", (string url, RequestInit? requestInit = null) =>
+                    Fetch(engine, url, requestInit, options));
             }
 
             JsValue defaultFunction;
@@ -211,6 +212,101 @@ internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, I
         return json.IsString() ? JsonNode.Parse(json.AsString()) : null;
     }
 
+    // Returns the fetch promise. Not left to Jint's task interop: that rejects a faulted task with
+    // the wrapped AggregateException, whose text (type names, stack trace, internal network
+    // details) would reach the script. Instead the script only ever sees a short, fixed description
+    // of the failure as a JS Error, and the full exception is logged. Settling from the task
+    // continuation mirrors what Jint's own task interop (and Response.Json/Text) does.
+    private JsValue Fetch(Engine engine, string url, RequestInit? requestInit, ScriptExecutorOptions options)
+    {
+        var (promise, resolve, reject) = engine.Advanced.RegisterPromise();
+
+        FetchAsync(engine, url, requestInit, options).ContinueWith(
+            task =>
+            {
+                if (task.IsCompletedSuccessfully)
+                {
+                    resolve(JsValue.FromObject(engine, task.Result));
+                    return;
+                }
+
+                if (task.Exception?.InnerException is JavaScriptException jsException)
+                {
+                    // Already a script-facing message.
+                    reject(jsException.Error);
+                    return;
+                }
+
+                Exception exception = task.Exception?.InnerException ?? new TaskCanceledException();
+                LogFetchFailed(exception);
+                reject(new JavaScriptException(engine.Intrinsics.Error, DescribeFetchFailure(exception)).Error);
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        return promise;
+    }
+
+    internal static string DescribeFetchFailure(Exception exception)
+    {
+        if (exception is AggregateException { InnerException: { } inner })
+        {
+            exception = inner;
+        }
+
+        if (FindInner<SsrfException>(exception) is not null)
+        {
+            return "http request was blocked";
+        }
+
+        if (exception is OperationCanceledException || FindInner<TimeoutException>(exception) is not null)
+        {
+            return "http request timed out";
+        }
+
+        if (exception is UriFormatException)
+        {
+            return "fetch failed: invalid url";
+        }
+
+        var reason = FindInner<SocketException>(exception)?.SocketErrorCode switch
+        {
+            SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain => "DNS lookup failed",
+            SocketError.ConnectionRefused => "connection refused",
+            SocketError.AccessDenied => "connection denied",
+            SocketError.TimedOut => "connection timed out",
+            SocketError.ConnectionReset or SocketError.ConnectionAborted => "connection reset",
+            SocketError.HostUnreachable or SocketError.NetworkUnreachable => "host unreachable",
+            _ => null,
+        };
+
+        reason ??= (exception as HttpRequestException)?.HttpRequestError switch
+        {
+            HttpRequestError.NameResolutionError => "DNS lookup failed",
+            HttpRequestError.ConnectionError => "could not connect",
+            HttpRequestError.SecureConnectionError => "secure connection failed",
+            HttpRequestError.ProxyTunnelError => "proxy error",
+            HttpRequestError.InvalidResponse or HttpRequestError.ResponseEnded => "invalid response",
+            _ => "request failed",
+        };
+
+        return $"fetch failed: {reason}";
+    }
+
+    private static T? FindInner<T>(Exception? exception) where T : Exception
+    {
+        for (; exception is not null; exception = exception.InnerException)
+        {
+            if (exception is T match)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
     private async Task<Response> FetchAsync(Engine engine, string url, RequestInit? requestInit, ScriptExecutorOptions options)
     {
         var requestUri = new Uri(url);
@@ -251,31 +347,20 @@ internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, I
             ? clientFactory.CreateClient(Constants.HttpClients.Default)
             : clientFactory.CreateClient(Constants.HttpClients.NoRedirect);
 
-        try
-        {
-            using var cts = new CancellationTokenSource(options.HttpRequestTimeout);
+        using var cts = new CancellationTokenSource(options.HttpRequestTimeout);
 
-            // Stream the response so MaxResponseBodyBytes is enforced while the body is read
-            // (see HttpResponseBodyReader) rather than after HttpClient has already buffered the
-            // whole payload into the host process.
-            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        // Stream the response so MaxResponseBodyBytes is enforced while the body is read
+        // (see HttpResponseBodyReader) rather than after HttpClient has already buffered the
+        // whole payload into the host process. Failures are translated by Fetch.
+        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
-            if (requestInit.Redirect is "error" && IsRedirect(response))
-            {
-                response.Dispose();
-                throw new JavaScriptException("http request was redirected");
-            }
+        if (requestInit.Redirect is "error" && IsRedirect(response))
+        {
+            response.Dispose();
+            throw new JavaScriptException("http request was redirected");
+        }
 
-            return new Response(requestUri, response, engine, options.MaxResponseBodyBytes);
-        }
-        catch (HttpRequestException ex) when (ex.InnerException is SsrfException)
-        {
-            throw new JavaScriptException("http request was blocked");
-        }
-        catch (TaskCanceledException)
-        {
-            throw new JavaScriptException("http request timed out");
-        }
+        return new Response(requestUri, response, engine, options.MaxResponseBodyBytes);
     }
 
     private static void ApplyRequestHeaders(HttpRequestMessage request, object? headers)
@@ -338,11 +423,11 @@ internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, I
 
     private static bool TryAddHeader(HttpHeaders headers, string key, string? value)
     {
-        // A header can only appear once here, so remove any existing value first.
-        headers.Remove(key);
-
         try
         {
+            // A header can only appear once here, so remove any existing value first. Remove
+            // throws for a header this collection does not accept, just as Add does.
+            headers.Remove(key);
             headers.Add(key, value);
             return true;
         }
@@ -359,4 +444,7 @@ internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, I
 
     [LoggerMessage(LogLevel.Error, "Unexpected error while executing script")]
     private partial void LogUnexpectedError(Exception ex);
+
+    [LoggerMessage(LogLevel.Warning, "Script fetch() request failed")]
+    private partial void LogFetchFailed(Exception ex);
 }
