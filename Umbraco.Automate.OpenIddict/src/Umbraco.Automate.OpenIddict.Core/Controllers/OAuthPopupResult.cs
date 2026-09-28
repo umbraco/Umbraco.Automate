@@ -20,10 +20,10 @@ internal static class OAuthPopupResult
     };
 
     /// <summary>
-    /// Builds a success page that reports the newly-stored credential id to the opener.
+    /// Builds a success page that reports the token for the newly-stored credential to the opener.
     /// </summary>
-    public static ContentResult Success(string credentialId) =>
-        Build(new PopupMessage(Success: true, CredentialId: credentialId));
+    public static ContentResult Success(string credentialToken) =>
+        Build(new PopupMessage(Success: true, CredentialToken: credentialToken));
 
     /// <summary>
     /// Builds a failure page that reports the given error to the opener. The error may contain
@@ -67,7 +67,7 @@ internal static class OAuthPopupResult
         return new ContentResult { Content = html, ContentType = "text/html" };
     }
 
-    private sealed record PopupMessage(bool Success, string? CredentialId = null, string? Error = null)
+    private sealed record PopupMessage(bool Success, string? CredentialToken = null, string? Error = null)
     {
         public string Type => "oauth-complete";
     }
