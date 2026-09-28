@@ -110,9 +110,9 @@ public static partial class UmbracoBuilderExtensions
         // component above has run.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();
 
-        // Recover runs stuck in Running/Pending from the previous process.
-        // Registered after migrations so the schema is up-to-date.
-        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, StuckRunRecoveryNotificationHandler>();
+        // Recovers runs stuck in Running/Pending from the previous process. Invoked by
+        // WorkflowHostLifecycle once migrations are done and before the engine starts.
+        builder.Services.AddSingleton<IStuckRunRecovery, EFCoreStuckRunRecovery>();
 
         return builder;
     }
