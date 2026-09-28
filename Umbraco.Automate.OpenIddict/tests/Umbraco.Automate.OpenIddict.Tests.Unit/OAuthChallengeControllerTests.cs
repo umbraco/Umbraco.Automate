@@ -102,5 +102,64 @@ public class OAuthChallengeControllerTests
         result.AuthenticationSchemes.ShouldContain(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
         result.Properties.ShouldNotBeNull();
         result.Properties!.GetString(OpenIddictClientAspNetCoreConstants.Properties.ProviderName).ShouldBe("Slack");
+        result.Properties.Items.ContainsKey(OAuthReturnUrl.UrlPropertyKey).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Challenge_StoresReturnUrlInProtectedProperties_WhenLocal()
+    {
+        // Same-tab fallback: the return URL must travel inside the OpenIddict state token (the
+        // authentication properties), never as a plain query parameter on the provider round trip.
+        const string returnUrl = "/umbraco/section/automate/workspace/connection/edit/abc";
+        _configurationSource.Setup(s => s.GetConfiguration("Slack"))
+            .Returns(new OAuthProviderConfiguration { ClientId = "client-id", ClientSecret = "client-secret" });
+
+        var result = _controller.Challenge("Slack", returnUrl, "nonce-1").ShouldBeOfType<ChallengeResult>();
+
+        result.Properties!.Items[OAuthReturnUrl.UrlPropertyKey].ShouldBe(returnUrl);
+        result.Properties.Items[OAuthReturnUrl.NoncePropertyKey].ShouldBe("nonce-1");
+        result.Properties.RedirectUri.ShouldBe("/umbraco/automate/oauth/callback/slack");
+    }
+
+    [Theory]
+    [InlineData("https://evil.example/")]
+    [InlineData("//evil.example/")]
+    [InlineData("/\\evil.example/")]
+    [InlineData("/\t/evil.example/")]
+    public void Challenge_RejectsNonLocalReturnUrl_WithoutDispatchingChallenge(string returnUrl)
+    {
+        _configurationSource.Setup(s => s.GetConfiguration("Slack"))
+            .Returns(new OAuthProviderConfiguration { ClientId = "client-id", ClientSecret = "client-secret" });
+
+        var result = _controller.Challenge("Slack", returnUrl, "nonce-1").ShouldBeOfType<ContentResult>();
+
+        result.Content.ShouldContain("\"success\":false");
+        result.Content.ShouldNotContain("evil.example");
+    }
+
+    [Fact]
+    public void Challenge_RedirectsBackWithError_WhenUnconfiguredAndReturnUrlGiven()
+    {
+        // Same-tab flow: there is no opener to postMessage to, so the unconfigured-provider error
+        // goes back to the backoffice in the fragment rather than stranding the user on this page.
+        _configurationSource.Setup(s => s.GetConfiguration("Slack")).Returns((OAuthProviderConfiguration?)null);
+
+        var result = _controller.Challenge("Slack", "/umbraco/section/automate", "nonce-1").ShouldBeOfType<RedirectResult>();
+
+        result.Url.ShouldStartWith("/umbraco/section/automate#automate-oauth=1&provider=Slack&nonce=nonce-1&error=");
+        result.Url.ShouldContain("not%20configured");
+    }
+
+    [Fact]
+    public void Challenge_RejectsReturnUrlWithoutNonce()
+    {
+        // The nonce is what lets the editor tell its own result from a crafted link, so the
+        // same-tab flow must never run without one.
+        _configurationSource.Setup(s => s.GetConfiguration("Slack"))
+            .Returns(new OAuthProviderConfiguration { ClientId = "client-id", ClientSecret = "client-secret" });
+
+        var result = _controller.Challenge("Slack", "/umbraco").ShouldBeOfType<ContentResult>();
+
+        result.Content.ShouldContain("\"success\":false");
     }
 }

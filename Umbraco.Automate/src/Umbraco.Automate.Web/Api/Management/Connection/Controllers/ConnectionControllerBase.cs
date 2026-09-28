@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Web.Api.Management.Common.Controllers;
 using Umbraco.Automate.Web.Api.Management.Common.Routing;
 using Umbraco.Cms.Api.Common.Builders;
@@ -19,5 +20,16 @@ public abstract class ConnectionControllerBase : UmbracoAutomateManagementContro
         => NotFound(new ProblemDetailsBuilder()
             .WithTitle("Connection not found")
             .WithDetail("The specified connection could not be found.")
+            .Build());
+
+    /// <summary>
+    /// Returns a 400 Bad Request response for connection settings rejected by an
+    /// <see cref="IConnectionSettingsSaveHandler"/>. Built with <see cref="ProblemDetailsBuilder"/> so the
+    /// backoffice recognises it and shows the detail on the toast.
+    /// </summary>
+    private protected IActionResult InvalidConnectionSettings(ConnectionSettingsValidationException exception)
+        => BadRequest(new ProblemDetailsBuilder()
+            .WithTitle("Invalid connection settings")
+            .WithDetail(exception.Message)
             .Build());
 }

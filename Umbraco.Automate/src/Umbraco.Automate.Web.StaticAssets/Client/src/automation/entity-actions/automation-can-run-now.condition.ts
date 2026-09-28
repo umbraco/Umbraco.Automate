@@ -12,26 +12,23 @@ import { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repo
 
 export { UA_ENTITY_AUTOMATION_CAN_RUN_NOW_CONDITION_ALIAS } from "./automation-can-run-now.condition.constants.js";
 
-// Per-process caches so the same automation isn't refetched every time the menu renders for the
-// same entity. Tree refreshes invalidate by recreating items.
-const triggerAliasCache = new Map<string, string | null>();
-
 // Which trigger aliases can be run on demand, as reported by the catalogue. Shared across
 // condition instances because the answer is a property of the installed triggers, not of any
 // one automation, and each instance owns a separate repository (and so a separate cache).
 let manualRunAliases: Set<string> | undefined;
 
 /**
- * Permitted when the entity context's unique points to an automation whose configured trigger
- * can be run on demand.
+ * Permitted when the entity context's unique points to a published automation whose configured
+ * trigger can be run on demand. The server rejects running a draft or unpublished automation, so
+ * offering "Run now" for one only leads to an error.
  *
  * Whether a trigger can is the server's call — it implements `ISupportsManualRun` and the
  * catalogue reports `supportsManualRun` — so a provider's trigger gets a working "Run now"
  * without this condition knowing anything about it.
  *
- * Fetches the full automation from the API on first evaluation per id so the condition is
- * independent of which tree store the entity action was launched from (standalone automation
- * tree vs workspace tree).
+ * Fetches the full automation from the API on each evaluation (no cache), because publishing or
+ * unpublishing changes the answer, and so the condition is independent of which tree store the
+ * entity action was launched from (standalone automation tree vs workspace tree).
  */
 export class UaEntityAutomationCanRunNowCondition
     extends UmbConditionBase<UmbConditionConfigBase>
@@ -52,25 +49,17 @@ export class UaEntityAutomationCanRunNowCondition
     async #evaluate(unique: string | null): Promise<boolean> {
         if (!unique) return false;
 
-        const triggerAlias = await this.#resolveTriggerAlias(unique);
-        if (!triggerAlias) return false;
-
-        const runnable = await this.#resolveManualRunAliases();
-        return runnable.has(triggerAlias);
-    }
-
-    async #resolveTriggerAlias(unique: string): Promise<string | null> {
-        if (triggerAliasCache.has(unique)) {
-            return triggerAliasCache.get(unique) ?? null;
-        }
-
         const { data } = await tryExecute(
             this,
             AutomationsService.getAutomationsById({ path: { id: unique } }),
         );
-        const triggerAlias = data?.trigger?.triggerAlias ?? null;
-        triggerAliasCache.set(unique, triggerAlias);
-        return triggerAlias;
+        if (data?.status !== "Published") return false;
+
+        const triggerAlias = data.trigger?.triggerAlias;
+        if (!triggerAlias) return false;
+
+        const runnable = await this.#resolveManualRunAliases();
+        return runnable.has(triggerAlias);
     }
 
     async #resolveManualRunAliases(): Promise<Set<string>> {

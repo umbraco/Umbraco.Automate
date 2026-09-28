@@ -26,6 +26,18 @@ public interface IOAuthCredentialsService
     Task DeleteCredentialsAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the IDs of credentials that were neither created nor modified (e.g. by a token refresh) at or
+    /// after <paramref name="cutoffUtc"/>. Used to find abandoned authentications to clean up; callers must
+    /// still exclude credentials that a connection refers to.
+    /// </summary>
+    /// <remarks>
+    /// The default implementation returns no IDs, so a custom implementation that does not override it
+    /// never has credentials cleaned up.
+    /// </remarks>
+    Task<IReadOnlyList<Guid>> GetCredentialIdsNotModifiedSinceAsync(DateTime cutoffUtc, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Guid>>([]);
+
+    /// <summary>
     /// Gets a valid access token for the credentials, refreshing if expired.
     /// Returns null if the credentials don't exist or the token cannot be refreshed.
     /// </summary>

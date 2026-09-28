@@ -1,24 +1,33 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Umbraco.Automate.Core;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
-using Umbraco.Cms.Core.Events;
-using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Sync;
+using WorkflowCore.Models;
 
-namespace Umbraco.Automate.Persistence.Notifications;
+namespace Umbraco.Automate.Persistence.Runs;
 
 /// <summary>
 /// On application startup, marks any automation runs left in <see cref="AutomationRunStatus.Running"/>
-/// or <see cref="AutomationRunStatus.Pending"/> as <see cref="AutomationRunStatus.Failed"/>.
+/// or <see cref="AutomationRunStatus.Pending"/> as <see cref="AutomationRunStatus.Failed"/>, and
+/// terminates their WorkflowCore instances.
 /// These represent workflows that were in-flight when the previous process stopped.
+/// <para>
+/// Terminating the instance is what makes the Failed status true. Left Runnable, the engine resumes
+/// it as soon as the host starts and re-executes the interrupted step — repeating any side effect
+/// that step already had (an AI call, an HTTP request, an email) behind a run the backoffice shows as
+/// failed and will not let a user terminate. For the same reason this runs before the host starts
+/// (see <see cref="WorkflowHostLifecycle"/>) rather than on <c>UmbracoApplicationStartedNotification</c>,
+/// by which point the engine may already have picked the instance up.
+/// </para>
 /// Skipped on <see cref="ServerRole.Subscriber"/> nodes — subscribers must not mark runs
 /// as failed that may still be executing elsewhere. Runs on all other roles including
 /// <see cref="ServerRole.Unknown"/> (role election may not have completed at startup).
 /// </summary>
-internal sealed class StuckRunRecoveryNotificationHandler
-    : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
+internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 {
+    private const string InterruptedError = "Recovered after application restart — workflow was interrupted";
+
     private static readonly int[] NonTerminalStatuses =
     [
         (int)AutomationRunStatus.Running,
@@ -27,38 +36,25 @@ internal sealed class StuckRunRecoveryNotificationHandler
 
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly IServerRoleAccessor _serverRoleAccessor;
-    private readonly AutomateReadinessSignal _readinessSignal;
-    private readonly ILogger<StuckRunRecoveryNotificationHandler> _logger;
+    private readonly ILogger<EFCoreStuckRunRecovery> _logger;
 
-    public StuckRunRecoveryNotificationHandler(
+    public EFCoreStuckRunRecovery(
         IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
         IServerRoleAccessor serverRoleAccessor,
-        AutomateReadinessSignal readinessSignal,
-        ILogger<StuckRunRecoveryNotificationHandler> logger)
+        ILogger<EFCoreStuckRunRecovery> logger)
     {
         _dbContextFactory = dbContextFactory;
         _serverRoleAccessor = serverRoleAccessor;
-        _readinessSignal = readinessSignal;
         _logger = logger;
     }
 
-    public async Task HandleAsync(
-        UmbracoApplicationStartedNotification notification,
-        CancellationToken cancellationToken)
+    public async Task RecoverStuckRunsAsync(CancellationToken cancellationToken)
     {
         if (_serverRoleAccessor.CurrentServerRole is ServerRole.Subscriber)
         {
             _logger.LogDebug(
                 "Stuck run recovery skipped — this node ({ServerRole}) is a subscriber",
                 _serverRoleAccessor.CurrentServerRole);
-            return;
-        }
-
-        if (!await _readinessSignal.WaitUntilReadyAsync(cancellationToken))
-        {
-            _logger.LogError(
-                "Automate startup migrations failed; stuck run recovery was skipped. " +
-                "Resolve the migration failure and restart.");
             return;
         }
 
@@ -83,23 +79,52 @@ internal sealed class StuckRunRecoveryNotificationHandler
         var stuckStepStatuses = new[] { (int)StepRunStatus.Pending, (int)StepRunStatus.Running };
 
         // 1. Recover stuck runs and their step runs.
-        var stuckRunIds = await db.AutomationRuns
+        var stuckRuns = await db.AutomationRuns
             .Where(r => NonTerminalStatuses.Contains(r.Status) && !durableRunIds.Contains(r.Id))
-            .Select(r => r.Id)
+            .Select(r => new { r.Id, r.WorkflowInstanceId })
             .ToListAsync(cancellationToken);
+
+        var stuckRunIds = stuckRuns.Select(r => r.Id).ToList();
 
         var recoveredSteps = 0;
         var recoveredRuns = 0;
+        var terminatedInstances = 0;
 
         if (stuckRunIds.Count > 0)
         {
+            // Terminate the engine instances first: if a later update fails, the worst case is a run
+            // that still reads Running over a stopped instance — which the next startup recovers —
+            // rather than a Failed run whose instance the engine is about to resume.
+            var instanceIds = stuckRuns
+                .Where(r => !string.IsNullOrEmpty(r.WorkflowInstanceId))
+                .Select(r => r.WorkflowInstanceId!)
+                .ToList();
+
+            if (instanceIds.Count > 0)
+            {
+                var liveInstanceStatuses = new[] { (int)WorkflowStatus.Runnable, (int)WorkflowStatus.Suspended };
+
+                // Status is a real column for both instance schema versions, and it is what the
+                // poller and WorkflowDefinitionRecovery filter on, so updating it is enough to stop
+                // the engine. Execution pointers are left as they are, mirroring WorkflowCore's own
+                // terminate.
+                terminatedInstances = await db.WorkflowInstances
+                    .Where(wi => instanceIds.Contains(wi.Id) && liveInstanceStatuses.Contains(wi.Status))
+                    .ExecuteUpdateAsync(
+                        s => s
+                            .SetProperty(wi => wi.Status, (int)WorkflowStatus.Terminated)
+                            .SetProperty(wi => wi.CompleteTime, now)
+                            .SetProperty(wi => wi.NextExecution, (long?)null),
+                        cancellationToken);
+            }
+
             recoveredSteps = await db.StepRuns
                 .Where(sr => stuckRunIds.Contains(sr.RunId) && stuckStepStatuses.Contains(sr.Status))
                 .ExecuteUpdateAsync(
                     s => s
                         .SetProperty(sr => sr.Status, (int)StepRunStatus.Failed)
                         .SetProperty(sr => sr.CompletedUtc, now)
-                        .SetProperty(sr => sr.Error, "Recovered after application restart — workflow was interrupted"),
+                        .SetProperty(sr => sr.Error, InterruptedError),
                     cancellationToken);
 
             recoveredRuns = await db.AutomationRuns
@@ -108,7 +133,7 @@ internal sealed class StuckRunRecoveryNotificationHandler
                     s => s
                         .SetProperty(r => r.Status, (int)AutomationRunStatus.Failed)
                         .SetProperty(r => r.CompletedUtc, now)
-                        .SetProperty(r => r.Error, "Recovered after application restart — workflow was interrupted"),
+                        .SetProperty(r => r.Error, InterruptedError),
                     cancellationToken);
         }
 
@@ -138,8 +163,9 @@ internal sealed class StuckRunRecoveryNotificationHandler
         if (recoveredRuns > 0 || recoveredSteps > 0)
         {
             _logger.LogWarning(
-                "Recovered {RunCount} stuck automation run(s) and {StepCount} stuck step run(s) from previous process",
-                recoveredRuns, recoveredSteps);
+                "Recovered {RunCount} stuck automation run(s), {StepCount} stuck step run(s) and terminated " +
+                "{InstanceCount} workflow instance(s) from previous process",
+                recoveredRuns, recoveredSteps, terminatedInstances);
         }
     }
 }
