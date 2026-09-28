@@ -261,6 +261,63 @@ public class RunScriptActionTests
     }
 
     [Fact]
+    public void AllowFetch_DefaultsToFalse()
+    {
+        new RunScriptSettings().AllowFetch.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SettingsSchema_AllowFetchDefaultValueIsFalse()
+    {
+        // The backoffice pre-fills a new step's toggle from this schema default.
+        var field = CreateAction().GetSettingsSchema()!.Fields
+            .Single(f => f.PropertyName == nameof(RunScriptSettings.AllowFetch));
+
+        field.DefaultValue.ShouldBe(false);
+    }
+
+    [Fact]
+    public void ResolveSettings_AllowFetchMissingFromJson_IsFalse()
+    {
+        // Steps saved without the key (e.g. created through the API or an import) take the default.
+        var resolver = new EditableModelResolver(new ConfigurationReferenceResolver(new ConfigurationBuilder().Build()));
+        using var json = System.Text.Json.JsonDocument.Parse("""{ "script": "export default () => 1" }""");
+
+        var settings = resolver.ResolveModel<RunScriptSettings>("umbracoAutomate.runScript", json.RootElement);
+
+        settings.ShouldNotBeNull();
+        settings!.AllowFetch.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AllowFetchNotSet_FetchIsUndefined()
+    {
+        var action = CreateAction(new ScriptingOptions { FetchEnabled = true });
+        var context = CreateContext(new RunScriptSettings { Script = "export default function () { return typeof fetch }" });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("undefined");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AllowFetchAndFetchEnabled_FetchIsAvailable()
+    {
+        var action = CreateAction(new ScriptingOptions { FetchEnabled = true });
+        var context = CreateContext(new RunScriptSettings
+        {
+            Script = "export default function () { return typeof fetch }",
+            AllowFetch = true,
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("function");
+    }
+
+    [Fact]
     public async Task ValidateSettingsAsync_InvalidScript_ReturnsErrors()
     {
         var errors = await CreateAction().ValidateSettingsAsync(new RunScriptSettings { Script = "export default function ( {" });
