@@ -9,16 +9,17 @@ public sealed class RunScriptSettings
 {
     /// <summary>
     /// Gets or sets the JavaScript module source. The module must export a default function that
-    /// receives the step inputs and returns a result.
+    /// receives the step's binding context (trigger and prior step outputs) and returns a result.
     /// </summary>
     [Field(
         Label = "Script",
         Description = """
-            JavaScript module. Export a default function that receives the step inputs as its single `data` argument and returns a result. The returned value becomes this step's output (as JSON) for later steps to bind to.
+            JavaScript module. Export a default function that takes a single `data` argument and returns a result. `data` holds the same values bindings can reach, at the same paths: `data.trigger`, `data.steps.<alias>`, `data.previous` and, inside a loop, `data.loop.item` / `data.loop.index`. Bindings are not resolved inside the script itself. The returned value becomes this step's output (as JSON) for later steps to bind to.
 
             ```js
             export default function (data) {
-                return { upper: data.name.toUpperCase() };
+                const bytes = data.steps.getMedia.properties.umbracoBytes;
+                return { sizeKb: Math.round(bytes / 1024) };
             }
             ```
             """,

@@ -7,17 +7,42 @@ sandboxed [Jint](https://github.com/sebastienros/jint) engine.
 
 ## Authoring contract
 
-Write an ES module that exports a **default function**. It receives the step's resolved inputs as
+Write an ES module that exports a **default function**. It receives the step's binding context as
 its single `data` argument and returns a value that becomes the step's output:
 
 ```javascript
 export default function (data) {
-    return { upper: data.name.toUpperCase() };
+    const bytes = data.steps.getMedia.properties.umbracoBytes;
+    return { name: data.trigger.name.toUpperCase(), sizeKb: Math.round(bytes / 1024) };
 }
 ```
 
-- **Input** — `data` is the step's input mappings (bindings to trigger output and prior step
-  outputs), as a plain JSON object.
+- **Input** — `data` exposes the values a binding can reach, at the same paths, as a plain JSON
+  object. If you would write `${ steps.getMedia.properties.umbracoBytes }` in a binding, the script
+  reads `data.steps.getMedia.properties.umbracoBytes`:
+
+  | Binding | Script |
+  | --- | --- |
+  | `${ trigger.<path> }` | `data.trigger.<path>` |
+  | `${ steps.<alias>.<path> }` | `data.steps.<alias>.<path>` |
+  | `${ previous.<path> }` | `data.previous.<path>` (absent for the first step) |
+  | `${ loop.item }` / `${ loop.index }` | `data.loop.item` / `data.loop.index` (inside a loop only) |
+
+  Steps appear under their alias — the name the binding picker uses — or under their ID if they
+  have no alias (`data.steps['<id>']`). Unlike bindings, script property access is
+  **case-sensitive**, so match the alias and property casing exactly. Only steps that ran before
+  this one are present; a step on a branch that did not run is simply missing, so guard optional
+  paths (`data.steps.maybe?.result`).
+- `data` is a **copy**. Changing it has no effect on later steps — return what they need instead.
+  Connection credentials are never part of it. It does include everything the trigger and prior
+  steps output (webhook headers, for example), exactly as bindings do.
+- `${ }` bindings are **not** resolved inside the script body — a binding substituted into code
+  would let step data inject script. Read values from `data` instead.
+- Large step outputs that were offloaded from the run's workflow state are loaded back in full
+  when the script runs, so a script placed after a very large output pays for reading it even if
+  it never touches it.
+- Input mappings, when a step has any (the backoffice does not currently set them), are added as
+  root-level keys of `data` and win over the binding context on a name clash.
 - **Output** — the returned value is serialized to JSON (via `JSON.stringify` semantics) and
   exposed as the step's `result` output, bindable downstream as `${ steps.<alias>.result... }`.
   Functions and `undefined` become `null`; `NaN`/`Infinity` become `null`; dates become ISO
