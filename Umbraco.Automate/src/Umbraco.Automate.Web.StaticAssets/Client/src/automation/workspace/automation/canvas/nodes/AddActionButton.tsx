@@ -1,5 +1,12 @@
 import { useCallback } from "react";
 import { Position, useReactFlow, type Node, type XYPosition } from "@xyflow/react";
+import {
+    DEFAULT_NODE_HEIGHT,
+    DEFAULT_NODE_WIDTH,
+    NEW_NODE_GAP,
+    findFreePosition,
+    type Rect,
+} from "../utils/placement.js";
 
 interface AddActionButtonProps {
     nodeId: string;
@@ -12,18 +19,6 @@ interface AddActionButtonProps {
 }
 
 const NEW_NODE_OFFSET_Y = 180;
-const NEW_NODE_GAP = 40;
-/** Fallbacks for nodes React Flow has not measured yet (within the node min/max width in canvas.styles.css). */
-const DEFAULT_NODE_WIDTH = 240;
-const DEFAULT_NODE_HEIGHT = 100;
-const MAX_PLACEMENT_ATTEMPTS = 50;
-
-interface Rect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
 
 function nodeRect(node: Node): Rect {
     return {
@@ -32,10 +27,6 @@ function nodeRect(node: Node): Rect {
         width: node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH,
         height: node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT,
     };
-}
-
-function overlaps(a: Rect, b: Rect): boolean {
-    return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
 export default function AddActionButton({ nodeId, sourceHandle, style, className }: AddActionButtonProps) {
@@ -81,20 +72,8 @@ export default function AddActionButton({ nodeId, sourceHandle, style, className
             const obstacles = getNodes()
                 .filter((n) => n.id !== nodeId)
                 .map(nodeRect);
-            const padded = (p: XYPosition): Rect => ({
-                x: p.x - NEW_NODE_GAP / 2,
-                y: p.y - NEW_NODE_GAP / 2,
-                width: size.width + NEW_NODE_GAP,
-                height: size.height + NEW_NODE_GAP,
-            });
 
-            for (let i = 0; i < MAX_PLACEMENT_ATTEMPTS; i++) {
-                const rect = padded(candidate);
-                if (!obstacles.some((o) => overlaps(rect, o))) break;
-                candidate = { x: candidate.x + step.x, y: candidate.y + step.y };
-            }
-
-            return candidate;
+            return findFreePosition(candidate, size, step, obstacles);
         },
         [nodeId, sourceHandle, getNodes, getInternalNode],
     );
@@ -109,6 +88,7 @@ export default function AddActionButton({ nodeId, sourceHandle, style, className
                 composed: true,
                 detail: {
                     position: computeNewNodePosition(node),
+                    autoPosition: true,
                     connectFrom: { sourceStepId: nodeId, sourceHandle: sourceHandle ?? null },
                 },
             });

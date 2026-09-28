@@ -370,6 +370,13 @@
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.5);
 }
 
+/* A step with no path from the trigger: the compiler drops it and it never runs. */
+.ua-node-unreachable .ua-node {
+    opacity: 0.6;
+    border-style: dashed;
+    border-color: var(--uui-color-warning-standalone, #f59e0b);
+}
+
 /* Run status overlays */
 .run-status-completed .ua-node {
     border-color: #22c55e;
