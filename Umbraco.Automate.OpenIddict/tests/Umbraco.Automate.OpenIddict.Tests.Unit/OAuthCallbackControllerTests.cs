@@ -91,14 +91,101 @@ public class OAuthCallbackControllerTests
             Times.Never);
     }
 
-    private void SetUpSuccessfulAuthentication(string? providerName)
+    [Fact]
+    public async Task Callback_RendersPopupPage_WhenNoReturnUrl()
+    {
+        SetUpSuccessfulAuthentication("Slack");
+        var id = Guid.NewGuid();
+        SetUpCreateReturningId(id);
+
+        var result = (await _controller.Callback("slack")).ShouldBeOfType<ContentResult>();
+
+        result.Content.ShouldContain("oauth-complete");
+        result.Content.ShouldContain(id.ToString());
+    }
+
+    [Fact]
+    public async Task Callback_RedirectsToReturnUrl_WithCredentialIdInFragment_WhenReturnUrlRoundTripped()
+    {
+        const string returnUrl = "/umbraco/section/automate/workspace/connection/edit/abc";
+        SetUpSuccessfulAuthentication("Slack", returnUrl);
+        var id = Guid.NewGuid();
+        SetUpCreateReturningId(id);
+
+        var result = (await _controller.Callback("slack")).ShouldBeOfType<RedirectResult>();
+
+        result.Url.ShouldBe($"{returnUrl}#automate-oauth=1&provider=Slack&nonce=nonce-1&credentialId={id}");
+    }
+
+    [Fact]
+    public async Task Callback_IgnoresNonLocalReturnUrl_AndFallsBackToPopupPage()
+    {
+        // Defence in depth: even if a non-local URL somehow reached the properties, never redirect to it.
+        SetUpSuccessfulAuthentication("Slack", "//evil.example/");
+        SetUpCreateReturningId(Guid.NewGuid());
+
+        var result = (await _controller.Callback("slack")).ShouldBeOfType<ContentResult>();
+
+        result.Content.ShouldNotContain("evil.example");
+    }
+
+    [Fact]
+    public async Task Callback_RedirectsBackWithError_WhenNoAccessTokenAndReturnUrlRoundTripped()
+    {
+        const string returnUrl = "/umbraco/section/automate";
+        SetUpSuccessfulAuthentication("Slack", returnUrl, accessToken: null);
+
+        var result = (await _controller.Callback("slack")).ShouldBeOfType<RedirectResult>();
+
+        result.Url.ShouldBe($"{returnUrl}#automate-oauth=1&provider=Slack&nonce=nonce-1&error=No%20access%20token%20received.");
+        _credentialsService.Verify(
+            s => s.CreateCredentialsAsync(It.IsAny<OAuthCredentials>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Callback_RedirectsBackWithError_WhenAuthenticationFailsButPropertiesCarryReturnUrl()
     {
         var properties = new AuthenticationProperties();
-        properties.StoreTokens(
-            [
-                new AuthenticationToken { Name = Tokens.BackchannelAccessToken, Value = "test-access-token" },
-                new AuthenticationToken { Name = Tokens.RefreshToken, Value = "test-refresh-token" },
-            ]);
+        properties.Items[OAuthReturnUrl.UrlPropertyKey] = "/umbraco";
+        properties.Items[OAuthReturnUrl.NoncePropertyKey] = "nonce-1";
+        _authenticationService
+            .Setup(s => s.AuthenticateAsync(It.IsAny<HttpContext>(), It.IsAny<string>()))
+            .ReturnsAsync(AuthenticateResult.Fail("simulated failure", properties));
+
+        var result = (await _controller.Callback("slack")).ShouldBeOfType<RedirectResult>();
+
+        result.Url.ShouldBe("/umbraco#automate-oauth=1&provider=slack&nonce=nonce-1&error=Authentication%20failed.");
+    }
+
+    private void SetUpCreateReturningId(Guid id) =>
+        _credentialsService
+            .Setup(s => s.CreateCredentialsAsync(It.IsAny<OAuthCredentials>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OAuthCredentials c, CancellationToken _) =>
+            {
+                c.Id = id;
+                return c;
+            });
+
+    private void SetUpSuccessfulAuthentication(string? providerName, string? returnUrl = null, string? accessToken = "test-access-token")
+    {
+        var properties = new AuthenticationProperties();
+        if (returnUrl is not null)
+        {
+            properties.Items[OAuthReturnUrl.UrlPropertyKey] = returnUrl;
+            properties.Items[OAuthReturnUrl.NoncePropertyKey] = "nonce-1";
+        }
+
+        var tokens = new List<AuthenticationToken>
+        {
+            new() { Name = Tokens.RefreshToken, Value = "test-refresh-token" },
+        };
+        if (accessToken is not null)
+        {
+            tokens.Add(new AuthenticationToken { Name = Tokens.BackchannelAccessToken, Value = accessToken });
+        }
+
+        properties.StoreTokens(tokens);
 
         if (providerName is not null)
         {
