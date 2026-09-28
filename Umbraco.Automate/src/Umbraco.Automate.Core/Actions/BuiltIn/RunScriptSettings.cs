@@ -67,11 +67,12 @@ public sealed class RunScriptSettings
 
     /// <summary>
     /// Gets or sets a value indicating whether the script may make outbound HTTP requests via
-    /// <c>fetch</c>. Defaults to <c>true</c>.
+    /// <c>fetch</c>. Defaults to <c>false</c>, so outbound requests are opt-in per step (secure by
+    /// default). Fetch also requires the site-wide <c>Umbraco:Automate:Scripting:FetchEnabled</c> switch.
     /// </summary>
     [Field(
         Label = "Allow fetch",
-        Description = "Allow the script to make outbound HTTP requests using fetch(). Requests are SSRF-protected.",
+        Description = "Allow the script to make outbound HTTP requests using fetch(). Off by default. Requests are SSRF-protected and also need fetch enabled site-wide.",
         SortOrder = 2)]
-    public bool AllowFetch { get; set; } = true;
+    public bool AllowFetch { get; set; }
 }
