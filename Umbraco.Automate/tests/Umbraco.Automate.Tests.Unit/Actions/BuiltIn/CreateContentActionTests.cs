@@ -9,6 +9,7 @@ using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Core.Strings;
 using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
@@ -413,6 +414,105 @@ public class CreateContentActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Failed);
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Cancelled);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_VariantContentType_SetsCultureVariantPropertiesForTheCulture()
+    {
+        var parentKey = Guid.NewGuid();
+        var created = SetupRealCreate(parentKey, ContentVariation.Culture, out var contentTypeKey);
+
+        var result = await _action.ExecuteAsync(
+            CreateContext(
+                new CreateContentSettings
+                {
+                    ParentKey = parentKey.ToString(),
+                    ContentType = contentTypeKey.ToString(),
+                    Name = "New Page",
+                    Culture = "en-US",
+                    PropertiesJson = """{ "title": "Hello", "code": "ABC" }""",
+                },
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        created.GetValue<string>("title", "en-US").ShouldBe("Hello");
+        created.GetValue<string>("code").ShouldBe("ABC");
+        _contentService.Verify(x => x.Save(created, It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InvariantContentType_IgnoresCultureWhenSettingProperties()
+    {
+        var parentKey = Guid.NewGuid();
+        var created = SetupRealCreate(parentKey, ContentVariation.Nothing, out var contentTypeKey);
+
+        var result = await _action.ExecuteAsync(
+            CreateContext(
+                new CreateContentSettings
+                {
+                    ParentKey = parentKey.ToString(),
+                    ContentType = contentTypeKey.ToString(),
+                    Name = "New Page",
+                    Culture = "en-US",
+                    PropertiesJson = """{ "code": "ABC" }""",
+                },
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        created.GetValue<string>("code").ShouldBe("ABC");
+    }
+
+    /// <summary>
+    /// Sets up a create backed by real CMS domain objects rather than mocks, so SetValue runs
+    /// the CMS's own variation checks. The type has an invariant "code" property, plus a
+    /// culture-variant "title" property when <paramref name="variations"/> includes culture.
+    /// </summary>
+    private Content SetupRealCreate(Guid parentKey, ContentVariation variations, out Guid contentTypeKey)
+    {
+        var typeKey = Guid.NewGuid();
+        contentTypeKey = typeKey;
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+
+        var shortStringHelper = new Mock<IShortStringHelper>();
+        shortStringHelper
+            .Setup(x => x.CleanString(It.IsAny<string>(), It.IsAny<CleanStringType>()))
+            .Returns<string, CleanStringType>((text, _) => text);
+
+        var contentType = new ContentType(shortStringHelper.Object, -1)
+        {
+            Alias = "page",
+            Key = typeKey,
+            Variations = variations,
+        };
+        contentType.AddPropertyType(new PropertyType(
+            shortStringHelper.Object,
+            Constants.PropertyEditors.Aliases.TextBox,
+            ValueStorageType.Nvarchar,
+            "code"));
+
+        if (variations.HasFlag(ContentVariation.Culture))
+        {
+            contentType.AddPropertyType(new PropertyType(
+                shortStringHelper.Object,
+                Constants.PropertyEditors.Aliases.TextBox,
+                ValueStorageType.Nvarchar,
+                "title")
+            {
+                Variations = ContentVariation.Culture,
+            });
+        }
+
+        _contentTypeService.Setup(x => x.Get(typeKey)).Returns(contentType);
+
+        var created = new Content("New Page", -1, contentType);
+        _contentService.Setup(x => x.Create("New Page", parentKey, "page", -1)).Returns(created);
+        _contentService
+            .Setup(x => x.Save(created, It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()))
+            .Returns(new OperationResult(OperationResultType.Success, new EventMessages()));
+
+        return created;
     }
 
     private static ActionContext CreateContext(CreateContentSettings settings, Guid? serviceAccountKey = null)

@@ -59,13 +59,14 @@ public sealed class CreateContentSettings
     public string? Culture { get; set; }
 
     /// <summary>
-    /// Gets or sets invariant property values to set on creation, as a JSON object
-    /// (e.g. {"bodyText": "Hello"}). Property aliases that don't exist on the resolved
-    /// content type are silently skipped. Leave empty to create with no property values set.
+    /// Gets or sets property values to set on creation, as a JSON object
+    /// (e.g. {"bodyText": "Hello"}). Culture-variant properties are set for <see cref="Culture"/>.
+    /// Property aliases that don't exist on the resolved content type are silently skipped.
+    /// Leave empty to create with no property values set.
     /// </summary>
     [Field(
         Label = "Property Values",
-        Description = "Invariant property values as JSON (e.g. {\"bodyText\": \"Hello\"}).",
+        Description = "Property values as JSON (e.g. {\"bodyText\": \"Hello\"}). Culture-variant properties are set for the chosen culture.",
         SortOrder = 4,
         SupportsBindings = true,
         EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",

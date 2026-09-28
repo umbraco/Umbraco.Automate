@@ -7,6 +7,7 @@ using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
+using Umbraco.Extensions;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
@@ -169,7 +170,7 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             content.SetCultureName(settings.Name, settings.Culture!);
         }
 
-        ApplyProperties(content, settings.PropertiesJson);
+        ApplyProperties(content, settings.PropertiesJson, variesByCulture ? settings.Culture : null);
 
         // Required when running from the outbox dispatcher, which has no HTTP request
         // scope. The save raises notifications (e.g. webhook delivery) that resolve
@@ -218,11 +219,12 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
     }
 
     /// <summary>
-    /// Applies optional invariant property values from a JSON object. Malformed JSON and
+    /// Applies optional property values from a JSON object. Culture-variant properties are set
+    /// for <paramref name="culture"/>; invariant properties ignore it. Malformed JSON and
     /// unknown property aliases are silently skipped — this is optional convenience config,
     /// not a required part of creating the content item.
     /// </summary>
-    private static void ApplyProperties(IContent content, string? propertiesJson)
+    private static void ApplyProperties(IContent content, string? propertiesJson, string? culture)
     {
         if (string.IsNullOrWhiteSpace(propertiesJson))
         {
@@ -246,10 +248,14 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
 
         foreach (var (alias, value) in properties)
         {
-            if (content.Properties.Contains(alias))
+            if (!content.Properties.TryGetValue(alias, out var property))
             {
-                content.SetValue(alias, value);
+                continue;
             }
+
+            // A culture-variant property rejects a value with no culture, and an invariant one
+            // rejects a value with one.
+            content.SetValue(alias, value, property.PropertyType.VariesByCulture() ? culture : null);
         }
     }
 
