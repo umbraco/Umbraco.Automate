@@ -1,5 +1,6 @@
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
 import { ConstantHelper } from './ConstantHelper';
+import { toAlias } from './TestData';
 
 /**
  * Connections — named, reusable credential sets for external services.
@@ -41,6 +42,26 @@ export class ConnectionApiHelper {
     }
 
     const requestUrl = this.api.baseUrl + this.basePath + 'connections/' + item.id;
+    const response = await this.api.get(requestUrl);
+    return await response.json();
+  }
+
+  /** Creates a connection record and returns its id. Settings may be empty: an unauthenticated
+   * connection saves fine, it just cannot be used or pass a test. */
+  async create(name: string, type: string, settings: Record<string, unknown> = {}): Promise<string> {
+    const requestUrl = this.api.baseUrl + this.basePath + 'connections';
+    const response = await this.api.post(requestUrl, { alias: toAlias(name), name, type, settings });
+
+    const location = response.headers()['location'];
+    if (location) {
+      return location.replace(/\/+$/, '').split('/').pop()!;
+    }
+
+    return (await response.text()).trim().replace(/^"|"$/g, '');
+  }
+
+  async getById(id: string) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'connections/' + id;
     const response = await this.api.get(requestUrl);
     return await response.json();
   }

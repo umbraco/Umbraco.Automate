@@ -99,4 +99,17 @@ test.describe('Connections', () => {
       await umbracoAutomateApi.connections.ensureNameNotExists(name);
     }
   });
+
+  test('opens the create flow from the collection view Create button (#297)', async ({
+    umbracoUi,
+    umbracoAutomateUi
+  }) => {
+    // Act
+    await umbracoUi.goToBackOffice();
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.connectionRootUrl());
+    await umbracoAutomateUi.automate.collectionCreateButton.click({ force: true });
+
+    // Assert — creating a connection starts by choosing its type.
+    await expect(umbracoAutomateUi.automate.connectionTypePickerModal).toBeVisible();
+  });
 });

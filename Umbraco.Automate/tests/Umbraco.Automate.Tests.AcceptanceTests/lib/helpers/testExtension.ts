@@ -18,6 +18,18 @@ const test = base.extend<AutomateFixtures>({
   // Reuse the injected CMS umbracoUi fixture rather than constructing a second façade, so a
   // spec that injects both umbracoUi and umbracoAutomateUi shares one CMS UiHelpers instance.
   umbracoAutomateUi: async ({ page, umbracoUi }, use) => {
+    // Leaving an automation with unsaved changes raises a `beforeunload` prompt — and one was seen
+    // after only opening an automation and using Run now, with nothing edited. Playwright
+    // dismisses dialogs by default, which cancels the navigation and leaves the next wait
+    // hanging. Specs verify state through the API, so always leave the page.
+    page.on('dialog', async (dialog) => {
+      if (dialog.type() === 'beforeunload') {
+        await dialog.accept();
+        return;
+      }
+      await dialog.dismiss();
+    });
+
     const umbracoAutomateUi = new AutomateUiHelpers(page, umbracoUi);
     await use(umbracoAutomateUi);
   },

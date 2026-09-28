@@ -88,4 +88,23 @@ test.describe('Workspace management', () => {
       }
     }
   });
+
+  test('opens the create flow from the collection view Create button (#297)', async ({
+    automateWorkspace,
+    umbracoUi,
+    umbracoAutomateUi
+  }) => {
+    // Arrange — a workspace must exist for the Automate sidebar, and so the collection, to load.
+    expect(automateWorkspace.id).toBeTruthy();
+
+    // Act
+    await umbracoUi.goToBackOffice();
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.workspaceRootUrl());
+    await umbracoAutomateUi.automate.collectionCreateButton.click({ force: true });
+
+    // Assert — the button routes to a new workspace's editor. Nothing is saved.
+    await expect(umbracoAutomateUi.page).toHaveURL(new RegExp(`${umbracoAutomateUi.automate.workspaceCreateUrl()}$`));
+    await umbracoAutomateUi.automate.waitForWorkspaceEditor();
+    await expect(umbracoAutomateUi.automate.nameInput).toBeVisible();
+  });
 });

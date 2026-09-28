@@ -1,6 +1,7 @@
 import { Page } from '@playwright/test';
 import { ApiHelpers as UmbracoApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
 import { AutomationApiHelper } from './AutomationApiHelper';
+import { CatalogueApiHelper } from './CatalogueApiHelper';
 import { ConnectionApiHelper } from './ConnectionApiHelper';
 import { ServiceAccountApiHelper } from './ServiceAccountApiHelper';
 import { WorkspaceApiHelper } from './WorkspaceApiHelper';
@@ -13,6 +14,7 @@ export class ApiHelpers {
   page: Page;
   umbracoApi: UmbracoApiHelpers;
   automations: AutomationApiHelper;
+  catalogue: CatalogueApiHelper;
   connections: ConnectionApiHelper;
   workspaces: WorkspaceApiHelper;
   serviceAccounts: ServiceAccountApiHelper;
@@ -21,6 +23,7 @@ export class ApiHelpers {
     this.page = page;
     this.umbracoApi = umbracoApi;
     this.automations = new AutomationApiHelper(umbracoApi);
+    this.catalogue = new CatalogueApiHelper(umbracoApi);
     this.connections = new ConnectionApiHelper(umbracoApi);
     this.workspaces = new WorkspaceApiHelper(umbracoApi);
     this.serviceAccounts = new ServiceAccountApiHelper(umbracoApi);

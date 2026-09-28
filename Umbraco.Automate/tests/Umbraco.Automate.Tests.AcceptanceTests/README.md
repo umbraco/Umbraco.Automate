@@ -60,7 +60,9 @@ npx playwright test -g "loads the Automate section"
 | `tests/auth.setup.ts` | Logs in once and saves storage state for every spec |
 | `tests/DefaultConfig/` | The specs |
 | `lib/helpers/AutomateUiHelper.ts` | Page Object Model for the Automate backoffice |
-| `lib/helpers/AutomationApiHelper.ts` | Automate management API — automations |
+| `lib/helpers/AutomationApiHelper.ts` | Automate management API — automations, publish, runs |
+| `lib/helpers/AutomationBuilder.ts` | `automationStep` / `automationConnection` / `manualTrigger` for seeding a graph |
+| `lib/helpers/CatalogueApiHelper.ts` | The installed step types — names and output descriptions specs read instead of hard-coding |
 | `lib/helpers/WorkspaceApiHelper.ts` | Automate management API — workspaces |
 | `lib/helpers/ConnectionApiHelper.ts` | Automate management API — connections |
 | `lib/helpers/ServiceAccountApiHelper.ts` | Service accounts (CMS users of kind Api) |
@@ -72,9 +74,13 @@ npx playwright test -g "loads the Automate section"
 | --- | --- |
 | `Smoke/automate.section.spec.ts` | Section loads, dashboard renders, management API answers |
 | `Workspaces/workspace.fixtures.spec.ts` | Both workspace fixture tiers |
-| `Workspaces/workspace.management.spec.ts` | Workspace list, rename, delete, service account display |
+| `Workspaces/workspace.management.spec.ts` | Workspace list, rename, delete, service account display, collection Create button (#297) |
 | `Automations/automation.lifecycle.spec.ts` | Automation create, rename, delete |
-| `Connections/connection.crud.spec.ts` | Connection create, rename, collection listing |
+| `Automations/automation.canvas.spec.ts` | Branches rejoining and publishing (#323), Approval rejected branch, placement beside the clicked output (#322), insert between on a connected output (#346), inserting a container (#324), unavailable actions (#325) |
+| `Automations/automation.binding-picker.spec.ts` | Predecessors in flow order (#299), expression descriptions (#307), inserting an expression |
+| `Automations/automation.run.spec.ts` | Publish, Run now, Runs view, Run Script reading upstream `data` (#345). Two `fixme`s: Run now on a draft, step output in the run view |
+| `Connections/connection.crud.spec.ts` | Connection create, rename, collection listing, collection Create button (#297) |
+| `Connections/connection.test.spec.ts` | Test connection saves unsaved edits (#347), popup-blocked same-tab OAuth fallback (#348, stubbed) |
 
 ## Fixtures
 

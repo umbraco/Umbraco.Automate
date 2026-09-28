@@ -24,7 +24,49 @@ export class ConstantHelper {
    * not carry the CMS `data-mark` attribute, so getByTestId does not reach them. */
   public static readonly elements = {
     dashboard: 'ua-automate-dashboard',
-    automationTree: 'umb-tree'
+    automationTree: 'umb-tree',
+    nodePickerModal: 'ua-node-picker-modal',
+    nodeSettingsModal: 'ua-node-settings-modal',
+    bindingPickerModal: 'ua-binding-picker-modal',
+    runsTable: 'ua-runs-table',
+    runDetailModal: 'ua-run-detail-modal',
+    connectionTypePickerModal: 'ua-connection-type-picker-modal',
+    oauthEditor: 'umb-automate-property-editor-ui-oauth'
+  };
+
+  /* Trigger and step type aliases, as the catalogue API reports them. */
+  public static readonly triggers = {
+    manual: 'umbracoAutomate.manual'
+  };
+
+  public static readonly actions = {
+    delay: 'umbracoAutomate.delay',
+    logMessage: 'umbracoAutomate.logMessage',
+    requestApproval: 'umbracoAutomate.requestApproval',
+    runScript: 'umbracoAutomate.runScript',
+    setVariable: 'umbracoAutomate.setVariable',
+    slackSendMessage: 'slack.sendMessage',
+    if: 'umbracoAutomate.if',
+    while: 'umbracoAutomate.while'
+  };
+
+  /* Source handle ids on branching and container nodes. Mirror model-to-flow.ts in the client. */
+  public static readonly handles = {
+    ifTrue: 'true',
+    ifFalse: 'false',
+    approved: 'approved',
+    rejected: 'rejected',
+    body: 'body',
+    done: 'done'
+  };
+
+  /* Extension aliases. The CMS renders workspace and entity actions with
+   * `data-mark="workspace-action:<alias>"` / `"entity-action:<alias>"`, which getByTestId reaches —
+   * a stable handle on Automate's own actions that does not depend on their localised label. */
+  public static readonly extensions = {
+    runNowEntityAction: 'UmbracoAutomate.EntityAction.Automation.RunNow',
+    deleteAutomationEntityAction: 'UmbracoAutomate.EntityAction.Automation.Delete',
+    testConnectionWorkspaceAction: 'UmbracoAutomate.WorkspaceAction.Connection.Test'
   };
 
   /* Entity types, from src/automation/entity.ts and src/workspace-management/entity.ts. */

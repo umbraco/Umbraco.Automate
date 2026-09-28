@@ -52,7 +52,17 @@ client source to confirm a name before relying on it.
 This also bites on the canvas: xyflow tags nodes `data-testid="rf__node-<id>"`, which
 `getByTestId` will **not** find. `AutomateUiHelper.canvasNode()` matches the attribute directly.
 
-## The workflow canvas needs no drag and drop
+The exception is anything the CMS renders **from a manifest**: workspace and entity actions get
+`data-mark="workspace-action:<alias>"` / `"entity-action:<alias>"`, and property actions sit
+behind `data-mark="open-property-actions"`. Those are the most stable handles there are — they
+do not change with a label or a translation — so `clickEntityAction`, `workspaceAction` and
+`openBindingPicker` use them, and the aliases live in `ConstantHelper.extensions`.
+
+In Playwright MCP the test id attribute is the default `data-testid`, not `data-mark`, so
+`getByTestId('workspace:action-menu-button')` finds nothing there. Use
+`locator('[data-mark="…"]')` when reproducing by hand.
+
+## The workflow canvas needs (almost) no drag and drop
 
 The canvas is React plus xyflow, which looks unautomatable and is not. Every node renders as a
 `group` with named buttons — `Settings`, `Delete`, `Add action`, and branch-specific variants
@@ -61,6 +71,39 @@ like `Add action — approved` or `Add action — body`. Edges carry accessible 
 `Add action` opens `ua-node-picker-modal`, an ordinary searchable list of buttons.
 
 So building a workflow is a sequence of clicks. `addActionFromNode()` covers the common case.
+
+The one gesture with no button is **connecting two steps that already exist** — every `+`
+creates a new step, so a merge (a branch rejoining a shared step) needs a real drag.
+`connectHandles()` does it with `page.mouse`: handles are `.react-flow__handle.source` /
+`.target`, named ones carry `data-handleid` (`true`, `false`, `approved`, `body`, `done`), and
+the pointer must move in steps before xyflow starts a connection.
+
+### Things that bite on the canvas
+
+- **Save the step settings modal, or the step vanishes.** Picking an action adds the step
+  provisionally and opens its settings; closing that modal without saving rolls the add back.
+  Call `submitNodeSettings()` after every `addActionFromNode()`, and pick step types whose
+  required settings have defaults (Delay, Run Script, Request Approval, If, While, Parallel)
+  unless the spec fills the fields in.
+- **The server does not keep seeded step ids.** `POST automations` assigns its own ids and
+  rewires the connections, so the id a spec generated is not the one it gets back. Read the
+  automation after creating it and look steps up with `AutomationApiHelper.stepByAlias()`;
+  `addedSteps(before, after)` finds what the UI added.
+- **A tier-1 workspace shows no actions in the picker.** Actions are scoped to what the
+  workspace's service account may do, so with the empty service account the picker lists control
+  flows only. Canvas specs that add actions need `automateServiceAccountWorkspace` even though
+  they never run anything.
+- **Filter the picker before clicking.** The list is taller than the modal, and a forced click on
+  an entry below the fold fails with "Element is outside of the viewport" (`force` skips the
+  scroll). `chooseActionInPicker` searches first, and `searchPicker` waits for the list to load,
+  because a query typed while it is loading leaves "No items found".
+- **Sidebar modals slide in.** A forced click during the animation fails with the same
+  "outside of the viewport" error. `clickInModal()` waits for the control to be in the viewport.
+- **Leaving an automation can raise `beforeunload`**, even without an edit. Playwright's default
+  is to dismiss it, which cancels the navigation and hangs the next wait; the `umbracoAutomateUi`
+  fixture accepts it instead.
+- Assert on the saved model (connections, `sourceHandle`, `outcome`, positions) through the API,
+  and use the canvas only for what the model cannot show (e.g. rendered nodes overlapping).
 
 ## Scope Actions-menu clicks
 
@@ -166,14 +209,28 @@ and Slack is normally **unconfigured** (no client id/secret in appsettings), whi
 without credentials — that is the boundary of what `connection.crud.spec.ts` covers.
 Authenticating a connection needs real OAuth and is out of scope.
 
-## Known product bug: collection create buttons are dead
+What can be covered without credentials, `connection.test.spec.ts` does:
 
-`UmbracoAutomate.CollectionAction.Connection.Create` and `...Workspace.Create` both fail at
-runtime with "did not succeed creating an api class instance". Both manifests declare only
-`element`, with no `api` and no `kind`; every CMS `collectionAction` supplies one or the other.
-The visible symptom is that the Connections and Workspaces **collection views have no create
-button** — you have to use the sidebar tree. Do not write a spec that clicks a create button in
-a collection view until this is fixed.
+- **Test connection saves first (#347)** is asserted on the saved record, not the test result,
+  which is always a failure for an unauthenticated Slack connection.
+- **The popup-blocked fallback (#348)** runs by stubbing its two inputs rather than configuring
+  Slack: `stubOAuthProviderConfigured()` answers the status endpoint with `isConfigured: true`,
+  `blockPopups()` makes `window.open` return null, and `interceptOAuthChallenge()` fulfils the
+  challenge navigation on the site's own origin so the tab never leaves and its sessionStorage
+  nonce stays readable. Set all three up **before** navigating to the connection.
+
+## Known product gaps the suite pins with `test.fixme`
+
+- **Run now is offered on a draft.** `UaEntityAutomationCanRunNowCondition` checks only that the
+  trigger supports manual runs, not that the automation is published, so the entry shows and
+  clicking it gets the server's 409. `automation.run.spec.ts` has the fixme'd spec.
+- **The Runs view does not show step outputs.** They are persisted (`StepRun.OutputData`) but
+  neither the run detail API nor `ua-run-detail-modal` exposes them. The Run Script spec proves
+  the script read upstream `data` by having the script throw unless it did.
+
+The collection-view Create buttons that used to be dead (no `api` or `kind` on the
+`collectionAction` manifests) were fixed in #297 and are now covered; `collectionCreateButton`
+is the locator.
 
 ## The session dies mid-run — navigate through `goToUrl`
 

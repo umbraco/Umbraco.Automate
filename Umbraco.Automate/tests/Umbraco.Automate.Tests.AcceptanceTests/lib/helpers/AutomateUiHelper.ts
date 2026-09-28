@@ -34,6 +34,10 @@ export class AutomateUiHelper {
     return `${this.sectionPath()}/workspace/ua:automation/edit/${id}`;
   }
 
+  automationRunsUrl(id: string): string {
+    return `${this.automationEditUrl(id)}/view/runs`;
+  }
+
   connectionCreateUrl(connectionType: string): string {
     return `${this.sectionPath()}/workspace/ua:connection/create/${connectionType}`;
   }
@@ -166,18 +170,199 @@ export class AutomateUiHelper {
       .click({ force: true });
   }
 
+  /**
+   * Opens the workspace's Actions menu and clicks an entity action by its manifest alias.
+   *
+   * Prefer this over `clickAction` for Automate's own actions: the CMS marks each entry with
+   * `data-mark="entity-action:<alias>"`, so the locator survives a label change or translation.
+   */
+  async clickEntityAction(alias: string) {
+    await this.actionsButton.click({ force: true });
+    await this.entityActionInMenu(alias).click({ force: true });
+  }
+
+  /* An entity action inside the open workspace Actions menu. Open the menu first. */
+  entityActionInMenu(alias: string): Locator {
+    return this.page.getByTestId('workspace:action-menu-button').getByTestId(`entity-action:${alias}`);
+  }
+
+  /* Opens the workspace Actions menu without choosing anything, to assert on what it offers. */
+  async openActionsMenu() {
+    await this.actionsButton.click({ force: true });
+    // Delete is unconditional, so its presence means the menu has rendered. Entries gated by a
+    // condition (Run now, Re-enable) resolve it asynchronously, so let those requests settle
+    // before a spec asserts that one is absent.
+    await expect(this.entityActionInMenu(ConstantHelper.extensions.deleteAutomationEntityAction)).toBeVisible();
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /* A workspace footer action (Save, Test connection, …) by its manifest alias. */
+  workspaceAction(alias: string): Locator {
+    return this.page.getByTestId(`workspace-action:${alias}`);
+  }
+
+  async clickWorkspaceAction(alias: string) {
+    await this.workspaceAction(alias).click({ force: true });
+  }
+
+  /* The Create button a collection view renders in its toolbar (#297). */
+  get collectionCreateButton(): Locator {
+    return this.page.locator('umb-collection').getByRole('button', { name: 'Create', exact: true });
+  }
+
   /* --- Modals -------------------------------------------------------------------------- */
 
-  /* The action picker opened by any "Add action" button on the canvas. */
+  /**
+   * Clicks a control inside a sidebar modal.
+   *
+   * Modals slide in from the side. A forced click while one is still animating fails with
+   * "Element is outside of the viewport" — `force` skips the actionability wait that would have
+   * covered the animation — so wait for the control to be on screen first.
+   */
+  async clickInModal(control: Locator) {
+    await expect(control).toBeInViewport();
+    await control.click({ force: true });
+  }
+
+  get nodePickerModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.nodePickerModal);
+  }
+
+  get nodeSettingsModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.nodeSettingsModal);
+  }
+
+  /**
+   * An entry in the action picker, by its exact name. It is a `uui-ref-node`, so assert on its
+   * `disabled` and `detail` attributes (an unavailable action carries its reason in `detail`).
+   */
+  pickerItem(actionName: string): Locator {
+    return this.nodePickerModal.locator(`uui-ref-node[name="${actionName}"]`);
+  }
+
+  /**
+   * Narrows the action picker with its search box.
+   *
+   * Waits for the list first: the catalogue loads asynchronously, and a query typed while it is
+   * still loading filters an empty list, so the picker shows "No items found" for good.
+   */
+  async searchPicker(query: string) {
+    await this.nodePickerModal.locator('uui-ref-node').first().waitFor({ state: 'visible' });
+    await this.nodePickerModal.getByRole('searchbox').fill(query);
+  }
+
+  /**
+   * Chooses an action in the picker opened by any "Add action" button on the canvas.
+   *
+   * The list is taller than the modal, and a forced click on an entry below the fold fails with
+   * "Element is outside of the viewport" — `force` skips the scroll that would have fixed it. So
+   * filter by name first, which also rules out partial matches such as "Get Content" vs
+   * "Get Content Property".
+   */
   async chooseActionInPicker(actionName: string) {
-    const modal = this.page.locator('ua-node-picker-modal');
-    await modal.waitFor({ state: 'visible' });
-    await modal.getByRole('button', { name: actionName }).first().click({ force: true });
+    await this.searchPicker(actionName);
+    await this.clickInModal(this.pickerItem(actionName).getByRole('button').first());
+  }
+
+  /**
+   * Saves the step settings modal that opens straight after an action is picked.
+   *
+   * This is not optional: the canvas adds the step provisionally and **rolls it back** if the
+   * settings modal is closed without saving. Pick an action whose required fields have defaults
+   * (Delay, Run Script, Request Approval, If, While, Parallel) unless the spec fills them in.
+   */
+  async submitNodeSettings() {
+    await this.nodeSettingsModal.waitFor({ state: 'visible' });
+    await this.clickInModal(this.nodeSettingsModal.getByRole('button', { name: 'Save', exact: true }));
+    await this.nodeSettingsModal.waitFor({ state: 'detached' });
+  }
+
+  /* Opens a step's settings from its node. */
+  async openStepSettings(stepId: string) {
+    await this.canvasNode(stepId).getByRole('button', { name: 'Settings', exact: true }).click({ force: true });
+    await this.nodeSettingsModal.waitFor({ state: 'visible' });
+  }
+
+  get bindingPicker(): Locator {
+    return this.page.locator(ConstantHelper.elements.bindingPickerModal).locator('ua-binding-picker');
+  }
+
+  /**
+   * Opens the binding picker for a binding-enabled field in the step settings modal.
+   *
+   * The picker is a property action, so it hangs off the field's "View actions" menu
+   * (`data-mark="open-property-actions"`) rather than being a button of its own. `fieldIndex`
+   * picks among several binding fields; most actions have one.
+   */
+  async openBindingPicker(fieldIndex: number = 0) {
+    // The "View actions" popover occasionally ignores the first click while the settings form is
+    // still rendering its property actions, so retry the open until the entry shows.
+    const insertBinding = this.page.getByRole('button', { name: 'Insert binding', exact: true }).first();
+    await expect(async () => {
+      await this.clickInModal(this.nodeSettingsModal.getByTestId('open-property-actions').nth(fieldIndex));
+      await expect(insertBinding).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
+    await insertBinding.click({ force: true });
+    await this.bindingPicker.waitFor({ state: 'visible' });
+  }
+
+  /**
+   * The step aliases the binding picker lists, top to bottom. Only real predecessor steps carry
+   * the Step ID chip; the trigger, "Previous" and "Loop" pseudo-sources are skipped.
+   */
+  async bindingSourceStepAliases(): Promise<string[]> {
+    return await this.bindingPicker.locator('uui-box').evaluateAll((boxes) =>
+      boxes
+        .filter((box) => box.querySelector('code[title="Step ID"]'))
+        .map((box) => box.querySelector('code[title="Alias"]')?.textContent?.trim() ?? '')
+    );
+  }
+
+  /* A leaf of one binding source, e.g. `bindingLeaf('alpha', 'value')`. Its `detail` holds the
+   * type and, since #307, the property description. */
+  bindingLeaf(stepAlias: string, path: string): Locator {
+    return this.bindingPicker
+      .locator('uui-box')
+      .filter({ has: this.page.locator(`code[title="Alias"]`, { hasText: new RegExp(`^${stepAlias}$`) }) })
+      .locator(`uui-ref-node[name="${path}"]`);
+  }
+
+  /* Picks a leaf in the open binding picker, which inserts its expression and closes the picker. */
+  async chooseBindingLeaf(stepAlias: string, path: string) {
+    await this.clickInModal(this.bindingLeaf(stepAlias, path).getByRole('button').first());
+    await this.bindingPicker.waitFor({ state: 'detached' });
+  }
+
+  get runsTable(): Locator {
+    return this.page.locator(ConstantHelper.elements.runsTable);
+  }
+
+  get runDetailModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.runDetailModal);
+  }
+
+  /* One box per step run in the open run detail modal. */
+  get runDetailSteps(): Locator {
+    return this.runDetailModal.locator('.step-header');
+  }
+
+  /* The runs table links each run by the first eight characters of its id. */
+  runLink(runId: string): Locator {
+    return this.runsTable.getByRole('link', { name: runId.slice(0, 8), exact: true });
+  }
+
+  async openRun(runId: string) {
+    await this.runLink(runId).click({ force: true });
+    await this.runDetailModal.waitFor({ state: 'visible' });
   }
 
   /* The connection type picker opened when creating a connection. */
+  get connectionTypePickerModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.connectionTypePickerModal);
+  }
+
   async chooseConnectionType(typeName: string) {
-    const modal = this.page.locator('ua-connection-type-picker-modal');
+    const modal = this.connectionTypePickerModal;
     await modal.waitFor({ state: 'visible' });
     await modal.getByRole('button', { name: new RegExp(typeName, 'i') }).first().click({ force: true });
   }
@@ -187,6 +372,70 @@ export class AutomateUiHelper {
     const dialog = this.page.locator('umb-confirm-modal');
     await dialog.waitFor({ state: 'visible' });
     await dialog.getByRole('button', { name: buttonName, exact: true }).click({ force: true });
+  }
+
+  /* --- Connections: OAuth ------------------------------------------------------------- */
+
+  get oauthEditor(): Locator {
+    return this.page.locator(ConstantHelper.elements.oauthEditor);
+  }
+
+  /* The warning the OAuth editor shows once the browser has blocked its sign-in popup. */
+  get oauthPopupBlockedWarning(): Locator {
+    return this.oauthEditor.locator('.popup-blocked-warning');
+  }
+
+  /* The "Authenticate with <provider>" button — the editor's primary button when disconnected. */
+  async clickAuthenticate() {
+    const button = this.oauthEditor.locator('.oauth-state > uui-button[look="primary"]');
+    await expect(button).toBeEnabled();
+    await button.click({ force: true });
+  }
+
+  async clickContinueInThisTab() {
+    await this.oauthPopupBlockedWarning.locator('uui-button').click({ force: true });
+  }
+
+  /**
+   * Makes the OAuth editor believe its provider is configured, by answering the status endpoint.
+   *
+   * The demo site has no Slack client id/secret, so the real answer is "not configured", which
+   * disables Authenticate before any popup logic runs. Call before navigating to the connection.
+   */
+  async stubOAuthProviderConfigured() {
+    await this.page.route('**/umbraco/automate/oauth/status/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isConfigured: true }) })
+    );
+  }
+
+  /* Makes `window.open` return null for every page load — what a blocked popup looks like to the
+   * page. Call before navigating. */
+  async blockPopups() {
+    await this.page.addInitScript(() => {
+      window.open = () => null;
+    });
+  }
+
+  /**
+   * Intercepts the OAuth challenge navigation so it never reaches the real provider, and resolves
+   * with the request once the page makes it. Answers with an empty page on the site's origin, so
+   * the tab's sessionStorage stays readable afterwards.
+   */
+  interceptOAuthChallenge(): Promise<import('@playwright/test').Request> {
+    const pattern = '**/umbraco/automate/oauth/challenge/**';
+    const requested = this.page.waitForRequest(pattern);
+    void this.page.route(pattern, (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>challenge</title>' })
+    );
+    return requested;
+  }
+
+  /* The nonce the same-tab flow stored for a provider (see nonceStorageKey in the editor). */
+  async storedOAuthNonce(provider: string): Promise<string | null> {
+    return await this.page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      `umb-automate-oauth-nonce:${provider.toLowerCase()}`
+    );
   }
 
   /* --- Canvas -------------------------------------------------------------------------- */
@@ -206,11 +455,63 @@ export class AutomateUiHelper {
     return this.page.locator('[data-testid="rf__node-__trigger__"]');
   }
 
-  /* Adds an action from a node's own "Add action" button. `branch` targets a branching node's
-   * outcome, e.g. "approved" or "body", which renders as "Add action — approved". */
-  async addActionFromNode(stepId: string, actionName: string, branch?: string) {
+  /* The id xyflow gives the trigger node. Pass it to `addActionFromNode` to add from the trigger. */
+  static readonly triggerNodeId = '__trigger__';
+
+  /* Waits until the canvas has rendered the saved graph, not just the React Flow shell. */
+  async waitForCanvas(timeout: number = 30000) {
+    await this.triggerNode.waitFor({ state: 'visible', timeout });
+  }
+
+  /* The "Add action" button on a node, optionally for one branch ("Add action — rejected"). */
+  addActionButton(stepId: string, branch?: string): Locator {
     const label = branch ? `Add action — ${branch}` : 'Add action';
-    await this.canvasNode(stepId).getByRole('button', { name: label, exact: true }).click({ force: true });
+    return this.canvasNode(stepId).getByRole('button', { name: label, exact: true });
+  }
+
+  /**
+   * Adds an action from a node's own "Add action" button and chooses it in the picker. `branch`
+   * targets a branching node's outcome, e.g. "approved" or "body", which renders as
+   * "Add action — approved". Follow with `submitNodeSettings()`, or the step is rolled back.
+   */
+  async addActionFromNode(stepId: string, actionName: string, branch?: string) {
+    await this.addActionButton(stepId, branch).click({ force: true });
     await this.chooseActionInPicker(actionName);
+  }
+
+  /**
+   * A connection handle on a node. xyflow renders handles as `.react-flow__handle` with the
+   * handle id in `data-handleid` (`true`, `false`, `approved`, `body`, …). Unnamed handles — a
+   * plain action's single output, and every node's input — carry no id, so omit `handleId`.
+   */
+  canvasHandle(stepId: string, type: 'source' | 'target', handleId?: string): Locator {
+    const byId = handleId ? `[data-handleid="${handleId}"]` : '';
+    return this.canvasNode(stepId).locator(`.react-flow__handle.${type}${byId}`);
+  }
+
+  /**
+   * Draws a connection between two existing steps by dragging from a source handle to the
+   * target's input handle.
+   *
+   * This is the one canvas gesture with no button equivalent: every "+" creates a **new** step,
+   * so wiring a branch into a step that is already on the canvas (a merge) needs a real drag.
+   * The mouse is moved in steps because xyflow only starts a connection after pointer movement.
+   */
+  async connectHandles(sourceStepId: string, sourceHandleId: string | undefined, targetStepId: string) {
+    const source = await this.canvasHandle(sourceStepId, 'source', sourceHandleId).boundingBox();
+    const target = await this.canvasHandle(targetStepId, 'target').boundingBox();
+    if (!source || !target) {
+      throw new Error(`Could not locate handles to connect ${sourceStepId} → ${targetStepId}.`);
+    }
+
+    await this.page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await this.page.mouse.down();
+    await this.page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 15 });
+    await this.page.mouse.up();
+  }
+
+  /* An edge, by the accessible name xyflow gives it ("Edge from <source> to <target>"). */
+  canvasEdge(sourceStepId: string, targetStepId: string): Locator {
+    return this.page.getByRole('group', { name: `Edge from ${sourceStepId} to ${targetStepId}`, exact: true });
   }
 }

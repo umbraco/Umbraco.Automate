@@ -85,6 +85,58 @@ export class AutomationApiHelper {
     return (await response.text()).trim().replace(/^"|"$/g, '');
   }
 
+  /* The full automation detail — steps, connections, status. */
+  async getById(id: string) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id;
+    const response = await this.api.get(requestUrl);
+    return await response.json();
+  }
+
+  /* Publishes through the API. Throws with the server's problem detail on a validation failure,
+   * so a spec that seeds a published automation fails on the real reason. */
+  async publish(id: string) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/publish';
+    const response = await this.api.post(requestUrl, {});
+    if (!response.ok()) {
+      throw new Error(`Publishing automation ${id} failed (${response.status()}): ${await response.text()}`);
+    }
+  }
+
+  /* The runs of one automation, newest first. */
+  async getRuns(id: string): Promise<any[]> {
+    const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/runs';
+    const response = await this.api.get(requestUrl);
+    const body = await response.json();
+    return body.items ?? [];
+  }
+
+  /* One run, including its per-step runs. The runs listing leaves `stepRuns` empty. */
+  async getRun(runId: string) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId;
+    const response = await this.api.get(requestUrl);
+    return await response.json();
+  }
+
+  /**
+   * Finds a step in an automation detail by its alias.
+   *
+   * Seeded steps must be looked up this way: the server assigns its own step ids on create, so
+   * the id a spec generated is not the id it gets back.
+   */
+  stepByAlias(automation: any, alias: string) {
+    const step = automation.steps.find((s: any) => s.alias === alias);
+    if (!step) {
+      throw new Error(`Step "${alias}" not found. Steps: ${automation.steps.map((s: any) => s.alias).join(', ')}`);
+    }
+    return step;
+  }
+
+  /* The steps that were not in `before` — i.e. what the UI just added. */
+  addedSteps(before: any, after: any): any[] {
+    const known = new Set(before.steps.map((s: any) => s.id));
+    return after.steps.filter((s: any) => !known.has(s.id));
+  }
+
   async deleteById(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id;
     return await this.api.delete(requestUrl);
