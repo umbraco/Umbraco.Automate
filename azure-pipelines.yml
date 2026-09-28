@@ -23,14 +23,17 @@ parameters:
             changeVar: SlackChanged
             hasNpm: false
 
+# Feature branches are not listed: their pull request builds them, and a branch
+# trigger as well would build every push twice.
+# batch: a burst of merges builds once, from the latest commit, rather than once per merge.
 trigger:
+    batch: true
     branches:
         include:
             - v*/main
             - v*/dev
             - v*/release/*
             - v*/hotfix/*
-            - v*/feature/*
 
 pr:
     branches:
@@ -46,6 +49,10 @@ variables:
       value: "true"
     - name: DOTNET_CLI_TELEMETRY_OPTOUT
       value: "true"
+    # A push to vN/main, vN/dev, vN/release/* or vN/hotfix/*: the builds that publish SBOMs and packages.
+    # Resolves to "True" or "False" at compile time; eq() compares case-insensitively.
+    - name: isPublishBuild
+      value: ${{ and(ne(variables['Build.Reason'], 'PullRequest'), or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/'), endsWith(variables['Build.SourceBranch'], '/main'), endsWith(variables['Build.SourceBranch'], '/dev'))) }}
 
 stages:
     # ============================================================
@@ -58,275 +65,32 @@ stages:
             displayName: Build & Test
             pool:
                 vmImage: "ubuntu-latest"
+            variables:
+                NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+                npm_config_cache: $(Pipeline.Workspace)/.npm
             steps:
                 - checkout: self
                   fetchDepth: 0
 
-                - task: UseDotNet@2
-                  displayName: Setup .NET
-                  inputs:
-                      useGlobalJson: true
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - script: |
-                      npm ci --include=optional
-                      npm run build
-                  displayName: Build frontend
-
-                - script: dotnet restore Umbraco.Automate.slnx
-                  displayName: Restore
-
-                - script: dotnet build Umbraco.Automate.slnx --configuration Release --no-restore -p:DisableCloudBuildNumber=true
-                  displayName: Build
-
-                - script: dotnet test Umbraco.Automate.slnx --configuration Release --no-build --verbosity normal --logger trx --results-directory $(Agent.TempDirectory)/TestResults
-                  displayName: Test
-
-                - task: PublishTestResults@2
-                  displayName: Publish test results
-                  condition: always()
-                  inputs:
-                      testResultsFormat: VSTest
-                      testResultsFiles: "$(Agent.TempDirectory)/TestResults/**/*.trx"
-                      mergeTestResults: true
-
-                - task: PublishPipelineArtifact@1
-                  displayName: Upload build outputs
-                  inputs:
-                      targetPath: $(Build.SourcesDirectory)
-                      artifact: build-outputs
-                      publishLocation: pipeline
-
-    # ============================================================
-    # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
-    # Generates per-product SBOMs and uploads to Dependency-Track
-    # ============================================================
-    - stage: GenerateSBOM
-      displayName: Generate & Upload SBOMs
-      dependsOn: Build
-      condition: |
-          and(
-            succeeded(),
-            ne(variables['Build.Reason'], 'PullRequest')
-          )
-      jobs:
-          # Core product
-          - job: GenerateSBOM_Core
-            displayName: Generate SBOM - Umbraco.Automate
-            continueOnError: true
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: self
-                  fetchDepth: 1
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
-                  parameters:
-                      product: Umbraco.Automate
-
-          # Level 1 products (matrix)
-          - job: GenerateSBOM_Level1
-            displayName: Generate SBOM - Level 1
-            continueOnError: true
-            pool:
-                vmImage: "ubuntu-latest"
-            strategy:
-                matrix:
-                    ${{ each product in parameters.level1Products }}:
-                        ${{ replace(replace(product.name, 'Umbraco.Automate.', ''), '.', '_') }}:
-                            product: ${{ product.name }}
-                maxParallel: 10
-            steps:
-                - checkout: self
-                  fetchDepth: 1
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
-                  parameters:
-                      product: $(product)
-
-          # Level 2 products (matrix)
-          - job: GenerateSBOM_Level2
-            displayName: Generate SBOM - Level 2
-            continueOnError: true
-            pool:
-                vmImage: "ubuntu-latest"
-            strategy:
-                matrix:
-                    ${{ each product in parameters.level2Products }}:
-                        ${{ replace(replace(product.name, 'Umbraco.Automate.', ''), '.', '_') }}:
-                            product: ${{ product.name }}
-                maxParallel: 10
-            steps:
-                - checkout: self
-                  fetchDepth: 1
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
-                  parameters:
-                      product: $(product)
-
-          # ============================================================
-          # Collect all SBOMs into single artifact
-          # Downloads artifacts from all SBOM jobs and combines them
-          # ============================================================
-          - job: CollectSBOMs
-            displayName: Collect All SBOMs
-            dependsOn:
-                - GenerateSBOM_Core
-                - GenerateSBOM_Level1
-                - GenerateSBOM_Level2
-            condition: |
-                and(
-                  not(failed()),
-                  not(canceled())
-                )
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: none
-
-                # Download Core SBOM
-                - task: DownloadPipelineArtifact@2
-                  displayName: Download Umbraco.Automate SBOM
-                  inputs:
-                      artifact: "Umbraco.Automate-sbom"
-                      targetPath: "$(Pipeline.Workspace)/sboms"
-
-                # Download Level 1 SBOMs
-                - ${{ each product in parameters.level1Products }}:
-                      - task: DownloadPipelineArtifact@2
-                        displayName: Download ${{ product.name }} SBOM
-                        inputs:
-                            artifact: "${{ product.name }}-sbom"
-                            targetPath: "$(Pipeline.Workspace)/sboms"
-
-                # Download Level 2 SBOMs
-                - ${{ each product in parameters.level2Products }}:
-                      - task: DownloadPipelineArtifact@2
-                        displayName: Download ${{ product.name }} SBOM
-                        inputs:
-                            artifact: "${{ product.name }}-sbom"
-                            targetPath: "$(Pipeline.Workspace)/sboms"
-
-                # Flatten SBOM files into single directory
+                # Set here rather than in a stage of its own, which cost an extra agent and
+                # its wait on every build. Safe to set early: every version.json disables
+                # nbgv's cloud build number, so the Pack stage's `nbgv cloud` leaves it alone.
                 - task: Bash@3
-                  displayName: Collect SBOM files
+                  displayName: Set build number (branch + date)
                   inputs:
                       targetType: inline
                       script: |
-                          mkdir -p all-sboms
+                          BUILD_DATE=$(date -u +%Y%m%d)
+                          echo "##vso[build.updatebuildnumber]$(Build.SourceBranchName)-${BUILD_DATE}-$(Build.BuildID)"
 
-                          # Find all SBOM JSON files and move to single directory
-                          if [ -d "$(Pipeline.Workspace)/sboms" ]; then
-                            find "$(Pipeline.Workspace)/sboms" -name "*-bom.json" -exec mv {} all-sboms/ \;
-                          fi
-
-                          # List collected SBOMs
-                          if [ -d "all-sboms" ] && [ "$(ls -A all-sboms 2>/dev/null)" ]; then
-                            echo "Collected SBOMs:"
-                            ls -la all-sboms/
-                          else
-                            echo "No SBOMs collected"
-                          fi
-
-                - task: PublishPipelineArtifact@1
-                  displayName: Upload combined SBOM artifact
-                  inputs:
-                      targetPath: $(Build.SourcesDirectory)/all-sboms
-                      artifact: all-sboms
-                      publishLocation: pipeline
-
-    # ============================================================
-    # Validate Changelogs - Only runs on release and hotfix branches
-    # Ensures CHANGELOGs are present and match version.json
-    # Runs in parallel with GenerateSBOM after Build
-    # ============================================================
-    - stage: ValidateChangelogs
-      displayName: Validate Changelogs
-      dependsOn: Build
-      # Only validate on release and hotfix branches (not main or dev)
-      condition: |
-          and(
-            succeeded(),
-            ne(variables['Build.Reason'], 'PullRequest'),
-            or(
-              contains(variables['Build.SourceBranch'], '/release/'),
-              contains(variables['Build.SourceBranch'], '/hotfix/')
-            )
-          )
-      jobs:
-          - job: ValidateChangelogFiles
-            displayName: Validate CHANGELOG.md Files
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: self
-                  fetchDepth: 0
-
-                - task: PowerShell@2
-                  displayName: Validate changelogs
-                  inputs:
-                      filePath: .azure-pipelines/scripts/validate-changelogs.ps1
-                      pwsh: true
-                      failOnStderr: false
-
-    # ============================================================
-    # Pack Stage - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
-    # Uses dynamic change detection to only pack products that changed
-    # Runs in parallel with GenerateSBOM after Build (through ValidateChangelogs dependency)
-    # ============================================================
-    - stage: Pack
-      displayName: Pack NuGet & NPM Packages
-      dependsOn:
-          - Build
-          - ValidateChangelogs
-      # Only pack on push (not PR) to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
-      # ValidateChangelogs may be skipped (on vN/main, vN/dev branches), which is OK
-      condition: |
-          and(
-            in(dependencies.Build.result, 'Succeeded'),
-            in(dependencies.ValidateChangelogs.result, 'Succeeded', 'Skipped'),
-            ne(variables['Build.Reason'], 'PullRequest'),
-            or(
-              contains(variables['Build.SourceBranch'], '/hotfix/'),
-              contains(variables['Build.SourceBranch'], '/release/'),
-              endsWith(variables['Build.SourceBranch'], '/main'),
-              endsWith(variables['Build.SourceBranch'], '/dev')
-            )
-          )
-      jobs:
-          # ============================================================
-          # Detect which products changed
-          # ============================================================
-          - job: DetectChanges
-            displayName: Detect Changed Products
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: self
-                  fetchDepth: 0
-
+                # Change detection runs here rather than as the first job of the Pack stage,
+                # which cost an agent and its wait before any packing could start. It only
+                # reads git history, so it runs before the build touches the working tree.
+                # The Pack stage reads its outputs via stageDependencies.
                 - task: PowerShell@2
                   displayName: Run change detection
                   name: detect
+                  condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
                   inputs:
                       filePath: .azure-pipelines/scripts/detect-changes.ps1
                       pwsh: true
@@ -337,6 +101,7 @@ stages:
 
                 - task: Bash@3
                   displayName: Summarize packed products + tag build
+                  condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
                   inputs:
                       targetType: inline
                       script: |
@@ -388,14 +153,181 @@ stages:
                             fi
                           done
 
+                - task: UseDotNet@2
+                  displayName: Setup .NET
+                  inputs:
+                      useGlobalJson: true
+
+                - task: UseNode@1
+                  displayName: Setup Node.js
+                  inputs:
+                      version: $(NODE_VERSION)
+
+                # PR builds read the cache saved by their target branch's builds.
+                - task: Cache@2
+                  displayName: Cache npm
+                  inputs:
+                      key: 'npm | "$(Agent.OS)" | package-lock.json'
+                      restoreKeys: |
+                          npm | "$(Agent.OS)"
+                      path: $(npm_config_cache)
+
+                # No packages.lock.json in this repo, so key on the central version file
+                # plus every project file.
+                - task: Cache@2
+                  displayName: Cache NuGet packages
+                  inputs:
+                      key: 'nuget | "$(Agent.OS)" | Directory.Packages.props | **/*.csproj'
+                      restoreKeys: |
+                          nuget | "$(Agent.OS)"
+                      path: $(NUGET_PACKAGES)
+
+                - script: |
+                      npm ci --include=optional
+                      npm run build
+                  displayName: Build frontend
+
+                - script: dotnet restore Umbraco.Automate.slnx
+                  displayName: Restore
+
+                - script: dotnet build Umbraco.Automate.slnx --configuration Release --no-restore -p:DisableCloudBuildNumber=true
+                  displayName: Build
+
+                - script: dotnet test Umbraco.Automate.slnx --configuration Release --no-build --verbosity normal --logger trx --results-directory $(Agent.TempDirectory)/TestResults
+                  displayName: Test
+
+                - task: PublishTestResults@2
+                  displayName: Publish test results
+                  condition: always()
+                  inputs:
+                      testResultsFormat: VSTest
+                      testResultsFiles: "$(Agent.TempDirectory)/TestResults/**/*.trx"
+                      mergeTestResults: true
+
+                # .artifactignore at the repo root keeps .git and node_modules out of this
+                # artifact: the Pack jobs check out the repo themselves and don't need them.
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload build outputs
+                  inputs:
+                      targetPath: $(Build.SourcesDirectory)
+                      artifact: build-outputs
+                      publishLocation: pipeline
+
+    # ============================================================
+    # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
+    # Generates per-product SBOMs and uploads to Dependency-Track
+    # ============================================================
+    - stage: GenerateSBOM
+      displayName: Generate & Upload SBOMs
+      dependsOn: Build
+      condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
+      jobs:
+          # One job for every product: each SBOM takes about a minute, far less than the
+          # agent wait a job per product cost, and cdxgen is installed once, not per product.
+          - job: GenerateSBOMs
+            displayName: Generate SBOMs
+            continueOnError: true
+            pool:
+                vmImage: "ubuntu-latest"
+            steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - task: UseNode@1
+                  displayName: Setup Node.js
+                  inputs:
+                      version: $(NODE_VERSION)
+
+                - task: Npm@1
+                  displayName: Install cdxgen
+                  inputs:
+                      command: custom
+                      customCommand: install --global @cyclonedx/cdxgen
+
+                - template: .azure-pipelines/templates/generate-sbom.yml
+                  parameters:
+                      product: Umbraco.Automate
+
+                - ${{ each product in parameters.level1Products }}:
+                      - template: .azure-pipelines/templates/generate-sbom.yml
+                        parameters:
+                            product: ${{ product.name }}
+
+                - ${{ each product in parameters.level2Products }}:
+                      - template: .azure-pipelines/templates/generate-sbom.yml
+                        parameters:
+                            product: ${{ product.name }}
+
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload combined SBOM artifact
+                  condition: succeededOrFailed()
+                  inputs:
+                      targetPath: $(Build.ArtifactStagingDirectory)/sbom
+                      artifact: all-sboms
+                      publishLocation: pipeline
+
+    # ============================================================
+    # Validate Changelogs - Only runs on release and hotfix branches
+    # Ensures CHANGELOGs are present and match version.json
+    # Runs in parallel with GenerateSBOM after Build
+    # ============================================================
+    - stage: ValidateChangelogs
+      displayName: Validate Changelogs
+      dependsOn: Build
+      # Only validate on release and hotfix branches (not main or dev)
+      condition: |
+          and(
+            succeeded(),
+            ne(variables['Build.Reason'], 'PullRequest'),
+            or(
+              contains(variables['Build.SourceBranch'], '/release/'),
+              contains(variables['Build.SourceBranch'], '/hotfix/')
+            )
+          )
+      jobs:
+          - job: ValidateChangelogFiles
+            displayName: Validate CHANGELOG.md Files
+            pool:
+                vmImage: "ubuntu-latest"
+            steps:
+                - checkout: self
+                  fetchDepth: 0
+
+                - task: PowerShell@2
+                  displayName: Validate changelogs
+                  inputs:
+                      filePath: .azure-pipelines/scripts/validate-changelogs.ps1
+                      pwsh: true
+                      failOnStderr: false
+
+    # ============================================================
+    # Pack Stage - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
+    # Uses dynamic change detection to only pack products that changed
+    # Runs in parallel with GenerateSBOM after Build (through ValidateChangelogs dependency)
+    # ============================================================
+    - stage: Pack
+      displayName: Pack NuGet & NPM Packages
+      dependsOn:
+          - Build
+          - ValidateChangelogs
+      # Only pack on push (not PR) to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches,
+      # and only when change detection (in the Build job) found something to pack.
+      # ValidateChangelogs may be skipped (on vN/main, vN/dev branches), which is OK
+      condition: |
+          and(
+            in(dependencies.Build.result, 'Succeeded'),
+            in(dependencies.ValidateChangelogs.result, 'Succeeded', 'Skipped'),
+            eq(variables.isPublishBuild, 'True'),
+            eq(dependencies.Build.outputs['BuildAndTest.detect.AnyChanged'], 'true')
+          )
+      jobs:
           # ============================================================
           # Pack Core (Level 0 - no internal dependencies)
           # Conditional based on change detection
           # ============================================================
           - job: PackCore
             displayName: Pack Umbraco.Automate
-            dependsOn: DetectChanges
-            condition: eq(dependencies.DetectChanges.outputs['detect.CoreChanged'], 'true')
+            condition: eq(stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'], 'true')
             pool:
                 vmImage: "ubuntu-latest"
             steps:
@@ -430,13 +362,12 @@ stages:
           - job: PackLevel1
             displayName: Pack Level 1
             dependsOn:
-                - DetectChanges
                 - PackCore
             condition: |
                 and(
                   not(failed()),
                   not(canceled()),
-                  eq(dependencies.DetectChanges.outputs['detect.Level1Changed'], 'true')
+                  eq(stageDependencies.Build.BuildAndTest.outputs['detect.Level1Changed'], 'true')
                 )
             pool:
                 vmImage: "ubuntu-latest"
@@ -450,9 +381,9 @@ stages:
                 maxParallel: 10
             variables:
                 # Pass all per-product change flags as job variables
-                CoreChanged: $[ dependencies.DetectChanges.outputs['detect.CoreChanged'] ]
+                CoreChanged: $[ stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'] ]
                 ${{ each product in parameters.level1Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
             steps:
                 - checkout: self
                   fetchDepth: 0
@@ -483,14 +414,13 @@ stages:
           - job: PackLevel2
             displayName: Pack Level 2
             dependsOn:
-                - DetectChanges
                 - PackCore
                 - PackLevel1
             condition: |
                 and(
                   not(failed()),
                   not(canceled()),
-                  eq(dependencies.DetectChanges.outputs['detect.Level2Changed'], 'true')
+                  eq(stageDependencies.Build.BuildAndTest.outputs['detect.Level2Changed'], 'true')
                 )
             pool:
                 vmImage: "ubuntu-latest"
@@ -504,11 +434,11 @@ stages:
                 maxParallel: 10
             variables:
                 # Pass all per-product change flags as job variables
-                CoreChanged: $[ dependencies.DetectChanges.outputs['detect.CoreChanged'] ]
+                CoreChanged: $[ stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'] ]
                 ${{ each product in parameters.level1Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
                 ${{ each product in parameters.level2Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
             steps:
                 - checkout: self
                   fetchDepth: 0
@@ -540,7 +470,6 @@ stages:
           - job: CollectPackages
             displayName: Collect All Packages
             dependsOn:
-                - DetectChanges
                 - PackCore
                 - PackLevel1
                 - PackLevel2
@@ -548,17 +477,17 @@ stages:
                 and(
                   not(failed()),
                   not(canceled()),
-                  eq(dependencies.DetectChanges.outputs['detect.AnyChanged'], 'true')
+                  eq(stageDependencies.Build.BuildAndTest.outputs['detect.AnyChanged'], 'true')
                 )
             pool:
                 vmImage: "ubuntu-latest"
             variables:
                 # Map dependency outputs to job variables (dependencies context only works at job level)
-                CoreChanged: $[ dependencies.DetectChanges.outputs['detect.CoreChanged'] ]
+                CoreChanged: $[ stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'] ]
                 ${{ each product in parameters.level1Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
                 ${{ each product in parameters.level2Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
             steps:
                 - checkout: self
                   fetchDepth: 0
@@ -769,26 +698,3 @@ stages:
                       artifact: all-npm-packages
                       publishLocation: pipeline
 
-    # ============================================================
-    # Finalize - set build number after both parallel paths complete
-    # Waits for both GenerateSBOM and Pack stages
-    # ============================================================
-    - stage: Finalize
-      displayName: Finalize Build
-      dependsOn:
-          - GenerateSBOM
-          - Pack
-      condition: not(canceled())
-      jobs:
-          - job: SetBuildNumber
-            displayName: Set build number
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - task: Bash@3
-                  displayName: Set build number (branch + date)
-                  inputs:
-                      targetType: inline
-                      script: |
-                          BUILD_DATE=$(date -u +%Y%m%d)
-                          echo "##vso[build.updatebuildnumber]$(Build.SourceBranchName)-${BUILD_DATE}-$(Build.BuildID)"
