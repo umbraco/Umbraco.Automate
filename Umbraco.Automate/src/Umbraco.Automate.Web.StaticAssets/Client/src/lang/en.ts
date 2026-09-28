@@ -231,6 +231,7 @@ export default {
         testWarning: "Connection test inconclusive",
         testFailure: "Connection test failed",
         testError: "Could not reach the server to test this connection.",
+        testSaveRequired: "Fix the errors and save the connection before testing it.",
     },
     uaApproval: {
         dashboardTitle: "Approvals",

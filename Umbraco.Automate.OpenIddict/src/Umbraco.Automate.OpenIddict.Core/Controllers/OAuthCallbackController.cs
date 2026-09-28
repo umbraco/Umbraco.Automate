@@ -10,7 +10,9 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 /// <summary>
 /// Handles OAuth callback redirects from external providers.
 /// Anonymous — validated via the state token that OpenIddict manages.
-/// Returns HTML that postMessages back to the parent window (popup flow).
+/// Returns HTML that postMessages back to the parent window (popup flow), or — when the challenge
+/// round-tripped a validated return URL (same-tab fallback for blocked popups) — redirects back to
+/// the backoffice with the result in the URL fragment.
 /// </summary>
 [ApiController]
 [Route("umbraco/automate/oauth")]
@@ -37,9 +39,14 @@ public sealed class OAuthCallbackController : ControllerBase
     public async Task<IActionResult> Callback(string provider)
     {
         var result = await HttpContext.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
+
+        // Present only for the same-tab flow. It was validated by the challenge and protected inside
+        // the state token; ReadFrom re-validates it as defence in depth before redirecting anywhere.
+        var returnTarget = OAuthReturnUrl.ReadFrom(result.Properties);
+
         if (!result.Succeeded)
         {
-            return OAuthPopupResult.Failure("Authentication failed.");
+            return Failure("Authentication failed.");
         }
 
         var accessToken = result.Properties?.GetTokenValue(Tokens.BackchannelAccessToken);
@@ -48,7 +55,7 @@ public sealed class OAuthCallbackController : ControllerBase
 
         if (string.IsNullOrEmpty(accessToken))
         {
-            return OAuthPopupResult.Failure("No access token received.");
+            return Failure("No access token received.");
         }
 
         // The {provider} route segment is the lowercased convention used for the callback URL
@@ -80,6 +87,13 @@ public sealed class OAuthCallbackController : ControllerBase
 
         var saved = await _credentialsService.CreateCredentialsAsync(credential);
 
-        return OAuthPopupResult.Success(saved.Id.ToString());
+        return returnTarget is not null
+            ? returnTarget.Success(resolvedProvider, saved.Id.ToString())
+            : OAuthPopupResult.Success(saved.Id.ToString());
+
+        IActionResult Failure(string error) =>
+            returnTarget is not null
+                ? returnTarget.Failure(result.Properties?.GetString(Properties.ProviderName) ?? provider, error)
+                : OAuthPopupResult.Failure(error);
     }
 }

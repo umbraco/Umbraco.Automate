@@ -60,9 +60,11 @@ port source this is a port, not a replay: adapt the change to the target line.
 {"issue":{"repo":"umbraco/Umbraco.Automate","number":159,"title":"Config references inside larger strings are not resolved"},"line":"v18","port":null}
 ```
 
-- `issue` — object — the issue being worked, including the repo that holds it
+- `issue` — object|null — the issue being worked, including the repo that holds it. `null` only
+  on a port whose source PR had no issue
 - `line` — string — the line to implement on, e.g. `v18`
-- `port` — object|null — the source line and commit when this is a port of an already-landed change
+- `port` — object|null — `{ from_line, commit, pr }` when this is a port of an already-landed
+  change; `pr` is the source PR number
 
 **Facts to return:**
 
@@ -76,6 +78,12 @@ port source this is a port, not a replay: adapt the change to the target line.
 1. **Work out the branch name first**, because it is also the idempotency key:
    `<line>/feature/issue-<issue.number>-<slug>`, where `<slug>` is a short kebab-case phrase from
    the issue title. Example: `v18/feature/issue-159-embedded-config-references`.
+
+   **A port with no issue** (`issue` is `null`, `port` is set) is named from the source PR
+   instead: `<line>/feature/port-<port.pr>-<slug>`, with `<slug>` from the source PR's title.
+   Example: `v17/feature/port-348-oauth-popup-fallback`. Never invent an issue number to fit the
+   first pattern. **Neither an issue nor a port** → return `{"ok": false, "detail": "no issue
+   and no port source"}`; there is nothing to name the change from.
 
    > This action names and creates its own branch rather than calling
    > `ops-branching · start-branch`. **Reason:** the engine default names branches
@@ -94,7 +102,8 @@ port source this is a port, not a replay: adapt the change to the target line.
    on the line's integration branch — do not resolve `v18/dev` here by hand. Everything below
    runs inside that workspace.
 
-4. **Read before writing.** Read the issue in full, then `CLAUDE.md` at the repo root and the
+4. **Read before writing.** Read the issue in full (or, on a port with no issue, the source PR
+   and its description), then `CLAUDE.md` at the repo root and the
    `CLAUDE.md` of the product you are about to touch. Follow the conventions already in the
    surrounding files.
 
@@ -136,9 +145,9 @@ port source this is a port, not a replay: adapt the change to the target line.
 
 10. Return `{"ok": true, "branch": "…", "pr_number": …, "url": "…", "summary": "…"}`.
 
-**Idempotency (a MUST).** The branch name is derived purely from `issue.number` and `line`, so
-the same context always produces the same name. Step 2 detects an existing remote branch and
-returns it untouched instead of implementing a second time. Step 9 is idempotent too:
+**Idempotency (a MUST).** The branch name is derived purely from `issue.number` (or, on a port
+with no issue, `port.pr`) and `line`, so the same context always produces the same name. Step 2
+detects an existing remote branch and returns it untouched instead of implementing a second time. Step 9 is idempotent too:
 `open-pr` returns an existing open PR from that head branch rather than opening a second one, so
 a re-run of a change whose branch is already pushed still comes back with its `pr_number`.
 
@@ -245,6 +254,11 @@ Told that a PR has landed, work out which issue it was for and close that issue 
    Fall back to a `#N` reference in the PR body or title only if the branch carries no number. If
    nothing resolves, return `{"ok": false, "detail": "cannot resolve an issue for PR #…"}` and
    close nothing.
+
+   **A `vN/feature/port-<N>-<slug>` branch carries a PR number, not an issue number.** It is a
+   port of a change that landed without an issue, so there is no issue to close. Return
+   `{"ok": true, "closed": false, "issue": null, "waiting_on": [], "detail": "no issue behind
+   this change"}`. That is a normal outcome, not a failure. Never read the `<N>` as an issue.
 
 2. **Work out the target lines from the human's confirmed port decision** — never from
    `lines.live` alone. Read the decision, in this order, and stop at the first one that answers:
