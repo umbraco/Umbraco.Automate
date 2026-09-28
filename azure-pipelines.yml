@@ -172,12 +172,13 @@ stages:
                           npm | "$(Agent.OS)"
                       path: $(npm_config_cache)
 
-                # No packages.lock.json in this repo, so key on the central version file
-                # plus every project file.
+                # No packages.lock.json in this repo. Central package management puts every
+                # version in Directory.Packages.props, so key on that alone: keying on project
+                # files too would miss, and pay the cache save, on every PR that edits a .csproj.
                 - task: Cache@2
                   displayName: Cache NuGet packages
                   inputs:
-                      key: 'nuget | "$(Agent.OS)" | Directory.Packages.props | **/*.csproj'
+                      key: 'nuget | "$(Agent.OS)" | Directory.Packages.props'
                       restoreKeys: |
                           nuget | "$(Agent.OS)"
                       path: $(NUGET_PACKAGES)
