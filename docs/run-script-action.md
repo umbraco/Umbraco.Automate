@@ -5,6 +5,14 @@ JavaScript function to transform or compute data between steps — so editors ca
 tweaks themselves instead of asking a developer to build a custom action. It executes in a
 sandboxed [Jint](https://github.com/sebastienros/jint) engine.
 
+## Settings
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| **Script** | (required) | The ES module to run. See the authoring contract below. |
+| **Output schema** | (empty) | Optional JSON Schema describing the returned value. See [Declaring the output shape](#declaring-the-output-shape). |
+| **Allow fetch** | Off | Lets this step's script make outbound HTTP requests. See [Allowing outbound requests](#allowing-outbound-requests). |
+
 ## Authoring contract
 
 Write an ES module that exports a **default function**. It receives the step's binding context as
@@ -98,6 +106,20 @@ export default async function (data) {
 addresses are blocked) and supports `method`, `body`, and headers as an object, an array of pairs,
 or a `Headers` instance. It is gated by both the tenant-wide master switch
 (`Scripting:FetchEnabled`) and the per-step **Allow fetch** toggle — both must be on.
+
+### Allowing outbound requests
+
+Outbound requests are opt-in per step, so a script cannot call out unless someone chose to let it
+(secure by default):
+
+- **Allow fetch** (per step) is **off** for new steps. Turn it on in the step's settings for each
+  script that needs `fetch`. With it off, `fetch` is not defined in the script at all. A step whose
+  saved settings do not include the value — for example one created through the Management API or
+  an import without `allowFetch` — is treated as off.
+- **`FetchEnabled`** (site-wide, `Umbraco:Automate:Scripting:FetchEnabled`) defaults to `true`.
+  Set it to `false` to turn `fetch` off for every Run Script step, whatever their toggle says.
+- **`FetchAllowedHosts`** (site-wide) restricts which hosts `fetch` may reach. Leave it empty to
+  allow any public host; list hosts to allow only those.
 
 ## Validation
 
