@@ -69,6 +69,47 @@ public class SensitiveSettingsReprotectionJobTests : IDisposable
     }
 
     [Fact]
+    public async Task PerformExecuteAsync_WithUnrepairableRows_SkipsThem_AndRepairsTheRest()
+    {
+        // A sensitive field holding a number makes encryption throw. That row fails the same way on
+        // every run, so it must not stop the other rows being repaired or the job completing.
+        var automationId = Guid.NewGuid();
+        var brokenStep = Step("ignored");
+        brokenStep.Settings["headers"] = 42;
+        var brokenDefinition = JsonSerializer.Serialize(new AutomationDefinitionDto { Steps = [brokenStep] }, CamelCase);
+        var brokenSnapshot = JsonSerializer.Serialize(
+            new Automation { Id = automationId, Alias = "a", Name = "A", Steps = [brokenStep] },
+            AutomationVersionableEntityAdapter.SerializerOptions);
+        await SeedAsync(automationId, brokenDefinition, brokenSnapshot, connectionSnapshot: null);
+
+        var repairableDefinition = JsonSerializer.Serialize(
+            new AutomationDefinitionDto { NotificationSettings = Channels("channel-plain") },
+            CamelCase);
+        await using (var seed = _fixture.CreateContext())
+        {
+            seed.Automations.Add(new AutomationEntity
+            {
+                Id = Guid.NewGuid(),
+                Alias = "repairable",
+                Name = "Repairable",
+                Definition = repairableDefinition,
+                Version = 1,
+                DateCreated = DateTime.UtcNow,
+                DateModified = DateTime.UtcNow,
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await CreateJob().PerformExecuteAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        db.Automations.Single(a => a.Id == automationId).Definition.ShouldBe(brokenDefinition);
+        db.Automations.Single(a => a.Alias == "repairable").Definition.ShouldNotBeNull().ShouldContain("ENC:channel-plain");
+        db.EntityVersions.Single().Snapshot.ShouldBe(brokenSnapshot);
+        _keyValueService.Verify(k => k.SetValue(SensitiveSettingsReprotectionJob.CompletedKey, It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
     public async Task PerformExecuteAsync_WhenAlreadyCompleted_ChangesNothing()
     {
         var automationId = Guid.NewGuid();

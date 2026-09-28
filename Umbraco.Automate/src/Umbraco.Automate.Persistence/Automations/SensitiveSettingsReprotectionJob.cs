@@ -144,7 +144,7 @@ internal sealed class SensitiveSettingsReprotectionJob : RecurringHostedServiceB
             await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             var entity = await db.Automations.FindAsync([id], cancellationToken);
-            if (entity is null || !_automationFactory.ReprotectDefinition(entity))
+            if (entity is null || !TryReprotectDefinition(entity))
             {
                 continue;
             }
@@ -188,7 +188,7 @@ internal sealed class SensitiveSettingsReprotectionJob : RecurringHostedServiceB
 
             foreach (var version in batch)
             {
-                var reprotected = ReprotectSnapshot(version.Snapshot);
+                var reprotected = ReprotectSnapshot(version.Id, version.Snapshot);
                 if (reprotected is null || reprotected == version.Snapshot)
                 {
                     continue;
@@ -204,29 +204,42 @@ internal sealed class SensitiveSettingsReprotectionJob : RecurringHostedServiceB
         return updated;
     }
 
+    // A row that cannot be repaired (unreadable JSON, or a sensitive field holding a non-string value)
+    // fails the same way on every run, so it is logged and skipped rather than failing the whole repair.
+    private bool TryReprotectDefinition(AutomationEntity entity)
+    {
+        try
+        {
+            return _automationFactory.ReprotectDefinition(entity);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Skipping the definition of automation {AutomationId}, which could not be re-encrypted", entity.Id);
+            return false;
+        }
+    }
+
     /// <summary>
     /// Encrypts any plaintext sensitive value in a snapshot without decrypting the rest, for the
     /// same reason as <see cref="AutomationFactory.ReprotectDefinition"/>.
     /// </summary>
-    private string? ReprotectSnapshot(string snapshot)
+    private string? ReprotectSnapshot(Guid versionId, string snapshot)
     {
-        Automation? automation;
         try
         {
-            automation = JsonSerializer.Deserialize<Automation>(snapshot, AutomationVersionableEntityAdapter.SerializerOptions);
+            var automation = JsonSerializer.Deserialize<Automation>(snapshot, AutomationVersionableEntityAdapter.SerializerOptions);
+            if (automation is null)
+            {
+                return null;
+            }
+
+            _settingsProtector.ProtectAutomationSettings(automation);
+            return JsonSerializer.Serialize(automation, AutomationVersionableEntityAdapter.SerializerOptions);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
-            _logger.LogWarning(ex, "Skipping an automation version snapshot that could not be read");
+            _logger.LogWarning(ex, "Skipping automation version snapshot {VersionId}, which could not be re-encrypted", versionId);
             return null;
         }
-
-        if (automation is null)
-        {
-            return null;
-        }
-
-        _settingsProtector.ProtectAutomationSettings(automation);
-        return JsonSerializer.Serialize(automation, AutomationVersionableEntityAdapter.SerializerOptions);
     }
 }
