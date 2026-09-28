@@ -138,8 +138,9 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
             .Build();
 
         var automationService = new Mock<IAutomationService>();
+        // Resolved per call so a test can swap in its own automation before triggering.
         automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[] { _automation });
+            .ReturnsAsync(() => new[] { _automation });
 
         var nodeEligibility = new Mock<IExecutionNodeEligibility>();
         nodeEligibility.Setup(e => e.CanExecuteWorkflows()).Returns(true);
@@ -168,7 +169,7 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
 
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
 
-        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait);
+        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait, expectedStepRuns: 1);
 
         completedRun.StepRuns.ShouldNotBeEmpty();
         var stepRun = completedRun.StepRuns.First();
@@ -181,7 +182,54 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
         doc.RootElement.GetProperty("result").GetProperty("answer").GetInt32().ShouldBe(42);
     }
 
-    private async Task<AutomationRun> WaitForStepRunAsync(TimeSpan timeout)
+    [Fact]
+    public async Task RunScript_ReadsTriggerAndPreviousStepOutputsFromData()
+    {
+        // The script's `data` argument carries the binding context, so a script can read a prior
+        // step's output at the same path a binding would (${ steps.first.result.answer }).
+        var first = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.runScript")
+            .WithName("First")
+            .WithAlias("first")
+            .WithSetting("script", "export default function () { return { answer: 42, tags: ['a', 'b', 'c'] }; }")
+            .Build();
+        var second = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.runScript")
+            .WithName("Second")
+            .WithAlias("second")
+            .WithSetting(
+                "script",
+                "export default function (data) { return [data.trigger.name, data.steps.first.result.answer, data.previous.result.tags.length].join('|'); }")
+            .Build();
+
+        _automation = new AutomationBuilder()
+            .WithAlias("test-manual-runscript-binding-context")
+            .WithName("Test Run Script Binding Context")
+            .WithManualTrigger()
+            .AddStep(first)
+            .AddStep(second)
+            .WithTriggerConnection(first.Id)
+            .WithConnection(first.Id, second.Id)
+            .Build();
+
+        var triggerMessage = new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.manual",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(new Dictionary<string, object?> { ["name"] = "Home" }, JsonOptions.Default),
+        };
+
+        await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
+
+        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait, expectedStepRuns: 2);
+
+        var secondRun = completedRun.StepRuns.Single(s => s.StepId == second.Id);
+        secondRun.Status.ShouldBe(StepRunStatus.Completed, secondRun.Error);
+        using var doc = JsonDocument.Parse(secondRun.OutputData!);
+        doc.RootElement.GetProperty("result").GetString().ShouldBe("Home|42|3");
+    }
+
+    private async Task<AutomationRun> WaitForStepRunAsync(TimeSpan timeout, int expectedStepRuns)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
@@ -190,7 +238,7 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
             if (paged.Items.FirstOrDefault() is { } run)
             {
                 var full = await _runRepository.GetAsync(run.Id);
-                if (full?.StepRuns.Count > 0 && full.StepRuns.All(s => s.Status != StepRunStatus.Running))
+                if (full?.StepRuns.Count >= expectedStepRuns && full.StepRuns.All(s => s.Status != StepRunStatus.Running))
                 {
                     return full;
                 }

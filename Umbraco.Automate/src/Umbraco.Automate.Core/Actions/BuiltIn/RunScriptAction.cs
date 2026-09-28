@@ -10,11 +10,11 @@ using Umbraco.Automate.Core.StepTypes;
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
 /// <summary>
-/// A built-in action that runs a user-authored JavaScript function against the step inputs and
-/// returns its result. The script is executed in a sandboxed Jint engine via <see cref="IScriptExecutor"/>.
+/// A built-in action that runs a user-authored JavaScript function against the step's binding
+/// context (trigger output, prior step outputs, loop item) and returns its result. The script is executed in a sandboxed Jint engine via <see cref="IScriptExecutor"/>.
 /// </summary>
 [Action("umbracoAutomate.runScript", "Run Script",
-    Description = "Runs a JavaScript function against the step inputs and returns its result.",
+    Description = "Runs a JavaScript function against the trigger and previous step outputs and returns its result.",
     Group = "Core",
     Icon = "icon-script")]
 public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOutput>, IValidatableStepType
@@ -167,7 +167,15 @@ public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOut
                 StepRunErrorCategory.Validation);
         }
 
-        var data = JsonSerializer.SerializeToNode(context.InputData);
+        JsonObject data;
+        try
+        {
+            data = RunScriptData.Build(context);
+        }
+        catch (JsonException ex)
+        {
+            return ActionResult.Failed(new InvalidOperationException(ex.Message, ex), StepRunErrorCategory.Validation);
+        }
 
         // Cap the script's total runtime at the smaller of the configured scripting timeout and
         // the step's own timeout budget, so a script can never outlive its step.
