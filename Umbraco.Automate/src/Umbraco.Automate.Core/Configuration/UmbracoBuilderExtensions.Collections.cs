@@ -31,6 +31,7 @@ using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.DependencyInjection;
 using WorkflowCore.Interface;
 
@@ -186,16 +187,14 @@ public static partial class UmbracoBuilderExtensions
 
         // Shared outbound HTTP client — with SSRF protection
         builder.Services.AddHttpClient(Constants.HttpClients.Default)
-            .ConfigurePrimaryHttpMessageHandler(_ => SsrfProtectionHandler.Create());
+            .ConfigurePrimaryHttpMessageHandler(sp => SsrfProtectionHandler.Create(
+                sp.GetRequiredService<IOptions<ExecutionOptions>>().Value.AllowOutboundHttpProxy));
 
         // Non-redirecting variant used by the Run Script action's fetch() when redirect: "manual".
         builder.Services.AddHttpClient(Constants.HttpClients.NoRedirect)
-            .ConfigurePrimaryHttpMessageHandler(_ =>
-            {
-                var handler = SsrfProtectionHandler.Create();
-                handler.AllowAutoRedirect = false;
-                return handler;
-            });
+            .ConfigurePrimaryHttpMessageHandler(sp => SsrfProtectionHandler.Create(
+                sp.GetRequiredService<IOptions<ExecutionOptions>>().Value.AllowOutboundHttpProxy,
+                allowAutoRedirect: false));
 
         // Downloads media files from a URL for the Create Media action.
         builder.Services.AddSingleton<IMediaFileDownloader, MediaFileDownloader>();

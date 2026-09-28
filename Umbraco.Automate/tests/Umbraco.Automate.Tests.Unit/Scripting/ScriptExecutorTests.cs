@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -202,6 +203,134 @@ public class ScriptExecutorTests
         result.ShouldBeNull();
         error!.Value.Kind.ShouldBe(ScriptErrorKind.Runtime);
         error!.Value.Message.ShouldContain("blocked");
+        ShouldNotLeakInternals(error!.Value.Message);
+    }
+
+    public static TheoryData<Exception, string> FetchFailures => new()
+    {
+        {
+            new HttpRequestException(
+                HttpRequestError.ConnectionError,
+                "No connection could be made because the target machine actively refused it. (10.0.0.1:80)",
+                new SocketException((int)SocketError.ConnectionRefused)),
+            "fetch failed: connection refused"
+        },
+        {
+            new HttpRequestException(
+                HttpRequestError.ConnectionError,
+                "An attempt was made to access a socket in a way forbidden by its access permissions.",
+                new SocketException((int)SocketError.AccessDenied)),
+            "fetch failed: connection denied"
+        },
+        {
+            new HttpRequestException(
+                HttpRequestError.ConnectionError,
+                "No such host is known. (nope.invalid:443)",
+                new SocketException((int)SocketError.HostNotFound)),
+            "fetch failed: DNS lookup failed"
+        },
+        {
+            new HttpRequestException(HttpRequestError.SecureConnectionError, "The SSL connection could not be established."),
+            "fetch failed: secure connection failed"
+        },
+        {
+            new AggregateException(new HttpRequestException(
+                HttpRequestError.ConnectionError,
+                "Connection refused",
+                new SocketException((int)SocketError.ConnectionRefused))),
+            "fetch failed: connection refused"
+        },
+        {
+            new HttpRequestException("blocked", new SsrfException("Request to 'internal' blocked.")),
+            "http request was blocked"
+        },
+        { new TaskCanceledException("The request was canceled.", new TimeoutException()), "http request timed out" },
+        { new InvalidOperationException("Something internal at Foo.Bar()"), "fetch failed: request failed" },
+    };
+
+    [Theory]
+    [MemberData(nameof(FetchFailures))]
+    public void DescribeFetchFailure_ReturnsConciseReason(Exception exception, string expected)
+    {
+        ScriptExecutor.DescribeFetchFailure(exception).ShouldBe(expected);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchConnectionFailure_ScriptSeesConciseMessageOnly()
+    {
+        var (executor, options) = CreateThrowing(new HttpRequestException(
+            HttpRequestError.ConnectionError,
+            "No connection could be made because the target machine actively refused it. (10.0.0.1:80)",
+            new SocketException((int)SocketError.ConnectionRefused)));
+
+        var result = await executor.ExecuteAsync(
+            "script",
+            """
+            export default async function () {
+                try {
+                    await fetch('https://example.com/');
+                    return 'should not reach here';
+                } catch (e) {
+                    return String(e && e.message !== undefined ? e.message : e) + '|' + String(e);
+                }
+            }
+            """,
+            null,
+            options);
+
+        var seen = result!.GetValue<string>();
+        seen.ShouldContain("fetch failed: connection refused");
+        ShouldNotLeakInternals(seen);
+        seen.ShouldNotContain("10.0.0.1");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchConnectionFailureUncaught_ReportsConciseRuntimeError()
+    {
+        ScriptError? error = null;
+        var (executor, options) = CreateThrowing(new HttpRequestException(
+            HttpRequestError.NameResolutionError,
+            "No such host is known.",
+            new SocketException((int)SocketError.HostNotFound)));
+        options.OnError = e => error = e;
+
+        var result = await executor.ExecuteAsync(
+            "script",
+            "export default async function () { await fetch('https://nope.invalid/'); }",
+            null,
+            options);
+
+        result.ShouldBeNull();
+        error!.Value.Kind.ShouldBe(ScriptErrorKind.Runtime);
+        error!.Value.Message.ShouldContain("fetch failed: DNS lookup failed");
+        ShouldNotLeakInternals(error!.Value.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchInvalidUrl_ReportsConciseMessage()
+    {
+        var (executor, options) = Create();
+
+        var result = await executor.ExecuteAsync(
+            "script",
+            """
+            export default async function () {
+                try { await fetch('not a url'); } catch (e) { return String(e); }
+            }
+            """,
+            null,
+            options);
+
+        var seen = result!.GetValue<string>();
+        seen.ShouldContain("fetch failed: invalid url");
+        ShouldNotLeakInternals(seen);
+    }
+
+    private static void ShouldNotLeakInternals(string message)
+    {
+        message.ShouldNotContain("System.");
+        message.ShouldNotContain("Exception");
+        message.ShouldNotContain(" at ");
     }
 
     [Fact]
@@ -554,6 +683,25 @@ public class ScriptExecutorTests
                 ItExpr.IsAny<CancellationToken>())
             .Callback<HttpRequestMessage, CancellationToken>((req, _) => onRequest(req))
             .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
+
+        var client = new HttpClient(handler.Object);
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
+
+        var executor = new ScriptExecutor(factory.Object, NullLogger<ScriptExecutor>.Instance);
+        return (executor, new ScriptExecutorOptions { AllowFetch = true });
+    }
+
+    private static (ScriptExecutor Executor, ScriptExecutorOptions Options) CreateThrowing(Exception exception)
+    {
+        var handler = new Mock<HttpMessageHandler>();
+        handler
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(exception);
 
         var client = new HttpClient(handler.Object);
         var factory = new Mock<IHttpClientFactory>();
