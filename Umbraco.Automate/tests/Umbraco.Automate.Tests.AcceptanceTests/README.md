@@ -22,15 +22,17 @@ npx playwright install chromium
 npm run config
 ```
 
-`npm run config` finds the running demo site automatically. The demo site binds a dynamic port
-and publishes its address on a named pipe, so there is nothing to type if it is already
-running. It writes `.env`, which is gitignored.
+`npm run config` finds the demo site automatically. Each worktree's demo site gets its own
+stable port, stored in that worktree's git config (`git config --worktree --get wdp.port`), so
+there is nothing to type once the site has started at least once. It writes `.env`, which is
+gitignored.
 
-If the demo site is running on a different branch or worktree than the one you are in, point
-config at it by name:
+If the demo site is running from a different worktree than the one you are in, point config at
+it by path, or give the port directly:
 
 ```bash
-npm run config -- --pipe v18-dev
+npm run config -- --worktree <path-to-other-worktree>
+npm run config -- --port 44381
 ```
 
 The default backoffice credentials for a generated demo site are `admin@example.com` /

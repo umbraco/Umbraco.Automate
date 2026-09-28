@@ -16,11 +16,13 @@ Forms has `examples/Umbraco.Forms.TestSite` checked in. Automate does not, and s
 whole `demos/` tree is gitignored and generated per-developer by `scripts/install-demo-site.*`.
 Consequences for this suite:
 
-- There is **no fixed URL**. The demo site binds a dynamic port and publishes its https address
-  on a named pipe (`umbraco.demosite.<identifier>`), where the identifier is the worktree folder
-  name in a worktree and the branch name otherwise. `config.js` reads that pipe.
-- A demo site started from a **different branch or worktree** uses a different pipe name, so
-  `npm run config` will not find it. Pass `--pipe <identifier>` in that case.
+- There is **no fixed URL**. `Umbraco.Community.WorktreeDevPort` assigns each worktree its own
+  stable port the first time its demo site starts, and stores it in that worktree's git config
+  under `wdp.port`. The main checkout gets `44380` when free. `config.js` reads it with
+  `git config --worktree --get wdp.port`.
+- A demo site started from a **different worktree** has a different port, so `npm run config`
+  will not find it. Pass `--worktree <path>` or `--port <number>` in that case. If `wdp.port` is
+  unset, the site has never started in this worktree.
 - If `demos/vN/` does not exist, generate it with `scripts/install-demo-site.{sh,ps1}` or
   `/repo-setup`. Never create demo files by hand.
 
@@ -220,9 +222,11 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
 
 Two things to know if you edit that stage. Azure macro-expands `$(name)` before bash sees the
 script, so use backticks for command substitution and `expr` rather than `$((...))`. And
-`config.js` is deliberately **not** used in CI: it discovers a dynamic port from a named pipe,
-which is a local-development affordance, whereas CI fixes the URL via `ASPNETCORE_URLS` and
-writes `.env` directly.
+`config.js` is deliberately **not** used in CI: it is interactive and reads the per-worktree
+port from git config, which is a local-development affordance, whereas CI fixes the URL via
+`ASPNETCORE_URLS` and writes `.env` directly. The checkout needs `fetchDepth: 0`, like the
+Build stage: the demo site builds from project references, and Nerdbank.GitVersioning fails
+on a shallow clone.
 
 `Pack` does **not** depend on this stage. Acceptance failures therefore do not block packaging;
 wire that up only if you want UI flakes to be able to hold a release.

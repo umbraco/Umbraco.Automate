@@ -131,8 +131,11 @@ stages:
                 PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
                 acceptanceDir: $(Build.SourcesDirectory)/Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
             steps:
+                # Full history, like the Build stage: the demo site builds the products from
+                # project references, and Nerdbank.GitVersioning cannot compute a version
+                # height from a shallow clone.
                 - checkout: self
-                  fetchDepth: 1
+                  fetchDepth: 0
 
                 - task: UseDotNet@2
                   displayName: Setup .NET
@@ -196,8 +199,8 @@ stages:
                   displayName: Install Playwright Chromium
                   workingDirectory: $(acceptanceDir)
 
-                # config.js is interactive and discovers the port from a named pipe,
-                # which is a local-development affordance. In CI the URL is fixed by
+                # config.js is interactive and reads the per-worktree port from git
+                # config, which is a local-development affordance. In CI the URL is fixed by
                 # ASPNETCORE_URLS, and the credentials are the ones the scaffold
                 # installs unattended, so write .env directly.
                 - script: |
