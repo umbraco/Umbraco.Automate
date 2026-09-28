@@ -50,11 +50,15 @@ internal static class OAuthPopupResult
             <head><title>OAuth Complete</title></head>
             <body>
                 <p>{{body}}</p>
+                <p id="return" hidden><a href="/umbraco">Return to Umbraco</a></p>
                 <script>
                     if (window.opener) {
                         window.opener.postMessage({{payload}}, window.location.origin);
                     }
                     window.close();
+                    // Still here: this is a normal tab (e.g. the same-tab flow failed before a
+                    // return URL was available), which cannot close itself — offer a way back.
+                    document.getElementById("return").hidden = false;
                 </script>
             </body>
             </html>
