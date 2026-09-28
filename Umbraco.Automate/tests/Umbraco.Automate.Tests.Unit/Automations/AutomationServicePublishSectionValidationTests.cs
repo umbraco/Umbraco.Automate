@@ -128,6 +128,69 @@ public class AutomationServicePublishSectionValidationTests
         ex.Errors.ShouldContain(e => e == $"Step 'Step 1': {PublishCheckedAction.Error}");
     }
 
+    [Fact]
+    public async Task Publish_fails_with_invalid_settings_when_step_settings_cannot_be_resolved()
+    {
+        var resolver = new Mock<IEditableModelResolver>();
+        resolver
+            .Setup(r => r.ResolveModel<object>(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<EditableModelSchema?>()))
+            .Throws(new FormatException("'abc' is not a valid number."));
+
+        var (service, repo) = BuildService(
+            triggers: [new UniversalTrigger(TriggerDeps)],
+            actions: [new PublishCheckedAction(new ActionInfrastructure(resolver.Object))],
+            allowedSections: ["content"]);
+
+        var automation = SetupAutomation(repo, "test.universalTrigger", ["test.publishCheckedAction"]);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain("Step 'Step 1' has invalid settings: 'abc' is not a valid number.");
+
+        // The step's own publish check never runs once its settings failed to resolve.
+        ex.Errors.ShouldNotContain(e => e.Contains(PublishCheckedAction.Error));
+    }
+
+    [Fact]
+    public async Task Publish_validates_steps_nested_inside_a_container()
+    {
+        var (service, repo) = BuildService(
+            triggers: [new UniversalTrigger(TriggerDeps)],
+            actions: [new PublishCheckedAction(ActionDeps)],
+            allowedSections: ["content"]);
+
+        // Steps inside a container are not nested in the model: they sit in the automation's flat
+        // step list and belong to the container through a connection, so the publish-time walk
+        // over automation.Steps reaches them.
+        var automation = SetupAutomation(repo, "test.universalTrigger", []);
+        var container = new StepConfiguration
+        {
+            Id = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.forEach",
+            Name = "For Each",
+            Alias = "forEach",
+        };
+        var nested = new StepConfiguration
+        {
+            Id = Guid.NewGuid(),
+            ActionAlias = "test.publishCheckedAction",
+            Name = "Nested Step",
+            Alias = "nested",
+        };
+        automation.Steps = [container, nested];
+        automation.Connections =
+        [
+            new StepConnection { SourceStepId = Guid.Empty, TargetStepId = container.Id },
+            new StepConnection { SourceStepId = container.Id, SourceHandle = ContainerHandles.Body, TargetStepId = nested.Id },
+        ];
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain($"Step 'Nested Step': {PublishCheckedAction.Error}");
+    }
+
     private static Automation SetupAutomation(Mock<IAutomationRepository> repo, string triggerAlias, string[] actionAliases)
     {
         var automation = new AutomationBuilder()

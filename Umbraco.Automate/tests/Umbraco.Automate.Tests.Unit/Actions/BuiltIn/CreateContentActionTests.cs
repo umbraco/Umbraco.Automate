@@ -415,6 +415,202 @@ public class CreateContentActionTests
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Cancelled);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_PropertiesJsonIsMalformed_SavesWithoutSettingValues()
+    {
+        var parentKey = Guid.NewGuid();
+        var created = SetupInvariantCreate(parentKey, out var contentTypeKey, "title");
+
+        var result = await _action.ExecuteAsync(
+            CreateContext(
+                new CreateContentSettings
+                {
+                    ParentKey = parentKey.ToString(),
+                    ContentType = contentTypeKey.ToString(),
+                    Name = "New Page",
+                    PropertiesJson = "{ not json",
+                },
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        // Property values are optional convenience config: bad JSON is skipped, not a failure.
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        created.Verify(
+            x => x.SetValue(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            Times.Never);
+        _contentService.Verify(
+            x => x.Save(created.Object, It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PropertiesJsonHasUnknownAlias_SkipsIt()
+    {
+        var parentKey = Guid.NewGuid();
+        var created = SetupInvariantCreate(parentKey, out var contentTypeKey, "title");
+
+        var result = await _action.ExecuteAsync(
+            CreateContext(
+                new CreateContentSettings
+                {
+                    ParentKey = parentKey.ToString(),
+                    ContentType = contentTypeKey.ToString(),
+                    Name = "New Page",
+                    PropertiesJson = """{ "doesNotExist": "value" }""",
+                },
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        created.Verify(
+            x => x.SetValue(It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PropertiesJsonHasKnownAlias_SetsTheValue()
+    {
+        var parentKey = Guid.NewGuid();
+        var created = SetupInvariantCreate(parentKey, out var contentTypeKey, "title");
+
+        var result = await _action.ExecuteAsync(
+            CreateContext(
+                new CreateContentSettings
+                {
+                    ParentKey = parentKey.ToString(),
+                    ContentType = contentTypeKey.ToString(),
+                    Name = "New Page",
+                    PropertiesJson = """{ "title": "Hello", "doesNotExist": "ignored" }""",
+                },
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        created.Verify(x => x.SetValue("title", "Hello", null, null), Times.Once);
+        created.Verify(
+            x => x.SetValue("doesNotExist", It.IsAny<object?>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_VariantContentTypeWithCulture_SetsTheCultureName()
+    {
+        var parentKey = Guid.NewGuid();
+        var contentTypeKey = Guid.NewGuid();
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+
+        var contentType = new Mock<IContentType>();
+        contentType.SetupGet(x => x.Alias).Returns("page");
+        contentType.SetupGet(x => x.Variations).Returns(ContentVariation.Culture);
+        _contentTypeService.Setup(x => x.Get(contentTypeKey)).Returns(contentType.Object);
+
+        var created = new Mock<IContent>();
+        created.SetupGet(x => x.Properties).Returns(new PropertyCollection());
+        _contentService.Setup(x => x.Create("New Page", parentKey, "page", -1)).Returns(created.Object);
+        _contentService
+            .Setup(x => x.Save(created.Object, It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()))
+            .Returns(new OperationResult(OperationResultType.Success, new EventMessages()));
+
+        var result = await _action.ExecuteAsync(
+            CreateContext(
+                new CreateContentSettings
+                {
+                    ParentKey = parentKey.ToString(),
+                    ContentType = contentTypeKey.ToString(),
+                    Name = "New Page",
+                    Culture = "en-US",
+                },
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        created.Verify(x => x.SetCultureName("New Page", "en-US"), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InvariantContentType_DoesNotSetACultureName()
+    {
+        var parentKey = Guid.NewGuid();
+        var created = SetupInvariantCreate(parentKey, out var contentTypeKey);
+
+        var result = await _action.ExecuteAsync(
+            CreateContext(
+                new CreateContentSettings
+                {
+                    ParentKey = parentKey.ToString(),
+                    ContentType = contentTypeKey.ToString(),
+                    Name = "New Page",
+                    Culture = "en-US",
+                },
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        created.Verify(x => x.SetCultureName(It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoBackofficeUserAndNoServiceAccount_Throws()
+    {
+        // The authorizer is mocked to succeed here, which is the only way to reach the identity
+        // lookup: the real AutomationActionAuthorizer returns a Failed result with the same
+        // "No backoffice identity available" message first when there is no current user. The
+        // throw is therefore a last-line guard, shared by every built-in CMS write action, and
+        // ErrorHandlingMiddleware turns it into a Failed step if it is ever reached in a run.
+        var parentKey = Guid.NewGuid();
+        SetupInvariantCreate(parentKey, out var contentTypeKey);
+
+        var context = CreateContext(
+            new CreateContentSettings
+            {
+                ParentKey = parentKey.ToString(),
+                ContentType = contentTypeKey.ToString(),
+                Name = "New Page",
+            },
+            serviceAccountKey: null);
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(() => _action.ExecuteAsync(context, CancellationToken.None));
+        ex.Message.ShouldContain("No backoffice identity available");
+        _contentService.Verify(
+            x => x.Create(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// Sets up an invariant content type under an existing parent whose created item carries a
+    /// property for each of <paramref name="propertyAliases"/>, and a successful save.
+    /// </summary>
+    private Mock<IContent> SetupInvariantCreate(Guid parentKey, out Guid contentTypeKey, params string[] propertyAliases)
+    {
+        var typeKey = Guid.NewGuid();
+        contentTypeKey = typeKey;
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+
+        var contentType = new Mock<IContentType>();
+        contentType.SetupGet(x => x.Alias).Returns("page");
+        contentType.SetupGet(x => x.Variations).Returns(ContentVariation.Nothing);
+        _contentTypeService.Setup(x => x.Get(typeKey)).Returns(contentType.Object);
+
+        var properties = new PropertyCollection();
+        foreach (var alias in propertyAliases)
+        {
+            var propertyType = new Mock<IPropertyType>();
+            propertyType.SetupGet(x => x.Alias).Returns(alias);
+            properties.Add(new Property(propertyType.Object));
+        }
+
+        var created = new Mock<IContent>();
+        created.SetupGet(x => x.Key).Returns(Guid.NewGuid());
+        created.SetupGet(x => x.Properties).Returns(properties);
+
+        _contentService.Setup(x => x.Create("New Page", parentKey, "page", -1)).Returns(created.Object);
+        _contentService
+            .Setup(x => x.Save(created.Object, It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()))
+            .Returns(new OperationResult(OperationResultType.Success, new EventMessages()));
+
+        return created;
+    }
+
     private static ActionContext CreateContext(CreateContentSettings settings, Guid? serviceAccountKey = null)
         => new()
         {

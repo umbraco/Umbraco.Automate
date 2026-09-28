@@ -229,6 +229,54 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
         doc.RootElement.GetProperty("result").GetString().ShouldBe("Home|42|3");
     }
 
+    [Fact]
+    public async Task RunScript_DoesNotResolveBindingsInsideTheScriptBody()
+    {
+        // `${ }` in the script source is JavaScript, not an Automate binding: the Script field does
+        // not support bindings, so a string that looks like one reaches the engine verbatim and a
+        // template literal keeps its JS meaning. Values come in through `data` instead.
+        const string script =
+            "export default function (data) {\n" +
+            "    return {\n" +
+            "        literal: '${ trigger.name }',\n" +
+            "        template: `Hello ${data.trigger.name}`,\n" +
+            "    };\n" +
+            "}";
+
+        var step = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.runScript")
+            .WithName("No Bindings")
+            .WithAlias("noBindings")
+            .WithSetting("script", script)
+            .Build();
+
+        _automation = new AutomationBuilder()
+            .WithAlias("test-manual-runscript-no-bindings")
+            .WithName("Test Run Script No Bindings")
+            .WithManualTrigger()
+            .AddStep(step)
+            .WithTriggerConnection(step.Id)
+            .Build();
+
+        var triggerMessage = new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.manual",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(new Dictionary<string, object?> { ["name"] = "Home" }, JsonOptions.Default),
+        };
+
+        await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
+
+        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait, expectedStepRuns: 1);
+
+        var stepRun = completedRun.StepRuns.Single();
+        stepRun.Status.ShouldBe(StepRunStatus.Completed, stepRun.Error);
+        using var doc = JsonDocument.Parse(stepRun.OutputData!);
+        var result = doc.RootElement.GetProperty("result");
+        result.GetProperty("literal").GetString().ShouldBe("${ trigger.name }");
+        result.GetProperty("template").GetString().ShouldBe("Hello Home");
+    }
+
     private async Task<AutomationRun> WaitForStepRunAsync(TimeSpan timeout, int expectedStepRuns)
     {
         var deadline = DateTime.UtcNow + timeout;

@@ -169,6 +169,59 @@ public class MoveMediaActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_MoveUnderOwnDescendant_FailsWithValidationError()
+    {
+        // The CMS refuses to move an item beneath itself with ParentInvalid; that must come back
+        // as an actionable validation failure naming the status, not an unknown error.
+        var mediaKey = Guid.NewGuid();
+        var descendantKey = Guid.NewGuid();
+
+        _mediaEditingService
+            .Setup(x => x.MoveAsync(mediaKey, descendantKey, It.IsAny<Guid>()))
+            .ReturnsAsync(Attempt<IMedia?, ContentEditingOperationStatus>.Fail(ContentEditingOperationStatus.ParentInvalid));
+
+        var context = CreateContext(
+            new MoveMediaSettings { MediaKey = mediaKey.ToString(), TargetParentKey = descendantKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        result.Exception.ShouldNotBeNull();
+        result.Exception.Message.ShouldContain(nameof(ContentEditingOperationStatus.ParentInvalid));
+        result.OutputData.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(ContentEditingOperationStatus.ParentNotFound, StepRunErrorCategory.Validation)]
+    [InlineData(ContentEditingOperationStatus.NotAllowed, StepRunErrorCategory.Validation)]
+    [InlineData(ContentEditingOperationStatus.InTrash, StepRunErrorCategory.Validation)]
+    [InlineData(ContentEditingOperationStatus.CancelledByNotification, StepRunErrorCategory.Cancelled)]
+    [InlineData(ContentEditingOperationStatus.Unknown, StepRunErrorCategory.Unknown)]
+    public async Task ExecuteAsync_MoveFails_MapsStatusToErrorCategory(
+        ContentEditingOperationStatus status,
+        StepRunErrorCategory expectedCategory)
+    {
+        var mediaKey = Guid.NewGuid();
+        var targetParentKey = Guid.NewGuid();
+
+        _mediaEditingService
+            .Setup(x => x.MoveAsync(mediaKey, targetParentKey, It.IsAny<Guid>()))
+            .ReturnsAsync(Attempt<IMedia?, ContentEditingOperationStatus>.Fail(status));
+
+        var context = CreateContext(
+            new MoveMediaSettings { MediaKey = mediaKey.ToString(), TargetParentKey = targetParentKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(expectedCategory);
+        result.Exception!.Message.ShouldContain(status.ToString());
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Unauthorised_ReturnsAuthenticationErrorNotCrash()
     {
         var mediaKey = Guid.NewGuid();
