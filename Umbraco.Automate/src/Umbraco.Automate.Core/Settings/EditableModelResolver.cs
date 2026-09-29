@@ -214,6 +214,13 @@ internal sealed class EditableModelResolver : IEditableModelResolver
                 continue;
             }
 
+            // A field hidden by its controlling field is not in use, so it is not validated.
+            if (field.VisibleWhen is { } visibleWhen
+                && !visibleWhen.IsVisibleFor(modelType.GetProperty(visibleWhen.PropertyName)?.GetValue(model)))
+            {
+                continue;
+            }
+
             var value = property.GetValue(model);
 
             foreach (var validationRule in field.ValidationRules)

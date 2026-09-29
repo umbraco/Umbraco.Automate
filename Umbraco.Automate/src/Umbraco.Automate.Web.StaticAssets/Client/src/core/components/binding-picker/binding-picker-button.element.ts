@@ -25,6 +25,7 @@ export class UaBindingPickerButtonElement extends UmbLitElement {
                 compact
                 look="secondary"
                 popovertarget=${this._popoverId}
+                label="Insert binding expression"
                 title="Insert binding expression"
             >
                 <uui-icon name="icon-code"></uui-icon>

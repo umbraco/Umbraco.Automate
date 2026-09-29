@@ -173,6 +173,80 @@ public class EditableModelSchemaBuilderTests
     }
 
     [Fact]
+    public void Build_NonNullableString_IsImplicitlyRequired()
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(RequiredInferenceSettings))!;
+
+        schema.Fields.First(f => f.PropertyName == "Name").IsRequired.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Build_NonNullableCollection_IsNotImplicitlyRequired()
+    {
+        // An empty list is a legitimate value (no headers), so non-nullable must not imply Required.
+        var schema = EditableModelSchemaBuilder.Build(typeof(RequiredInferenceSettings))!;
+
+        schema.Fields.First(f => f.PropertyName == "Rows").IsRequired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Build_CollectionWithExplicitRequired_IsRequired()
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(RequiredInferenceSettings))!;
+
+        schema.Fields.First(f => f.PropertyName == "RequiredRows").IsRequired.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Build_ReadsVisibleWhen_AsCamelCaseKeyAndValues()
+    {
+        var schema = EditableModelSchemaBuilder.Build(typeof(VisibilitySettings))!;
+
+        var field = schema.Fields.First(f => f.PropertyName == "Body");
+
+        field.VisibleWhen.ShouldNotBeNull();
+        field.VisibleWhen.Key.ShouldBe("mode");
+        field.VisibleWhen.PropertyName.ShouldBe("Mode");
+        field.VisibleWhen.Values.ShouldBe(["Raw"]);
+        schema.Fields.First(f => f.PropertyName == "Mode").VisibleWhen.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Build_VisibleWhenUnknownProperty_Throws()
+    {
+        Should.Throw<InvalidOperationException>(() => EditableModelSchemaBuilder.Build(typeof(BrokenVisibilitySettings)))
+            .Message.ShouldContain("Missing");
+    }
+
+    [Fact]
+    public void Build_VisibleWhenWithoutValues_Throws()
+    {
+        Should.Throw<InvalidOperationException>(() => EditableModelSchemaBuilder.Build(typeof(NoValuesVisibilitySettings)))
+            .Message.ShouldContain("VisibleWhenValues");
+    }
+
+    [Theory]
+    [InlineData("Raw", true)]
+    [InlineData("raw", true)]
+    [InlineData("Form", false)]
+    [InlineData(null, false)]
+    public void Visibility_IsVisibleFor_ComparesCaseInsensitively(string? value, bool expected)
+    {
+        var visibility = new EditableModelFieldVisibility { Key = "mode", Values = ["Raw"] };
+
+        visibility.IsVisibleFor(value).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Visibility_IsVisibleFor_ComparesEnumsByName()
+    {
+        var visibility = new EditableModelFieldVisibility { Key = "mode", Values = ["Form"] };
+
+        visibility.IsVisibleFor(VisibilityMode.Form).ShouldBeTrue();
+        visibility.IsVisibleFor(VisibilityMode.Raw).ShouldBeFalse();
+    }
+
+    [Fact]
     public void HumanizePropertyName_ConvertsCorrectly()
     {
         EditableModelSchemaBuilder.HumanizePropertyName("ContentName").ShouldBe("Content Name");
@@ -226,6 +300,44 @@ public class EditableModelSchemaBuilderTests
 
         [Field(IsSensitive = true)]
         public int RotationDays { get; set; }
+    }
+
+    private class RequiredInferenceSettings
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public List<string> Rows { get; set; } = [];
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public List<string> RequiredRows { get; set; } = [];
+    }
+
+    private enum VisibilityMode
+    {
+        Raw,
+        Form,
+    }
+
+    private class VisibilitySettings
+    {
+        public VisibilityMode Mode { get; set; }
+
+        [Field(VisibleWhen = nameof(Mode), VisibleWhenValues = ["Raw"])]
+        public string? Body { get; set; }
+    }
+
+    private class BrokenVisibilitySettings
+    {
+        [Field(VisibleWhen = "Missing", VisibleWhenValues = ["Raw"])]
+        public string? Body { get; set; }
+    }
+
+    private class NoValuesVisibilitySettings
+    {
+        public VisibilityMode Mode { get; set; }
+
+        [Field(VisibleWhen = nameof(Mode))]
+        public string? Body { get; set; }
     }
 
     private class EditorInferenceSettings
