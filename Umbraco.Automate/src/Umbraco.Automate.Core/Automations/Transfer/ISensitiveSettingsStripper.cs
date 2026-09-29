@@ -2,7 +2,7 @@ namespace Umbraco.Automate.Core.Automations.Transfer;
 
 /// <summary>
 /// Strips sensitive settings (those marked <c>[IsSensitive]</c> via EditableModelSchema)
-/// from triggers and step configurations. Used when an automation leaves the system —
+/// from triggers, step configurations and notification channels. Used when an automation leaves the system —
 /// via the in-app export flow or the Deploy integration — so credentials never land in
 /// portable artifacts.
 /// </summary>
@@ -31,4 +31,16 @@ public interface ISensitiveSettingsStripper
     /// nothing needed to be stripped.
     /// </summary>
     Dictionary<string, object?> StripConnectionSettings(string connectionTypeAlias, Dictionary<string, object?> settings);
+
+    /// <summary>
+    /// Returns a copy of the notification settings with sensitive fields removed from each
+    /// channel (per the channel's settings schema), or the original instance when there are
+    /// no channels. Returns <c>null</c> if the input is null.
+    /// </summary>
+    /// <remarks>
+    /// The default implementation returns <c>null</c>, so an implementation written before this
+    /// member existed drops notification settings rather than exporting channel secrets.
+    /// </remarks>
+    AutomationNotificationSettings? StripNotificationSettings(AutomationNotificationSettings? notificationSettings)
+        => null;
 }
