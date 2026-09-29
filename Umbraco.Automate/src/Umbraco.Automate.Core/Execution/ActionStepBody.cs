@@ -170,6 +170,8 @@ internal sealed class ActionStepBody : StepBodyAsync
             MaxLogEntries = _executionOptions.Value.MaxLogEntriesPerStep,
         };
 
+        var (inputJson, sensitiveValues) = RecordStepInput(settings, resolvedInputs);
+
         // Create and persist step run.
         var stepRun = new StepRun
         {
@@ -179,7 +181,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             ActionAlias = _action.Alias,
             Status = StepRunStatus.Running,
             StartedUtc = DateTime.UtcNow,
-            InputData = SerializeStepInput(settings, resolvedInputs),
+            InputData = inputJson,
         };
 
         await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
@@ -191,8 +193,9 @@ internal sealed class ActionStepBody : StepBodyAsync
         // the same ActionContext instance the pipeline just executed — ErrorHandlingMiddleware
         // catches exceptions on this same context, so entries recorded before a throw survive
         // even for a Failed result. Every branch below ends in an UpdateStepRunAsync call, so
-        // this rides along with no extra DB round trip.
-        stepRun.LogEntries = actionContext.LogEntries.ToList();
+        // this rides along with no extra DB round trip. Sensitive setting values an action wrote
+        // into a message are redacted before storing, as they are in the recorded input.
+        stepRun.LogEntries = ActionLogSanitizer.Sanitize(actionContext.LogEntries, sensitiveValues);
 
         // Handle suspension: the action needs the workflow to pause.
         switch (result.Suspension)
@@ -612,26 +615,32 @@ internal sealed class ActionStepBody : StepBodyAsync
     /// references were resolved (or, for a step without settings, its resolved input mappings) —
     /// for the run view. Sensitive values are masked <em>before</em> the payload is stored, so a
     /// resolved secret never lands in the step run record; the run data API masks again on read.
-    /// Recording the input is diagnostic only: a failure here is logged and never fails the step.
+    /// Also returns the values that were masked, so the same values can be redacted from the
+    /// step's log entries. Recording the input is diagnostic only: a failure here is logged and
+    /// never fails the step.
     /// </summary>
-    private string? SerializeStepInput(object? settings, Dictionary<string, object?> resolvedInputs)
+    private (string? Json, IReadOnlyCollection<string> SensitiveValues) RecordStepInput(
+        object? settings,
+        Dictionary<string, object?> resolvedInputs)
     {
         object? input = settings ?? (resolvedInputs.Count > 0 ? resolvedInputs : null);
         if (input is null)
         {
-            return null;
+            return (null, []);
         }
 
         try
         {
             var node = JsonSerializer.SerializeToNode(input, input.GetType(), Dispatch.JsonOptions.Settings);
-            SensitiveDataMasker.Mask(node, SensitiveDataMasker.GetSensitiveFieldKeys(_action.GetSettingsSchema()));
-            return node?.ToJsonString(Dispatch.JsonOptions.Default);
+            var sensitiveFieldKeys = SensitiveDataMasker.GetSensitiveFieldKeys(_action.GetSettingsSchema());
+            var sensitiveValues = ActionLogSanitizer.CollectSensitiveValues(node, sensitiveFieldKeys);
+            SensitiveDataMasker.Mask(node, sensitiveFieldKeys);
+            return (node?.ToJsonString(Dispatch.JsonOptions.Default), sensitiveValues);
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
         {
             _logger.LogWarning(ex, "Could not record the input of step {StepId}; the step runs regardless", _stepConfig.Id);
-            return null;
+            return (null, []);
         }
     }
 
