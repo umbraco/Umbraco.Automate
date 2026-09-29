@@ -68,6 +68,25 @@ public class EditableModelFieldAttribute : Attribute
     /// at runtime against automation run data (trigger output, step outputs).
     /// </summary>
     public bool SupportsBindings { get; set; }
+
+    /// <summary>
+    /// Gets or sets the name of another property on the same settings model that controls
+    /// whether this field applies (e.g. <c>nameof(BodyMode)</c>). Used with
+    /// <see cref="VisibleWhenValues"/>; when null the field always applies.
+    /// </summary>
+    /// <remarks>
+    /// A field that does not apply is hidden in the UI and skipped by validation, so a
+    /// required field only has to be filled in while it is visible. Its stored value is kept,
+    /// so switching back restores what the author had entered.
+    /// </remarks>
+    public string? VisibleWhen { get; set; }
+
+    /// <summary>
+    /// Gets or sets the values of <see cref="VisibleWhen"/> for which this field applies,
+    /// compared case-insensitively against the controlling value's string form (an enum
+    /// compares by name).
+    /// </summary>
+    public string[]? VisibleWhenValues { get; set; }
 }
 
 /// <summary>

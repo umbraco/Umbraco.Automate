@@ -847,6 +847,54 @@ public class EditableModelResolverTests
 
     #endregion
 
+    #region Conditional visibility
+
+    [Fact]
+    public void ResolveModel_HiddenRequiredField_IsNotValidated()
+    {
+        // Content Type only applies to a raw body, so a form body must not fail on it.
+        var settings = new HttpRequestSettings
+        {
+            Url = "https://example.com",
+            BodyMode = HttpRequestBodyMode.Form,
+            ContentType = string.Empty,
+        };
+        var resolver = CreateResolver();
+
+        var result = resolver.ResolveModel<HttpRequestSettings>("test", settings, EditableModelSchemaBuilder.Build(typeof(HttpRequestSettings)));
+
+        result.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void ResolveModel_VisibleRequiredField_IsStillValidated()
+    {
+        var settings = new HttpRequestSettings
+        {
+            Url = "https://example.com",
+            BodyMode = HttpRequestBodyMode.Raw,
+            ContentType = string.Empty,
+        };
+        var resolver = CreateResolver();
+
+        var act = () => resolver.ResolveModel<HttpRequestSettings>("test", settings, EditableModelSchemaBuilder.Build(typeof(HttpRequestSettings)));
+
+        Should.Throw<InvalidOperationException>(act).Message.ShouldContain("Content Type");
+    }
+
+    [Fact]
+    public void ResolveModel_EmptyHeaders_IsValid()
+    {
+        var settings = new HttpRequestSettings { Url = "https://example.com", Headers = [] };
+        var resolver = CreateResolver();
+
+        var result = resolver.ResolveModel<HttpRequestSettings>("test", settings, EditableModelSchemaBuilder.Build(typeof(HttpRequestSettings)));
+
+        result!.Headers.ShouldBeEmpty();
+    }
+
+    #endregion
+
     #region Test models
 
     public class FakeSettings
