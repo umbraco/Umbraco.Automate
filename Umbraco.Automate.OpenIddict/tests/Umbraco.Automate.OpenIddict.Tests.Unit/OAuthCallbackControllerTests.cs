@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Client.AspNetCore;
-using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Automate.OpenIddict.Controllers;
 using Umbraco.Automate.OpenIddict.Credentials;
 using static OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants;
@@ -172,43 +171,6 @@ public class OAuthCallbackControllerTests
         var result = (await _controller.Callback("slack")).ShouldBeOfType<RedirectResult>();
 
         result.Url.ShouldBe("/umbraco#automate-oauth=1&provider=slack&nonce=nonce-1&error=Authentication%20failed.");
-    }
-
-    [Fact]
-    public async Task ObsoleteConstructor_ResolvesNewDependenciesFromStaticServiceProvider()
-    {
-        // The single-argument constructor is kept for binary compatibility (removed in Umbraco 20).
-        // It must resolve the dependencies added since from StaticServiceProvider and produce a
-        // controller whose tokens the injected protector can read.
-        var staticServices = new ServiceCollection()
-            .AddSingleton<IDataProtectionProvider>(_dataProtectionProvider)
-            .AddSingleton(TimeProvider.System)
-            .BuildServiceProvider();
-
-        var previous = StaticServiceProvider.Instance;
-        StaticServiceProvider.Instance = staticServices;
-        try
-        {
-#pragma warning disable CS0618 // Type or member is obsolete
-            var controller = new OAuthCallbackController(_credentialsService.Object);
-#pragma warning restore CS0618 // Type or member is obsolete
-            controller.ControllerContext = _controller.ControllerContext;
-
-            SetUpSuccessfulAuthentication("Slack");
-            var id = Guid.NewGuid();
-            SetUpCreateReturningId(id);
-
-            var result = (await controller.Callback("slack")).ShouldBeOfType<ContentResult>();
-
-            var token = Regex.Match(result.Content!, "\"credentialToken\":\"([^\"]+)\"").Groups[1].Value;
-            var handoff = Protector().Unprotect(token);
-            handoff.Status.ShouldBe(OAuthCredentialsHandoffStatus.Valid);
-            handoff.CredentialId.ShouldBe(id);
-        }
-        finally
-        {
-            StaticServiceProvider.Instance = previous;
-        }
     }
 
     private OAuthCredentialsHandoffProtector Protector() => new(_dataProtectionProvider, TimeProvider.System);

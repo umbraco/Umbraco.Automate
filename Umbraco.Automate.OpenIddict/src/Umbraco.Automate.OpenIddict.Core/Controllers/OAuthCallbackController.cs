@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Client.AspNetCore;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Cms.Api.Common.Attributes;
-using Umbraco.Cms.Core.DependencyInjection;
 using static OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants;
 
 namespace Umbraco.Automate.OpenIddict.Controllers;
@@ -30,24 +28,6 @@ public sealed class OAuthCallbackController : ControllerBase
     /// <summary>
     /// Initializes a new instance of the <see cref="OAuthCallbackController"/> class.
     /// </summary>
-    [Obsolete("Please use the constructor with all parameters. Scheduled for removal in Umbraco 20.")]
-    public OAuthCallbackController(IOAuthCredentialsService credentialService)
-        : this(
-            credentialService,
-            StaticServiceProvider.Instance.GetRequiredService<IDataProtectionProvider>(),
-            StaticServiceProvider.Instance.GetRequiredService<TimeProvider>())
-    {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="OAuthCallbackController"/> class.
-    /// </summary>
-    /// <remarks>
-    /// Marked as the activation constructor: MVC builds controllers through <c>ActivatorUtilities</c>,
-    /// which throws when it can satisfy more than one constructor. The obsolete overload is kept for
-    /// binary compatibility, so this attribute is what keeps activation unambiguous.
-    /// </remarks>
-    [ActivatorUtilitiesConstructor]
     public OAuthCallbackController(
         IOAuthCredentialsService credentialService,
         IDataProtectionProvider dataProtectionProvider,
