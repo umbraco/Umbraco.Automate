@@ -16,6 +16,20 @@ export interface UaStepRunModel {
     durationMs: number | null;
 }
 
+/**
+ * A recorded run payload prepared for display by the server: pretty-printed JSON with
+ * sensitive values masked, or `null` when nothing was recorded.
+ */
+export interface UaRunDataValueModel {
+    value: string | null;
+    truncated: boolean;
+}
+
+export interface UaStepRunDataModel {
+    input: UaRunDataValueModel;
+    output: UaRunDataValueModel;
+}
+
 export interface UaRunDetailModel extends UmbEntityModel {
     unique: string;
     entityType: string;
@@ -27,6 +41,8 @@ export interface UaRunDetailModel extends UmbEntityModel {
     initiatedBy: string;
     correlationId: string | null;
     error: string | null;
+    /** The alias of the trigger that started the run, from the automation version that ran. */
+    triggerAlias: string | null;
     stepRuns: UaStepRunModel[];
 }
 

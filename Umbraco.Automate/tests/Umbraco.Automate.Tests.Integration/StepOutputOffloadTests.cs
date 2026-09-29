@@ -417,6 +417,83 @@ public class StepOutputOffloadTests : IAsyncLifetime
         StepOutputReference.TryGetTriggerRunId(data.TriggerOutput, out _).ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task OffloadedOutput_IsServedInFullByStepRunData_WithInputRecorded()
+    {
+        // The run view loads a step's payloads through GetStepRunDataAsync. An offloaded output
+        // lives only on the step run record, so that is where the full value must come from.
+        var payload = PayloadSentinel + new string('x', 4000);
+        var bigStep = LogStep("bigLog", payload);
+        var tailStep = LogStep("tailLog", "done");
+
+        var automation = BuildAutomation("test-offload-step-run-data", bigStep, tailStep);
+        await TriggerAsync(automation, new Dictionary<string, object?> { ["country"] = "dk" });
+
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+        var data = instance.Data.ShouldBeOfType<AutomationWorkflowData>();
+        StepOutputReference.TryGetStepRunId(data.StepOutputs[bigStep.Id], out var bigStepRunId).ShouldBeTrue();
+
+        var stepRunData = await _runRepository.GetStepRunDataAsync(run.Id, bigStepRunId);
+
+        stepRunData.ShouldNotBeNull();
+        stepRunData.AutomationId.ShouldBe(automation.Id);
+        stepRunData.ActionAlias.ShouldBe("umbracoAutomate.logMessage");
+        ReadMessage(stepRunData.OutputData!).ShouldBe(payload);
+
+        // The input is the step's resolved settings.
+        ReadMessage(stepRunData.InputData!).ShouldBe(payload);
+
+        // Sanitized for display, the offloaded output comes back whole (it is under the cap).
+        var sanitizer = new RunDataSanitizer(
+            _provider.GetRequiredService<ActionCollection>(),
+            _provider.GetRequiredService<ControlFlowCollection>(),
+            _provider.GetRequiredService<ILogger<RunDataSanitizer>>());
+        var output = sanitizer.SanitizeStepOutput(stepRunData.ActionAlias, stepRunData.OutputData);
+        output.Truncated.ShouldBeFalse();
+        ReadMessage(output.Value!).ShouldBe(payload);
+
+        // A step run is only found under its own run.
+        (await _runRepository.GetStepRunDataAsync(Guid.NewGuid(), bigStepRunId)).ShouldBeNull();
+
+        var triggerData = await _runRepository.GetTriggerDataAsync(run.Id);
+        triggerData.ShouldNotBeNull();
+        triggerData.AutomationId.ShouldBe(automation.Id);
+        triggerData.TriggerData.ShouldNotBeNull();
+        triggerData.TriggerData!.ShouldContain("dk");
+        (await _runRepository.GetTriggerDataAsync(Guid.NewGuid())).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task StepInput_IsRecordedWithSecretsMasked_WhileOutputIsStoredUnchanged()
+    {
+        // The recorded input exists only for display, so secrets are masked before it is stored.
+        // The output is stored exactly as produced (later steps bind into it) and masked on read.
+        const string secret = "leak-me-if-you-can";
+        var secretStep = LogStep("secretLog", $$"""{"access_token":"{{secret}}","scope":"read"}""");
+        var tailStep = LogStep("tailLog", "done");
+
+        var automation = BuildAutomation("test-step-input-masked", secretStep, tailStep);
+        await TriggerAsync(automation);
+
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        var completed = await _runRepository.GetAsync(run.Id);
+        var secretRun = completed!.StepRuns.Single(s => s.StepId == secretStep.Id);
+
+        secretRun.InputData.ShouldNotBeNull();
+        secretRun.InputData.ShouldNotContain(secret);
+        secretRun.InputData.ShouldContain("read");
+        secretRun.OutputData.ShouldContain(secret);
+
+        var sanitizer = new RunDataSanitizer(
+            _provider.GetRequiredService<ActionCollection>(),
+            _provider.GetRequiredService<ControlFlowCollection>(),
+            _provider.GetRequiredService<ILogger<RunDataSanitizer>>());
+        sanitizer.SanitizeStepOutput(secretRun.ActionAlias, secretRun.OutputData).Value.ShouldNotContain(secret);
+    }
+
     private static StepConfiguration LogStep(string alias, string message) => new()
     {
         Id = Guid.NewGuid(),
