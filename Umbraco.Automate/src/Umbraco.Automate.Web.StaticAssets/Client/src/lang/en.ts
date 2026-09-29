@@ -142,6 +142,8 @@ export default {
         searchPlaceholder: "Search...",
         noResults: "No items found",
         loadError: "Failed to load catalogue items",
+        connectionRequired: (connectionTypeName: string) =>
+            `Needs a ${connectionTypeName} connection in this workspace's Allowed Connections.`,
     },
     uaBindings: {
         insertExpression: "Insert Binding Expression",
@@ -229,6 +231,7 @@ export default {
         testWarning: "Connection test inconclusive",
         testFailure: "Connection test failed",
         testError: "Could not reach the server to test this connection.",
+        testSaveRequired: "Fix the errors and save the connection before testing it.",
     },
     uaApproval: {
         dashboardTitle: "Approvals",
@@ -277,6 +280,14 @@ export default {
         caseNamePlaceholder: "e.g. high-priority",
         caseName: "Case name",
         defaultInfo: "Cases are evaluated in order. The first matching case wins. A 'default' outcome handles unmatched conditions.",
+    },
+    uaKeyValueEditor: {
+        key: "Key",
+        value: "Value",
+        keyPlaceholder: "Name",
+        valuePlaceholder: "Value",
+        addRow: "Add row",
+        removeRow: "Remove row",
     },
     uaVersionHistory: {
         history: "History",

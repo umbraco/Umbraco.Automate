@@ -1,3 +1,5 @@
+using Json.Schema.Generation;
+
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
 /// <summary>
@@ -10,30 +12,36 @@ public sealed class ApprovalRequestOutput
     /// <summary>
     /// Gets the approval prompt message shown to approvers.
     /// </summary>
+    [Description("The approval prompt message shown to approvers.")]
     public required string Prompt { get; init; }
 
     /// <summary>
     /// Gets the id of the run the approval belongs to.
     /// </summary>
+    [Description("The id of the automation run the approval belongs to.")]
     public Guid RunId { get; init; }
 
     /// <summary>
     /// Gets the id of the step awaiting approval.
     /// </summary>
+    [Description("The id of the step awaiting approval.")]
     public Guid StepId { get; init; }
 
     /// <summary>
     /// Gets the id of the automation the approval belongs to.
     /// </summary>
+    [Description("The id of the automation the approval belongs to.")]
     public Guid AutomationId { get; init; }
 
     /// <summary>
     /// Gets the UTC time the approval was requested.
     /// </summary>
+    [Description("The UTC date and time the approval was requested.")]
     public DateTime RequestedUtc { get; init; }
 
     /// <summary>
     /// Gets the optional timeout, in hours, after which the step auto-rejects.
     /// </summary>
+    [Description("The optional timeout, in hours, after which the step auto-rejects.")]
     public int? TimeoutHours { get; init; }
 }

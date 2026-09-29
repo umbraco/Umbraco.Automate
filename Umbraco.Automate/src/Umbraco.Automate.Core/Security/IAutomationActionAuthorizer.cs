@@ -31,6 +31,24 @@ public interface IAutomationActionAuthorizer
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for the
+    /// content root. Distinct from <see cref="AuthorizeContentAsync(Guid, IReadOnlySet{string}, CancellationToken)"/>
+    /// because the root is not a node and has no key: an account with a content start node is
+    /// confined to that subtree and cannot write to the root at all.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeContentRootAsync(
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for the
+    /// media root. Distinct from <see cref="AuthorizeMediaAsync(Guid, CancellationToken)"/>
+    /// because the root is not a node and has no key: an account with a media start node is
+    /// confined to that subtree and cannot write to the root at all.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeMediaRootAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Filters a set of content keys to only those the ambient service account is
     /// authorised to access for the given permission letters. Used by search/list actions to
     /// suppress unauthorised results.
@@ -67,5 +85,27 @@ public interface IAutomationActionAuthorizer
     Task<AutomationAuthorizationResult> AuthorizeMediaAsync(
         IUser user,
         Guid mediaKey,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for a
+    /// target parent content node, or the content root when <paramref name="parentKey"/> is
+    /// <c>null</c>. Used by actions that relocate content (e.g. Move) and must authorise the
+    /// destination as well as the source — a node-only check would let an account escape its
+    /// start-node scope by moving into an unrelated, unauthorised subtree.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeContentParentAsync(
+        Guid? parentKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for a
+    /// target parent media node, or the media root when <paramref name="parentKey"/> is
+    /// <c>null</c>. See <see cref="AuthorizeContentParentAsync"/> for why this is separate from
+    /// <see cref="AuthorizeMediaAsync(Guid, CancellationToken)"/>.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeMediaParentAsync(
+        Guid? parentKey,
         CancellationToken cancellationToken);
 }

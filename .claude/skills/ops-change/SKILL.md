@@ -26,7 +26,7 @@ guess at one, and never silently succeed.
 
 | Action | What it must do |
 |---|---|
-| `implement` | Make the change the issue asks for on a work branch, and push it. Where the context carries a port source this is a port, not a replay: adapt the change to the target line, because a port that needs adapting is a real change. |
+| `implement` | Make the change the issue asks for on a work branch, push it, and open the PR onto that line's base via `ops-branching · open-pr`. Opening it is part of this action: `ops-branching` is `supporting`, so no loop may call it, and a branch pushed without a PR strands the change. Where the context carries a port source this is a port, not a replay: adapt the change to the target line, because a port that needs adapting is a real change. |
 | `verify` | Run this repo's build, tests and sanity checks against the change, and report pass or fail with enough detail for the caller to act on a failure. |
 | `close-issue` | Told that a PR has landed, work out which issue it was for and close that issue only once EVERY target line has landed — one logical change lands N times at N moments. The caller passes the PR, not the issue, because how a PR references its issue and which lines are targets are both repo facts. MUST close explicitly: a `Closes #N` keyword does not cross repos. MUST tolerate an already-closed issue, and MUST report `closed: false` with the lines still outstanding rather than closing early. |
 
@@ -71,7 +71,9 @@ port source this is a port, not a replay: adapt the change to the target line.
 **Facts to return:**
 
 - `branch` — string — the branch the work was pushed to
-- `summary` — string — what was changed, for the PR body
+- `pr_number` — integer — the PR opened onto the line's base, or the existing one
+- `url` — string — that PR's URL, so the caller can comment it on the issue
+- `summary` — string — what was changed, used as the PR body
 
 ### Steps
 
@@ -86,8 +88,11 @@ port source this is a port, not a replay: adapt the change to the target line.
    > still belongs to `ops-branching` — see step 3.
 
 2. **Idempotency check.** Ask `github-ops` whether that branch already exists on the remote.
-   If it does, do not implement again: return the existing branch with a summary read from its
-   commits, and stop.
+   If it does, do not implement again: read a summary from its commits and **skip to step 9**.
+
+   > **Skip to step 9, do not stop here.** A branch an earlier run pushed may still have no PR,
+   > and stopping at step 2 leaves it that way forever. Step 9 is idempotent, so going through
+   > it either opens the PR that is missing or returns the one already open.
 
 3. **Get the workspace.** Call `ops-workspace · prepare` with the branch. Let it root the branch
    on the line's integration branch — do not resolve `v17/dev` here by hand. Everything below
@@ -115,8 +120,7 @@ port source this is a port, not a replay: adapt the change to the target line.
 
 7. **Push** the branch.
 
-8. Return `{"ok": true, "branch": "…", "summary": "…"}`. Write the summary as PR-body prose: what
-   changed, why, and how a reviewer can test it.
+8. **Write the summary** as PR-body prose: what changed, why, and how a reviewer can test it.
 
    **Leave the port decision open, and say so.** End the summary with the template's *Other
    version lines* section, both boxes **unticked**, naming the other live lines and asking the
@@ -127,9 +131,24 @@ port source this is a port, not a replay: adapt the change to the target line.
    When this change **is itself** a backport (`port` was non-null), say which line and PR it came
    from and title the PR the way the repo already does — `… (v17 backport)`, as in #175 and #176.
 
+9. **Open the PR.** Call `ops-branching · open-pr` with `{ branch, line, title, body: summary }`.
+   It resolves the base for the line itself, so pass the **line** (`v17`) and never a branch
+   name (`v17/dev`). The title is the change in conventional-commit form, sentence-case after
+   the type, matching the branch's commits, and for a backport it carries the suffix step 8
+   just described.
+
+   > **Not optional, and no caller can do it instead.** `ops-branching` is a `supporting`
+   > capability, so a loop is forbidden from calling it, and `ops-issue-loop` treats an
+   > `implement` that returns no `pr_number` as a failure. Stopping at a pushed branch leaves
+   > the work with no PR and the issue blocked — which is what happened on #305 (18-09-2026).
+
+10. Return `{"ok": true, "branch": "…", "pr_number": …, "url": "…", "summary": "…"}`.
+
 **Idempotency (a MUST).** The branch name is derived purely from `issue.number` and `line`, so
 the same context always produces the same name. Step 2 detects an existing remote branch and
-returns it untouched instead of implementing a second time.
+returns it untouched instead of implementing a second time. Step 9 is idempotent too:
+`open-pr` returns an existing open PR from that head branch rather than opening a second one, so
+a re-run of a change whose branch is already pushed still comes back with its `pr_number`.
 
 ## Action: `verify`
 

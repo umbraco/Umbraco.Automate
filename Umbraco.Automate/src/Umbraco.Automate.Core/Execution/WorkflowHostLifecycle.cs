@@ -11,17 +11,20 @@ namespace Umbraco.Automate.Core.Execution;
 internal sealed class WorkflowHostLifecycle : BackgroundService
 {
     private readonly IWorkflowHost _workflowHost;
+    private readonly IStuckRunRecovery _stuckRunRecovery;
     private readonly WorkflowDefinitionRecovery _definitionRecovery;
     private readonly AutomateReadinessSignal _readinessSignal;
     private readonly ILogger<WorkflowHostLifecycle> _logger;
 
     public WorkflowHostLifecycle(
         IWorkflowHost workflowHost,
+        IStuckRunRecovery stuckRunRecovery,
         WorkflowDefinitionRecovery definitionRecovery,
         AutomateReadinessSignal readinessSignal,
         ILogger<WorkflowHostLifecycle> logger)
     {
         _workflowHost = workflowHost;
+        _stuckRunRecovery = stuckRunRecovery;
         _definitionRecovery = definitionRecovery;
         _readinessSignal = readinessSignal;
         _logger = logger;
@@ -36,6 +39,11 @@ internal sealed class WorkflowHostLifecycle : BackgroundService
                 "Resolve the migration failure and restart.");
             return;
         }
+
+        // Fail runs the previous process left in flight, and terminate their instances, before
+        // the host starts — otherwise the engine resumes them and re-executes the interrupted step
+        // behind a run already reported as failed.
+        await _stuckRunRecovery.RecoverStuckRunsAsync(stoppingToken);
 
         // Re-register workflow definitions for in-flight instances before starting the host,
         // so WorkflowCore's poller can resume them without "not registered" errors.

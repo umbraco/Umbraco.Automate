@@ -1,4 +1,6 @@
 using System.Data;
+using ActionContext = Umbraco.Automate.Core.Actions.ActionContext;
+using ActionResult = Umbraco.Automate.Core.Actions.ActionResult;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
@@ -6,11 +8,13 @@ using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
@@ -18,8 +22,6 @@ using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Services;
-using ActionContext = Umbraco.Automate.Core.Actions.ActionContext;
-using ActionResult = Umbraco.Automate.Core.Actions.ActionResult;
 
 namespace Umbraco.Automate.Tests.Unit.Automations;
 
@@ -112,6 +114,22 @@ public class AutomationServicePublishSectionValidationTests
         ex.Errors.ShouldContain(e => e.Contains("Service account") && e.Contains("not found"));
     }
 
+    [Fact]
+    public async Task Publish_fails_when_step_publish_validation_returns_errors()
+    {
+        var (service, repo) = BuildService(
+            triggers: [new UniversalTrigger(TriggerDeps)],
+            actions: [new PublishCheckedAction(ActionDeps)],
+            allowedSections: ["content"]);
+
+        var automation = SetupAutomation(repo, "test.universalTrigger", ["test.publishCheckedAction"]);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain(e => e == $"Step 'Step 1': {PublishCheckedAction.Error}");
+    }
+
     private static Automation SetupAutomation(Mock<IAutomationRepository> repo, string triggerAlias, string[] actionAliases)
     {
         var automation = new AutomationBuilder()
@@ -201,7 +219,10 @@ public class AutomationServicePublishSectionValidationTests
             actionCollection,
             triggerCollection,
             controlFlowCollection,
-            new SensitiveSettingsStripper(actionCollection, triggerCollection, controlFlowCollection, connectionTypeCollection),
+            new SensitiveSettingsStripper(
+                actionCollection, triggerCollection, controlFlowCollection, connectionTypeCollection,
+                new WebhookAuthenticatorCollection(() => []),
+                new NotificationChannelCollection(() => [])),
             new SectionAccessChecker());
 
         return (service, repo);
@@ -227,6 +248,20 @@ public class AutomationServicePublishSectionValidationTests
     {
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => throw new NotImplementedException();
+    }
+
+    [Action("test.publishCheckedAction", "Publish Checked Action")]
+    private sealed class PublishCheckedAction(ActionInfrastructure infrastructure)
+        : ActionBase<object, object>(infrastructure), IPublishValidatableStepType
+    {
+        public const string Error = "Not ready to publish.";
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<string>> ValidateSettingsForPublishAsync(
+            object? settings, Automation automation, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<string>>([Error]);
     }
 
     #endregion

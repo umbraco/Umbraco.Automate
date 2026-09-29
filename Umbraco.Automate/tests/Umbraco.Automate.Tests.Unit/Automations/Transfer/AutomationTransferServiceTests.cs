@@ -5,11 +5,13 @@ using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
@@ -63,7 +65,10 @@ public class AutomationTransferTests
             _actions,
             _triggers,
             _controlFlows,
-            new SensitiveSettingsStripper(_actions, _triggers, _controlFlows, connectionTypes),
+            new SensitiveSettingsStripper(
+                _actions, _triggers, _controlFlows, connectionTypes,
+                new WebhookAuthenticatorCollection(() => []),
+                new NotificationChannelCollection(() => [])),
             new SectionAccessChecker());
     }
 

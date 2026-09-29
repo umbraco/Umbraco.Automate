@@ -20,6 +20,7 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Messaging;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Scripting;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
@@ -79,6 +80,13 @@ public class StepOutputOffloadTests : IAsyncLifetime
             {
                 new LogMessageAction(deps, LoggerFactory.Create(b => b.AddDebug()).CreateLogger<LogMessageAction>()),
                 new RequestApprovalAction(deps),
+                new RunScriptAction(
+                    deps,
+                    new ScriptExecutor(Mock.Of<IHttpClientFactory>(), LoggerFactory.Create(b => b.AddDebug()).CreateLogger<ScriptExecutor>()),
+                    new ScriptValidator(),
+                    Options.Create(new ScriptingOptions()),
+                    Options.Create(new ExecutionOptions()),
+                    LoggerFactory.Create(b => b.AddDebug()).CreateLogger<RunScriptAction>()),
             };
         });
 
@@ -369,6 +377,44 @@ public class StepOutputOffloadTests : IAsyncLifetime
         var blob = SerializeAsPersistenceBlob(data);
         blob.ShouldContain(country);
         blob.ShouldNotContain(StepOutputReference.TriggerMarkerKey);
+    }
+
+    [Fact]
+    public async Task LargeOutputs_AreHydratedIntoRunScriptData()
+    {
+        // A Run Script step receives the binding context as `data`, so offloaded outputs — a
+        // step's and the trigger's — must be hydrated into it rather than showing up as markers.
+        var stepPayload = PayloadSentinel + new string('x', 4000);
+        var triggerPayload = PayloadSentinel + new string('t', 3000);
+        var bigStep = LogStep("bigLog", stepPayload);
+        var scriptStep = new StepConfiguration
+        {
+            Id = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.runScript",
+            Name = "script",
+            Alias = "script",
+            Settings = new Dictionary<string, object?>
+            {
+                ["script"] = "export default (data) => data.steps.bigLog.message.length + '|' + data.trigger.payload.length",
+            },
+        };
+
+        var automation = BuildAutomation("test-offload-run-script", bigStep, scriptStep);
+        await TriggerAsync(automation, new Dictionary<string, object?> { ["payload"] = triggerPayload });
+
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        var completed = await _runRepository.GetAsync(run.Id);
+        var scriptRun = completed!.StepRuns.Single(s => s.StepId == scriptStep.Id);
+        scriptRun.Status.ShouldBe(StepRunStatus.Completed, scriptRun.Error);
+        using var doc = JsonDocument.Parse(scriptRun.OutputData!);
+        doc.RootElement.GetProperty("result").GetString().ShouldBe($"{stepPayload.Length}|{triggerPayload.Length}");
+
+        // Both really were offloaded, so the script read them through hydration.
+        var data = instance.Data.ShouldBeOfType<AutomationWorkflowData>();
+        StepOutputReference.TryGetStepRunId(data.StepOutputs[bigStep.Id], out _).ShouldBeTrue();
+        StepOutputReference.TryGetTriggerRunId(data.TriggerOutput, out _).ShouldBeTrue();
     }
 
     private static StepConfiguration LogStep(string alias, string message) => new()

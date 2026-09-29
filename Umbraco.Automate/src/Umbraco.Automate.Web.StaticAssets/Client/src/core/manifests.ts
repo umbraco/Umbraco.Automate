@@ -1,6 +1,7 @@
 import { manifests as versionHistoryManifests } from "./version-history/manifests.js";
 import { conditionBuilderManifests } from "./components/condition-builder/manifests.js";
 import { switchCaseBuilderManifests } from "./components/switch-case-builder/manifests.js";
+import { keyValueEditorManifests } from "./components/key-value-editor/manifests.js";
 import { bindingPickerManifests } from "./components/binding-picker/manifests.js";
 import { bindingTextBoxManifests } from "./components/binding-text-box/manifests.js";
 import { bindingTextAreaManifests } from "./components/binding-text-area/manifests.js";
@@ -12,11 +13,13 @@ import { sensitiveFieldManifests } from "./components/sensitive-field/manifests.
 import { editorNotificationSeverityPickerManifests } from "./components/editor-notification-severity-picker/manifests.js";
 import { memberTypePickerManifests } from "./components/member-type-picker/manifests.js";
 import { userGroupPickerManifests } from "./components/user-group-picker/manifests.js";
+import { automationPickerManifests } from "./components/automation-picker/manifests.js";
 
 export const manifests: UmbExtensionManifest[] = [
     ...versionHistoryManifests,
     ...conditionBuilderManifests,
     ...switchCaseBuilderManifests,
+    ...keyValueEditorManifests,
     ...bindingPickerManifests,
     ...bindingTextBoxManifests,
     ...bindingTextAreaManifests,
@@ -28,4 +31,5 @@ export const manifests: UmbExtensionManifest[] = [
     ...editorNotificationSeverityPickerManifests,
     ...memberTypePickerManifests,
     ...userGroupPickerManifests,
+    ...automationPickerManifests,
 ];

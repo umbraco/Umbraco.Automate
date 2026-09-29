@@ -20,21 +20,46 @@ internal static class HttpResponseBodyReader
     /// <returns>The decoded body, or <c>null</c> if it exceeds <paramref name="maxBytes"/>.</returns>
     public static async Task<string?> ReadCappedAsync(HttpContent content, long maxBytes, CancellationToken cancellationToken)
     {
+        var buffer = await ReadCappedBytesAsync(content, maxBytes, cancellationToken);
+        if (buffer is null)
+        {
+            return null;
+        }
+
+        using (buffer)
+        {
+            return ResolveEncoding(content.Headers.ContentType?.CharSet).GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+        }
+    }
+
+    /// <summary>
+    /// Reads <paramref name="content"/> up to <paramref name="maxBytes"/> as raw bytes, returning
+    /// <c>null</c> when the body turns out to be larger. Used for binary payloads — media files —
+    /// that must not be decoded as text. The returned stream is rewound and owned by the caller.
+    /// </summary>
+    /// <param name="content">The response content to read.</param>
+    /// <param name="maxBytes">The maximum number of bytes to buffer.</param>
+    /// <param name="cancellationToken">A token to cancel the read.</param>
+    /// <returns>The buffered body positioned at zero, or <c>null</c> if it exceeds <paramref name="maxBytes"/>.</returns>
+    public static async Task<MemoryStream?> ReadCappedBytesAsync(HttpContent content, long maxBytes, CancellationToken cancellationToken)
+    {
         await using var stream = await content.ReadAsStreamAsync(cancellationToken);
-        using var buffer = new MemoryStream();
+        var buffer = new MemoryStream();
         var chunk = new byte[81920];
         int read;
         while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
         {
             if (buffer.Length + read > maxBytes)
             {
+                await buffer.DisposeAsync();
                 return null;
             }
 
             buffer.Write(chunk, 0, read);
         }
 
-        return ResolveEncoding(content.Headers.ContentType?.CharSet).GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+        buffer.Position = 0;
+        return buffer;
     }
 
     private static Encoding ResolveEncoding(string? charset)

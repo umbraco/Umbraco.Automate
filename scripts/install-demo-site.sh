@@ -48,27 +48,8 @@ echo "========================================="
 echo "Working directory: $REPO_ROOT"
 echo ""
 
-# Toolchain check — required Node version comes from package.json's engines.node, so this
-# stays in lockstep with the npm-side enforcement and the .nvmrc.
-REQUIRED_NODE_RANGE=$(grep -oE '"node"[[:space:]]*:[[:space:]]*"[^"]+"' "$REPO_ROOT/package.json" | head -1 | grep -oE '"[^"]+"$' | tr -d '"')
-REQUIRED_NODE_MAJOR=$(echo "$REQUIRED_NODE_RANGE" | grep -oE '[0-9]+' | head -1)
-if [ -z "$REQUIRED_NODE_MAJOR" ]; then
-    echo "ERROR: Could not parse engines.node ('$REQUIRED_NODE_RANGE') from package.json." >&2
-    exit 1
-fi
-if ! command -v node >/dev/null 2>&1; then
-    echo "ERROR: Node.js is not installed or not on PATH. package.json requires '$REQUIRED_NODE_RANGE'." >&2
-    echo "Install Node $REQUIRED_NODE_MAJOR+ (e.g. 'nvm install $REQUIRED_NODE_MAJOR && nvm use $REQUIRED_NODE_MAJOR') and re-run." >&2
-    exit 1
-fi
-NODE_VERSION_RAW=$(node --version | sed 's/^v//')
-NODE_MAJOR=${NODE_VERSION_RAW%%.*}
-if [ "${NODE_MAJOR:-0}" -lt "$REQUIRED_NODE_MAJOR" ]; then
-    echo "ERROR: Node $NODE_VERSION_RAW detected; package.json requires '$REQUIRED_NODE_RANGE'." >&2
-    echo "Run 'nvm install $REQUIRED_NODE_MAJOR && nvm use $REQUIRED_NODE_MAJOR' (or equivalent) before re-running this script." >&2
-    exit 1
-fi
-echo "Node $NODE_VERSION_RAW detected (satisfies '$REQUIRED_NODE_RANGE')."
+# Toolchain check (shared with build-frontend.sh). Sourced so a PATH fix sticks.
+REQUIRE_NODE_REPO_ROOT="$REPO_ROOT" . "$SCRIPT_DIR/require-node.sh"
 echo ""
 
 # Detect template version and major from Directory.Packages.props.
@@ -170,22 +151,25 @@ else
 fi
 popd > /dev/null
 
-# Step 3.2: Set fixed port for consistent development
-echo "Configuring fixed port (44380)..."
+# Step 3.2: Install the launch profile (the dev port itself is assigned in step 3.3)
+echo "Installing launch profile..."
 mkdir -p "$DEMO_SITE_DIR/Properties"
 cp "$SCRIPT_DIR/templates/launchSettings.json" "$DEMO_SITE_DIR/Properties/launchSettings.json"
 
-# Step 3.3: Add NamedPipeListenerComposer for HTTP over named pipes
-echo "Adding NamedPipeListenerComposer for HTTP over named pipes..."
-mkdir -p "$DEMO_SITE_DIR/Composers"
-cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "$DEMO_SITE_DIR/Composers/NamedPipeListenerComposer.cs"
+# Step 3.3: Add Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port
+echo "Adding Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port..."
+pushd "$DEMO_SITE_DIR" > /dev/null
+dotnet add package Umbraco.Community.WorktreeDevPort
+popd > /dev/null
 
-# Step 3.4: Point Umbraco.Automate at the CMS database
+# Step 3.4: Point Umbraco.Automate at the CMS database, and keep 44380 for the main checkout
 # Automate needs its own connection string (defaults to umbracoAutomateDbDSN) or it throws
 # on first run. For the demo we reuse the CMS SQLite connection (umbracoDbDSN) via
 # UseNamedConnectionString so a single database backs both CMS and Automate. This must be
 # configured before the first run, otherwise startup fails. Node is guaranteed present by the
 # toolchain check above, so we use it to edit the JSON robustly (no jq dependency).
+# WorktreeDevPort:MainWorktreePort keeps the familiar 44380 for the main checkout; linked
+# worktrees get their own port from the 44300+ pool and never take 44380.
 echo "Configuring Umbraco.Automate to share the CMS database..."
 DEV_SETTINGS_PATH="$DEMO_SITE_DIR/appsettings.Development.json"
 node -e '
@@ -195,6 +179,8 @@ const s = JSON.parse(fs.readFileSync(p, "utf8"));
 s.Umbraco = s.Umbraco || {};
 s.Umbraco.Automate = s.Umbraco.Automate || {};
 s.Umbraco.Automate.UseNamedConnectionString = "umbracoDbDSN";
+s.WorktreeDevPort = s.WorktreeDevPort || {};
+s.WorktreeDevPort.MainWorktreePort = 44380;
 fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
 ' "$DEV_SETTINGS_PATH"
 

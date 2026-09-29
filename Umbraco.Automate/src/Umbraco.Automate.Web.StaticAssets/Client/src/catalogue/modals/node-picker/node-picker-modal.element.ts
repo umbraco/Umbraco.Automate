@@ -66,13 +66,11 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
             }
             items = [...(actionsResult.data ?? []), ...(controlFlowsResult.data ?? [])];
 
-            // Filter out actions that require a connection type not available in the workspace.
+            // Actions that need a connection type the workspace has no allowed connection for stay
+            // listed (so users can find them) but are marked unavailable with an explanation.
             const availableTypes = await this.#resolveAvailableConnectionTypes();
             if (availableTypes) {
-                items = items.filter((item) => {
-                    const alias = (item as UaActionCatalogueItemModel).connectionTypeAlias;
-                    return !alias || availableTypes.has(alias);
-                });
+                items = await this.#markUnavailableItems(items, availableTypes);
             }
         }
 
@@ -109,6 +107,41 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
         }
     }
 
+    /**
+     * Returns copies of the items where any action requiring a connection type outside
+     * `availableTypes` carries an `unavailableReason`. Items are copied so cached
+     * repository models are never mutated.
+     */
+    async #markUnavailableItems(
+        items: UaCatalogueItemModel[],
+        availableTypes: Set<string>,
+    ): Promise<UaCatalogueItemModel[]> {
+        const needsConnection = (item: UaCatalogueItemModel) => {
+            const alias = (item as UaActionCatalogueItemModel).connectionTypeAlias;
+            return !!alias && !availableTypes.has(alias);
+        };
+
+        if (!items.some(needsConnection)) return items;
+
+        const typeNames = await this.#resolveConnectionTypeNames();
+
+        return items.map((item) => {
+            if (!needsConnection(item)) return item;
+            const alias = (item as UaActionCatalogueItemModel).connectionTypeAlias!;
+            const typeName = typeNames.get(alias) ?? alias;
+            return {
+                ...item,
+                unavailableReason: this.localize.term("uaCatalogue_connectionRequired", typeName),
+            };
+        });
+    }
+
+    /** Maps connection type alias to display name. Empty map on failure (callers fall back to the alias). */
+    async #resolveConnectionTypeNames(): Promise<Map<string, string>> {
+        const { data } = await this.#repository!.requestConnectionTypes();
+        return new Map((data ?? []).map((type) => [type.alias, type.name]));
+    }
+
     #groupItems(items: UaCatalogueItemModel[]): CatalogueGroup[] {
         const map = new Map<string, UaCatalogueItemModel[]>();
 
@@ -126,7 +159,12 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([name, groupItems]) => ({
                 name,
-                items: groupItems.sort((a, b) => a.name.localeCompare(b.name)),
+                // Available items first, then unavailable ones; alphabetical within each.
+                items: groupItems.sort(
+                    (a, b) =>
+                        Number(!!a.unavailableReason) - Number(!!b.unavailableReason) ||
+                        a.name.localeCompare(b.name),
+                ),
             }));
     }
 
@@ -157,6 +195,7 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
     }
 
     #onSelect(item: UaCatalogueItemModel) {
+        if (item.unavailableReason) return;
         this.value = { item };
         this.modalContext?.submit();
     }
@@ -230,10 +269,13 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
     }
 
     #renderItem(item: UaCatalogueItemModel) {
+        // When unavailable, show the reason in place of the description so the user
+        // understands why the action can't be picked.
         return html`
             <uui-ref-node
                 name=${item.name}
-                detail=${item.description ?? ""}
+                detail=${item.unavailableReason ?? item.description ?? ""}
+                ?disabled=${!!item.unavailableReason}
                 @open=${() => this.#onSelect(item)}
             >
                 <umb-icon slot="icon" name=${item.icon || "icon-plugin"}></umb-icon>
@@ -269,6 +311,10 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
             .error {
                 color: var(--uui-color-danger);
                 text-align: center;
+            }
+
+            uui-ref-node[disabled] {
+                cursor: not-allowed;
             }
 
             .empty {

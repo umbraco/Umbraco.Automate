@@ -187,6 +187,12 @@ internal sealed class ActionStepBody : StepBodyAsync
         switch (result.Suspension)
         {
             case ActionSuspension.WaitForEvent wait:
+                // Take the subscription's start time before the step is shown as waiting.
+                // WorkflowCore only delivers an event published at or after this time, and
+                // callers (an approver, a test) publish as soon as they see WaitingForInput;
+                // a timestamp taken after the write could post-date that event and drop it.
+                var subscribeAsOf = DateTime.UtcNow;
+
                 stepRun.Status = StepRunStatus.WaitingForInput;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
@@ -195,7 +201,7 @@ internal sealed class ActionStepBody : StepBodyAsync
                     "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
                     _stepConfig.Id, wait.EventName, wait.EventKey);
 
-                return ExecutionResult.WaitForEvent(wait.EventName, wait.EventKey, DateTime.UtcNow);
+                return ExecutionResult.WaitForEvent(wait.EventName, wait.EventKey, subscribeAsOf);
 
             case ActionSuspension.Sleep sleep:
                 stepRun.Status = StepRunStatus.Sleeping;

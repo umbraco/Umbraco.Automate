@@ -1,3 +1,5 @@
+using Json.Schema.Generation;
+
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
 /// <summary>
@@ -9,32 +11,41 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class FindMediaMatch
 {
     /// <summary>Gets the media item's unique key.</summary>
+    [Description("The media item's unique key.")]
     public Guid MediaKey { get; init; }
 
     /// <summary>Gets the media item's name.</summary>
+    [Description("The media item's name.")]
     public string? Name { get; init; }
 
     /// <summary>Gets the media type alias.</summary>
+    [Description("The media type alias.")]
     public string MediaTypeAlias { get; init; } = string.Empty;
 
     /// <summary>Gets the parent media key, if available in the index.</summary>
+    [Description("The parent media key, if available in the index.")]
     public Guid? ParentKey { get; init; }
 
     /// <summary>Gets the tree level (1 = root). Zero if unavailable from the index.</summary>
+    [Description("The tree level (1 = root). Zero if unavailable from the index.")]
     public int Level { get; init; }
 
     /// <summary>Gets the node path (comma-separated IDs, CMS internal format).</summary>
+    [Description("The node path (comma-separated IDs, CMS internal format).")]
     public string? Path { get; init; }
 
     /// <summary>
     /// Gets the URL for the media file, resolved from its <c>umbracoFile</c> property.
     /// Null if the media type has no such property or the file can't be resolved.
     /// </summary>
+    [Description("The URL for the media file. Null if the media type has no file property or it can't be resolved.")]
     public string? Url { get; init; }
 
     /// <summary>Gets the creation timestamp (UTC). Default (0001-01-01) if unavailable.</summary>
+    [Description("The creation timestamp (UTC). Default (0001-01-01) if unavailable.")]
     public DateTime CreateDate { get; init; }
 
     /// <summary>Gets the last-edited timestamp (UTC). Default (0001-01-01) if unavailable.</summary>
+    [Description("The last-edited timestamp (UTC). Default (0001-01-01) if unavailable.")]
     public DateTime UpdateDate { get; init; }
 }

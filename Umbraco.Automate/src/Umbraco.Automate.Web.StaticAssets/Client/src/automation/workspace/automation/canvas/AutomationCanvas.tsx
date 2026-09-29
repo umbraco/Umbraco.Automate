@@ -137,51 +137,69 @@ export default function AutomationCanvas({
         [],
     );
 
-    // Prevent self-loops and cycles. For branching nodes (If/Switch), each source handle
-    // can have one outgoing edge. For regular nodes, only one outgoing edge total.
+    // Returns a predicate for the edges a new connection replaces. Each source handle carries one
+    // outgoing connection (an If/Switch/Approval outcome, a container's done handle, a plain step's
+    // output), so drawing from an occupied handle moves that connection. Parallel's body handle is
+    // the exception: it adds another branch alongside the existing ones. Incoming connections are
+    // never replaced, so several branches can converge on one shared downstream step — the server
+    // compiles these merges (WorkflowCompiler.TopologicalSort counts in-degree).
+    const replacedBy = useCallback(
+        (connection: Edge | Connection) => {
+            if (isParallelBranchHandle(connection.source, connection.sourceHandle)) return () => false;
+            return (e: Edge) =>
+                e.source === connection.source && (e.sourceHandle ?? null) === (connection.sourceHandle ?? null);
+        },
+        [isParallelBranchHandle],
+    );
+
+    // Reject self-loops, exact duplicates of an existing connection, and anything that would close
+    // a cycle. Merges (a step with several incoming connections) are allowed.
     const isValidConnection = useCallback(
         (connection: Edge | Connection) => {
             if (connection.source === connection.target) return false;
 
-            // Walk the edge chain from target forward — if we reach source, it's a cycle.
-            // Exclude edges that would be replaced by this connection (same source+handle or same target),
-            // unless this is another Parallel branch, which coexists with the others instead of replacing them.
-            const replacesSourceHandle = isParallelBranchHandle(connection.source, connection.sourceHandle)
-                ? false
-                : (e: Edge) => e.source === connection.source && (e.sourceHandle ?? null) === (connection.sourceHandle ?? null);
-            const remaining = edgesRef.current.filter(
+            const isDuplicate = edgesRef.current.some(
                 (e) =>
-                    !(replacesSourceHandle && replacesSourceHandle(e)) &&
-                    e.target !== connection.target,
+                    e.source === connection.source &&
+                    e.target === connection.target &&
+                    (e.sourceHandle ?? null) === (connection.sourceHandle ?? null) &&
+                    (e.targetHandle ?? null) === (connection.targetHandle ?? null),
             );
-            let current: string | null = connection.target;
+            if (isDuplicate) return false;
+
+            // Walk every path forward from the target. If any reaches the source, the new
+            // connection would close a cycle. Edges this connection replaces are left out, since
+            // they will be gone once it is made.
+            const isReplaced = replacedBy(connection);
+            const successors = new Map<string, string[]>();
+            for (const e of edgesRef.current) {
+                if (isReplaced(e)) continue;
+                const targets = successors.get(e.source);
+                if (targets) targets.push(e.target);
+                else successors.set(e.source, [e.target]);
+            }
+
+            const stack = [connection.target];
             const visited = new Set<string>();
-            while (current) {
+            while (stack.length > 0) {
+                const current = stack.pop()!;
                 if (current === connection.source) return false;
-                if (visited.has(current)) break;
+                if (visited.has(current)) continue;
                 visited.add(current);
-                const next = remaining.find((e) => e.source === current);
-                current = next?.target ?? null;
+                stack.push(...(successors.get(current) ?? []));
             }
             return true;
         },
-        [isParallelBranchHandle],
+        [replacedBy],
     );
 
     const onConnect: OnConnect = useCallback(
         (params) => {
             setEdges((eds) => {
-                // Remove any existing edge from the same source+handle or to the same target.
-                // For branching nodes (If/Switch), each handle can have one connection. A Parallel
-                // branch is the exception — it adds a new branch alongside the existing ones.
-                const replacesSourceHandle = isParallelBranchHandle(params.source, params.sourceHandle)
-                    ? false
-                    : (e: Edge) => e.source === params.source && (e.sourceHandle ?? null) === (params.sourceHandle ?? null);
-                const filtered = eds.filter(
-                    (e) =>
-                        !(replacesSourceHandle && replacesSourceHandle(e)) &&
-                        e.target !== params.target,
-                );
+                // Move the source handle's existing connection (see replacedBy). Other edges into
+                // the target are kept, so branches can rejoin on a shared step.
+                const isReplaced = replacedBy(params);
+                const filtered = eds.filter((e) => !isReplaced(e));
 
                 // Auto-label edges from named handles (If: true/false, Switch: case names)
                 const label = params.sourceHandle ?? undefined;
@@ -193,7 +211,7 @@ export default function AutomationCanvas({
                 return updated;
             });
         },
-        [setEdges, setNodes, emitChange, isParallelBranchHandle],
+        [setEdges, setNodes, emitChange, replacedBy],
     );
 
     // Track the source of a connection drag for drop-to-add.
