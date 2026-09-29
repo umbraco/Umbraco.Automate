@@ -93,6 +93,9 @@ public sealed class MoveContentAction : ActionBase<MoveContentSettings, MoveCont
 
         if (result.Success)
         {
+            var destination = targetParentKey is null ? "the content root" : $"parent {targetParentKey}";
+            context.LogInfo($"Moved {ActionLogFormat.Item(result.Result?.Name, contentKey)} to {destination}");
+
             return Success(new MoveContentOutput
             {
                 ContentKey = contentKey,

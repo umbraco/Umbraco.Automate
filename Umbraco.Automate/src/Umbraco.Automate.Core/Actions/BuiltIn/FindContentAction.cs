@@ -160,10 +160,21 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
             matches = matches.Where(m => authorizedKeys.Contains(m.ContentKey)).ToList();
         }
 
+        var searched = settings.IncludeUnpublished ? "published and unpublished content" : "published content";
+        var hidden = preFilterCount - matches.Count;
+        if (hidden > 0)
+        {
+            context.LogInfo($"{hidden} of {preFilterCount} matches were left out because the service account cannot access them");
+        }
+
         if (matches.Count == 0)
         {
+            context.LogInfo($"No {searched} found with a name matching '{settings.Name}' ({matchMode})");
             return SuccessWithOutcome(OutcomeNotFound, new FindContentOutput());
         }
+
+        var limitNote = preFilterCount >= settings.Limit ? $"; the limit of {settings.Limit} was reached, so there may be more" : string.Empty;
+        context.LogInfo($"Found {matches.Count} {searched} {(matches.Count == 1 ? "item" : "items")} with a name matching '{settings.Name}' ({matchMode}){limitNote}");
 
         return Success(new FindContentOutput
         {

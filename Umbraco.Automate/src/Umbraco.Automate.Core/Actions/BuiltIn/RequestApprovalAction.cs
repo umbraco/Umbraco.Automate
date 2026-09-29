@@ -57,6 +57,10 @@ public sealed class RequestApprovalAction : ActionBase<RequestApprovalSettings, 
             TimeoutHours = settings.TimeoutHours,
         };
 
+        context.LogInfo(settings.TimeoutHours is { } hours and > 0
+            ? $"Waiting for approval, for up to {ActionLogFormat.Duration(TimeSpan.FromHours(hours))}"
+            : "Waiting for approval");
+
         // The suspend-time payload is the pending-approval record, not the declared
         // ApprovalDecisionOutput — there is no decision yet, and the pending-approvals API reads
         // the prompt from it. The typed WaitForInput overload is bypassed for that reason.
