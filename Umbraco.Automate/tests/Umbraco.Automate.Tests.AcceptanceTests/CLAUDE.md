@@ -221,12 +221,8 @@ What can be covered without credentials, `connection.test.spec.ts` does:
 
 ## Known product gaps the suite pins with `test.fixme`
 
-- **Run now is offered on a draft.** `UaEntityAutomationCanRunNowCondition` checks only that the
-  trigger supports manual runs, not that the automation is published, so the entry shows and
-  clicking it gets the server's 409. `automation.run.spec.ts` has the fixme'd spec.
-- **The Runs view does not show step outputs.** They are persisted (`StepRun.OutputData`) but
-  neither the run detail API nor `ua-run-detail-modal` exposes them. The Run Script spec proves
-  the script read upstream `data` by having the script throw unless it did.
+None at present. Both earlier ones are fixed and now covered in `automation.run.spec.ts`: Run
+now offered on a draft (#366), and step outputs missing from the Runs view (#376).
 
 The collection-view Create buttons that used to be dead (no `api` or `kind` on the
 `collectionAction` manifests) were fixed in #297 and are now covered; `collectionCreateButton`

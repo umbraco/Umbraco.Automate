@@ -346,6 +346,24 @@ export class AutomateUiHelper {
     return this.runDetailModal.locator('.step-header');
   }
 
+  /* One ua-step-run-detail per step run, in execution order. The trigger row is a separate element. */
+  runDetailStep(index: number): Locator {
+    return this.runDetailModal.locator('ua-step-run-detail').nth(index);
+  }
+
+  /* Expands a step run, then opens one of its tabs. The labels are localised, so tabs are picked
+   * by their fixed order in ua-step-run-detail: Details, Input, Output. */
+  async openStepRunTab(index: number, tab: 'details' | 'input' | 'output') {
+    const step = this.runDetailStep(index);
+    await step.locator('.step-header').click();
+    await step.locator('uui-tab').nth(['details', 'input', 'output'].indexOf(tab)).click();
+  }
+
+  /* The open tab's content in a step run. */
+  stepRunTabPanel(index: number): Locator {
+    return this.runDetailStep(index).locator('.tab-panel');
+  }
+
   /* The runs table links each run by the first eight characters of its id. */
   runLink(runId: string): Locator {
     return this.runsTable.getByRole('link', { name: runId.slice(0, 8), exact: true });

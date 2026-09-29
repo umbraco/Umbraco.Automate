@@ -82,16 +82,32 @@ test.describe('Automation runs', () => {
     await expect(umbracoAutomateUi.automate.runDetailSteps).toHaveCount(2);
   });
 
-  // PRODUCT GAP: the script's result is persisted (StepRun.OutputData), but neither the run detail
-  // API (`stepRuns` has no output) nor ua-run-detail-modal (started, completed, retries and error
-  // only) exposes step outputs, so the value cannot be read back in the Runs view. The test above
-  // proves the script read the value instead: the script throws unless it did.
-  test.fixme('shows the Run Script output in the run view', async () => {});
+  test('shows the Run Script output in the run view (#376)', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange — a completed run, started through the API since the test above covers Run now.
+    const token = `output-${uniqueSuffix()}`;
+    const id = await seedScriptAutomation(umbracoAutomateApi, automateServiceAccountWorkspace.id, token);
+    await umbracoAutomateApi.automations.publish(id);
+    await umbracoAutomateApi.automations.run(id);
+    await expect
+      .poll(async () => (await umbracoAutomateApi.automations.getRuns(id))[0]?.status, { timeout: 30000 })
+      .toBe('Completed');
+    const [listed] = await umbracoAutomateApi.automations.getRuns(id);
 
-  // PRODUCT BUG: Run now is offered on a draft. UaEntityAutomationCanRunNowCondition checks only
-  // that the trigger supports manual runs, never the automation's status, so the entry shows and
-  // clicking it fails with the server's 409 "The automation must be published to be triggered."
-  test.fixme('does not offer Run now on an automation that has never been published', async ({
+    // Act — open the run and the Run Script step's Output tab.
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationRunsUrl(id));
+    await umbracoAutomateUi.automate.openRun(listed.id);
+    await umbracoAutomateUi.automate.openStepRunTab(1, 'output');
+
+    // Assert — the value the script returned, loaded on demand from the step's stored output.
+    await expect(umbracoAutomateUi.automate.stepRunTabPanel(1).getByText(token)).toBeVisible();
+  });
+
+  // #366: Run now is offered only once the automation is published.
+  test('does not offer Run now on an automation that has never been published', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi

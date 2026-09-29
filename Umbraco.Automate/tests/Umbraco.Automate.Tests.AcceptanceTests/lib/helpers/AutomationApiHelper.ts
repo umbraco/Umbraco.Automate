@@ -102,6 +102,15 @@ export class AutomationApiHelper {
     }
   }
 
+  /* Starts a run, as Run now does. The automation must be published and have a manual trigger. */
+  async run(id: string) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/trigger';
+    const response = await this.api.post(requestUrl, {});
+    if (!response.ok()) {
+      throw new Error(`Running automation ${id} failed (${response.status()}): ${await response.text()}`);
+    }
+  }
+
   /* The runs of one automation, newest first. */
   async getRuns(id: string): Promise<any[]> {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/runs';
