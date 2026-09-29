@@ -5,8 +5,8 @@ Playwright end-to-end tests that drive a **running** demo site
 `@umbraco-cms/acceptance-test-helpers`. Specs live under `tests/DefaultConfig/`; auth is
 bootstrapped by `tests/auth.setup.ts`. Commands are in [README.md](README.md).
 
-Runs locally and in CI. The `AcceptanceTests` stage in `azure-pipelines.yml` depends on
-`Build`, so it gates pull requests too — see "How the CI stage works" below.
+Runs locally and in CI. The `AcceptanceTests` stage in `azure-pipelines.yml` runs
+alongside `Build` and gates pull requests too — see "How the CI stage works" below.
 
 ---
 
@@ -261,10 +261,12 @@ bites in one place is usually this divergence, not a product bug.
 
 The `AcceptanceTests` stage in `azure-pipelines.yml`:
 
-- **Depends on `Build`, not `Pack`.** `Pack` is restricted to pushes on `vN/main`, `vN/dev`,
-  `vN/hotfix/*` and `vN/release/*`, so depending on it would mean the suite never ran on a pull
-  request — useless as a gate. The trade-off is that CI exercises **project references**, not a
-  published package.
+- **Depends on nothing (`dependsOn: []`), so it runs alongside `Build`.** It uses nothing
+  `Build` produces, so waiting for it only cost ~3.5 min of wall-clock; the price is a wasted
+  agent on the rare PR whose Build fails. It cannot depend on `Pack`, which is restricted to
+  pushes on `vN/main`, `vN/dev`, `vN/hotfix/*` and `vN/release/*`, so the suite would never run
+  on a pull request. The trade-off is that CI exercises **project references**, not a published
+  package.
 - **Scaffolds the site with `scripts/install-demo-site.sh`**, the same script developers run, so
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to

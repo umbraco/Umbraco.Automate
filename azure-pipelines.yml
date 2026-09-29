@@ -104,8 +104,10 @@ stages:
     # ============================================================
     # Acceptance Tests - Playwright end-to-end against a real running site
     #
-    # Depends on Build, NOT Pack, so this also gates pull requests: Pack is
-    # restricted to pushes on vN/main, vN/dev, vN/hotfix/*, vN/release/*.
+    # Depends on nothing, so it runs alongside Build and gates pull requests too.
+    # It uses nothing Build produces (it builds the site from source itself), so
+    # waiting for Build only added ~3.5 min of wall-clock. Pack is not an option:
+    # it is restricted to pushes on vN/main, vN/dev, vN/hotfix/*, vN/release/*.
     # The site is scaffolded from source by scripts/install-demo-site.sh, the
     # same script developers run, so the leg exercises project references
     # rather than a published package and matches the local workflow exactly.
@@ -113,8 +115,7 @@ stages:
     # ============================================================
     - stage: AcceptanceTests
       displayName: Acceptance Tests
-      dependsOn: Build
-      condition: succeeded()
+      dependsOn: []
       jobs:
           - job: AcceptanceTests
             displayName: Run Playwright Acceptance Tests

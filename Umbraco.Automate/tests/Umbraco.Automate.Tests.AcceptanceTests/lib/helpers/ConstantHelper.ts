@@ -8,7 +8,7 @@ export class ConstantHelper {
   /* Section alias and pathname, from src/section/constants.ts in the client. */
   public static readonly section = {
     alias: 'Ua.Section.Automate',
-    pathname: 'automate'
+    pathname: 'automation'
   };
 
   public static readonly api = {

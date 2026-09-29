@@ -30,7 +30,7 @@ export default defineConfig({
 
   use: {
     /* Lets the page object navigate with app-relative paths like
-     * `/umbraco/section/automate/...` instead of rebuilding the host every time. */
+     * `/umbraco/section/automation/...` instead of rebuilding the host every time. */
     baseURL: umbracoConfig.environment.baseUrl,
     actionTimeout: 0,
     trace: 'retain-on-failure',
