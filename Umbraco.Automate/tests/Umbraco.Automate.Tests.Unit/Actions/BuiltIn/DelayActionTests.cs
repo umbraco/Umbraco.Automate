@@ -61,6 +61,25 @@ public class DelayActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ValidDuration_LogsTheDelay()
+    {
+        var context = new ActionContext
+        {
+            AutomationId = Guid.NewGuid(),
+            RunId = Guid.NewGuid(),
+            StepId = Guid.NewGuid(),
+            ActionAlias = _action.Alias,
+            Settings = new DelaySettings { Duration = "01:30:00" },
+        };
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Info);
+        entry.Message.ShouldBe("Delaying for 1 hour 30 minutes");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_InvalidDuration_Returns_Failed()
     {
         var context = new ActionContext

@@ -143,6 +143,8 @@ public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, 
                 _logger.LogWarning(
                     "Published version {Version} snapshot not found for automation {AutomationId}, using current state",
                     automation.PublishedVersion.Value, automation.Id);
+
+                context.LogWarning($"The published version of '{automation.Name}' could not be loaded, so its current state was run");
             }
         }
 
@@ -162,6 +164,8 @@ public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, 
                 "Automation {AutomationId} / Run {RunId}: Start of automation {TargetAutomationId} skipped — circuit breaker is open",
                 context.AutomationId, context.RunId, automationKey);
 
+            context.LogWarning($"'{automation.Name}' was not started because its circuit breaker has disabled it");
+
             return Success(new StartAutomationOutput
             {
                 AutomationKey = automationKey,
@@ -173,6 +177,8 @@ public sealed class StartAutomationAction : ActionBase<StartAutomationSettings, 
         _logger.LogDebug(
             "Automation {AutomationId} / Run {RunId}: Started automation {TargetAutomationId} (run {TargetRunId})",
             context.AutomationId, context.RunId, automationKey, runId);
+
+        context.LogInfo($"Started '{automation.Name}' (run {runId})");
 
         return Success(new StartAutomationOutput
         {

@@ -92,6 +92,9 @@ public sealed class MoveMediaAction : ActionBase<MoveMediaSettings, MoveMediaOut
 
         if (result.Success)
         {
+            var destination = targetParentKey is null ? "the media root" : $"parent {targetParentKey}";
+            context.LogInfo($"Moved {ActionLogFormat.Item(result.Result?.Name, mediaKey)} to {destination}");
+
             return Success(new MoveMediaOutput
             {
                 MediaKey = mediaKey,
