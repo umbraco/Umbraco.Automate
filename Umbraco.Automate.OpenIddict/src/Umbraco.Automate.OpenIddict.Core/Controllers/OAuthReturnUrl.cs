@@ -12,7 +12,7 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 /// </summary>
 /// <remarks>
 /// The nonce lets the editor reject a result it did not ask for: without it, anyone could send a
-/// user a backoffice link ending in <c>#automate-oauth=1&amp;credentialId=...</c> and bind the
+/// user a backoffice link ending in <c>#automate-oauth=1&amp;credentialToken=...</c> and bind the
 /// victim's connection to the attacker's own provider account. The editor keeps the nonce in
 /// <c>sessionStorage</c>, which is per tab, so a crafted link opened elsewhere never matches.
 /// </remarks>
@@ -116,12 +116,12 @@ internal sealed record OAuthReturnUrl(string Url, string Nonce)
     }
 
     /// <summary>
-    /// Redirects back to the backoffice with the newly-stored credential id in the fragment.
-    /// The fragment is used rather than the query string so the id is not sent to the server
+    /// Redirects back to the backoffice with the token for the newly-stored credential in the fragment.
+    /// The fragment is used rather than the query string so the token is not sent to the server
     /// (request logs) or leaked via the <c>Referer</c> header.
     /// </summary>
-    public RedirectResult Success(string provider, string credentialId) =>
-        Build(provider, ("credentialId", credentialId));
+    public RedirectResult Success(string provider, string credentialToken) =>
+        Build(provider, ("credentialToken", credentialToken));
 
     /// <summary>
     /// Redirects back to the backoffice with an error message in the fragment. The property editor

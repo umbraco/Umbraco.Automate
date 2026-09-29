@@ -87,11 +87,11 @@ public class OAuthReturnUrlTests
     }
 
     [Fact]
-    public void Success_PutsNonceAndCredentialIdInFragment_NotQueryString()
+    public void Success_PutsNonceAndCredentialTokenInFragment_NotQueryString()
     {
         var result = new OAuthReturnUrl("/umbraco/section/automate?x=1", Nonce).Success("Slack", "abc-123");
 
-        result.Url.ShouldBe($"/umbraco/section/automate?x=1#automate-oauth=1&provider=Slack&nonce={Nonce}&credentialId=abc-123");
+        result.Url.ShouldBe($"/umbraco/section/automate?x=1#automate-oauth=1&provider=Slack&nonce={Nonce}&credentialToken=abc-123");
     }
 
     [Fact]

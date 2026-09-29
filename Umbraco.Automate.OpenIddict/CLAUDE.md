@@ -33,7 +33,10 @@ Umbraco.Automate.OpenIddict provides reusable OAuth connection infrastructure fo
 - **IOAuthProviderConfigurationSource** — Replaceable source for provider app credentials (client ID/secret). Default reads from `IConfiguration` at `Umbraco:Automate:Providers:{providerName}`
 - **OpenIddictClientCredentialsConfigurator** — `IPostConfigureOptions<OpenIddictClientOptions>` that patches credentials and redirect URIs onto OpenIddict registrations at runtime via `IOAuthProviderConfigurationSource`
 - **OAuthChallengeController** — Initiates the OAuth popup flow (anonymous, like the callback; it only redirects to the external provider and is secured by the state token validated on callback)
-- **OAuthCallbackController** — Handles provider redirects, exchanges codes for tokens, stores credentials
+- **OAuthCallbackController** — Handles provider redirects, exchanges codes for tokens, stores credentials, and hands the editor a short-lived credential token (not the credential id)
+- **OAuthCredentialsHandoffProtector** — Issues/reads that token (Data Protection, dedicated purpose, 15-minute lifetime)
+- **OAuthCredentialsBindingHandler** — `IConnectionSettingsSaveHandler` that, on connection save, keeps an unchanged credential id or exchanges a valid token for the id; a credential can only be used by one connection. A raw id that matches no credential (e.g. carried over from another environment by Umbraco Deploy) is ignored — the connection keeps its current credential, or stays unauthenticated — while a raw id of an existing credential is rejected
+- **OAuthCredentialsCleanupJob** — Recurring job that deletes credentials no connection refers to, once untouched for 24 hours
 - **IOAuthCredentialsService** — Service for credentials CRUD and transparent token refresh
 - **OAuth Property Editor** (`Umb.Automate.OAuth`) — Lit component handling the popup OAuth flow UI
 
@@ -41,7 +44,7 @@ Umbraco.Automate.OpenIddict provides reusable OAuth connection infrastructure fo
 
 1. Provider packages register their OpenIddict WebIntegration provider at startup (e.g. `.AddSlack(_ => { })`) — no credentials needed
 2. `OpenIddictClientCredentialsConfigurator` patches client ID/secret from `IOAuthProviderConfigurationSource` and sets the callback URI from convention (`automate/oauth/callback/{provider}`)
-3. Connection settings reference an `OAuthCredentialsId` via the OAuth property editor
+3. Connection settings reference an `OAuthCredentialsId` via the OAuth property editor (the editor submits a credential token; the save stores the id)
 4. The challenge controller redirects to the provider's authorize page in a popup
 5. The callback controller exchanges the auth code for tokens and stores them as `OAuthCredentials`
 6. At runtime, actions call `GetValidAccessTokenAsync()` which handles refresh transparently

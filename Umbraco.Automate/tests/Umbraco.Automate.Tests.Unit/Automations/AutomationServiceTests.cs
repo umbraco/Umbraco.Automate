@@ -6,9 +6,11 @@ using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
@@ -68,7 +70,10 @@ public class AutomationServiceTests
             actions,
             triggers,
             controlFlows,
-            new SensitiveSettingsStripper(actions, triggers, controlFlows, connectionTypes),
+            new SensitiveSettingsStripper(
+                actions, triggers, controlFlows, connectionTypes,
+                new WebhookAuthenticatorCollection(() => []),
+                new NotificationChannelCollection(() => [])),
             new SectionAccessChecker());
     }
 
