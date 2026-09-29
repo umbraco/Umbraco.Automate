@@ -16,7 +16,11 @@ import type {
 interface OAuthCompleteMessage {
     type: "oauth-complete";
     success: boolean;
-    credentialId?: string;
+    /**
+     * Short-lived token for the credential just stored. It is kept as this editor's value and the
+     * server exchanges it for the credential id when the connection is saved.
+     */
+    credentialToken?: string;
     error?: string;
 }
 
@@ -38,7 +42,7 @@ const REDIRECT_FRAGMENT_KEY = "automate-oauth";
 
 /**
  * sessionStorage key (per provider) for the nonce the same-tab flow round-trips. sessionStorage is
- * per tab, so a crafted `#automate-oauth=...&credentialId=...` link opened anywhere else cannot
+ * per tab, so a crafted `#automate-oauth=...&credentialToken=...` link opened anywhere else cannot
  * match it — without this, a link could bind the user's connection to an attacker's account.
  */
 const nonceStorageKey = (provider: string) => `umb-automate-oauth-nonce:${provider.toLowerCase()}`;
@@ -165,23 +169,23 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         this.#cleanup();
         this._authenticating = false;
 
-        if (data.success && data.credentialId) {
-            this.#applyCredential(data.credentialId);
-            this.#notify("positive", `Connected to ${this._provider || "provider"}.`);
+        if (data.success && data.credentialToken) {
+            this.#applyCredential(data.credentialToken);
+            this.#notify("positive", `Connected to ${this._provider || "provider"}. Save to keep the new authentication.`);
         } else {
             this.#notify("danger", data.error ?? "Authentication failed. Please try again.");
         }
     }
 
-    #applyCredential(credentialId: string) {
+    #applyCredential(credentialToken: string) {
         this._popupBlocked = false;
-        this.value = credentialId;
+        this.value = credentialToken;
         this.dispatchEvent(new UmbChangeEvent());
     }
 
     /**
      * Picks up the result of the same-tab flow: the OAuth callback redirects back to the workspace
-     * URL with `#automate-oauth=1&provider=...&credentialId=...` (or `&error=...`). Called from both
+     * URL with `#automate-oauth=1&provider=...&credentialToken=...` (or `&error=...`). Called from both
      * the config setter and connectedCallback because either may run last. It needs the provider so
      * that, with several OAuth editors on one page, only the matching one claims the result.
      */
@@ -210,9 +214,9 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         }
         if (!expectedNonce || params.get("nonce") !== expectedNonce) return;
 
-        const credentialId = params.get("credentialId");
-        if (credentialId) {
-            this.#applyCredential(credentialId);
+        const credentialToken = params.get("credentialToken");
+        if (credentialToken) {
+            this.#applyCredential(credentialToken);
             this.#notify("positive", `Connected to ${this._provider}. Save to keep the new authentication.`);
             return;
         }

@@ -1,9 +1,12 @@
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Client.AspNetCore;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Automate.OpenIddict.Controllers;
 using Umbraco.Automate.OpenIddict.Credentials;
 using static OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants;
@@ -20,11 +23,12 @@ public class OAuthCallbackControllerTests
 {
     private readonly Mock<IOAuthCredentialsService> _credentialsService = new();
     private readonly Mock<IAuthenticationService> _authenticationService = new();
+    private readonly EphemeralDataProtectionProvider _dataProtectionProvider = new();
     private readonly OAuthCallbackController _controller;
 
     public OAuthCallbackControllerTests()
     {
-        _controller = new OAuthCallbackController(_credentialsService.Object);
+        _controller = new OAuthCallbackController(_credentialsService.Object, _dataProtectionProvider, TimeProvider.System);
 
         var services = new ServiceCollection();
         services.AddSingleton(_authenticationService.Object);
@@ -101,11 +105,17 @@ public class OAuthCallbackControllerTests
         var result = (await _controller.Callback("slack")).ShouldBeOfType<ContentResult>();
 
         result.Content.ShouldContain("oauth-complete");
-        result.Content.ShouldContain(id.ToString());
+        result.Content.ShouldNotContain(id.ToString());
+
+        var token = Regex.Match(result.Content!, "\"credentialToken\":\"([^\"]+)\"").Groups[1].Value;
+        var handoff = Protector().Unprotect(token);
+        handoff.Status.ShouldBe(OAuthCredentialsHandoffStatus.Valid);
+        handoff.CredentialId.ShouldBe(id);
+        handoff.Provider.ShouldBe("Slack");
     }
 
     [Fact]
-    public async Task Callback_RedirectsToReturnUrl_WithCredentialIdInFragment_WhenReturnUrlRoundTripped()
+    public async Task Callback_RedirectsToReturnUrl_WithCredentialTokenInFragment_WhenReturnUrlRoundTripped()
     {
         const string returnUrl = "/umbraco/section/automate/workspace/connection/edit/abc";
         SetUpSuccessfulAuthentication("Slack", returnUrl);
@@ -114,7 +124,13 @@ public class OAuthCallbackControllerTests
 
         var result = (await _controller.Callback("slack")).ShouldBeOfType<RedirectResult>();
 
-        result.Url.ShouldBe($"{returnUrl}#automate-oauth=1&provider=Slack&nonce=nonce-1&credentialId={id}");
+        var prefix = $"{returnUrl}#automate-oauth=1&provider=Slack&nonce=nonce-1&credentialToken=";
+        result.Url.ShouldStartWith(prefix);
+        result.Url.ShouldNotContain(id.ToString());
+
+        var handoff = Protector().Unprotect(Uri.UnescapeDataString(result.Url[prefix.Length..]));
+        handoff.Status.ShouldBe(OAuthCredentialsHandoffStatus.Valid);
+        handoff.CredentialId.ShouldBe(id);
     }
 
     [Fact]
@@ -157,6 +173,45 @@ public class OAuthCallbackControllerTests
 
         result.Url.ShouldBe("/umbraco#automate-oauth=1&provider=slack&nonce=nonce-1&error=Authentication%20failed.");
     }
+
+    [Fact]
+    public async Task ObsoleteConstructor_ResolvesNewDependenciesFromStaticServiceProvider()
+    {
+        // The single-argument constructor is kept for binary compatibility (removed in Umbraco 20).
+        // It must resolve the dependencies added since from StaticServiceProvider and produce a
+        // controller whose tokens the injected protector can read.
+        var staticServices = new ServiceCollection()
+            .AddSingleton<IDataProtectionProvider>(_dataProtectionProvider)
+            .AddSingleton(TimeProvider.System)
+            .BuildServiceProvider();
+
+        var previous = StaticServiceProvider.Instance;
+        StaticServiceProvider.Instance = staticServices;
+        try
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            var controller = new OAuthCallbackController(_credentialsService.Object);
+#pragma warning restore CS0618 // Type or member is obsolete
+            controller.ControllerContext = _controller.ControllerContext;
+
+            SetUpSuccessfulAuthentication("Slack");
+            var id = Guid.NewGuid();
+            SetUpCreateReturningId(id);
+
+            var result = (await controller.Callback("slack")).ShouldBeOfType<ContentResult>();
+
+            var token = Regex.Match(result.Content!, "\"credentialToken\":\"([^\"]+)\"").Groups[1].Value;
+            var handoff = Protector().Unprotect(token);
+            handoff.Status.ShouldBe(OAuthCredentialsHandoffStatus.Valid);
+            handoff.CredentialId.ShouldBe(id);
+        }
+        finally
+        {
+            StaticServiceProvider.Instance = previous;
+        }
+    }
+
+    private OAuthCredentialsHandoffProtector Protector() => new(_dataProtectionProvider, TimeProvider.System);
 
     private void SetUpCreateReturningId(Guid id) =>
         _credentialsService

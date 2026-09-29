@@ -1,193 +1,210 @@
-using Microsoft.Extensions.Logging;
-using Umbraco.Automate.Core;
-using Umbraco.Automate.Core.Actions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Automate.Core.Runs;
-using Umbraco.Automate.Core.Security;
-using Umbraco.Automate.Core.Settings;
-using Umbraco.Automate.Core.Triggers;
-using Umbraco.Automate.Core.Triggers.Webhooks;
-using Umbraco.Automate.Persistence.Automations;
-using Umbraco.Automate.Persistence.Notifications;
 using Umbraco.Automate.Persistence.Runs;
-using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Persistence.Workflows;
 using Umbraco.Automate.Tests.Common.Fixtures;
-using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Sync;
+using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Tests.Integration;
 
 /// <summary>
-/// Integration tests for <see cref="StuckRunRecoveryNotificationHandler"/> against in-memory SQLite:
-/// on <see cref="UmbracoApplicationStartedNotification"/>, and only once
-/// <see cref="AutomateReadinessSignal"/> reports the schema is ready, runs the previous process
-/// left in flight are marked failed. The failed-migration skip is covered by the unit tests.
+/// Integration tests for <see cref="EFCoreStuckRunRecovery"/> against in-memory SQLite. The reported
+/// bug: recovery failed the run row but left its WorkflowCore instance Runnable, so the engine resumed
+/// it on startup and re-ran the interrupted AI step — spending credits behind a run the backoffice
+/// showed as failed and would not let anyone terminate.
 /// </summary>
 public class StuckRunRecoveryTests : IDisposable
 {
-    private const string InterruptedError = "Recovered after application restart — workflow was interrupted";
-
-    private readonly EfCoreTestFixture _fixture;
-    private readonly TestDbContextFactory _dbContextFactory;
-    private readonly EFCoreAutomationRepository _automationRepository;
-    private readonly EFCoreAutomationRunRepository _runRepository;
-    private readonly AutomateReadinessSignal _readinessSignal = new();
+    private readonly EfCoreTestFixture _fixture = new();
     private readonly Mock<IServerRoleAccessor> _serverRoleAccessor = new();
+    private readonly EFCoreStuckRunRecovery _recovery;
 
     public StuckRunRecoveryTests()
     {
-        _fixture = new EfCoreTestFixture();
-        _dbContextFactory = new TestDbContextFactory(_fixture.CreateContext);
-        _automationRepository = new EFCoreAutomationRepository(_dbContextFactory, CreateFactory());
-        _runRepository = new EFCoreAutomationRunRepository(_dbContextFactory);
         _serverRoleAccessor.Setup(r => r.CurrentServerRole).Returns(ServerRole.Single);
+
+        _recovery = new EFCoreStuckRunRecovery(
+            new TestDbContextFactory(_fixture.CreateContext),
+            _serverRoleAccessor.Object,
+            NullLogger<EFCoreStuckRunRecovery>.Instance);
     }
 
     [Fact]
-    public async Task HandleAsync_AfterReadiness_MarksStuckRunAndItsStepsFailed()
+    public async Task RecoverStuckRunsAsync_InterruptedRun_FailsRunAndTerminatesItsInstance()
     {
-        var automation = await SaveAutomationAsync();
-        var stuckRun = await SaveRunAsync(automation.Id, AutomationRunStatus.Running, StepRunStatus.Completed, StepRunStatus.Running);
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
 
-        var handler = CreateHandler();
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
 
-        // Recovery must not touch the database until Automate's startup migrations have run.
-        var handleTask = handler.HandleAsync(new UmbracoApplicationStartedNotification(false), CancellationToken.None);
-        var completedBeforeReady = await Task.WhenAny(handleTask, Task.Delay(TimeSpan.FromMilliseconds(200))) == handleTask;
-        completedBeforeReady.ShouldBeFalse("Stuck run recovery ran before AutomateReadinessSignal was signalled.");
-        (await _runRepository.GetAsync(stuckRun.Id))!.Status.ShouldBe(AutomationRunStatus.Running);
+        await using var db = _fixture.CreateContext();
+        var run = await db.AutomationRuns.SingleAsync(r => r.Id == runId);
+        run.Status.ShouldBe((int)AutomationRunStatus.Failed);
+        run.Error.ShouldNotBeNull();
 
-        _readinessSignal.Signal();
-        await handleTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var step = await db.StepRuns.SingleAsync(sr => sr.RunId == runId);
+        step.Status.ShouldBe((int)StepRunStatus.Failed);
 
-        var recovered = await _runRepository.GetAsync(stuckRun.Id);
-        recovered.ShouldNotBeNull();
-        recovered.Status.ShouldBe(AutomationRunStatus.Failed);
-        recovered.CompletedUtc.ShouldNotBeNull();
-        recovered.Error.ShouldBe(InterruptedError);
+        var instance = await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId);
+        instance.Status.ShouldBe((int)WorkflowStatus.Terminated);
+        instance.CompleteTime.ShouldNotBeNull();
+        instance.NextExecution.ShouldBeNull();
+    }
 
-        // The in-flight step is failed; the step that had already completed is left alone.
-        var running = recovered.StepRuns.Single(s => s.StepId == stuckRun.StepRuns[1].StepId);
-        running.Status.ShouldBe(StepRunStatus.Failed);
-        running.Error.ShouldBe(InterruptedError);
-        var completed = recovered.StepRuns.Single(s => s.StepId == stuckRun.StepRuns[0].StepId);
-        completed.Status.ShouldBe(StepRunStatus.Completed);
+    [Fact]
+    public async Task RecoverStuckRunsAsync_InterruptedRun_LeavesItsCompletedStepsAlone()
+    {
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
+        var completedStepId = await AddStepRunAsync(runId, StepRunStatus.Completed);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        var completed = await db.StepRuns.SingleAsync(sr => sr.Id == completedStepId);
+        completed.Status.ShouldBe((int)StepRunStatus.Completed);
         completed.Error.ShouldBeNull();
     }
 
     [Fact]
-    public async Task HandleAsync_MarksPendingRunFailed()
+    public async Task RecoverStuckRunsAsync_PendingRun_FailsRunAndItsSteps()
     {
-        var automation = await SaveAutomationAsync();
-        var pendingRun = await SaveRunAsync(automation.Id, AutomationRunStatus.Pending, StepRunStatus.Pending);
-        _readinessSignal.Signal();
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Pending, StepRunStatus.Pending, WorkflowStatus.Runnable);
 
-        await CreateHandler().HandleAsync(new UmbracoApplicationStartedNotification(false), CancellationToken.None);
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
 
-        var recovered = await _runRepository.GetAsync(pendingRun.Id);
-        recovered!.Status.ShouldBe(AutomationRunStatus.Failed);
-        recovered.StepRuns.Single().Status.ShouldBe(StepRunStatus.Failed);
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+        (await db.StepRuns.SingleAsync(sr => sr.RunId == runId)).Status.ShouldBe((int)StepRunStatus.Failed);
     }
 
     [Theory]
     [InlineData(StepRunStatus.Sleeping)]
     [InlineData(StepRunStatus.WaitingForInput)]
-    public async Task HandleAsync_LeavesDurablyWaitingRunForWorkflowCoreToResume(StepRunStatus durableStatus)
+    public async Task RecoverStuckRunsAsync_DurableRun_LeavesRunAndInstanceToResume(StepRunStatus durableStatus)
     {
-        var automation = await SaveAutomationAsync();
-        var waitingRun = await SaveRunAsync(automation.Id, AutomationRunStatus.Running, StepRunStatus.Completed, durableStatus);
-        _readinessSignal.Signal();
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, durableStatus, WorkflowStatus.Runnable);
 
-        await CreateHandler().HandleAsync(new UmbracoApplicationStartedNotification(false), CancellationToken.None);
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
 
-        var untouched = await _runRepository.GetAsync(waitingRun.Id);
-        untouched!.Status.ShouldBe(AutomationRunStatus.Running);
-        untouched.Error.ShouldBeNull();
-        untouched.StepRuns.ShouldContain(s => s.Status == durableStatus);
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Running);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Runnable);
     }
 
     [Fact]
-    public async Task HandleAsync_FailsOrphanedStepOfCompletedRunWithoutChangingTheRun()
+    public async Task RecoverStuckRunsAsync_FinishedRun_DoesNotTouchItsInstance()
     {
-        var automation = await SaveAutomationAsync();
-        var completedRun = await SaveRunAsync(automation.Id, AutomationRunStatus.Completed, StepRunStatus.Running);
-        _readinessSignal.Signal();
+        var (_, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Completed, StepRunStatus.Completed, WorkflowStatus.Complete);
 
-        await CreateHandler().HandleAsync(new UmbracoApplicationStartedNotification(false), CancellationToken.None);
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
 
-        var run = await _runRepository.GetAsync(completedRun.Id);
-        run!.Status.ShouldBe(AutomationRunStatus.Completed);
+        await using var db = _fixture.CreateContext();
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Complete);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_CompletedRunWithOrphanedStep_FailsTheStepOnly()
+    {
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Completed, StepRunStatus.Running, WorkflowStatus.Complete);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        var run = await db.AutomationRuns.SingleAsync(r => r.Id == runId);
+        run.Status.ShouldBe((int)AutomationRunStatus.Completed);
         run.Error.ShouldBeNull();
-        var step = run.StepRuns.Single();
-        step.Status.ShouldBe(StepRunStatus.Failed);
+
+        var step = await db.StepRuns.SingleAsync(sr => sr.RunId == runId);
+        step.Status.ShouldBe((int)StepRunStatus.Failed);
         step.Error.ShouldBe("Recovered after application restart — parent run already completed");
     }
 
     [Fact]
-    public async Task HandleAsync_OnSubscriber_LeavesStuckRunAlone()
+    public async Task RecoverStuckRunsAsync_SubscriberNode_LeavesEverythingAlone()
     {
         _serverRoleAccessor.Setup(r => r.CurrentServerRole).Returns(ServerRole.Subscriber);
-        var automation = await SaveAutomationAsync();
-        var stuckRun = await SaveRunAsync(automation.Id, AutomationRunStatus.Running, StepRunStatus.Running);
-        _readinessSignal.Signal();
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
 
-        await CreateHandler().HandleAsync(new UmbracoApplicationStartedNotification(false), CancellationToken.None);
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
 
-        // The run may still be executing on the scheduling publisher.
-        (await _runRepository.GetAsync(stuckRun.Id))!.Status.ShouldBe(AutomationRunStatus.Running);
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Running);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Runnable);
     }
 
-    private StuckRunRecoveryNotificationHandler CreateHandler()
-        => new(
-            _dbContextFactory,
-            _serverRoleAccessor.Object,
-            _readinessSignal,
-            Mock.Of<ILogger<StuckRunRecoveryNotificationHandler>>());
-
-    private async Task<Core.Automations.Automation> SaveAutomationAsync()
+    private async Task<(Guid RunId, string InstanceId)> SeedRunAsync(
+        AutomationRunStatus runStatus,
+        StepRunStatus stepStatus,
+        WorkflowStatus instanceStatus)
     {
-        var automation = new AutomationBuilder().WithName("Recovery").Build();
-        await _automationRepository.SaveAsync(automation);
-        return automation;
-    }
+        var runId = Guid.NewGuid();
+        var instanceId = Guid.NewGuid().ToString();
 
-    private async Task<AutomationRun> SaveRunAsync(Guid automationId, AutomationRunStatus status, params StepRunStatus[] stepStatuses)
-    {
-        var run = await _runRepository.SaveAsync(new AutomationRunBuilder()
-            .WithAutomationId(automationId)
-            .WithStatus(status)
-            .Build());
+        await using var db = _fixture.CreateContext();
 
-        foreach (var stepStatus in stepStatuses)
+        db.WorkflowInstances.Add(new WorkflowInstanceEntity
         {
-            run.StepRuns.Add(await _runRepository.AddStepRunAsync(new StepRun
-            {
-                RunId = run.Id,
-                StepId = Guid.NewGuid(),
-                ActionAlias = "umbracoAutomate.logMessage",
-                Status = stepStatus,
-                StartedUtc = DateTime.UtcNow,
-            }));
-        }
+            Id = instanceId,
+            WorkflowDefinitionId = $"automate-{Guid.NewGuid()}-v1",
+            Version = 1,
+            Status = (int)instanceStatus,
+            CreateTime = DateTime.UtcNow,
+            NextExecution = 0,
+            SchemaVersion = 1,
+            Data = "{}",
+        });
 
-        return run;
+        db.AutomationRuns.Add(new AutomationRunEntity
+        {
+            Id = runId,
+            AutomationId = Guid.NewGuid(),
+            AutomationVersion = 1,
+            Status = (int)runStatus,
+            StartedUtc = DateTime.UtcNow,
+            InitiatedBy = "system",
+            WorkflowInstanceId = instanceId,
+        });
+
+        db.StepRuns.Add(new StepRunEntity
+        {
+            Id = Guid.NewGuid(),
+            RunId = runId,
+            StepId = Guid.NewGuid(),
+            ActionAlias = "runAIAgent",
+            Status = (int)stepStatus,
+            StartedUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+        return (runId, instanceId);
     }
 
-    private static AutomationFactory CreateFactory()
+    private async Task<Guid> AddStepRunAsync(Guid runId, StepRunStatus status)
     {
-        var serializer = new EditableModelSerializer(
-            Mock.Of<ISensitiveFieldProtector>(p => p.IsProtected(It.IsAny<string>()) == false),
-            new ConfigurationReferenceResolver(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
+        var stepRunId = Guid.NewGuid();
 
-        return new AutomationFactory(
-            serializer,
-            new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>),
-            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
+        await using var db = _fixture.CreateContext();
+        db.StepRuns.Add(new StepRunEntity
+        {
+            Id = stepRunId,
+            RunId = runId,
+            StepId = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.logMessage",
+            Status = (int)status,
+            StartedUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+        return stepRunId;
     }
 
-    public void Dispose()
-    {
-        _fixture.Dispose();
-        GC.SuppressFinalize(this);
-    }
+    public void Dispose() => _fixture.Dispose();
 }

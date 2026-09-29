@@ -38,6 +38,7 @@ public sealed class UpdateConnectionController : ConnectionControllerBase
     [HttpPut("{id:guid}")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateConnection(
@@ -71,6 +72,10 @@ public sealed class UpdateConnectionController : ConnectionControllerBase
         catch (ConcurrencyConflictException)
         {
             return ConcurrencyConflict("connection");
+        }
+        catch (ConnectionSettingsValidationException ex)
+        {
+            return InvalidConnectionSettings(ex);
         }
 
         return Ok();

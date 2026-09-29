@@ -1,4 +1,6 @@
 using System.Data;
+using ActionContext = Umbraco.Automate.Core.Actions.ActionContext;
+using ActionResult = Umbraco.Automate.Core.Actions.ActionResult;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
@@ -6,11 +8,13 @@ using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
@@ -18,8 +22,6 @@ using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Services;
-using ActionContext = Umbraco.Automate.Core.Actions.ActionContext;
-using ActionResult = Umbraco.Automate.Core.Actions.ActionResult;
 
 namespace Umbraco.Automate.Tests.Unit.Automations;
 
@@ -280,7 +282,10 @@ public class AutomationServicePublishSectionValidationTests
             actionCollection,
             triggerCollection,
             controlFlowCollection,
-            new SensitiveSettingsStripper(actionCollection, triggerCollection, controlFlowCollection, connectionTypeCollection),
+            new SensitiveSettingsStripper(
+                actionCollection, triggerCollection, controlFlowCollection, connectionTypeCollection,
+                new WebhookAuthenticatorCollection(() => []),
+                new NotificationChannelCollection(() => [])),
             new SectionAccessChecker());
 
         return (service, repo);

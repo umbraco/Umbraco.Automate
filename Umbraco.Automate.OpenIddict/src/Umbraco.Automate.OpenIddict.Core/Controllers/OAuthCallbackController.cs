@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using OpenIddict.Client.AspNetCore;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Cms.Api.Common.Attributes;
+using Umbraco.Cms.Core.DependencyInjection;
 using static OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants;
 
 namespace Umbraco.Automate.OpenIddict.Controllers;
@@ -10,6 +13,7 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 /// <summary>
 /// Handles OAuth callback redirects from external providers.
 /// Anonymous — validated via the state token that OpenIddict manages.
+/// The result carries a short-lived credential token (see <see cref="OAuthCredentialsHandoffProtector"/>).
 /// Returns HTML that postMessages back to the parent window (popup flow), or — when the challenge
 /// round-tripped a validated return URL (same-tab fallback for blocked popups) — redirects back to
 /// the backoffice with the result in the URL fragment.
@@ -21,13 +25,38 @@ namespace Umbraco.Automate.OpenIddict.Controllers;
 public sealed class OAuthCallbackController : ControllerBase
 {
     private readonly IOAuthCredentialsService _credentialsService;
+    private readonly OAuthCredentialsHandoffProtector _handoffProtector;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OAuthCallbackController"/> class.
     /// </summary>
+    [Obsolete("Please use the constructor with all parameters. Scheduled for removal in Umbraco 20.")]
     public OAuthCallbackController(IOAuthCredentialsService credentialService)
+        : this(
+            credentialService,
+            StaticServiceProvider.Instance.GetRequiredService<IDataProtectionProvider>(),
+            StaticServiceProvider.Instance.GetRequiredService<TimeProvider>())
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OAuthCallbackController"/> class.
+    /// </summary>
+    /// <remarks>
+    /// Marked as the activation constructor: MVC builds controllers through <c>ActivatorUtilities</c>,
+    /// which throws when it can satisfy more than one constructor. The obsolete overload is kept for
+    /// binary compatibility, so this attribute is what keeps activation unambiguous.
+    /// </remarks>
+    [ActivatorUtilitiesConstructor]
+    public OAuthCallbackController(
+        IOAuthCredentialsService credentialService,
+        IDataProtectionProvider dataProtectionProvider,
+        TimeProvider timeProvider)
     {
         _credentialsService = credentialService;
+        // Built here rather than injected: the protector is internal, and a public controller's
+        // constructor can't expose it. It shares its purpose with the injected instance, so tokens match.
+        _handoffProtector = new OAuthCredentialsHandoffProtector(dataProtectionProvider, timeProvider);
     }
 
     /// <summary>
@@ -87,9 +116,13 @@ public sealed class OAuthCallbackController : ControllerBase
 
         var saved = await _credentialsService.CreateCredentialsAsync(credential);
 
+        // The editor receives a short-lived token, not the credential id; the connection save exchanges
+        // it for the id (see OAuthCredentialsBindingHandler).
+        var credentialToken = _handoffProtector.Protect(saved.Id, resolvedProvider);
+
         return returnTarget is not null
-            ? returnTarget.Success(resolvedProvider, saved.Id.ToString())
-            : OAuthPopupResult.Success(saved.Id.ToString());
+            ? returnTarget.Success(resolvedProvider, credentialToken)
+            : OAuthPopupResult.Success(credentialToken);
 
         IActionResult Failure(string error) =>
             returnTarget is not null

@@ -107,6 +107,21 @@ addresses are blocked) and supports `method`, `body`, and headers as an object, 
 or a `Headers` instance. It is gated by both the tenant-wide master switch
 (`Scripting:FetchEnabled`) and the per-step **Allow fetch** toggle — both must be on.
 
+Destination checks follow the shared outbound HTTP rules (`Umbraco:Automate:Execution`):
+
+- **Direct connections** are validated at connect time against the address actually connected to.
+- **Through a proxy** (`AllowOutboundHttpProxy`, default `true`, honours the system/environment
+  proxy such as `HTTP_PROXY`/`HTTPS_PROXY`): the connection goes to the proxy, so the destination
+  host is resolved and validated *before* the request — and before every redirect hop — is sent,
+  and rejected if any resolved address is blocked. A short DNS-rebinding window remains between
+  that lookup and the proxy's own, so the proxy should still deny access to internal networks.
+  Set `AllowOutboundHttpProxy` to `false` to ignore any proxy and always connect directly.
+
+When a request fails, the returned promise rejects with an `Error` carrying a short, fixed reason
+rather than server-side exception details, for example `http request was blocked`,
+`http request timed out`, `fetch failed: connection refused`, `fetch failed: DNS lookup failed` or
+`fetch failed: invalid url`. The full exception is written to the server log.
+
 ### Allowing outbound requests
 
 Outbound requests are opt-in per step, so a script cannot call out unless someone chose to let it

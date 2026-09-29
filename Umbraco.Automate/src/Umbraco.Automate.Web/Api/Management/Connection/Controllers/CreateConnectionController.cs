@@ -50,7 +50,15 @@ public sealed class CreateConnectionController : ConnectionControllerBase
 
         var connection = _mapper.Map<Core.Connections.Connection>(requestModel)!;
 
-        var created = await _connectionService.CreateConnectionAsync(connection, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        Core.Connections.Connection created;
+        try
+        {
+            created = await _connectionService.CreateConnectionAsync(connection, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        }
+        catch (ConnectionSettingsValidationException ex)
+        {
+            return InvalidConnectionSettings(ex);
+        }
 
         return CreatedAtAction(
             nameof(ByIdConnectionController.GetConnectionById),
