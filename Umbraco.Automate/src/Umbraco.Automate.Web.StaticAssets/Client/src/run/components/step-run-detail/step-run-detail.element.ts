@@ -53,14 +53,17 @@ export class UaStepRunDetailElement extends UmbLitElement {
     /**
      * The tabs shown when the step is expanded, in order. To add one: add its id to
      * `UaStepRunTab`, an entry here and a case in `#renderTabPanel()`. Set `needsData` if its
-     * panel shows the lazily loaded step data.
+     * panel shows the lazily loaded step data. Logs only appear when the action wrote some,
+     * since most actions write none.
      */
     #tabs(): Array<{ id: UaStepRunTab; label: string; needsData?: boolean }> {
         return [
             { id: "details", label: this.localize.term("uaRun_details") },
             { id: "input", label: this.localize.term("uaRun_input"), needsData: true },
             { id: "output", label: this.localize.term("uaRun_output"), needsData: true },
-            { id: "logs", label: `${this.localize.term("uaLabels_logs")} (${this.stepRun.logEntries.length})` },
+            ...(this.stepRun.logEntries.length > 0
+                ? [{ id: "logs" as const, label: this.localize.term("uaLabels_logs") }]
+                : []),
         ];
     }
 
@@ -210,10 +213,6 @@ export class UaStepRunDetailElement extends UmbLitElement {
     }
 
     #renderLogEntries() {
-        if (this.stepRun.logEntries.length === 0) {
-            return html`<p class="empty">${this.localize.term("uaRun_noLogEntries")}</p>`;
-        }
-
         return html`
             <div class="log-list">
                 ${repeat(
@@ -341,12 +340,6 @@ export class UaStepRunDetailElement extends UmbLitElement {
 
             .tab-panel {
                 padding: var(--uui-size-space-5);
-            }
-
-            .empty {
-                color: var(--uui-color-text-alt);
-                font-style: italic;
-                margin: 0;
             }
 
             .log-list {

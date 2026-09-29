@@ -172,7 +172,6 @@ export default {
         trigger: "Trigger",
         noInput: "No input was recorded for this step.",
         noOutput: "This step produced no output.",
-        noLogEntries: "This step wrote no log entries.",
         noTriggerData: "This run was started without trigger data.",
         rawJson: "Raw JSON",
         dataTruncated: "This value is too large to show in full, so it has been truncated.",
