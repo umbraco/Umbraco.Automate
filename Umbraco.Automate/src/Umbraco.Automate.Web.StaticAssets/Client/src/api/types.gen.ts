@@ -1574,6 +1574,10 @@ export type PutConnectionsByIdData = {
 
 export type PutConnectionsByIdErrors = {
     /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
