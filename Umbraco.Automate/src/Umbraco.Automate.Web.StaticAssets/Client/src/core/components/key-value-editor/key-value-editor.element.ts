@@ -6,6 +6,7 @@ import type {
     UmbPropertyEditorConfigCollection,
 } from "@umbraco-cms/backoffice/property-editor";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
+import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
 import "../binding-picker/binding-picker-button.element.js";
 
@@ -94,7 +95,23 @@ export class UaKeyValueEditorElement extends UmbLitElement implements UmbPropert
         this.#emitChange(newValue);
     }
 
-    #removeRow(rowIndex: number) {
+    async #removeRow(rowIndex: number) {
+        const row = this.value?.[rowIndex];
+
+        // Nothing to lose in an untouched row, so only ask when it holds something.
+        if (row?.key || row?.value) {
+            try {
+                await umbConfirmModal(this, {
+                    headline: this.localize.term("uaKeyValueEditor_removeRowHeadline"),
+                    content: this.localize.term("uaKeyValueEditor_removeRowConfirm", row.key ?? ""),
+                    color: "danger",
+                    confirmLabel: "#actions_remove",
+                });
+            } catch {
+                return;
+            }
+        }
+
         const newValue = this.#cloneValue();
         newValue.splice(rowIndex, 1);
         this.#emitChange(newValue);

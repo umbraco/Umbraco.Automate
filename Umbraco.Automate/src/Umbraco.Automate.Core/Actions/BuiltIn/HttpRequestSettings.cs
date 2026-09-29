@@ -37,8 +37,10 @@ public sealed class HttpRequestSettings
     /// </summary>
     [Field(
         Label = "Body",
-        Description = "The request body content. Used when the body type is Raw.",
+        Description = "The request body content.",
         SortOrder = 3,
+        VisibleWhen = nameof(BodyMode),
+        VisibleWhenValues = [nameof(HttpRequestBodyMode.Raw)],
         SupportsBindings = true,
         EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",
         EditorConfig = """
@@ -56,8 +58,10 @@ public sealed class HttpRequestSettings
     /// </summary>
     [Field(
         Label = "Form fields",
-        Description = "The fields sent as an application/x-www-form-urlencoded body. Used when the body type is Form.",
+        Description = "The fields sent as an application/x-www-form-urlencoded body.",
         SortOrder = 4,
+        VisibleWhen = nameof(BodyMode),
+        VisibleWhenValues = [nameof(HttpRequestBodyMode.Form)],
         SupportsBindings = true,
         EditorUiAlias = "UmbracoAutomate.PropertyEditorUi.KeyValueEditor")]
     public List<HttpRequestKeyValue> FormFields { get; set; } = [];
@@ -66,7 +70,12 @@ public sealed class HttpRequestSettings
     /// Gets or sets the content type header for a raw body. Defaults to application/json.
     /// Ignored when <see cref="BodyMode"/> is <see cref="HttpRequestBodyMode.Form"/>.
     /// </summary>
-    [Field(Label = "Content Type", Description = "The Content-Type header value for a raw body.", SortOrder = 5)]
+    [Field(
+        Label = "Content Type",
+        Description = "The Content-Type header value for a raw body.",
+        SortOrder = 5,
+        VisibleWhen = nameof(BodyMode),
+        VisibleWhenValues = [nameof(HttpRequestBodyMode.Raw)])]
     public string ContentType { get; set; } = "application/json";
 
     /// <summary>
