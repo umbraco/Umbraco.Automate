@@ -2,21 +2,21 @@ import { css, html, customElement, property, state, nothing, repeat } from "@umb
 import type { PropertyValues } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import type { UaStepRunDataModel, UaStepRunModel } from "../../types.js";
-import { formatDateTime } from "../../../core/index.js";
+import type { UaStepRunDataModel, UaStepRunLogEntryModel, UaStepRunModel } from "../../types.js";
+import { formatDateTime, formatLogTimestamp } from "../../../core/index.js";
 import { UaRunDetailServerDataSource } from "../../repository/detail/run-detail.server.data-source.js";
 import "../run-data-block/run-data-block.element.js";
 
-type UaStepRunTab = "details" | "input" | "output";
+type UaStepRunTab = "details" | "input" | "output" | "logs";
 
 /**
  * Renders a single step run within a run's step list: a clickable header (status,
  * duration) that expands to show the error (always, when the step failed) above tabs for
- * Details (timestamps, retry count), Input and Output. Expand/collapse state and the action
+ * Details (timestamps, retry count), Input, Output and Logs (the entries the action wrote). Expand/collapse state and the action
  * display name are owned by the parent (both `<ua-run-detail-modal>` and
  * `<ua-run-details-view>` track this across the whole step list), so this stays a controlled
  * component; the only thing it loads itself is the step's input/output, fetched the first
- * time the Input or Output tab is selected and cached.
+ * time the Input or Output tab is selected and cached. Log entries come with the step run.
  */
 @customElement("ua-step-run-detail")
 export class UaStepRunDetailElement extends UmbLitElement {
@@ -51,16 +51,19 @@ export class UaStepRunDetailElement extends UmbLitElement {
     private _activeTab: UaStepRunTab = "details";
 
     /**
-     * The tabs shown when the step is expanded, in order. To add one (e.g. #164's action logs):
-     * add its id to `UaStepRunTab`, an entry here — the label can carry a count, e.g.
-     * `` `${this.localize.term("uaRun_logs")} (${logs.length})` `` — and a case in
-     * `#renderTabPanel()`. Set `needsData` if its panel shows the lazily loaded step data.
+     * The tabs shown when the step is expanded, in order. To add one: add its id to
+     * `UaStepRunTab`, an entry here and a case in `#renderTabPanel()`. Set `needsData` if its
+     * panel shows the lazily loaded step data. Logs only appear when the action wrote some,
+     * since most actions write none.
      */
     #tabs(): Array<{ id: UaStepRunTab; label: string; needsData?: boolean }> {
         return [
             { id: "details", label: this.localize.term("uaRun_details") },
             { id: "input", label: this.localize.term("uaRun_input"), needsData: true },
             { id: "output", label: this.localize.term("uaRun_output"), needsData: true },
+            ...(this.stepRun.logEntries.length > 0
+                ? [{ id: "logs" as const, label: this.localize.term("uaLabels_logs") }]
+                : []),
         ];
     }
 
@@ -79,6 +82,16 @@ export class UaStepRunDetailElement extends UmbLitElement {
                 return "danger";
             default:
                 return "default";
+        }
+    }
+
+    #logIcon(level: UaStepRunLogEntryModel["level"]): string {
+        switch (level) {
+            case "Error":
+            case "Warning":
+                return "icon-alert";
+            default:
+                return "icon-info";
         }
     }
 
@@ -194,7 +207,27 @@ export class UaStepRunDetailElement extends UmbLitElement {
                 return this.#renderData((data) =>
                     this.#renderDataBlock("uaRun_noOutput", data.output),
                 );
+            case "logs":
+                return this.#renderLogEntries();
         }
+    }
+
+    #renderLogEntries() {
+        return html`
+            <div class="log-list">
+                ${repeat(
+                    this.stepRun.logEntries,
+                    (_entry, index) => index,
+                    (entry) => html`
+                        <div class="log-entry log-entry--${entry.level.toLowerCase()}">
+                            <uui-icon name=${this.#logIcon(entry.level)}></uui-icon>
+                            <span class="log-time">${formatLogTimestamp(entry.timestampUtc)}</span>
+                            <span class="log-message">${entry.message}</span>
+                        </div>
+                    `,
+                )}
+            </div>
+        `;
     }
 
     /** Shows a panel that needs the lazily loaded step data, with its loading and error states. */
@@ -307,6 +340,52 @@ export class UaStepRunDetailElement extends UmbLitElement {
 
             .tab-panel {
                 padding: var(--uui-size-space-5);
+            }
+
+            .log-list {
+                display: flex;
+                flex-direction: column;
+                gap: var(--uui-size-space-2);
+            }
+
+            .log-entry {
+                display: flex;
+                align-items: baseline;
+                gap: var(--uui-size-space-3);
+                padding: var(--uui-size-space-2) var(--uui-size-space-3);
+                border-radius: var(--uui-border-radius);
+                font-size: var(--uui-size-4);
+            }
+
+            .log-entry uui-icon {
+                flex-shrink: 0;
+            }
+
+            .log-time {
+                flex-shrink: 0;
+                color: var(--uui-color-text-alt);
+                font-family: monospace;
+            }
+
+            .log-message {
+                overflow-wrap: anywhere;
+            }
+
+            .log-entry--debug {
+                color: var(--uui-color-text-alt);
+                opacity: 0.75;
+            }
+
+            .log-entry--info {
+                color: var(--uui-color-text-alt);
+            }
+
+            .log-entry--warning {
+                color: var(--uui-color-warning-standalone);
+            }
+
+            .log-entry--error {
+                color: var(--uui-color-danger-standalone);
             }
 
             .data-error {
