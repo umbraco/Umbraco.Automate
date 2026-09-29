@@ -190,6 +190,43 @@ internal sealed class EFCoreAutomationRunRepository : IAutomationRunRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<StoredStepRunData?> GetStepRunDataAsync(Guid runId, Guid stepRunId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.StepRuns
+            .Where(s => s.Id == stepRunId && s.RunId == runId)
+            .Join(
+                db.AutomationRuns,
+                s => s.RunId,
+                r => r.Id,
+                (s, r) => new StoredStepRunData
+                {
+                    RunId = s.RunId,
+                    StepRunId = s.Id,
+                    AutomationId = r.AutomationId,
+                    ActionAlias = s.ActionAlias,
+                    InputData = s.InputData,
+                    OutputData = s.OutputData,
+                })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<StoredRunTriggerData?> GetTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.AutomationRuns
+            .Where(r => r.Id == runId)
+            .Select(r => new StoredRunTriggerData
+            {
+                RunId = r.Id,
+                AutomationId = r.AutomationId,
+                TriggerData = r.TriggerData,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);

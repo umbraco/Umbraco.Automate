@@ -1,5 +1,9 @@
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
+using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 
@@ -10,6 +14,10 @@ public class AutomationRunServiceTests
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
     private readonly Mock<IWorkflowHost> _workflowHost = new();
     private readonly Mock<IEventAggregator> _eventAggregator = new();
+    private readonly RunDataSanitizer _sanitizer = new(
+        new ActionCollection(() => []),
+        new ControlFlowCollection(() => []),
+        NullLogger<RunDataSanitizer>.Instance);
     private readonly AutomationRunService _service;
 
     public AutomationRunServiceTests()
@@ -20,6 +28,7 @@ public class AutomationRunServiceTests
 
         _service = new AutomationRunService(
             _runRepo.Object,
+            _sanitizer,
             _workflowHost.Object,
             _eventAggregator.Object,
             NullLogger<AutomationRunService>.Instance);
@@ -38,6 +47,135 @@ public class AutomationRunServiceTests
             StartedUtc = DateTime.UtcNow,
             WorkflowInstanceId = workflowInstanceId,
         };
+    }
+
+    // --- Run data ---
+
+    [Fact]
+    public async Task GetStepRunData_ReturnsMaskedPrettyPrintedInputAndOutput()
+    {
+        var stored = GivenStoredStepRunData(
+            inputData: """{"url":"https://example.com","headers":[{"key":"Authorization","value":"Bearer abc"}]}""",
+            outputData: """{"statusCode":200,"token":"xyz"}""");
+
+        var data = await _service.GetStepRunDataAsync(stored.RunId, stored.StepRunId);
+
+        data.ShouldNotBeNull();
+        data.RunId.ShouldBe(stored.RunId);
+        data.StepRunId.ShouldBe(stored.StepRunId);
+        data.AutomationId.ShouldBe(stored.AutomationId);
+        data.ActionAlias.ShouldBe(stored.ActionAlias);
+        data.InputTruncated.ShouldBeFalse();
+        data.OutputTruncated.ShouldBeFalse();
+        data.Input!.ShouldNotContain("Bearer abc");
+        JsonNode.Parse(data.Input!)!["url"]!.GetValue<string>().ShouldBe("https://example.com");
+        var output = JsonNode.Parse(data.Output!)!;
+        output["statusCode"]!.GetValue<int>().ShouldBe(200);
+        output["token"]!.GetValue<string>().ShouldBe(SensitiveDataMasker.MaskedValue);
+        data.Output!.ShouldContain(Environment.NewLine);
+    }
+
+    [Fact]
+    public async Task GetStepRunData_OffloadedOutput_IsReturnedInFull()
+    {
+        // An output above the inline threshold is offloaded from the workflow data; the step run
+        // record is its store, so it is served from there like any other output.
+        var large = new string('a', 40_000);
+        var stored = GivenStoredStepRunData(inputData: null, outputData: $$"""{"body":"{{large}}"}""");
+
+        var data = await _service.GetStepRunDataAsync(stored.RunId, stored.StepRunId);
+
+        data.ShouldNotBeNull();
+        data.OutputTruncated.ShouldBeFalse();
+        JsonNode.Parse(data.Output!)!["body"]!.GetValue<string>().ShouldBe(large);
+        data.Input.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetStepRunData_OversizedOutput_IsTruncatedAndFlagged()
+    {
+        var huge = new string('a', IRunDataSanitizer.MaxValueLength + 1);
+        var stored = GivenStoredStepRunData(inputData: "{}", outputData: $$"""{"body":"{{huge}}"}""");
+
+        var data = await _service.GetStepRunDataAsync(stored.RunId, stored.StepRunId);
+
+        data.ShouldNotBeNull();
+        data.OutputTruncated.ShouldBeTrue();
+        data.Output!.Length.ShouldBe(IRunDataSanitizer.MaxValueLength);
+        data.InputTruncated.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task GetStepRunData_UnknownStepRun_ReturnsNull()
+    {
+        var data = await _service.GetStepRunDataAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        data.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetTriggerData_ReturnsMaskedTriggerData()
+    {
+        var runId = Guid.NewGuid();
+        var automationId = Guid.NewGuid();
+        _runRepo
+            .Setup(r => r.GetTriggerDataAsync(runId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoredRunTriggerData
+            {
+                RunId = runId,
+                AutomationId = automationId,
+                TriggerData = """{"headers":{"X-Api-Key":"k"},"contentId":42}""",
+            });
+
+        var data = await _service.GetTriggerDataAsync(runId);
+
+        data.ShouldNotBeNull();
+        data.RunId.ShouldBe(runId);
+        data.AutomationId.ShouldBe(automationId);
+        data.TriggerDataTruncated.ShouldBeFalse();
+        var node = JsonNode.Parse(data.TriggerData!)!;
+        node["headers"]!["X-Api-Key"]!.GetValue<string>().ShouldBe(SensitiveDataMasker.MaskedValue);
+        node["contentId"]!.GetValue<int>().ShouldBe(42);
+    }
+
+    [Fact]
+    public async Task GetTriggerData_NoTriggerData_ReturnsNullValue()
+    {
+        var runId = Guid.NewGuid();
+        _runRepo
+            .Setup(r => r.GetTriggerDataAsync(runId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoredRunTriggerData { RunId = runId, AutomationId = Guid.NewGuid() });
+
+        var data = await _service.GetTriggerDataAsync(runId);
+
+        data.ShouldNotBeNull();
+        data.TriggerData.ShouldBeNull();
+        data.TriggerDataTruncated.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task GetTriggerData_UnknownRun_ReturnsNull()
+    {
+        var data = await _service.GetTriggerDataAsync(Guid.NewGuid());
+
+        data.ShouldBeNull();
+    }
+
+    private StoredStepRunData GivenStoredStepRunData(string? inputData, string? outputData)
+    {
+        var stored = new StoredStepRunData
+        {
+            RunId = Guid.NewGuid(),
+            StepRunId = Guid.NewGuid(),
+            AutomationId = Guid.NewGuid(),
+            ActionAlias = "test.action",
+            InputData = inputData,
+            OutputData = outputData,
+        };
+        _runRepo
+            .Setup(r => r.GetStepRunDataAsync(stored.RunId, stored.StepRunId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(stored);
+        return stored;
     }
 
     // --- Suspend ---
