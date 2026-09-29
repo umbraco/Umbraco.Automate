@@ -100,6 +100,9 @@ public static partial class UmbracoBuilderExtensions
 
         builder.Services.AddSingleton<IAutomateSchemaInitializer, AutomateSchemaInitializer>();
 
+        // One-off repair: encrypt sensitive automation settings that earlier versions stored in plaintext.
+        builder.Services.AddHostedService<SensitiveSettingsReprotectionJob>();
+
         // Run pending EF Core migrations during component initialization, which both boot paths do
         // immediately before publishing UmbracoApplicationStartingNotification. That puts the schema
         // in place before any Starting handler can query it — notably Umbraco Deploy's boot-time

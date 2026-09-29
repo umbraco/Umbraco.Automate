@@ -582,7 +582,9 @@ internal sealed class AutomationService : IAutomationService
                 Steps = exportSteps,
                 Connections = automation.Connections,
                 CanvasState = automation.CanvasState,
-                NotificationSettings = options.IncludeNotifications ? automation.NotificationSettings : null,
+                NotificationSettings = options.IncludeNotifications
+                    ? _sensitiveStripper.StripNotificationSettings(automation.NotificationSettings)
+                    : null,
             },
             ConnectionReferences = connectionReferences,
         };
