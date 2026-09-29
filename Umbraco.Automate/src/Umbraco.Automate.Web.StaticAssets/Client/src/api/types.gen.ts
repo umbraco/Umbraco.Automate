@@ -19,6 +19,8 @@ export type ActionItemResponseModel = {
     type: string;
 };
 
+export type ActionLogLevelModel = 'Debug' | 'Info' | 'Warning' | 'Error';
+
 export type ApprovalDecisionRequestModel = {
     outcome: ApprovalOutcomeModel;
     comment?: string | null;
@@ -456,6 +458,12 @@ export type StepRunDataResponseModel = {
     outputTruncated: boolean;
 };
 
+export type StepRunLogEntryResponseModel = {
+    timestampUtc: string;
+    level: ActionLogLevelModel;
+    message: string;
+};
+
 export type StepRunResponseModel = {
     id: string;
     stepId: string;
@@ -466,6 +474,7 @@ export type StepRunResponseModel = {
     error?: string | null;
     retryCount: number;
     durationMs?: number | null;
+    logEntries: Array<StepRunLogEntryResponseModel>;
 };
 
 export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput' | 'Sleeping' | 'Rejected';
