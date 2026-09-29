@@ -91,6 +91,8 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found.",
                 context.AutomationId, context.RunId, contentKey);
 
+            context.LogWarning($"Content {contentKey} was not found, so nothing was updated");
+
             return SuccessWithOutcome(OutcomeNotFound, new UpdateContentPropertyOutput
             {
                 ContentKey = contentKey,
@@ -105,6 +107,8 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Property {PropertyAlias} not found on {ContentTypeAlias}.",
                 context.AutomationId, context.RunId, settings.PropertyAlias, content.ContentType.Alias);
+
+            context.LogWarning($"Property '{settings.PropertyAlias}' does not exist on {content.ContentType.Alias}, so nothing was updated");
 
             return SuccessWithOutcome(OutcomePropertyNotFound, new UpdateContentPropertyOutput
             {
@@ -137,6 +141,8 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
 
         if (result.Success)
         {
+            context.LogInfo(DescribeUpdate(settings.PropertyAlias, ActionLogFormat.Item(content.Name, contentKey), settings.Culture, culture, segment));
+
             return Success(new UpdateContentPropertyOutput
             {
                 ContentKey = contentKey,
@@ -150,6 +156,20 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
         return ActionResult.Failed(
             new InvalidOperationException($"Failed to save content '{contentKey}': {result.Result}"),
             MapErrorCategory(result.Result));
+    }
+
+    private static string DescribeUpdate(string alias, string item, string? requestedCulture, string? culture, string? segment)
+    {
+        var variant = segment is null ? culture : $"{culture ?? "invariant"} / {segment}";
+        var description = variant is null
+            ? $"Updated '{alias}' on {item}, saved as a draft"
+            : $"Updated '{alias}' on {item} ({variant}), saved as a draft";
+
+        // A culture-variant item with no culture requested falls back to its first culture, which
+        // the Input tab cannot show.
+        return culture is not null && string.IsNullOrWhiteSpace(requestedCulture)
+            ? $"{description}; no culture was given, so {culture} was used"
+            : description;
     }
 
     private static string? NormaliseCulture(string? requested, IContent content)

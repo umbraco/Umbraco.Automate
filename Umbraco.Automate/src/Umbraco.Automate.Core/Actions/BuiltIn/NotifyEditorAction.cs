@@ -62,6 +62,8 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found — skipping editor notification.",
                 context.AutomationId, context.RunId, contentKey);
 
+            context.LogWarning($"Content {contentKey} was not found, so no editors were notified");
+
             return SuccessWithOutcome(OutcomeNotFound, new NotifyEditorOutput { ContentKey = contentKey });
         }
 
@@ -91,6 +93,8 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
         };
 
         await _editorNotifier.NotifyAsync(message, cancellationToken);
+
+        context.LogInfo($"Sent a notification to anyone editing {ActionLogFormat.Item(content.Name, contentKey)}");
 
         return Success(new NotifyEditorOutput
         {

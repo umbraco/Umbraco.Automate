@@ -81,8 +81,13 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
 
         var result = await _contentPublishingService.PublishAsync(contentKey, culturesToPublish, userKey);
 
+        var item = ActionLogFormat.Item(result.Result?.Content?.Name, contentKey);
+        var cultures = ActionLogFormat.Cultures(culturesToPublish.Select(c => c.Culture));
+
         if (result.Success)
         {
+            context.LogInfo(cultures.Length == 0 ? $"Published {item}" : $"Published {item} in {cultures}");
+
             return Success(new PublishContentOutput
             {
                 ContentKey = contentKey,
@@ -92,6 +97,13 @@ public sealed class PublishContentAction : ActionBase<PublishContentSettings, Pu
 
         var status = result.Status;
         var errorCategory = MapErrorCategory(status);
+
+        // The failure message only carries the status; the offending aliases are the actionable part.
+        var invalidAliases = result.Result?.InvalidPropertyAliases.ToArray() ?? [];
+        if (invalidAliases.Length > 0)
+        {
+            context.LogWarning($"{item} has invalid property values: {string.Join(", ", invalidAliases)}");
+        }
 
         return ActionResult.Failed(
             new InvalidOperationException($"Failed to publish content '{contentKey}': {status}"),

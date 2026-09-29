@@ -97,6 +97,8 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found in published cache.",
                 context.AutomationId, context.RunId, contentKey);
 
+            context.LogWarning($"Content {contentKey} was not found in the published cache");
+
             return SuccessWithOutcome(OutcomeNotFound, new GetContentPropertyOutput
             {
                 ContentKey = contentKey,
@@ -111,6 +113,8 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Property {PropertyAlias} not found on {ContentTypeAlias}.",
                 context.AutomationId, context.RunId, settings.PropertyAlias, content.ContentType.Alias);
+
+            context.LogWarning($"Property '{settings.PropertyAlias}' does not exist on {content.ContentType.Alias}");
 
             return SuccessWithOutcome(OutcomePropertyNotFound, new GetContentPropertyOutput
             {
