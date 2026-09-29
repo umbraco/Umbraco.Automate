@@ -417,6 +417,90 @@ public class RunScriptActionTests
         errors.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ConsoleCalls_AreWrittenToTheRunLogAtMatchingLevels()
+    {
+        var context = new ActionContext
+        {
+            AutomationId = Guid.NewGuid(),
+            RunId = Guid.NewGuid(),
+            StepId = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.runScript",
+            MinimumLogLevel = ActionLogLevel.Debug,
+            Settings = new RunScriptSettings
+            {
+                Script = """
+                    export default function () {
+                        console.log('log', 1);
+                        console.info('info');
+                        console.warn('warn');
+                        console.error('error');
+                        console.debug('debug');
+                        return true;
+                    }
+                    """,
+            },
+        };
+
+        await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.Select(e => (e.Level, e.Message)).Take(5).ShouldBe(
+        [
+            (ActionLogLevel.Info, "log 1"),
+            (ActionLogLevel.Info, "info"),
+            (ActionLogLevel.Warning, "warn"),
+            (ActionLogLevel.Error, "error"),
+            (ActionLogLevel.Debug, "debug"),
+        ]);
+
+        var completed = context.LogEntries[5];
+        completed.Level.ShouldBe(ActionLogLevel.Info);
+        completed.Message.ShouldStartWith("Script completed in ");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ThrownError_LogsTheError()
+    {
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default function () { throw new Error('boom') }" });
+
+        await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("Script threw an error after ");
+        entry.Message.ShouldContain("boom");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InfiniteLoop_LogsTheTimeout()
+    {
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default function () { while (true) { let x = 1 } }" });
+
+        await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("Script stopped after ");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchDisabledGlobally_WarnsWhenStepAllowsIt()
+    {
+        var context = CreateContext(new RunScriptSettings
+        {
+            Script = "export default function () { return 1 }",
+            AllowFetch = true,
+        });
+
+        await CreateAction(new ScriptingOptions { FetchEnabled = false }).ExecuteAsync(context, CancellationToken.None);
+
+        var warning = context.LogEntries[0];
+        warning.Level.ShouldBe(ActionLogLevel.Warning);
+        warning.Message.ShouldContain("fetch() is not available");
+    }
+
     private static ActionContext CreateContext(
         RunScriptSettings settings,
         IReadOnlyDictionary<string, object?>? inputData = null,

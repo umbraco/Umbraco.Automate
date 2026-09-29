@@ -464,6 +464,74 @@ public class CreateContentActionTests
         created.GetValue<string>("code").ShouldBe("ABC");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ValidRequest_LogsWhatWasCreatedAndWhere()
+    {
+        var parentKey = Guid.NewGuid();
+        var created = SetupRealCreate(parentKey, ContentVariation.Culture, out var contentTypeKey);
+        var context = CreateContext(
+            new CreateContentSettings
+            {
+                ParentKey = parentKey.ToString(),
+                ContentType = contentTypeKey.ToString(),
+                Name = "New Page",
+                Culture = "en-US",
+            },
+            Guid.NewGuid());
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Info);
+        entry.Message.ShouldBe($"Created 'New Page' ({created.Key}) as page under {Guid.Empty} in en-US");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnknownPropertyAlias_LogsWarningAndStillCreates()
+    {
+        var parentKey = Guid.NewGuid();
+        SetupRealCreate(parentKey, ContentVariation.Nothing, out var contentTypeKey);
+        var context = CreateContext(
+            new CreateContentSettings
+            {
+                ParentKey = parentKey.ToString(),
+                ContentType = contentTypeKey.ToString(),
+                Name = "New Page",
+                PropertiesJson = """{ "code": "ABC", "missing": "secret value" }""",
+            },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        context.LogEntries.Count.ShouldBe(2);
+        context.LogEntries[0].Level.ShouldBe(ActionLogLevel.Warning);
+        context.LogEntries[0].Message.ShouldBe("Property 'missing' does not exist on page and was skipped");
+        context.LogEntries[1].Message.ShouldStartWith("Created 'New Page'");
+        context.LogEntries.ShouldAllBe(e => !e.Message.Contains("secret value"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentNotFound_LogsWarning()
+    {
+        var parentKey = Guid.NewGuid();
+        _contentService.Setup(x => x.GetById(parentKey)).Returns((IContent?)null);
+        var context = CreateContext(
+            new CreateContentSettings
+            {
+                ParentKey = parentKey.ToString(),
+                ContentType = Guid.NewGuid().ToString(),
+                Name = "New Page",
+            },
+            Guid.NewGuid());
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Warning);
+        entry.Message.ShouldBe($"Parent content {parentKey} was not found, so nothing was created");
+    }
+
     /// <summary>
     /// Sets up a create backed by real CMS domain objects rather than mocks, so SetValue runs
     /// the CMS's own variation checks. The type has an invariant "code" property, plus a
