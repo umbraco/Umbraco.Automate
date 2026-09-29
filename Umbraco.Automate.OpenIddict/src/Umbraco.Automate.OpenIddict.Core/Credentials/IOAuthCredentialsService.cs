@@ -34,6 +34,7 @@ public interface IOAuthCredentialsService
     /// The default implementation returns no IDs, so a custom implementation that does not override it
     /// never has credentials cleaned up.
     /// </remarks>
+    // TODO (V19): Remove the default implementation.
     Task<IReadOnlyList<Guid>> GetCredentialIdsNotModifiedSinceAsync(DateTime cutoffUtc, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<Guid>>([]);
 
