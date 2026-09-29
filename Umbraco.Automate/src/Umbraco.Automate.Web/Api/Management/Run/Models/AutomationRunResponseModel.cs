@@ -39,6 +39,12 @@ public sealed class AutomationRunResponseModel
     /// <summary>Error message if failed.</summary>
     public string? Error { get; set; }
 
+    /// <summary>
+    /// The alias of the trigger that started the run, from the automation version that ran. Only set
+    /// when getting a single run.
+    /// </summary>
+    public string? TriggerAlias { get; set; }
+
     /// <summary>The step runs within this automation run.</summary>
     public IList<StepRunResponseModel> StepRuns { get; set; } = [];
 }

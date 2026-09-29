@@ -180,6 +180,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
+        builder.Services.AddSingleton<IRunDataSanitizer, RunDataSanitizer>();
         builder.Services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<BindingEvaluator>();
