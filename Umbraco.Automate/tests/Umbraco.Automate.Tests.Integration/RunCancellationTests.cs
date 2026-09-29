@@ -140,6 +140,7 @@ public class RunCancellationTests : IAsyncLifetime
 
         _runService = new AutomationRunService(
             _runRepository,
+            Mock.Of<IRunDataSanitizer>(),
             _workflowHost,
             _provider.GetRequiredService<IEventAggregator>(),
             _provider.GetRequiredService<ILogger<AutomationRunService>>());
