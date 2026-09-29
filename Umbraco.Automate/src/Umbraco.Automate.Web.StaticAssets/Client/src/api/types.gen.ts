@@ -139,6 +139,7 @@ export type AutomationRunResponseModel = {
     initiatedBy: string;
     correlationId?: string | null;
     error?: string | null;
+    triggerAlias?: string | null;
     stepRuns: Array<StepRunResponseModel>;
 };
 
@@ -409,6 +410,11 @@ export type RunSummaryModel = {
     successRate: number;
 };
 
+export type RunTriggerDataResponseModel = {
+    triggerData?: null | string;
+    triggerDataTruncated: boolean;
+};
+
 export type StepConfigurationModel = {
     id: string;
     actionAlias: string;
@@ -441,6 +447,13 @@ export type StepErrorBehaviorModel = 'Retry' | 'Suspend' | 'Terminate' | 'Compen
 export type StepPositionModel = {
     x: number;
     y: number;
+};
+
+export type StepRunDataResponseModel = {
+    input?: null | string;
+    inputTruncated: boolean;
+    output?: null | string;
+    outputTruncated: boolean;
 };
 
 export type StepRunResponseModel = {
@@ -1507,6 +1520,10 @@ export type PutConnectionsByIdData = {
 
 export type PutConnectionsByIdErrors = {
     /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
@@ -1738,6 +1755,42 @@ export type PostRunsByIdResumeResponses = {
     202: unknown;
 };
 
+export type GetRunsByIdStepRunsByStepRunIdDataData = {
+    body?: never;
+    path: {
+        id: string;
+        stepRunId: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/step-runs/{stepRunId}/data';
+};
+
+export type GetRunsByIdStepRunsByStepRunIdDataErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have access to this resource
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetRunsByIdStepRunsByStepRunIdDataError = GetRunsByIdStepRunsByStepRunIdDataErrors[keyof GetRunsByIdStepRunsByStepRunIdDataErrors];
+
+export type GetRunsByIdStepRunsByStepRunIdDataResponses = {
+    /**
+     * OK
+     */
+    200: StepRunDataResponseModel;
+};
+
+export type GetRunsByIdStepRunsByStepRunIdDataResponse = GetRunsByIdStepRunsByStepRunIdDataResponses[keyof GetRunsByIdStepRunsByStepRunIdDataResponses];
+
 export type PostRunsByIdSuspendData = {
     body?: never;
     path: {
@@ -1803,6 +1856,41 @@ export type PostRunsByIdTerminateResponses = {
      */
     202: unknown;
 };
+
+export type GetRunsByIdTriggerDataData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/trigger-data';
+};
+
+export type GetRunsByIdTriggerDataErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have access to this resource
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetRunsByIdTriggerDataError = GetRunsByIdTriggerDataErrors[keyof GetRunsByIdTriggerDataErrors];
+
+export type GetRunsByIdTriggerDataResponses = {
+    /**
+     * OK
+     */
+    200: RunTriggerDataResponseModel;
+};
+
+export type GetRunsByIdTriggerDataResponse = GetRunsByIdTriggerDataResponses[keyof GetRunsByIdTriggerDataResponses];
 
 export type GetVersionHistoryByEntityTypeByEntityIdData = {
     body?: never;

@@ -32,7 +32,7 @@ public class RunMapDefinition : IMapDefinition
         target.Error = source.Error;
     }
 
-    // Umbraco.Code.MapAll
+    // Umbraco.Code.MapAll -TriggerAlias
     private static void MapToResponse(AutomationRun source, AutomationRunResponseModel target, MapperContext context)
     {
         target.Id = source.Id;
