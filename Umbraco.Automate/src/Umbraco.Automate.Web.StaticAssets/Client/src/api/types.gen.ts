@@ -280,6 +280,12 @@ export type EditableModelFieldDescriptorModel = {
     isRequired: boolean;
     group?: string | null;
     supportsBindings: boolean;
+    visibleWhen?: null | EditableModelFieldVisibilityModel;
+};
+
+export type EditableModelFieldVisibilityModel = {
+    key: string;
+    values: Array<string>;
 };
 
 export type EditableModelSchemaModel = {
