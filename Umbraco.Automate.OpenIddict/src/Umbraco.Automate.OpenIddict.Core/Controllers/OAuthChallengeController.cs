@@ -30,15 +30,6 @@ public sealed class OAuthChallengeController : ControllerBase
     }
 
     /// <summary>
-    /// Initiates an OAuth authorization code flow for the specified provider (popup flow).
-    /// </summary>
-    /// <param name="provider">The OpenIddict provider name (e.g. "Slack", "GitHub").</param>
-    [Obsolete("Use the overload taking all parameters. Scheduled for removal in Umbraco 20.")]
-    [NonAction]
-    public IActionResult Challenge(string provider)
-        => Challenge(provider, returnUrl: null, nonce: null);
-
-    /// <summary>
     /// Initiates an OAuth authorization code flow for the specified provider.
     /// Normally opens in a popup — the callback will close the popup when complete. When the
     /// browser blocks the popup, the property editor navigates the current tab here instead and
