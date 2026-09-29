@@ -810,6 +810,43 @@ public class EditableModelResolverTests
 
     #endregion
 
+    #region Configuration references inside list rows
+
+    [Fact]
+    public void ResolveModel_WithConfigReferenceInRowValue_Resolves()
+    {
+        // A field whose editor stores rows keeps its references inside the rows, so the walk
+        // has to go one level in — otherwise a header that resolved fine as a JSON string
+        // would start going out with the literal "$Umbraco:Automate:Secrets:SlackToken".
+        var settings = new FakeRowSettings
+        {
+            Headers = [new FakeRow { Key = "Authorization", Value = "Bearer $Umbraco:Automate:Secrets:SlackToken" }],
+        };
+        var resolver = CreateResolver("Umbraco:Automate:Secrets");
+
+        var result = resolver.ResolveModel<FakeRowSettings>("test", settings);
+
+        result!.Headers.Single().Key.ShouldBe("Authorization");
+        result.Headers.Single().Value.ShouldBe("Bearer xoxb-secret-token");
+    }
+
+    [Fact]
+    public void ResolveModel_WithSecretReferenceInNonSensitiveRowList_Throws()
+    {
+        // The secret-into-sensitive-only restriction has to survive the extra level too.
+        var settings = new FakeRowSettings
+        {
+            FormFields = [new FakeRow { Key = "token", Value = "$Umbraco:Automate:Secrets:SlackToken" }],
+        };
+        var resolver = CreateResolver("Umbraco:Automate:Secrets");
+
+        var act = () => resolver.ResolveModel<FakeRowSettings>("test", settings);
+
+        Should.Throw<InvalidOperationException>(act).Message.ShouldContain("sensitive field");
+    }
+
+    #endregion
+
     #region Test models
 
     public class FakeSettings
@@ -821,6 +858,22 @@ public class EditableModelResolverTests
 
         [Field(IsSensitive = true)]
         public string? SecretField { get; set; }
+    }
+
+    public class FakeRowSettings
+    {
+        [Field(IsSensitive = true)]
+        public List<FakeRow> Headers { get; set; } = [];
+
+        [Field]
+        public List<FakeRow> FormFields { get; set; } = [];
+    }
+
+    public class FakeRow
+    {
+        public string Key { get; set; } = string.Empty;
+
+        public string? Value { get; set; }
     }
 
     #endregion

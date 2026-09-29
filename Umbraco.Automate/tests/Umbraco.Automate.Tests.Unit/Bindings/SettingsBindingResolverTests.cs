@@ -174,6 +174,43 @@ public class SettingsBindingResolverTests
         settings.Columns.ShouldBe(["${ trigger.name }", "literal"]);
     }
 
+    [Fact]
+    public void ResolveBindings_ResolvesBindingsInRowProperties()
+    {
+        // A list of rows rather than of strings — the HTTP Request action's headers and form
+        // fields. Both the key and the value of a row accept bindings.
+        var settings = new MarkedRowListSettings
+        {
+            Rows =
+            [
+                new Row { Key = "X-${ trigger.key }", Value = "HELLO ${ trigger.name }" },
+                new Row { Key = "Static", Value = null },
+            ],
+        };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.Rows[0].Key.ShouldBe("X-abc-123");
+        settings.Rows[0].Value.ShouldBe("HELLO Hello World");
+        settings.Rows[1].Key.ShouldBe("Static");
+        settings.Rows[1].Value.ShouldBeNull();
+    }
+
+    [Fact]
+    public void ResolveBindings_SkipsUnmarkedRowListProperty()
+    {
+        var settings = new MixedRowListSettings
+        {
+            Marked = [new Row { Key = "k", Value = "${ trigger.name }" }],
+            Unmarked = [new Row { Key = "k", Value = "${ trigger.name }" }],
+        };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.Marked[0].Value.ShouldBe("Hello World");
+        settings.Unmarked[0].Value.ShouldBe("${ trigger.name }");
+    }
+
     // --- Test settings POCOs ---
 
     private sealed class MarkedSettings
@@ -221,6 +258,28 @@ public class SettingsBindingResolverTests
     {
         [Field(SupportsBindings = true)]
         public string[] Columns { get; set; } = [];
+    }
+
+    private sealed class MarkedRowListSettings
+    {
+        [Field(SupportsBindings = true)]
+        public List<Row> Rows { get; set; } = [];
+    }
+
+    private sealed class MixedRowListSettings
+    {
+        [Field(SupportsBindings = true)]
+        public List<Row> Marked { get; set; } = [];
+
+        [Field]
+        public List<Row> Unmarked { get; set; } = [];
+    }
+
+    private sealed class Row
+    {
+        public string Key { get; set; } = string.Empty;
+
+        public string? Value { get; set; }
     }
 
     private sealed class ReadOnlyListSettings

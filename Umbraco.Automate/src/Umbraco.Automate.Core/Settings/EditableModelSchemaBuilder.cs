@@ -106,7 +106,7 @@ public static class EditableModelSchemaBuilder
     /// already taken for <c>IsRequired</c>. A settings author who wants a sensitive field
     /// rendered some other way sets <see cref="EditableModelFieldAttribute.EditorUiAlias"/>,
     /// which the caller checks first and so always wins; that is the escape hatch for a
-    /// sensitive field masking would make unusable, such as the JSON headers on
+    /// sensitive field masking would make unusable, such as the key/value headers on
     /// <c>HttpRequestSettings</c>.
     /// </remarks>
     private static string InferEditorUiAlias(Type type, bool isSensitive)
