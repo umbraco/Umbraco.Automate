@@ -99,8 +99,48 @@ public sealed class EditableModelFieldDescriptor
     public bool SupportsBindings { get; init; }
 
     /// <summary>
+    /// Gets the condition under which this field applies, or null when it always applies.
+    /// See <see cref="EditableModelFieldAttribute.VisibleWhen"/>.
+    /// </summary>
+    public EditableModelFieldVisibility? VisibleWhen { get; init; }
+
+    /// <summary>
     /// Gets the validation rules inferred from data annotation attributes on the property.
     /// </summary>
     [JsonIgnore]
     public IEnumerable<ValidationAttribute> ValidationRules { get; init; } = [];
+}
+
+/// <summary>
+/// Makes an <see cref="EditableModelFieldDescriptor"/> apply only while another field on the
+/// same model holds one of <see cref="Values"/>.
+/// </summary>
+public sealed class EditableModelFieldVisibility
+{
+    /// <summary>
+    /// Gets the key of the controlling field.
+    /// </summary>
+    public required string Key { get; init; }
+
+    /// <summary>
+    /// Gets the property name of the controlling field on the settings POCO.
+    /// </summary>
+    [JsonIgnore]
+    public string PropertyName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the controlling values for which the field applies, compared case-insensitively.
+    /// </summary>
+    public required IReadOnlyList<string> Values { get; init; }
+
+    /// <summary>
+    /// Determines whether the field applies for the given controlling value.
+    /// </summary>
+    /// <param name="controllingValue">The current value of the controlling field.</param>
+    /// <returns><c>true</c> when the value's string form matches one of <see cref="Values"/>.</returns>
+    public bool IsVisibleFor(object? controllingValue)
+    {
+        var text = controllingValue?.ToString();
+        return text is not null && Values.Contains(text, StringComparer.OrdinalIgnoreCase);
+    }
 }
