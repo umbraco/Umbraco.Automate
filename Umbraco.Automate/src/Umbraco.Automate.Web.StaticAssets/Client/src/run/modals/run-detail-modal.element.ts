@@ -265,8 +265,8 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("suspend")}
                             >
-                                <uui-icon name="icon-pause"></uui-icon>
                                 ${this.localize.term("uaRun_suspend")}
+                                <uui-icon name="icon-pause"></uui-icon>
                             </uui-button>
                         `,
                     )}
@@ -280,8 +280,8 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("resume")}
                             >
-                                <uui-icon name="icon-play"></uui-icon>
                                 ${this.localize.term("uaRun_resume")}
+                                <uui-icon name="icon-play"></uui-icon>
                             </uui-button>
                         `,
                     )}
@@ -295,8 +295,8 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("terminate")}
                             >
-                                <uui-icon name="icon-stop-alt"></uui-icon>
                                 ${this.localize.term("uaRun_terminate")}
+                                <uui-icon name="icon-stop-alt"></uui-icon>
                             </uui-button>
                         `,
                     )}

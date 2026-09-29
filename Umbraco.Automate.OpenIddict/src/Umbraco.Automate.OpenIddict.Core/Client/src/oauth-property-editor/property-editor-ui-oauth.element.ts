@@ -463,17 +463,15 @@ export class UmbAutomatePropertyEditorUIOAuthElement
                 ${this._setupDocsUrl
                     ? html`
                           <uui-button
-                              class="docs-link"
                               look="secondary"
                               color="warning"
-                              compact
                               href=${this._setupDocsUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               label=${`Get ${providerLabel} credentials`}
                           >
                               Get ${providerLabel} credentials
-                              <uui-icon name="icon-out" slot="extra"></uui-icon>
+                              <uui-icon name="icon-out"></uui-icon>
                           </uui-button>
                       `
                     : nothing}
@@ -521,10 +519,6 @@ export class UmbAutomatePropertyEditorUIOAuthElement
 
         .not-configured-warning code {
             font-size: 0.9em;
-        }
-
-        .not-configured-warning .docs-link uui-icon {
-            margin-left: var(--uui-size-space-2);
         }
     `;
 }
