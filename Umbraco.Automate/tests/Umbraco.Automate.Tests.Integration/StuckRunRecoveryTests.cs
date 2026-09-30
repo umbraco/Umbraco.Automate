@@ -185,6 +185,54 @@ public class StuckRunRecoveryTests : IDisposable
         (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
     }
 
+    [Fact]
+    public async Task RecoverStuckRunsAsync_RunCompletesDuringLeaseWait_LeavesItCompleted()
+    {
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
+        await SeedLeaseAsync(instanceId, DateTime.UtcNow.AddMilliseconds(100));
+
+        var recovery = _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        // Another node finishes the run and releases its lease while recovery is waiting.
+        await Task.Delay(50);
+        await using (var other = _fixture.CreateContext())
+        {
+            await other.StepRuns.Where(sr => sr.RunId == runId)
+                .ExecuteUpdateAsync(s => s.SetProperty(sr => sr.Status, (int)StepRunStatus.Completed));
+            await other.AutomationRuns.Where(r => r.Id == runId)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, (int)AutomationRunStatus.Completed));
+            await other.WorkflowInstances.Where(wi => wi.Id == instanceId)
+                .ExecuteUpdateAsync(s => s.SetProperty(wi => wi.Status, (int)WorkflowStatus.Complete));
+            await other.WorkflowLocks.Where(l => l.LockId == instanceId).ExecuteDeleteAsync();
+        }
+
+        await recovery;
+
+        await using var db = _fixture.CreateContext();
+        var run = await db.AutomationRuns.SingleAsync(r => r.Id == runId);
+        run.Status.ShouldBe((int)AutomationRunStatus.Completed);
+        run.Error.ShouldBeNull();
+        (await db.StepRuns.SingleAsync(sr => sr.RunId == runId)).Status.ShouldBe((int)StepRunStatus.Completed);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Complete);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_MixOfLeasedAndUnleasedRuns_RecoversOnlyTheUnleased()
+    {
+        var (leasedRunId, leasedInstanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
+        await SeedLeaseAsync(leasedInstanceId, DateTime.UtcNow.AddHours(1));
+        var (pendingRunId, _) = await SeedRunAsync(
+            AutomationRunStatus.Pending, StepRunStatus.Pending, WorkflowStatus.Runnable);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == leasedRunId)).Status.ShouldBe((int)AutomationRunStatus.Running);
+        (await db.AutomationRuns.SingleAsync(r => r.Id == pendingRunId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+    }
+
     private async Task SeedLeaseAsync(string lockId, DateTime expiresUtc)
     {
         await using var db = _fixture.CreateContext();

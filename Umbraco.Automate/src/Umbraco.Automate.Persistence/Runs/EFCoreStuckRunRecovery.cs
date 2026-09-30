@@ -43,6 +43,12 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
         (int)AutomationRunStatus.Pending,
     ];
 
+    private static readonly int[] LiveInstanceStatuses =
+    [
+        (int)WorkflowStatus.Runnable,
+        (int)WorkflowStatus.Suspended,
+    ];
+
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IOptions<WorkflowLockOptions> _lockOptions;
@@ -74,27 +80,10 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 
         var now = DateTime.UtcNow;
 
-        // Exclude runs that have steps in a durable status (Sleeping, WaitingForInput) —
-        // WorkflowCore will resume these naturally via its persistence mechanism.
-        var durableStepStatuses = new[]
-        {
-            (int)StepRunStatus.Sleeping,
-            (int)StepRunStatus.WaitingForInput,
-        };
-
-        var durableRunIds = await db.StepRuns
-            .Where(sr => durableStepStatuses.Contains(sr.Status))
-            .Select(sr => sr.RunId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
         var stuckStepStatuses = new[] { (int)StepRunStatus.Pending, (int)StepRunStatus.Running };
 
         // 1. Recover stuck runs and their step runs.
-        var candidateRuns = await db.AutomationRuns
-            .Where(r => NonTerminalStatuses.Contains(r.Status) && !durableRunIds.Contains(r.Id))
-            .Select(r => new StuckRun(r.Id, r.WorkflowInstanceId))
-            .ToListAsync(cancellationToken);
+        var candidateRuns = await ReadCandidateRunsAsync(db, cancellationToken);
 
         // Leave alone runs another node is still executing (see class remarks).
         var stuckRuns = await ExcludeRunsHeldByLiveLeasesAsync(db, candidateRuns, cancellationToken);
@@ -117,14 +106,19 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 
             if (instanceIds.Count > 0)
             {
-                var liveInstanceStatuses = new[] { (int)WorkflowStatus.Runnable, (int)WorkflowStatus.Suspended };
+                // Checked in the statement itself rather than only up front: a node that takes the
+                // lease between the check and this update must not have its instance terminated
+                // mid-pass — it would persist its in-memory copy as Runnable behind a Failed run.
+                var leaseNow = DateTime.UtcNow;
 
                 // Status is a real column for both instance schema versions, and it is what the
                 // poller and WorkflowDefinitionRecovery filter on, so updating it is enough to stop
                 // the engine. Execution pointers are left as they are, mirroring WorkflowCore's own
                 // terminate.
                 terminatedInstances = await db.WorkflowInstances
-                    .Where(wi => instanceIds.Contains(wi.Id) && liveInstanceStatuses.Contains(wi.Status))
+                    .Where(wi => instanceIds.Contains(wi.Id)
+                        && LiveInstanceStatuses.Contains(wi.Status)
+                        && !db.WorkflowLocks.Any(l => l.LockId == wi.Id && l.ExpiresUtc >= leaseNow))
                     .ExecuteUpdateAsync(
                         s => s
                             .SetProperty(wi => wi.Status, (int)WorkflowStatus.Terminated)
@@ -133,8 +127,17 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
                         cancellationToken);
             }
 
+            // The run and step updates re-check status and instance state so they only touch runs that
+            // are still in flight and whose instance is no longer live: a run that finished meanwhile,
+            // or whose instance was skipped above because a node just leased it, is left alone.
             recoveredSteps = await db.StepRuns
-                .Where(sr => stuckRunIds.Contains(sr.RunId) && stuckStepStatuses.Contains(sr.Status))
+                .Where(sr => stuckRunIds.Contains(sr.RunId)
+                    && stuckStepStatuses.Contains(sr.Status)
+                    && db.AutomationRuns.Any(r => r.Id == sr.RunId
+                        && NonTerminalStatuses.Contains(r.Status)
+                        && (r.WorkflowInstanceId == null
+                            || !db.WorkflowInstances.Any(wi => wi.Id == r.WorkflowInstanceId
+                                && LiveInstanceStatuses.Contains(wi.Status)))))
                 .ExecuteUpdateAsync(
                     s => s
                         .SetProperty(sr => sr.Status, (int)StepRunStatus.Failed)
@@ -143,7 +146,11 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
                     cancellationToken);
 
             recoveredRuns = await db.AutomationRuns
-                .Where(r => stuckRunIds.Contains(r.Id))
+                .Where(r => stuckRunIds.Contains(r.Id)
+                    && NonTerminalStatuses.Contains(r.Status)
+                    && (r.WorkflowInstanceId == null
+                        || !db.WorkflowInstances.Any(wi => wi.Id == r.WorkflowInstanceId
+                            && LiveInstanceStatuses.Contains(wi.Status))))
                 .ExecuteUpdateAsync(
                     s => s
                         .SetProperty(r => r.Status, (int)AutomationRunStatus.Failed)
@@ -184,13 +191,33 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
         }
     }
 
+    private static async Task<List<StuckRun>> ReadCandidateRunsAsync(
+        UmbracoAutomateDbContext db, CancellationToken cancellationToken)
+    {
+        // Exclude runs that have steps in a durable status (Sleeping, WaitingForInput) —
+        // WorkflowCore will resume these naturally via its persistence mechanism.
+        var durableStepStatuses = new[]
+        {
+            (int)StepRunStatus.Sleeping,
+            (int)StepRunStatus.WaitingForInput,
+        };
+
+        var durableRunIds = await db.StepRuns
+            .Where(sr => durableStepStatuses.Contains(sr.Status))
+            .Select(sr => sr.RunId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return await db.AutomationRuns
+            .Where(r => NonTerminalStatuses.Contains(r.Status) && !durableRunIds.Contains(r.Id))
+            .Select(r => new StuckRun(r.Id, r.WorkflowInstanceId))
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task<List<StuckRun>> ExcludeRunsHeldByLiveLeasesAsync(
         UmbracoAutomateDbContext db, List<StuckRun> candidates, CancellationToken cancellationToken)
     {
-        var instanceIds = candidates
-            .Where(r => !string.IsNullOrEmpty(r.WorkflowInstanceId))
-            .Select(r => r.WorkflowInstanceId!)
-            .ToList();
+        var instanceIds = GetInstanceIds(candidates);
 
         if (instanceIds.Count == 0)
         {
@@ -205,11 +232,17 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
             // A lease held by the process that just died lapses on its own; a live node keeps renewing
             // its lease. Give the former time to lapse, bounded by the lease duration, then decide.
             _logger.LogInformation(
-                "Waiting up to {LeaseDuration} for {Count} workflow lease(s) to lapse before recovering stuck runs",
+                "Waiting {LeaseDuration} for {Count} workflow lease(s) to lapse before recovering stuck runs",
                 leaseDuration, heldInstanceIds.Count);
 
             await Task.Delay(leaseDuration, cancellationToken);
-            heldInstanceIds = await GetLeasedInstanceIdsAsync(db, instanceIds, cancellationToken);
+
+            // Runs finish while we wait, so the candidates read before it are stale: read them again.
+            candidates = await ReadCandidateRunsAsync(db, cancellationToken);
+            instanceIds = GetInstanceIds(candidates);
+            heldInstanceIds = instanceIds.Count == 0
+                ? []
+                : await GetLeasedInstanceIdsAsync(db, instanceIds, cancellationToken);
         }
 
         if (heldInstanceIds.Count == 0)
@@ -225,6 +258,11 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
             .Where(r => string.IsNullOrEmpty(r.WorkflowInstanceId) || !heldInstanceIds.Contains(r.WorkflowInstanceId))
             .ToList();
     }
+
+    private static List<string> GetInstanceIds(List<StuckRun> candidates) => candidates
+        .Where(r => !string.IsNullOrEmpty(r.WorkflowInstanceId))
+        .Select(r => r.WorkflowInstanceId!)
+        .ToList();
 
     private static async Task<HashSet<string>> GetLeasedInstanceIdsAsync(
         UmbracoAutomateDbContext db, List<string> instanceIds, CancellationToken cancellationToken)
