@@ -10,6 +10,7 @@ import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import type { UaRunItemModel } from "../../types.js";
 import { UA_RUN_DETAIL_MODAL } from "../../modals/run-detail-modal.token.js";
 import { formatDateTime, getRunStatusColor } from "../../../core/index.js";
+import "./run-link.element.js";
 
 /**
  * Shared run-list table used by the dashboard and the automation runs view.
@@ -88,17 +89,17 @@ export class UaRunsTableElement extends UmbLitElement {
             const leadingCell = this.showAutomationColumn
                 ? {
                       columnAlias: "automationName",
-                      value: html`<button type="button" class="run-link" @click=${onClick}>
+                      value: html`<ua-run-link @click=${onClick}>
                           ${item.automationName
                               ?? this.automationNames.get(item.automationId)
                               ?? item.automationId}
-                      </button>`,
+                      </ua-run-link>`,
                   }
                 : {
                       columnAlias: "run",
-                      value: html`<button type="button" class="run-link" @click=${onClick}>
+                      value: html`<ua-run-link @click=${onClick}>
                           ${item.unique.substring(0, 8)}
-                      </button>`,
+                      </ua-run-link>`,
                   };
 
             return {
@@ -175,26 +176,6 @@ export class UaRunsTableElement extends UmbLitElement {
                 white-space: nowrap;
                 max-width: 400px;
                 vertical-align: middle;
-            }
-
-            /* Opens the run modal rather than navigating, so a button styled as a link, not an <a>. */
-            .run-link {
-                padding: 0;
-                border: none;
-                background: none;
-                font: inherit;
-                color: var(--uui-color-interactive);
-                text-align: left;
-                cursor: pointer;
-            }
-
-            .run-link:hover {
-                text-decoration: underline;
-            }
-
-            .run-link:focus-visible {
-                outline: 2px solid var(--uui-color-focus);
-                outline-offset: 2px;
             }
         `,
     ];
