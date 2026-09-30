@@ -770,6 +770,8 @@ public class CreateContentActionTests
         var created = new Mock<IContent>();
         created.SetupGet(x => x.Key).Returns(Guid.NewGuid());
         created.SetupGet(x => x.Properties).Returns(properties);
+        // The skipped-alias log entry names the content type.
+        created.SetupGet(x => x.ContentType).Returns(Mock.Of<ISimpleContentType>(t => t.Alias == "page"));
 
         _contentService.Setup(x => x.Create("New Page", parentKey, "page", -1)).Returns(created.Object);
         _contentService
