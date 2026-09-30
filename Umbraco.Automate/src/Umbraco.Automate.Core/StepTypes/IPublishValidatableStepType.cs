@@ -3,15 +3,18 @@ using Umbraco.Automate.Core.Automations;
 namespace Umbraco.Automate.Core.StepTypes;
 
 /// <summary>
-/// Implemented by step types (actions, control flow) that need to check their resolved settings
+/// Implemented by actions that need to check their resolved settings
 /// before an automation is published. When an automation is published, the automation service calls
 /// <see cref="ValidateSettingsForPublishAsync"/> for each step whose type implements this, and rejects
 /// the publish if any errors are returned.
 /// </summary>
 /// <remarks>
+/// Only actions are validated; control-flow step types that implement this interface are not called.
+/// <para>
 /// <see cref="IValidatableStepType"/> runs on every draft save, so it should only reject values that
 /// are malformed. This runs only on publish, so it is the place to require a setting to be filled in
 /// or a referenced entity to exist — checks that would otherwise stop an author saving work in progress.
+/// </para>
 /// </remarks>
 public interface IPublishValidatableStepType
 {
