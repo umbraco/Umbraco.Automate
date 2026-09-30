@@ -37,12 +37,15 @@ public sealed class DelayAction : ActionBase<DelaySettings, DelayOutput>
 
         if (duration == TimeSpan.Zero)
         {
+            context.LogInfo("Delay is zero, so the automation continues immediately");
             return Task.FromResult(Success(new DelayOutput { DelayedFor = "00:00:00" }));
         }
 
         _logger.LogDebug(
             "Automation {AutomationId} / Run {RunId}: Sleeping for {Duration} (durable)",
             context.AutomationId, context.RunId, duration);
+
+        context.LogInfo($"Delaying for {ActionLogFormat.Duration(duration)}");
 
         return Task.FromResult(Sleep(duration, new DelayOutput { DelayedFor = duration.ToString() }));
     }

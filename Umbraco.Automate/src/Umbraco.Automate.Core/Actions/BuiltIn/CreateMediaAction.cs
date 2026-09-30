@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
@@ -115,11 +116,14 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
             return failure;
         }
 
-        if (!atRoot && _mediaService.GetById(parentKey) is null)
+        var parent = atRoot ? null : _mediaService.GetById(parentKey);
+        if (!atRoot && parent is null)
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Parent media {ParentKey} not found.",
                 context.AutomationId, context.RunId, parentKey);
+
+            context.LogWarning($"Parent media {parentKey} was not found, so nothing was created");
 
             return SuccessWithOutcome(OutcomeParentNotFound, new CreateMediaOutput
             {
@@ -135,6 +139,8 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Media type {MediaTypeKey} not found.",
                 context.AutomationId, context.RunId, mediaTypeKey);
+
+            context.LogWarning($"Media type {mediaTypeKey} was not found, so nothing was created");
 
             return SuccessWithOutcome(OutcomeMediaTypeNotFound, new CreateMediaOutput
             {
@@ -155,7 +161,7 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
             ? _mediaService.CreateMedia(settings.Name, UmbracoConstants.System.Root, mediaType.Alias, userId)
             : _mediaService.CreateMedia(settings.Name, parentKey, mediaType.Alias, userId);
 
-        ApplyProperties(media, settings.PropertiesJson);
+        ApplyProperties(context, media, settings.PropertiesJson);
 
         // Download before the save so the file and the item land in one write. A failure here
         // leaves the item fileless rather than aborting — see OutcomeFileDownloadFailed.
@@ -170,6 +176,9 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
 
         if (result.Success)
         {
+            var location = parent is null ? "at the media root" : $"under {ActionLogFormat.Item(parent.Name, parent.Key)}";
+            context.LogInfo($"Created '{settings.Name}' ({media.Key}) as {mediaType.Alias} {location}");
+
             var output = new CreateMediaOutput
             {
                 MediaKey = media.Key,
@@ -211,18 +220,30 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
         var propertyAlias = _fileDownloader.DefaultFilePropertyAlias;
         if (!media.Properties.Contains(propertyAlias))
         {
+            context.LogWarning($"Media type {media.ContentType.Alias} has no '{propertyAlias}' property, so the file was not downloaded");
             return MediaFileDownloadResult.Failed(
                 $"Media type '{media.ContentType.Alias}' has no '{propertyAlias}' property to store a file on.");
         }
 
+        var started = Stopwatch.GetTimestamp();
         var result = await _fileDownloader.DownloadToPropertyAsync(media, sourceUrl, propertyAlias, cancellationToken);
+        var elapsed = ActionLogFormat.Elapsed(Stopwatch.GetElapsedTime(started));
 
         if (!result.Success)
         {
             _logger.LogWarning(
                 "Automation {AutomationId} / Run {RunId}: Media file download failed. {Reason}",
                 context.AutomationId, context.RunId, result.FailureReason);
+
+            // The reason quotes the source URL, whose query string may carry a signed token.
+            var safeUrl = ActionLogFormat.Url(Uri.TryCreate(sourceUrl, UriKind.Absolute, out var uri) ? uri : null);
+            var reason = result.FailureReason?.Replace(sourceUrl, safeUrl, StringComparison.Ordinal);
+            context.LogWarning($"File download failed after {elapsed}, so the item was saved without a file: {reason}");
+
+            return result;
         }
+
+        context.LogInfo($"Downloaded '{result.FileName}' in {elapsed}");
 
         return result;
     }
@@ -251,10 +272,10 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
 
     /// <summary>
     /// Applies optional invariant property values from a JSON object. Malformed JSON and
-    /// unknown property aliases are silently skipped — this is optional convenience config,
-    /// not a required part of creating the media item.
+    /// unknown property aliases are skipped with a warning in the run log — this is optional
+    /// convenience config, not a required part of creating the media item.
     /// </summary>
-    private static void ApplyProperties(IMedia media, string? propertiesJson)
+    private static void ApplyProperties(ActionContext context, IMedia media, string? propertiesJson)
     {
         if (string.IsNullOrWhiteSpace(propertiesJson))
         {
@@ -268,6 +289,7 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
         }
         catch (JsonException)
         {
+            context.LogWarning("Properties are not a valid JSON object and were ignored");
             return;
         }
 
@@ -278,10 +300,13 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
 
         foreach (var (alias, value) in properties)
         {
-            if (media.Properties.Contains(alias))
+            if (!media.Properties.Contains(alias))
             {
-                media.SetValue(alias, value);
+                context.LogWarning($"Property '{alias}' does not exist on {media.ContentType.Alias} and was skipped");
+                continue;
             }
+
+            media.SetValue(alias, value);
         }
     }
 

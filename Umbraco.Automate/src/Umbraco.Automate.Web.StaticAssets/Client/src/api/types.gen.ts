@@ -19,6 +19,8 @@ export type ActionItemResponseModel = {
     type: string;
 };
 
+export type ActionLogLevelModel = 'Debug' | 'Info' | 'Warning' | 'Error';
+
 export type ApprovalDecisionRequestModel = {
     outcome: ApprovalOutcomeModel;
     comment?: null | string;
@@ -280,6 +282,12 @@ export type EditableModelFieldDescriptorModel = {
     isRequired: boolean;
     group?: null | string;
     supportsBindings: boolean;
+    visibleWhen?: null | EditableModelFieldVisibilityModel;
+};
+
+export type EditableModelFieldVisibilityModel = {
+    key: string;
+    values: Array<string>;
 };
 
 export type EditableModelSchemaModel = {
@@ -449,6 +457,12 @@ export type StepRunDataResponseModel = {
     outputTruncated: boolean;
 };
 
+export type StepRunLogEntryResponseModel = {
+    timestampUtc: string;
+    level: ActionLogLevelModel;
+    message: string;
+};
+
 export type StepRunResponseModel = {
     id: string;
     stepId: string;
@@ -459,6 +473,7 @@ export type StepRunResponseModel = {
     error?: null | string;
     retryCount: number;
     durationMs?: null | number;
+    logEntries: Array<StepRunLogEntryResponseModel>;
 };
 
 export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput' | 'Sleeping' | 'Rejected' | 'Cancelled';

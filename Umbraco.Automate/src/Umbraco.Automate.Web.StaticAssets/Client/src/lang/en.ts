@@ -54,6 +54,7 @@ export default {
         settings: "Settings",
         webhookUrl: "Webhook URL",
         steps: "Steps",
+        logs: "Logs",
         runInfo: "Run Info",
         search: "Search",
         details: "Details",
@@ -296,8 +297,11 @@ export default {
         value: "Value",
         keyPlaceholder: "Name",
         valuePlaceholder: "Value",
-        addRow: "Add row",
+        addRow: "Add",
         removeRow: "Remove row",
+        removeRowHeadline: "Remove row",
+        removeRowConfirm: (key: string) =>
+            key ? `Are you sure you want to remove "${key}"?` : "Are you sure you want to remove this row?",
     },
     uaVersionHistory: {
         history: "History",
