@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
 import { ConstantHelper } from './ConstantHelper';
 import { toAlias } from './TestData';
@@ -10,7 +11,15 @@ export type CreateAutomationOptions = {
   trigger?: { triggerAlias: string; settings: Record<string, unknown> } | null;
   steps?: unknown[];
   connections?: unknown[];
+  /** e.g. `{ channels: [{ channelAlias: 'umbracoAutomate.webhook', settings: {…}, isEnabled: true, notifyOn: 'Failed' }] }`.
+   * Left out of the body when not given, so the server applies its own default. */
+  notificationSettings?: { channels: unknown[] };
 };
+
+/* The run lifecycle endpoints under `runs/{id}/…`, as the run detail modal's footer calls them. */
+export type RunLifecycleAction = 'resume' | 'suspend' | 'terminate';
+
+export type ApprovalOutcome = 'Approved' | 'Rejected';
 
 /**
  * Automations, via the Automate management API.
@@ -74,7 +83,8 @@ export class AutomationApiHelper {
       groupId: options.groupId ?? null,
       trigger: options.trigger ?? null,
       steps: options.steps ?? [],
-      connections: options.connections ?? []
+      connections: options.connections ?? [],
+      notificationSettings: options.notificationSettings
     });
 
     const location = response.headers()['location'];
@@ -124,6 +134,85 @@ export class AutomationApiHelper {
     const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId;
     const response = await this.api.get(requestUrl);
     return await response.json();
+  }
+
+  /**
+   * Waits until one run reaches `status`, and returns its detail.
+   *
+   * Runs execute in the background, so every run assertion starts by polling; the timeout is
+   * generous because a run is picked up by the engine's poll loop, not straight away.
+   */
+  async waitForRunStatus(runId: string, status: string, timeout: number = 30000) {
+    await expect.poll(async () => (await this.getRun(runId)).status, { timeout }).toBe(status);
+    return await this.getRun(runId);
+  }
+
+  /**
+   * Publishes and runs an automation, waits for its newest run to reach `status`, and returns
+   * that run's id.
+   *
+   * The newest run is read from the listing (newest first) rather than from the trigger call,
+   * because `trigger` answers before the run record exists and does not return its id.
+   */
+  async publishAndRunUntil(automationId: string, status: string, timeout: number = 30000): Promise<string> {
+    await this.publish(automationId);
+    await this.run(automationId);
+
+    let runId = '';
+    await expect
+      .poll(
+        async () => {
+          const [newest] = await this.getRuns(automationId);
+          runId = newest?.id ?? '';
+          return newest?.status;
+        },
+        { timeout }
+      )
+      .toBe(status);
+    return runId;
+  }
+
+  /**
+   * Publishes and runs an automation that pauses on a Request Approval step, and returns the run
+   * id once it is parked there. A run waiting on an approval is `Suspended`, with the approval
+   * step `WaitingForInput`.
+   */
+  async startWaitingRun(automationId: string): Promise<string> {
+    return await this.publishAndRunUntil(automationId, 'Suspended');
+  }
+
+  /**
+   * Resumes, suspends or terminates a run, and returns the raw response.
+   *
+   * Deliberately does not throw: refusals are behaviour worth asserting on (resuming a run that
+   * waits on an approval answers 409), so the caller decides what a non-2xx means.
+   */
+  async postRunLifecycle(runId: string, action: RunLifecycleAction) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId + '/' + action;
+    return await this.api.post(requestUrl, {});
+  }
+
+  /**
+   * The pending approvals of one automation, from `approvals/pending`.
+   *
+   * The endpoint lists every pending approval on the site, and the demo site may hold other
+   * automations' approvals, so always scope to the automation the spec created.
+   */
+  async getPendingApprovals(automationId: string): Promise<any[]> {
+    const requestUrl = this.api.baseUrl + this.basePath + 'approvals/pending';
+    const response = await this.api.get(requestUrl);
+    const items = await response.json();
+    return (items ?? []).filter((item: any) => item.automationId === automationId);
+  }
+
+  /* Decides a pending approval, as the decision modal does. Throws with the server's problem
+   * detail on failure, so cleanup that relies on it fails loudly rather than leaving a run waiting. */
+  async decideApproval(runId: string, stepId: string, outcome: ApprovalOutcome) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'approvals/' + runId + '/steps/' + stepId + '/decision';
+    const response = await this.api.post(requestUrl, { outcome });
+    if (!response.ok()) {
+      throw new Error(`Deciding approval ${runId}/${stepId} failed (${response.status()}): ${await response.text()}`);
+    }
   }
 
   /**

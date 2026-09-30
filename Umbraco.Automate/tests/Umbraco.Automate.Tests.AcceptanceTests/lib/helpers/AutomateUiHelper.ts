@@ -38,6 +38,15 @@ export class AutomateUiHelper {
     return `${this.automationEditUrl(id)}/view/runs`;
   }
 
+  automationNotificationsUrl(id: string): string {
+    return `${this.automationEditUrl(id)}/view/notifications`;
+  }
+
+  /* The Approvals dashboard, from src/approval/dashboard/manifests.ts (pathname `approvals`). */
+  approvalDashboardUrl(): string {
+    return `${this.sectionPath()}/dashboard/approvals`;
+  }
+
   connectionCreateUrl(connectionType: string): string {
     return `${this.sectionPath()}/workspace/ua:connection/create/${connectionType}`;
   }
@@ -352,11 +361,30 @@ export class AutomateUiHelper {
   }
 
   /* Expands a step run, then opens one of its tabs. The labels are localised, so tabs are picked
-   * by their fixed order in ua-step-run-detail: Details, Input, Output. */
-  async openStepRunTab(index: number, tab: 'details' | 'input' | 'output') {
+   * by their fixed order in ua-step-run-detail: Details, Input, Output, Logs. Logs only renders
+   * when the step wrote log entries, so asking for it on a silent step times out. */
+  async openStepRunTab(index: number, tab: 'details' | 'input' | 'output' | 'logs') {
     const step = this.runDetailStep(index);
     await step.locator('.step-header').click();
-    await step.locator('uui-tab').nth(['details', 'input', 'output'].indexOf(tab)).click();
+    await step.locator('uui-tab').nth(['details', 'input', 'output', 'logs'].indexOf(tab)).click();
+  }
+
+  /* The expandable trigger row at the top of the run detail modal. It is a role=button div that
+   * reports its state through `aria-expanded`. */
+  get runDetailTriggerHeader(): Locator {
+    return this.runDetailModal.locator('ua-run-trigger-detail div.header');
+  }
+
+  /* The trigger row's body, rendered only while the row is expanded. */
+  get runDetailTriggerContent(): Locator {
+    return this.runDetailModal.locator('ua-run-trigger-detail .content');
+  }
+
+  /* A footer button in the open run detail modal (Close, Suspend, Resume, Terminate, Replay).
+   * Scoped to the modal's `actions` slot, because step runs render buttons of their own. Which
+   * of them shows depends on the run's status, so assert presence and absence here. */
+  runDetailAction(label: string): Locator {
+    return this.runDetailModal.locator('[slot="actions"]').getByRole('button', { name: label, exact: true });
   }
 
   /* The open tab's content in a step run. */
@@ -375,6 +403,55 @@ export class AutomateUiHelper {
     await this.runDetailModal.waitFor({ state: 'visible' });
   }
 
+  /**
+   * The status tag in one run's row of the runs table.
+   *
+   * The row is found by the link inside it. That inner locator must start from the page, not
+   * from `runLink()`: a `has` locator is resolved relative to each candidate row, and `runLink`
+   * is rooted at ua-runs-table, which is never inside a row, so it would match nothing.
+   */
+  runStatusTag(runId: string): Locator {
+    const link = this.page.getByRole('button', { name: runId.slice(0, 8), exact: true });
+    return this.runsTable.locator('uui-table-row').filter({ has: link }).locator('uui-tag');
+  }
+
+  /* --- Dashboards ---------------------------------------------------------------------- */
+
+  /**
+   * A run in the Overview dashboard's recent activity, by automation name. The list spans every
+   * automation on the site, so the name (unique per test) is what scopes it. The row is a
+   * role=button, so it opens the run modal from the keyboard as well as on click.
+   */
+  recentActivityItem(automationName: string): Locator {
+    return this.dashboard
+      .locator('.activity-item')
+      .filter({ has: this.page.locator('.activity-name', { hasText: automationName }) });
+  }
+
+  get approvalDashboard(): Locator {
+    return this.page.locator(ConstantHelper.elements.approvalDashboard);
+  }
+
+  /**
+   * One automation's row on the Approvals dashboard.
+   *
+   * The dashboard lists every pending approval on the site, and the demo site may hold other
+   * automations' approvals, so never act on a row that is not scoped to the spec's own automation.
+   */
+  approvalRow(automationName: string): Locator {
+    return this.approvalDashboard.locator('uui-table-row').filter({ hasText: automationName });
+  }
+
+  get approvalDecisionModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.approvalDecisionModal);
+  }
+
+  /* Opens the decision modal from one automation's row on the Approvals dashboard. */
+  async openApprovalReview(automationName: string) {
+    await this.approvalRow(automationName).getByRole('button', { name: 'Review', exact: true }).click({ force: true });
+    await this.approvalDecisionModal.waitFor({ state: 'visible' });
+  }
+
   /* The connection type picker opened when creating a connection. */
   get connectionTypePickerModal(): Locator {
     return this.page.locator(ConstantHelper.elements.connectionTypePickerModal);
@@ -386,11 +463,41 @@ export class AutomateUiHelper {
     await modal.getByRole('button', { name: new RegExp(typeName, 'i') }).first().click({ force: true });
   }
 
+  /* The CMS confirm dialog destructive actions go through. Assert `toHaveCount(0)` on it to prove
+   * an action did not ask. */
+  get confirmModal(): Locator {
+    return this.page.locator('umb-confirm-modal');
+  }
+
   /* Confirms a destructive action in the CMS confirm dialog. */
   async confirmDialog(buttonName: string = 'Delete') {
-    const dialog = this.page.locator('umb-confirm-modal');
+    const dialog = this.confirmModal;
     await dialog.waitFor({ state: 'visible' });
     await dialog.getByRole('button', { name: buttonName, exact: true }).click({ force: true });
+  }
+
+  /* Backs out of the CMS confirm dialog, which should leave the item in place. Waits for the
+   * dialog to close, so the caller's next assertion sees the settled state. */
+  async cancelDialog() {
+    const dialog = this.confirmModal;
+    await dialog.waitFor({ state: 'visible' });
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click({ force: true });
+    await dialog.waitFor({ state: 'detached' });
+  }
+
+  /* --- Request stubs ------------------------------------------------------------------- */
+
+  /**
+   * Answers every request matching `pattern` with a 500, and returns the matching unroute.
+   *
+   * Error states are provoked this way rather than by breaking real data, so nothing on the shared
+   * site is touched. Call the returned function before any cleanup that goes through the page.
+   */
+  async failRequests(pattern: string): Promise<() => Promise<void>> {
+    const handler = (route: import('@playwright/test').Route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ title: 'Stubbed failure' }) });
+    await this.page.route(pattern, handler);
+    return async () => await this.page.unroute(pattern, handler);
   }
 
   /* --- Connections: OAuth ------------------------------------------------------------- */
@@ -532,5 +639,41 @@ export class AutomateUiHelper {
   /* An edge, by the accessible name xyflow gives it ("Edge from <source> to <target>"). */
   canvasEdge(sourceStepId: string, targetStepId: string): Locator {
     return this.page.getByRole('group', { name: `Edge from ${sourceStepId} to ${targetStepId}`, exact: true });
+  }
+
+  get edgeFilterModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.edgeFilterModal);
+  }
+
+  /**
+   * Opens the filter modal of the one edge that already has a filter.
+   *
+   * Only a filtered edge renders its filter button in the active state, which is what picks it
+   * out; an automation with several filtered edges needs a locator scoped to `canvasEdge()`.
+   */
+  async openActiveEdgeFilter() {
+    await this.page.locator('.ua-edge__actions .ua-action-bar__btn--active').click({ force: true });
+    await this.edgeFilterModal.waitFor({ state: 'visible' });
+    // The first click into this modal is usually a small icon button (Remove group), and
+    // `clickInModal`'s in-viewport check passes while the modal is still sliding, so a forced
+    // click lands where the button was a frame ago and is silently lost. Wait for it to stop.
+    await this.waitForStopMoving(this.edgeFilterModal);
+  }
+
+  /* Waits until an element's position has been the same for two reads in a row — the end of a
+   * slide-in animation, which no attribute or event on the modal reports. */
+  async waitForStopMoving(locator: Locator) {
+    let previous = '';
+    await expect
+      .poll(
+        async () => {
+          const box = JSON.stringify(await locator.boundingBox());
+          const settled = box === previous && box !== 'null';
+          previous = box;
+          return settled;
+        },
+        { intervals: [100] }
+      )
+      .toBe(true);
   }
 }

@@ -246,9 +246,10 @@ stages:
             # Sharded across parallel agents, each with its own demo site and LocalDB. The
             # specs share site data and the suite runs one worker, so shards cannot share a
             # site; splitting across agents is what makes them run concurrently. Playwright
-            # splits by spec file (--shard below), and every shard runs auth.setup.ts itself.
+            # splits by test (fullyParallel in playwright.config.ts, --shard below), and every shard runs
+            # auth.setup.ts itself.
             strategy:
-                parallel: 3
+                parallel: 4
             # Windows agents build more slowly, and the first boot against a cold LocalDB
             # creates the database and runs the full unattended install.
             timeoutInMinutes: 60
