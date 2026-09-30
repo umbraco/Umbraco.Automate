@@ -3,7 +3,10 @@
 
 param(
     [switch]$SkipTemplateInstall,
-    [switch]$Force
+    [switch]$Force,
+    # Skip creating Umbraco.Automate.local.slnx. CI builds the demo project directly and never
+    # opens the solution, and the ~15 `dotnet sln add` calls cost about 15s per acceptance shard.
+    [switch]$SkipSolution
 )
 
 $ErrorActionPreference = "Stop"
@@ -163,10 +166,6 @@ if (-not $devSettings.WorktreeDevPort) {
 $devSettings.WorktreeDevPort | Add-Member -NotePropertyName "MainWorktreePort" -NotePropertyValue 44380 -Force
 $devSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $devSettingsPath -Encoding utf8 -Force
 
-# Step 4: Create unified solution
-Write-Host "Creating unified solution..." -ForegroundColor Green
-dotnet new sln -n "Umbraco.Automate.local" --force
-
 # Helper function to add all projects from a product's src and tests folders
 function Add-ProductProjects {
     param(
@@ -189,21 +188,29 @@ function Add-ProductProjects {
     Write-Host "  Added $count projects" -ForegroundColor DarkGreen
 }
 
-# Step 5: Add Core projects
-Write-Host "Adding Umbraco.Automate projects..." -ForegroundColor Green
-Add-ProductProjects -ProductFolder "Umbraco.Automate" -SolutionFolder "Core"
+if (-not $SkipSolution) {
+    # Step 4: Create unified solution
+    Write-Host "Creating unified solution..." -ForegroundColor Green
+    dotnet new sln -n "Umbraco.Automate.local" --force
 
-# Step 6: Add OpenIddict projects
-Write-Host "Adding Umbraco.Automate.OpenIddict projects..." -ForegroundColor Green
-Add-ProductProjects -ProductFolder "Umbraco.Automate.OpenIddict" -SolutionFolder "OpenIddict"
+    # Step 5: Add Core projects
+    Write-Host "Adding Umbraco.Automate projects..." -ForegroundColor Green
+    Add-ProductProjects -ProductFolder "Umbraco.Automate" -SolutionFolder "Core"
 
-# Step 7: Add Slack projects
-Write-Host "Adding Umbraco.Automate.Slack projects..." -ForegroundColor Green
-Add-ProductProjects -ProductFolder "Umbraco.Automate.Slack" -SolutionFolder "Slack"
+    # Step 6: Add OpenIddict projects
+    Write-Host "Adding Umbraco.Automate.OpenIddict projects..." -ForegroundColor Green
+    Add-ProductProjects -ProductFolder "Umbraco.Automate.OpenIddict" -SolutionFolder "OpenIddict"
 
-# Step 8: Add demo site to solution
-Write-Host "Adding demo site to solution..." -ForegroundColor Green
-dotnet sln "Umbraco.Automate.local.slnx" add "$DemoSiteDir/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+    # Step 7: Add Slack projects
+    Write-Host "Adding Umbraco.Automate.Slack projects..." -ForegroundColor Green
+    Add-ProductProjects -ProductFolder "Umbraco.Automate.Slack" -SolutionFolder "Slack"
+
+    # Step 8: Add demo site to solution
+    Write-Host "Adding demo site to solution..." -ForegroundColor Green
+    dotnet sln "Umbraco.Automate.local.slnx" add "$DemoSiteDir/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+} else {
+    Write-Host "Skipping the local solution (-SkipSolution)" -ForegroundColor Gray
+}
 
 # Step 7: Add project references to demo site
 Write-Host "Adding project references to demo site..." -ForegroundColor Green
