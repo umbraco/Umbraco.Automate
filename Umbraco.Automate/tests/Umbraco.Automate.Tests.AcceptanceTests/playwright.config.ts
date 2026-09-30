@@ -22,6 +22,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only. Local stays at 0 so a flake is visible while you write specs. */
   retries: process.env.CI ? 2 : 0,
+  /* On CI, stop once this many tests have failed. When the site wedges, every remaining spec fails
+   * in fixture setup, and three attempts each would otherwise run the job into its timeout. */
+  maxFailures: process.env.CI ? 10 : undefined,
   /* Single worker: specs share the state of one running site. */
   workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */

@@ -263,20 +263,41 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
   pushes on `vN/main`, `vN/dev`, `vN/hotfix/*` and `vN/release/*`, so the suite would never run
   on a pull request. The trade-off is that CI exercises **project references**, not a published
   package.
-- **Scaffolds the site with `scripts/install-demo-site.sh`**, the same script developers run, so
+- **Scaffolds the site with `scripts/install-demo-site.ps1`**, the same script developers run, so
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to
   register and every UI spec fails with element-not-found.
-- **Stays on `ubuntu-latest`.** The demo uses SQLite, so there is no LocalDB leg to add. Forms
-  needs Windows for that; Automate does not.
+- **Runs on `windows-latest` against SQL Server LocalDB, not SQLite.** It overrides the
+  scaffold's connection string with `CONNECTIONSTRINGS__UMBRACODBDSN` and its provider name.
+  Automate shares that connection (`UseNamedConnectionString = umbracoDbDSN`), so both move.
+  The reason is a CMS deadlock on SQLite. The CMS cache-instruction sync job and an
+  end-of-request cache-instruction insert can deadlock on `umbracoCacheInstruction`. With the
+  CMS default `Cache=Shared`, the stuck write blocks every connection in the process, so
+  `SQLite Error 6: 'database table is locked'` hits unrelated Automate and OpenIddict tables.
+  The CMS retry policy then retries for ~9.5 min, and every spec in that window fails in fixture
+  setup (build 289321). Forms moved its acceptance and integration legs to LocalDB for the same
+  reason (umbraco/Forms#1420, #1537). **Do not move this back to SQLite to save time.** Local
+  development stays on SQLite, where the stall is rare.
+- **Windows step shells matter.** `script:` is cmd on Windows, where the first `npm` (a `.cmd`)
+  ends a multi-line step, so multi-line npm steps use `bash:`. `npx playwright install` stays on
+  `script:`, because under `pwsh` it hangs after the download (seen in Forms).
+- **Stops the site with `taskkill /T /F` on `always()`.** The recorded PID is the `dotnet run`
+  launcher. Killing only that orphans the site process, which keeps the log open and fails the
+  upload.
 - **Sets `CI: true` explicitly.** Azure does not set it, and the Playwright config keys its
   junit reporter, retries and timeouts off it — as does `postinstall.js`, which would otherwise
   try to run the interactive config prompt.
-- On failure it publishes `results/` (traces, screenshots, video) and the demo site log. A UI
-  failure is rarely diagnosable from the error text alone.
+- It always publishes `results/` (traces, screenshots, video) and the demo site logs, named with
+  the job attempt. A UI failure is rarely diagnosable from the error text alone. The condition is
+  `always()`, as in Forms, because a job killed by its timeout is *cancelled*, and a cancelled job
+  skips any step whose condition lacks `always()`, so the run that most needs diagnosing would
+  upload nothing.
+- **`maxFailures` stops a run that is going nowhere.** If the site wedges, every remaining spec
+  fails in setup with three attempts each, which used to run into the job timeout.
 
-Two things to know if you edit that stage. Azure macro-expands `$(name)` before bash sees the
-script, so use backticks for command substitution and `expr` rather than `$((...))`. And
+Two things to know if you edit that stage. Azure macro-expands `$(name)` before bash or pwsh
+sees the script. PowerShell subexpressions such as `$($process.Id)` are safe, because Azure only
+matches a variable name after `$(`, but bash `$(command)` substitution is not. And
 `config.js` is deliberately **not** used in CI: it is interactive and reads the per-worktree
 port from git config, which is a local-development affordance, whereas CI fixes the URL via
 `ASPNETCORE_URLS` and writes `.env` directly. The checkout needs `fetchDepth: 0`, like the
