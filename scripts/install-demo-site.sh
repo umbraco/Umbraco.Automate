@@ -201,7 +201,7 @@ add_product_projects() {
                 local proj_name=$(basename "$proj")
                 echo "  Adding $proj_name"
                 dotnet sln "Umbraco.Automate.local.slnx" add "$proj" --solution-folder "$solution_folder" 2>/dev/null || true
-                ((count++))
+                count=$((count + 1))
             done < <(find "$sub_path" -name "*.csproj" -print0)
         fi
     done
