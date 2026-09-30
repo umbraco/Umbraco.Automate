@@ -16,12 +16,12 @@
   "devDependencies": {
     "@playwright/test": "1.60.0",
     "@types/node": "^20.9.0",
-    "@umbraco-cms/backoffice": "^18.1.0",
+    "@umbraco-cms/backoffice": "~17.6.0",
     "prompt": "^1.3.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@umbraco-cms/acceptance-test-helpers": "^18.1.0",
+    "@umbraco-cms/acceptance-test-helpers": "~17.6.0",
     "dotenv": "^16.5.0"
   }
 }
