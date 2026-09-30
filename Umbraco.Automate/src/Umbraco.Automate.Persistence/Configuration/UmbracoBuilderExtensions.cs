@@ -94,6 +94,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ISubscriptionRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
         builder.Services.AddSingleton<IEventRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
         builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
+        builder.Services.AddSingleton<IWorkflowPurger, EFCoreWorkflowPurger>();
         builder.Services.AddSingleton<IWorkflowLockStore, EFCoreWorkflowLockStore>();
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
         builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
