@@ -240,19 +240,10 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             return;
         }
 
-        Dictionary<string, string>? properties;
-        try
-        {
-            properties = JsonSerializer.Deserialize<Dictionary<string, string>>(propertiesJson);
-        }
-        catch (JsonException)
-        {
-            context.LogWarning("Properties are not a valid JSON object and were ignored");
-            return;
-        }
-
+        var properties = PropertyValuesJson.TryParse(propertiesJson);
         if (properties is null)
         {
+            context.LogWarning("Properties are not a valid JSON object and were ignored");
             return;
         }
 
