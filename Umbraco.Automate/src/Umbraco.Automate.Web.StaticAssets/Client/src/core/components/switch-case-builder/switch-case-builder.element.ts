@@ -75,8 +75,12 @@ export class UaSwitchCaseBuilderElement extends UmbLitElement implements UmbProp
     async #removeCase(caseIndex: number) {
         const caseItem = this.value?.[caseIndex];
 
-        // Nothing to lose in an untouched case, so only ask when it has a name or conditions.
-        const hasConditions = caseItem?.Conditions?.Groups?.some((g) => g.Conditions.length > 0) ?? false;
+        // Nothing to lose in an untouched case, so only ask when it has a name or a filled-in
+        // condition. A new case starts with one blank condition (createEmptyCase), which does not count.
+        const hasConditions =
+            caseItem?.Conditions?.Groups?.some((g) =>
+                g.Conditions.some((c) => c.LeftOperand || c.RightOperand || c.Operator !== "Equals"),
+            ) ?? false;
         if (caseItem?.Name || hasConditions) {
             try {
                 await umbConfirmModal(this, {
