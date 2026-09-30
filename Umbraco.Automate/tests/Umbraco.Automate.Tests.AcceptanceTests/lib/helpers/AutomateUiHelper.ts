@@ -313,6 +313,10 @@ export class AutomateUiHelper {
     }).toPass({ timeout: 15000 });
     await insertBinding.click({ force: true });
     await this.bindingPicker.waitFor({ state: 'visible' });
+    // The picker slides in, and clickInModal's in-viewport check passes mid-slide. A forced click
+    // on a leaf that is still moving can land on the modal backdrop instead, which closes the
+    // picker with no selection — the field keeps its old value (flaky on CI build 289743).
+    await this.waitForStopMoving(this.bindingPicker);
   }
 
   /**
