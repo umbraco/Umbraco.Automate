@@ -243,6 +243,12 @@ stages:
       jobs:
           - job: AcceptanceTests
             displayName: Run Playwright Acceptance Tests
+            # Sharded across parallel agents, each with its own demo site and LocalDB. The
+            # specs share site data and the suite runs one worker, so shards cannot share a
+            # site; splitting across agents is what makes them run concurrently. Playwright
+            # splits by spec file (--shard below), and every shard runs auth.setup.ts itself.
+            strategy:
+                parallel: 3
             # Windows agents build more slowly, and the first boot against a cold LocalDB
             # creates the database and runs the full unattended install.
             timeoutInMinutes: 60
@@ -384,8 +390,8 @@ stages:
                       exit 1
                   displayName: Wait for demo site
 
-                - script: npx playwright test DefaultConfig
-                  displayName: Run acceptance tests
+                - script: npx playwright test DefaultConfig --shard=$(System.JobPositionInPhase)/$(System.TotalJobsInPhase)
+                  displayName: Run acceptance tests (shard $(System.JobPositionInPhase) of $(System.TotalJobsInPhase))
                   workingDirectory: $(acceptanceDir)
 
                 # always(), so the site is also stopped after a failed or cancelled test step.
@@ -408,21 +414,21 @@ stages:
                   inputs:
                       testResultsFormat: JUnit
                       testResultsFiles: "$(acceptanceDir)/results/results.xml"
-                      testRunTitle: Acceptance Tests
+                      testRunTitle: Acceptance Tests (shard $(System.JobPositionInPhase))
                       mergeTestResults: true
 
                 # Traces, screenshots and video for every failed test, plus the site
                 # logs, because a UI failure is rarely diagnosable from the error alone.
                 # always(), as in Forms: a job killed by its timeout is cancelled, and a
                 # cancelled job skips steps whose condition does not include always(), so
-                # the run that most needs diagnosing would upload nothing. The attempt number
-                # keeps a re-run from colliding with the first attempt's artifact.
+                # the run that most needs diagnosing would upload nothing. The shard and attempt
+                # numbers keep shards and re-runs from colliding on the same artifact name.
                 - task: PublishPipelineArtifact@1
                   displayName: Upload failure diagnostics
                   condition: always()
                   inputs:
                       targetPath: $(acceptanceDir)/results
-                      artifact: acceptance-test-results - Attempt $(System.JobAttempt)
+                      artifact: acceptance-test-results - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
                 - task: PublishPipelineArtifact@1
@@ -430,7 +436,7 @@ stages:
                   condition: always()
                   inputs:
                       targetPath: $(Build.ArtifactStagingDirectory)
-                      artifact: acceptance-demo-site-log - Attempt $(System.JobAttempt)
+                      artifact: acceptance-demo-site-log - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
     # ============================================================

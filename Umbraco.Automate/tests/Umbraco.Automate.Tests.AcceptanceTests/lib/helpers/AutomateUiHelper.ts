@@ -364,9 +364,10 @@ export class AutomateUiHelper {
     return this.runDetailStep(index).locator('.tab-panel');
   }
 
-  /* The runs table links each run by the first eight characters of its id. */
+  /* The runs table links each run by the first eight characters of its id. The link is a
+   * button (ua-run-link) because it opens the run modal rather than navigating. */
   runLink(runId: string): Locator {
-    return this.runsTable.getByRole('link', { name: runId.slice(0, 8), exact: true });
+    return this.runsTable.getByRole('button', { name: runId.slice(0, 8), exact: true });
   }
 
   async openRun(runId: string) {
