@@ -1,4 +1,5 @@
 import { css, html, customElement, property, repeat, nothing } from "@umbraco-cms/backoffice/external/lit";
+import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UmbPropertyEditorUiElement, UmbPropertyEditorConfigCollection } from "@umbraco-cms/backoffice/property-editor";
@@ -71,7 +72,24 @@ export class UaSwitchCaseBuilderElement extends UmbLitElement implements UmbProp
         this.#emitChange(newValue);
     }
 
-    #removeCase(caseIndex: number) {
+    async #removeCase(caseIndex: number) {
+        const caseItem = this.value?.[caseIndex];
+
+        // Nothing to lose in an untouched case, so only ask when it has a name or conditions.
+        const hasConditions = caseItem?.Conditions?.Groups?.some((g) => g.Conditions.length > 0) ?? false;
+        if (caseItem?.Name || hasConditions) {
+            try {
+                await umbConfirmModal(this, {
+                    headline: this.localize.term("uaSwitchCaseBuilder_removeCase"),
+                    content: this.localize.term("uaSwitchCaseBuilder_removeCaseConfirm", caseItem.Name ?? ""),
+                    color: "danger",
+                    confirmLabel: "#actions_remove",
+                });
+            } catch {
+                return;
+            }
+        }
+
         const newValue = this.#cloneValue();
         newValue.splice(caseIndex, 1);
         this.#emitChange(newValue);

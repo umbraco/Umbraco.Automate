@@ -9,7 +9,7 @@ import type {
 import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 import type { UaRunItemModel } from "../../types.js";
 import { UA_RUN_DETAIL_MODAL } from "../../modals/run-detail-modal.token.js";
-import { formatDateTime } from "../../../core/index.js";
+import { formatDateTime, getRunStatusColor } from "../../../core/index.js";
 
 /**
  * Shared run-list table used by the dashboard and the automation runs view.
@@ -68,23 +68,6 @@ export class UaRunsTableElement extends UmbLitElement {
         modalManager?.open(this, UA_RUN_DETAIL_MODAL, { data: { runId } });
     }
 
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            // A refusal is not an error, so never danger — but it is the outcome someone
-            // scanning this list wants to spot, so it does not blend in as default either.
-            case "Rejected":
-                return "warning";
-            case "Failed":
-                return "danger";
-            default:
-                return "default";
-        }
-    }
-
     #formatDuration(ms: number | null): string {
         if (ms == null) return "-";
         if (ms < 1000) return `${ms}ms`;
@@ -105,17 +88,17 @@ export class UaRunsTableElement extends UmbLitElement {
             const leadingCell = this.showAutomationColumn
                 ? {
                       columnAlias: "automationName",
-                      value: html`<a href="javascript:void(0)" @click=${onClick}>
+                      value: html`<button type="button" class="run-link" @click=${onClick}>
                           ${item.automationName
                               ?? this.automationNames.get(item.automationId)
                               ?? item.automationId}
-                      </a>`,
+                      </button>`,
                   }
                 : {
                       columnAlias: "run",
-                      value: html`<a href="javascript:void(0)" @click=${onClick}>
+                      value: html`<button type="button" class="run-link" @click=${onClick}>
                           ${item.unique.substring(0, 8)}
-                      </a>`,
+                      </button>`,
                   };
 
             return {
@@ -124,7 +107,7 @@ export class UaRunsTableElement extends UmbLitElement {
                     leadingCell,
                     {
                         columnAlias: "status",
-                        value: html`<uui-tag color=${this.#statusColor(item.status)} look="secondary">
+                        value: html`<uui-tag color=${getRunStatusColor(item.status)} look="secondary">
                             ${item.status}
                         </uui-tag>`,
                     },
@@ -194,14 +177,24 @@ export class UaRunsTableElement extends UmbLitElement {
                 vertical-align: middle;
             }
 
-            a {
+            /* Opens the run modal rather than navigating, so a button styled as a link, not an <a>. */
+            .run-link {
+                padding: 0;
+                border: none;
+                background: none;
+                font: inherit;
                 color: var(--uui-color-interactive);
-                text-decoration: none;
+                text-align: left;
                 cursor: pointer;
             }
 
-            a:hover {
+            .run-link:hover {
                 text-decoration: underline;
+            }
+
+            .run-link:focus-visible {
+                outline: 2px solid var(--uui-color-focus);
+                outline-offset: 2px;
             }
         `,
     ];

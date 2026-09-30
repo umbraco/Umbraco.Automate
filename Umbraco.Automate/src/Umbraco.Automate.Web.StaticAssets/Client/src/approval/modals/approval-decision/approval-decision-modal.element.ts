@@ -5,6 +5,8 @@ import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { ApprovalsService } from "../../../api/sdk.gen.js";
 import type { UaApprovalDecisionModalData, UaApprovalDecisionModalValue } from "./types.js";
 
+type Outcome = UaApprovalDecisionModalValue["outcome"];
+
 @customElement("ua-approval-decision-modal")
 export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
     UaApprovalDecisionModalData,
@@ -16,11 +18,17 @@ export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
     @state()
     private _submitting = false;
 
-    async #onDecision(outcome: "Approved" | "Rejected") {
+    /** The button the user pressed, and how its request went — drives that button's `state`. */
+    @state()
+    private _decisionState?: { outcome: Outcome; state: "waiting" | "failed" };
+
+    async #onDecision(outcome: Outcome) {
         if (!this.data || this._submitting) return;
 
         this._submitting = true;
+        this._decisionState = { outcome, state: "waiting" };
 
+        // tryExecute raises the error notification itself; the modal stays open so the user can retry.
         const { error } = await tryExecute(
             this,
             ApprovalsService.postApprovalsByRunIdStepsByStepIdDecision({
@@ -32,13 +40,18 @@ export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
         this._submitting = false;
 
         if (error) {
-            // TODO: Show error notification when UMB_NOTIFICATION_CONTEXT is available
-            console.error(this.localize.term("uaApproval_decisionError"), error);
+            this._decisionState = { outcome, state: "failed" };
             return;
         }
 
+        this._decisionState = undefined;
+
         this.value = { outcome };
         this.modalContext?.submit();
+    }
+
+    #buttonState(outcome: Outcome) {
+        return this._decisionState?.outcome === outcome ? this._decisionState.state : undefined;
     }
 
     #onCancel() {
@@ -76,6 +89,7 @@ export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
                             <div slot="editor">
                                 <uui-textarea
                                     id="comment"
+                                    label=${this.localize.term("uaApproval_comment")}
                                     .value=${this._comment}
                                     placeholder=${this.localize.term("uaApproval_commentPlaceholder")}
                                     @input=${this.#onCommentInput}
@@ -95,6 +109,7 @@ export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
                         color="danger"
                         label=${this.localize.term("uaApproval_reject")}
                         @click=${() => this.#onDecision("Rejected")}
+                        .state=${this.#buttonState("Rejected")}
                         .disabled=${this._submitting}
                     ></uui-button>
                     <uui-button
@@ -102,6 +117,7 @@ export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
                         color="positive"
                         label=${this.localize.term("uaApproval_approve")}
                         @click=${() => this.#onDecision("Approved")}
+                        .state=${this.#buttonState("Approved")}
                         .disabled=${this._submitting}
                     ></uui-button>
                 </div>
