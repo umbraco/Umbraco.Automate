@@ -243,4 +243,6 @@ All commits should follow the [Conventional Commits](https://www.conventionalcom
 
 **Valid scopes:** `core`, `provider`, `action`, `trigger`, `automation`, `step`, `settings`, `ui`, `frontend`, `api`, `deps`, `ci`, `docs`, `release`
 
+**Scope must not repeat the type** - commitlint's `scope-not-type` rule rejects `ci(ci):`, `docs(docs):`, `build(build):`. Drop the scope (`ci: ...`) or use a more specific one (`ci(hooks): ...`).
+
 **Subject must be sentence-case** - Capitalize the first word after the scope.
