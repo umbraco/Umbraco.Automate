@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Cms.Core.Sync;
@@ -22,7 +23,15 @@ namespace Umbraco.Automate.Persistence.Runs;
 /// </para>
 /// Skipped on <see cref="ServerRole.Subscriber"/> nodes — subscribers must not mark runs
 /// as failed that may still be executing elsewhere. Runs on all other roles including
-/// <see cref="ServerRole.Unknown"/> (role election may not have completed at startup).
+/// <see cref="ServerRole.Unknown"/> (role election may not have completed at startup), so the server
+/// role alone cannot tell a run this node abandoned from one another node is executing.
+/// <para>
+/// What can is the workflow lock lease: a node executing an instance holds a lease on its id and keeps
+/// renewing it, so a run whose instance has an unexpired lease is still live and is left alone. A
+/// lease left behind by a process that just died lapses within
+/// <see cref="WorkflowLockOptions.LeaseDuration"/>, so recovery waits at most that long for leases to
+/// lapse before failing the runs whose instances are still held.
+/// </para>
 /// </summary>
 internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 {
@@ -36,15 +45,18 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly IServerRoleAccessor _serverRoleAccessor;
+    private readonly IOptions<WorkflowLockOptions> _lockOptions;
     private readonly ILogger<EFCoreStuckRunRecovery> _logger;
 
     public EFCoreStuckRunRecovery(
         IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
         IServerRoleAccessor serverRoleAccessor,
+        IOptions<WorkflowLockOptions> lockOptions,
         ILogger<EFCoreStuckRunRecovery> logger)
     {
         _dbContextFactory = dbContextFactory;
         _serverRoleAccessor = serverRoleAccessor;
+        _lockOptions = lockOptions;
         _logger = logger;
     }
 
@@ -79,10 +91,13 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
         var stuckStepStatuses = new[] { (int)StepRunStatus.Pending, (int)StepRunStatus.Running };
 
         // 1. Recover stuck runs and their step runs.
-        var stuckRuns = await db.AutomationRuns
+        var candidateRuns = await db.AutomationRuns
             .Where(r => NonTerminalStatuses.Contains(r.Status) && !durableRunIds.Contains(r.Id))
-            .Select(r => new { r.Id, r.WorkflowInstanceId })
+            .Select(r => new StuckRun(r.Id, r.WorkflowInstanceId))
             .ToListAsync(cancellationToken);
+
+        // Leave alone runs another node is still executing (see class remarks).
+        var stuckRuns = await ExcludeRunsHeldByLiveLeasesAsync(db, candidateRuns, cancellationToken);
 
         var stuckRunIds = stuckRuns.Select(r => r.Id).ToList();
 
@@ -168,4 +183,63 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
                 recoveredRuns, recoveredSteps, terminatedInstances);
         }
     }
+
+    private async Task<List<StuckRun>> ExcludeRunsHeldByLiveLeasesAsync(
+        UmbracoAutomateDbContext db, List<StuckRun> candidates, CancellationToken cancellationToken)
+    {
+        var instanceIds = candidates
+            .Where(r => !string.IsNullOrEmpty(r.WorkflowInstanceId))
+            .Select(r => r.WorkflowInstanceId!)
+            .ToList();
+
+        if (instanceIds.Count == 0)
+        {
+            return candidates;
+        }
+
+        var leaseDuration = _lockOptions.Value.LeaseDuration;
+        var heldInstanceIds = await GetLeasedInstanceIdsAsync(db, instanceIds, cancellationToken);
+
+        if (heldInstanceIds.Count > 0)
+        {
+            // A lease held by the process that just died lapses on its own; a live node keeps renewing
+            // its lease. Give the former time to lapse, bounded by the lease duration, then decide.
+            _logger.LogInformation(
+                "Waiting up to {LeaseDuration} for {Count} workflow lease(s) to lapse before recovering stuck runs",
+                leaseDuration, heldInstanceIds.Count);
+
+            await Task.Delay(leaseDuration, cancellationToken);
+            heldInstanceIds = await GetLeasedInstanceIdsAsync(db, instanceIds, cancellationToken);
+        }
+
+        if (heldInstanceIds.Count == 0)
+        {
+            return candidates;
+        }
+
+        _logger.LogInformation(
+            "Leaving {Count} run(s) alone — their workflow instances are still leased by another node",
+            heldInstanceIds.Count);
+
+        return candidates
+            .Where(r => string.IsNullOrEmpty(r.WorkflowInstanceId) || !heldInstanceIds.Contains(r.WorkflowInstanceId))
+            .ToList();
+    }
+
+    private static async Task<HashSet<string>> GetLeasedInstanceIdsAsync(
+        UmbracoAutomateDbContext db, List<string> instanceIds, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        // AsNoTracking + a fresh query each call: the second look must see renewals, not cached rows.
+        var held = await db.WorkflowLocks
+            .AsNoTracking()
+            .Where(l => instanceIds.Contains(l.LockId) && l.ExpiresUtc >= now)
+            .Select(l => l.LockId)
+            .ToListAsync(cancellationToken);
+
+        return held.ToHashSet();
+    }
+
+    private sealed record StuckRun(Guid Id, string? WorkflowInstanceId);
 }

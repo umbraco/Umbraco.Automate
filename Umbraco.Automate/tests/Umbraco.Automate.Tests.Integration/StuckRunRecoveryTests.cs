@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Persistence.Workflows;
@@ -28,6 +30,7 @@ public class StuckRunRecoveryTests : IDisposable
         _recovery = new EFCoreStuckRunRecovery(
             new TestDbContextFactory(_fixture.CreateContext),
             _serverRoleAccessor.Object,
+            Options.Create(new WorkflowLockOptions { LeaseDuration = TimeSpan.FromMilliseconds(200) }),
             NullLogger<EFCoreStuckRunRecovery>.Instance);
     }
 
@@ -138,6 +141,61 @@ public class StuckRunRecoveryTests : IDisposable
         await using var db = _fixture.CreateContext();
         (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Running);
         (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Runnable);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_InstanceLeasedByAnotherNode_LeavesRunAndInstanceAlone()
+    {
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
+        await SeedLeaseAsync(instanceId, DateTime.UtcNow.AddHours(1));
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Running);
+        (await db.StepRuns.SingleAsync(sr => sr.RunId == runId)).Status.ShouldBe((int)StepRunStatus.Running);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Runnable);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_LeaseLeftByDeadProcess_RecoversRunOnceItLapses()
+    {
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
+        await SeedLeaseAsync(instanceId, DateTime.UtcNow.AddMilliseconds(100));
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Terminated);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_ReleasedLease_RecoversRun()
+    {
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
+        await SeedLeaseAsync(instanceId, DateTime.MinValue);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+    }
+
+    private async Task SeedLeaseAsync(string lockId, DateTime expiresUtc)
+    {
+        await using var db = _fixture.CreateContext();
+        db.WorkflowLocks.Add(new WorkflowLockEntity
+        {
+            LockId = lockId,
+            OwnerToken = Guid.NewGuid(),
+            AcquiredUtc = DateTime.UtcNow,
+            ExpiresUtc = expiresUtc,
+        });
+        await db.SaveChangesAsync();
     }
 
     private async Task<(Guid RunId, string InstanceId)> SeedRunAsync(
