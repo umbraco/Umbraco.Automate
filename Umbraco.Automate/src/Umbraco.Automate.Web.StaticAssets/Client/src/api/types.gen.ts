@@ -19,6 +19,8 @@ export type ActionItemResponseModel = {
     type: string;
 };
 
+export type ActionLogLevelModel = 'Debug' | 'Info' | 'Warning' | 'Error';
+
 export type ApprovalDecisionRequestModel = {
     outcome: ApprovalOutcomeModel;
     comment?: null | string;
@@ -139,6 +141,7 @@ export type AutomationRunResponseModel = {
     initiatedBy: string;
     correlationId?: null | string;
     error?: null | string;
+    triggerAlias?: null | string;
     stepRuns: Array<StepRunResponseModel>;
 };
 
@@ -279,6 +282,12 @@ export type EditableModelFieldDescriptorModel = {
     isRequired: boolean;
     group?: null | string;
     supportsBindings: boolean;
+    visibleWhen?: null | EditableModelFieldVisibilityModel;
+};
+
+export type EditableModelFieldVisibilityModel = {
+    key: string;
+    values: Array<string>;
 };
 
 export type EditableModelSchemaModel = {
@@ -402,6 +411,11 @@ export type RunSummaryModel = {
     successRate: number;
 };
 
+export type RunTriggerDataResponseModel = {
+    triggerData?: null | string;
+    triggerDataTruncated: boolean;
+};
+
 export type StepConfigurationModel = {
     id: string;
     actionAlias: string;
@@ -436,6 +450,19 @@ export type StepPositionModel = {
     y: number;
 };
 
+export type StepRunDataResponseModel = {
+    input?: null | string;
+    inputTruncated: boolean;
+    output?: null | string;
+    outputTruncated: boolean;
+};
+
+export type StepRunLogEntryResponseModel = {
+    timestampUtc: string;
+    level: ActionLogLevelModel;
+    message: string;
+};
+
 export type StepRunResponseModel = {
     id: string;
     stepId: string;
@@ -446,6 +473,7 @@ export type StepRunResponseModel = {
     error?: null | string;
     retryCount: number;
     durationMs?: null | number;
+    logEntries: Array<StepRunLogEntryResponseModel>;
 };
 
 export type StepRunStatusModel = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Skipped' | 'WaitingForInput' | 'Sleeping' | 'Rejected' | 'Cancelled';
@@ -1568,6 +1596,10 @@ export type PutConnectionsByIdData = {
 
 export type PutConnectionsByIdErrors = {
     /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
@@ -1811,6 +1843,42 @@ export type PostRunsByIdResumeResponses = {
     202: unknown;
 };
 
+export type GetRunsByIdStepRunsByStepRunIdDataData = {
+    body?: never;
+    path: {
+        id: string;
+        stepRunId: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/step-runs/{stepRunId}/data';
+};
+
+export type GetRunsByIdStepRunsByStepRunIdDataErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have access to this resource
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetRunsByIdStepRunsByStepRunIdDataError = GetRunsByIdStepRunsByStepRunIdDataErrors[keyof GetRunsByIdStepRunsByStepRunIdDataErrors];
+
+export type GetRunsByIdStepRunsByStepRunIdDataResponses = {
+    /**
+     * OK
+     */
+    200: StepRunDataResponseModel;
+};
+
+export type GetRunsByIdStepRunsByStepRunIdDataResponse = GetRunsByIdStepRunsByStepRunIdDataResponses[keyof GetRunsByIdStepRunsByStepRunIdDataResponses];
+
 export type PostRunsByIdSuspendData = {
     body?: never;
     path: {
@@ -1884,6 +1952,41 @@ export type PostRunsByIdTerminateResponses = {
      */
     202: unknown;
 };
+
+export type GetRunsByIdTriggerDataData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/runs/{id}/trigger-data';
+};
+
+export type GetRunsByIdTriggerDataErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have access to this resource
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetRunsByIdTriggerDataError = GetRunsByIdTriggerDataErrors[keyof GetRunsByIdTriggerDataErrors];
+
+export type GetRunsByIdTriggerDataResponses = {
+    /**
+     * OK
+     */
+    200: RunTriggerDataResponseModel;
+};
+
+export type GetRunsByIdTriggerDataResponse = GetRunsByIdTriggerDataResponses[keyof GetRunsByIdTriggerDataResponses];
 
 export type GetVersionHistoryByEntityTypeByEntityIdData = {
     body?: never;

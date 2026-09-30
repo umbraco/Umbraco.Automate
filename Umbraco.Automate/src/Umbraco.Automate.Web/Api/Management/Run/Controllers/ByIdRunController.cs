@@ -64,6 +64,14 @@ public sealed class ByIdRunController : RunControllerBase
             return forbidden;
         }
 
-        return Ok(_mapper.Map<AutomationRunResponseModel>(run));
+        // The trigger may have changed since this run; fall back to the current one if the version
+        // snapshot is gone (e.g. cleaned up by version retention).
+        var definition = await _automationService.GetAutomationVersionSnapshotAsync(run.AutomationId, run.AutomationVersion, cancellationToken)
+            ?? automation;
+
+        var model = _mapper.Map<AutomationRunResponseModel>(run)!;
+        model.TriggerAlias = definition.Trigger?.TriggerAlias;
+
+        return Ok(model);
     }
 }

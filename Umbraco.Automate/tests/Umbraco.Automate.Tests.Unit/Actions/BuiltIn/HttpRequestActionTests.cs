@@ -328,6 +328,83 @@ public class HttpRequestActionTests
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_SuccessfulRequest_LogsStatusTimingAndSizeWithoutQueryString()
+    {
+        var action = CreateAction(HttpStatusCode.OK, "{\"ok\":true}");
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api?token=secret",
+            Method = "GET",
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Info);
+        entry.Message.ShouldStartWith("GET https://example.com/api?… → 200 OK in ");
+        entry.Message.ShouldEndWith(" ms (11 B)");
+        entry.Message.ShouldNotContain("secret");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ServerError_LogsStatusAsError()
+    {
+        var action = CreateAction(HttpStatusCode.InternalServerError, "error");
+        var context = CreateContext(new HttpRequestSettings { Url = "https://example.com/api", Method = "POST" });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("POST https://example.com/api → 500 Internal Server Error in ");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ResponseOverLimit_LogsError()
+    {
+        var action = CreateAction(HttpStatusCode.OK, new string('a', 2000), maxResponseBodyBytes: 1024);
+        var context = CreateContext(new HttpRequestSettings { Url = "https://example.com/api" });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldContain("exceeds the 1.0 KB limit");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RequestThrows_LogsErrorAndRethrows()
+    {
+        var action = CreateAction(new DelegateHandler(_ => throw new HttpRequestException("No such host is known.")));
+        var context = CreateContext(new HttpRequestSettings { Url = "https://missing.example.com/api?key=secret" });
+
+        await Should.ThrowAsync<HttpRequestException>(() => action.ExecuteAsync(context, CancellationToken.None));
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("GET https://missing.example.com/api?… failed: No such host is known. after ");
+        entry.Message.ShouldNotContain("secret");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FollowedRedirect_LogsFinalUrl()
+    {
+        // A redirecting handler leaves the final address on the request, as SocketsHttpHandler does.
+        var action = CreateAction(new DelegateHandler(req =>
+        {
+            req.RequestUri = new Uri("https://other.example.com/moved?sig=secret");
+            return new HttpResponseMessage(HttpStatusCode.OK) { RequestMessage = req, Content = new StringContent("ok") };
+        }));
+        var context = CreateContext(new HttpRequestSettings { Url = "https://example.com/old" });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.Count.ShouldBe(2);
+        context.LogEntries[0].Message.ShouldBe("Redirected to https://other.example.com/moved?…");
+        context.LogEntries[1].Message.ShouldStartWith("GET https://example.com/old → 200 OK in ");
+    }
+
     private static ActionContext CreateContext(HttpRequestSettings settings) => new()
     {
         AutomationId = Guid.NewGuid(),
@@ -369,6 +446,21 @@ public class HttpRequestActionTests
 
         var deps = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
         return new HttpRequestAction(deps, factory.Object, Options.Create(options));
+    }
+
+    private static HttpRequestAction CreateAction(HttpMessageHandler handler)
+    {
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(Constants.HttpClients.Default)).Returns(new HttpClient(handler));
+
+        var deps = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
+        return new HttpRequestAction(deps, factory.Object, Options.Create(new ExecutionOptions()));
+    }
+
+    private sealed class DelegateHandler(Func<HttpRequestMessage, HttpResponseMessage> send) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(send(request));
     }
 
     /// <summary>

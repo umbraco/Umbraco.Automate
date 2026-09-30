@@ -144,6 +144,7 @@ export class UaConditionModalElement extends UmbModalBaseElement<UaConditionModa
                     ? html`<uui-button
                           look="outline"
                           compact
+                          label=${this.localize.term("uaBindings_insertExpression")}
                           title=${this.localize.term("uaBindings_insertExpression")}
                           @click=${() => this.#insertBinding(operand)}
                       >

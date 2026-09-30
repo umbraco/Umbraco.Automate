@@ -103,6 +103,8 @@ public sealed class GetMediaAction : ActionBase<GetMediaSettings, GetMediaOutput
                 "Automation {AutomationId} / Run {RunId}: Media {MediaKey} not found in published cache.",
                 context.AutomationId, context.RunId, mediaKey);
 
+            context.LogWarning($"Media {mediaKey} was not found");
+
             return SuccessWithOutcome(OutcomeNotFound, new GetMediaOutput { MediaKey = mediaKey });
         }
 

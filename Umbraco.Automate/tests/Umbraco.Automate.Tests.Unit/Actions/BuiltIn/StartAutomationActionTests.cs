@@ -209,6 +209,62 @@ public class StartAutomationActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_PublishedSnapshotMissing_FallsBackToCurrentState()
+    {
+        var target = new AutomationBuilder()
+            .WithWorkspaceId(_workspaceId)
+            .WithPublishedVersion(3)
+            .Build();
+        SetupAutomation(target);
+        _versionService.Setup(v => v.GetVersionSnapshotAsync<Automation>(target.Id, 3, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation?)null);
+        _executor.Setup(e => e.ExecuteAsync(
+                It.IsAny<Automation>(), It.IsAny<string>(), It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, object?>?>(), It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()))
+            .ReturnsAsync(Guid.NewGuid());
+
+        var result = await ExecuteAsync(new StartAutomationSettings { AutomationKey = target.Id.ToString() });
+
+        // A lost snapshot must not stop the chain: the step still starts the child, from the
+        // automation's current state.
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<StartAutomationOutput>().Started.ShouldBeTrue();
+        _versionService.Verify(
+            v => v.GetVersionSnapshotAsync<Automation>(target.Id, 3, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _executor.Verify(e => e.ExecuteAsync(
+            target,
+            TriggerInitiatorType.System,
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoPublishedVersion_RunsCurrentStateWithoutSnapshotLookup()
+    {
+        var target = new AutomationBuilder()
+            .WithWorkspaceId(_workspaceId)
+            .WithPublishedVersion(null)
+            .Build();
+        SetupAutomation(target);
+
+        await ExecuteAsync(new StartAutomationSettings { AutomationKey = target.Id.ToString() });
+
+        _versionService.Verify(
+            v => v.GetVersionSnapshotAsync<Automation>(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _executor.Verify(e => e.ExecuteAsync(
+            target,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_PassesParsedTriggerData()
     {
         var target = CreateTargetAutomation();

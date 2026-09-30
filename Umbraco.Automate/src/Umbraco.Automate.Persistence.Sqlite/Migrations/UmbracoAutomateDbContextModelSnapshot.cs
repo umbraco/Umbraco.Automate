@@ -297,6 +297,9 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.Property<string>("InputData")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("LogEntries")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("OutputData")
                         .HasColumnType("TEXT");
 

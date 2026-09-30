@@ -12,6 +12,7 @@ using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -165,7 +166,11 @@ internal sealed class ActionStepBody : StepBodyAsync
             Connection = connection,
             Action = _action,
             BindingData = bindingData,
+            MinimumLogLevel = _executionOptions.Value.MinimumLogLevel,
+            MaxLogEntries = _executionOptions.Value.MaxLogEntriesPerStep,
         };
+
+        var (inputJson, sensitiveValues) = RecordStepInput(settings, resolvedInputs);
 
         // Create and persist step run.
         var stepRun = new StepRun
@@ -176,12 +181,21 @@ internal sealed class ActionStepBody : StepBodyAsync
             ActionAlias = _action.Alias,
             Status = StepRunStatus.Running,
             StartedUtc = DateTime.UtcNow,
+            InputData = inputJson,
         };
 
         await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
 
         // Execute through the middleware pipeline with the timeout-linked token.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
+
+        // Capture any log entries the action recorded, regardless of outcome. Reads from
+        // the same ActionContext instance the pipeline just executed — ErrorHandlingMiddleware
+        // catches exceptions on this same context, so entries recorded before a throw survive
+        // even for a Failed result. Every branch below ends in an UpdateStepRunAsync call, so
+        // this rides along with no extra DB round trip. Sensitive setting values an action wrote
+        // into a message are redacted before storing, as they are in the recorded input.
+        stepRun.LogEntries = ActionLogSanitizer.Sanitize(actionContext.LogEntries, sensitiveValues);
 
         // Handle suspension: the action needs the workflow to pause.
         switch (result.Suspension)
@@ -594,6 +608,40 @@ internal sealed class ActionStepBody : StepBodyAsync
         }
 
         return matches[0];
+    }
+
+    /// <summary>
+    /// Serializes what the step received — its settings after bindings and configuration
+    /// references were resolved (or, for a step without settings, its resolved input mappings) —
+    /// for the run view. Sensitive values are masked <em>before</em> the payload is stored, so a
+    /// resolved secret never lands in the step run record; the run data API masks again on read.
+    /// Also returns the values that were masked, so the same values can be redacted from the
+    /// step's log entries. Recording the input is diagnostic only: a failure here is logged and
+    /// never fails the step.
+    /// </summary>
+    private (string? Json, IReadOnlyCollection<string> SensitiveValues) RecordStepInput(
+        object? settings,
+        Dictionary<string, object?> resolvedInputs)
+    {
+        object? input = settings ?? (resolvedInputs.Count > 0 ? resolvedInputs : null);
+        if (input is null)
+        {
+            return (null, []);
+        }
+
+        try
+        {
+            var node = JsonSerializer.SerializeToNode(input, input.GetType(), Dispatch.JsonOptions.Settings);
+            var sensitiveFieldKeys = SensitiveDataMasker.GetSensitiveFieldKeys(_action.GetSettingsSchema());
+            var sensitiveValues = ActionLogSanitizer.CollectSensitiveValues(node, sensitiveFieldKeys);
+            SensitiveDataMasker.Mask(node, sensitiveFieldKeys);
+            return (node?.ToJsonString(Dispatch.JsonOptions.Default), sensitiveValues);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Could not record the input of step {StepId}; the step runs regardless", _stepConfig.Id);
+            return (null, []);
+        }
     }
 
     private Dictionary<string, object?> ResolveInputMappings(

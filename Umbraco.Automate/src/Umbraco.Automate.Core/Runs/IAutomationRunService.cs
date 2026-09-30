@@ -1,3 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
+using Umbraco.Cms.Core.DependencyInjection;
+
 namespace Umbraco.Automate.Core.Runs;
 
 /// <summary>
@@ -9,6 +12,46 @@ public interface IAutomationRunService
     /// Gets a run by its unique ID, including step runs.
     /// </summary>
     Task<AutomationRun?> GetRunAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the recorded input and output of a single step run, prepared for display, or
+    /// <c>null</c> when the step run does not exist or does not belong to <paramref name="runId"/>.
+    /// The values are masked (sensitive keys, and fields the action's settings schema marks
+    /// sensitive), pretty-printed and truncated to a maximum length — they are safe to show to a
+    /// user but are not the stored payloads. The caller remains responsible for authorizing access
+    /// to the run's workspace.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. It resolves the
+    // internal repository and sanitizer through StaticServiceProvider, which is temporary and
+    // goes with the default implementation.
+    async Task<StepRunData?> GetStepRunDataAsync(Guid runId, Guid stepRunId, CancellationToken cancellationToken = default)
+    {
+        var repository = StaticServiceProvider.Instance.GetRequiredService<IAutomationRunRepository>();
+        var sanitizer = StaticServiceProvider.Instance.GetRequiredService<IRunDataSanitizer>();
+
+        var stored = await repository.GetStepRunDataAsync(runId, stepRunId, cancellationToken);
+        return stored is null ? null : StepRunData.Create(stored, sanitizer);
+    }
+
+    /// <summary>
+    /// Gets the recorded trigger data of a run, prepared for display, or <c>null</c> when the run
+    /// does not exist. The value is masked, pretty-printed and truncated to a maximum length — it is
+    /// safe to show to a user but is not the stored payload. The caller remains responsible for
+    /// authorizing access to the run's workspace.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. It resolves the
+    // internal repository and sanitizer through StaticServiceProvider, which is temporary and
+    // goes with the default implementation.
+    async Task<RunTriggerData?> GetTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var repository = StaticServiceProvider.Instance.GetRequiredService<IAutomationRunRepository>();
+        var sanitizer = StaticServiceProvider.Instance.GetRequiredService<IRunDataSanitizer>();
+
+        var stored = await repository.GetTriggerDataAsync(runId, cancellationToken);
+        return stored is null ? null : RunTriggerData.Create(stored, sanitizer);
+    }
 
     /// <summary>
     /// Gets paged runs for a specific automation.

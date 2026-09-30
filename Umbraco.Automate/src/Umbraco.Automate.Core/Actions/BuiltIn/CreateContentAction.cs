@@ -106,11 +106,14 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             return failure;
         }
 
-        if (!atRoot && _contentService.GetById(parentKey) is null)
+        var parent = atRoot ? null : _contentService.GetById(parentKey);
+        if (!atRoot && parent is null)
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Parent content {ParentKey} not found.",
                 context.AutomationId, context.RunId, parentKey);
+
+            context.LogWarning($"Parent content {parentKey} was not found, so nothing was created");
 
             return SuccessWithOutcome(OutcomeParentNotFound, new CreateContentOutput
             {
@@ -126,6 +129,8 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Content type {ContentTypeKey} not found.",
                 context.AutomationId, context.RunId, contentTypeKey);
+
+            context.LogWarning($"Content type {contentTypeKey} was not found, so nothing was created");
 
             return SuccessWithOutcome(OutcomeContentTypeNotFound, new CreateContentOutput
             {
@@ -170,7 +175,7 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             content.SetCultureName(settings.Name, settings.Culture!);
         }
 
-        ApplyProperties(content, settings.PropertiesJson, variesByCulture ? settings.Culture : null);
+        ApplyProperties(context, content, settings.PropertiesJson, variesByCulture ? settings.Culture : null);
 
         // Required when running from the outbox dispatcher, which has no HTTP request
         // scope. The save raises notifications (e.g. webhook delivery) that resolve
@@ -181,6 +186,10 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
 
         if (result.Success)
         {
+            var location = parent is null ? "at the content root" : $"under {ActionLogFormat.Item(parent.Name, parent.Key)}";
+            var culture = variesByCulture ? $" in {settings.Culture}" : string.Empty;
+            context.LogInfo($"Created '{settings.Name}' ({content.Key}) as {contentType.Alias} {location}{culture}");
+
             return Success(new CreateContentOutput
             {
                 ContentKey = content.Key,
@@ -221,28 +230,20 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
     /// <summary>
     /// Applies optional property values from a JSON object. Culture-variant properties are set
     /// for <paramref name="culture"/>; invariant properties ignore it. Malformed JSON and
-    /// unknown property aliases are silently skipped — this is optional convenience config,
-    /// not a required part of creating the content item.
+    /// unknown property aliases are skipped with a warning in the run log — this is optional
+    /// convenience config, not a required part of creating the content item.
     /// </summary>
-    private static void ApplyProperties(IContent content, string? propertiesJson, string? culture)
+    private static void ApplyProperties(ActionContext context, IContent content, string? propertiesJson, string? culture)
     {
         if (string.IsNullOrWhiteSpace(propertiesJson))
         {
             return;
         }
 
-        Dictionary<string, string>? properties;
-        try
-        {
-            properties = JsonSerializer.Deserialize<Dictionary<string, string>>(propertiesJson);
-        }
-        catch (JsonException)
-        {
-            return;
-        }
-
+        var properties = PropertyValuesJson.TryParse(propertiesJson);
         if (properties is null)
         {
+            context.LogWarning("Properties are not a valid JSON object and were ignored");
             return;
         }
 
@@ -250,6 +251,7 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
         {
             if (!content.Properties.TryGetValue(alias, out var property))
             {
+                context.LogWarning($"Property '{alias}' does not exist on {content.ContentType.Alias} and was skipped");
                 continue;
             }
 

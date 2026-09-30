@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Options;
@@ -79,21 +80,45 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
 
         var maxBodyBytes = _executionOptions.Value.MaxHttpResponseBodyBytes;
 
+        // Captured before sending: a followed redirect rewrites the request's method and URL.
+        var requestedUri = request.RequestUri;
+        var requestLine = $"{request.Method} {ActionLogFormat.Url(requestedUri)}";
+        var started = Stopwatch.GetTimestamp();
+
         // Stream the response so an oversized body can be rejected from the Content-Length
         // header — or while reading when the server doesn't declare one — without ever
         // buffering the whole payload first.
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await SendAsync(client, request, context, requestLine, started, cancellationToken);
+
+        // Redirects are followed inside the handler, which leaves the final address on the request.
+        if (response.RequestMessage?.RequestUri is { } finalUri && finalUri != requestedUri)
+        {
+            context.LogInfo($"Redirected to {ActionLogFormat.Url(finalUri)}");
+        }
+
+        var statusLine = $"{requestLine} → {(int)response.StatusCode} {response.ReasonPhrase}";
 
         if (response.Content.Headers.ContentLength is { } declaredLength && declaredLength > maxBodyBytes)
         {
+            context.LogError(
+                $"{statusLine} in {ActionLogFormat.Elapsed(Stopwatch.GetElapsedTime(started))}, but the response body "
+                + $"({ActionLogFormat.Bytes(declaredLength)}) exceeds the {ActionLogFormat.Bytes(maxBodyBytes)} limit");
             return ResponseTooLarge(settings.Url, declaredLength, maxBodyBytes);
         }
 
         var body = await HttpResponseBodyReader.ReadCappedAsync(response.Content, maxBodyBytes, cancellationToken);
+        var elapsed = ActionLogFormat.Elapsed(Stopwatch.GetElapsedTime(started));
+
         if (body is null)
         {
+            context.LogError(
+                $"{statusLine} in {elapsed}, but the response body exceeds the {ActionLogFormat.Bytes(maxBodyBytes)} limit");
             return ResponseTooLarge(settings.Url, actualBytes: null, maxBodyBytes);
         }
+
+        context.Log(
+            response.IsSuccessStatusCode ? ActionLogLevel.Info : ActionLogLevel.Error,
+            $"{statusLine} in {elapsed} ({ActionLogFormat.Bytes(Encoding.UTF8.GetByteCount(body))})");
 
         var output = new HttpRequestOutput
         {
@@ -107,6 +132,30 @@ public sealed class HttpRequestAction : ActionBase<HttpRequestSettings, HttpRequ
             : ActionResult.Failed(
                 new HttpRequestException($"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}"),
                 StepRunErrorCategory.InvalidResponse);
+    }
+
+    /// <summary>
+    /// Sends the request, recording a failed attempt in the run log before rethrowing so the
+    /// pipeline still categorises the exception as it always has.
+    /// </summary>
+    private static async Task<HttpResponseMessage> SendAsync(
+        HttpClient client,
+        HttpRequestMessage request,
+        ActionContext context,
+        string requestLine,
+        long started,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        {
+            var reason = ex is OperationCanceledException ? "timed out or was cancelled" : $"failed: {ex.Message}";
+            context.LogError($"{requestLine} {reason} after {ActionLogFormat.Elapsed(Stopwatch.GetElapsedTime(started))}");
+            throw;
+        }
     }
 
     private static ActionResult ResponseTooLarge(string? url, long? actualBytes, long maxBytes)

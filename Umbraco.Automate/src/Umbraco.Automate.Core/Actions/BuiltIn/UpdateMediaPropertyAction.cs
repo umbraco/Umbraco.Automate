@@ -90,6 +90,8 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
                 "Automation {AutomationId} / Run {RunId}: Media {MediaKey} not found.",
                 context.AutomationId, context.RunId, mediaKey);
 
+            context.LogWarning($"Media {mediaKey} was not found, so nothing was updated");
+
             return SuccessWithOutcome(OutcomeNotFound, new UpdateMediaPropertyOutput
             {
                 MediaKey = mediaKey,
@@ -104,6 +106,8 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Property {PropertyAlias} not found on {MediaTypeAlias}.",
                 context.AutomationId, context.RunId, settings.PropertyAlias, media.ContentType.Alias);
+
+            context.LogWarning($"Property '{settings.PropertyAlias}' does not exist on {media.ContentType.Alias}, so nothing was updated");
 
             return SuccessWithOutcome(OutcomePropertyNotFound, new UpdateMediaPropertyOutput
             {
@@ -136,6 +140,8 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
 
         if (result.Success)
         {
+            context.LogInfo(DescribeUpdate(settings.PropertyAlias, ActionLogFormat.Item(media.Name, mediaKey), settings.Culture, culture, segment));
+
             return Success(new UpdateMediaPropertyOutput
             {
                 MediaKey = mediaKey,
@@ -150,6 +156,20 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
         return ActionResult.Failed(
             new InvalidOperationException($"Failed to save media '{mediaKey}': {status}"),
             MapErrorCategory(status));
+    }
+
+    private static string DescribeUpdate(string alias, string item, string? requestedCulture, string? culture, string? segment)
+    {
+        var variant = segment is null ? culture : $"{culture ?? "invariant"} / {segment}";
+        var description = variant is null
+            ? $"Updated '{alias}' on {item}"
+            : $"Updated '{alias}' on {item} ({variant})";
+
+        // A culture-variant item with no culture requested falls back to its first culture, which
+        // the Input tab cannot show.
+        return culture is not null && string.IsNullOrWhiteSpace(requestedCulture)
+            ? $"{description}; no culture was given, so {culture} was used"
+            : description;
     }
 
     private static string? NormaliseCulture(string? requested, IMedia media)
