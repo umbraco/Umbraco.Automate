@@ -6,6 +6,8 @@ using Umbraco.Cms.Core.Runtime;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Sync;
 using Umbraco.Cms.Infrastructure.HostedServices;
+using WorkflowCore.Interface;
+using WorkflowCore.Models;
 
 namespace Umbraco.Automate.Core.Runs;
 
@@ -98,6 +100,13 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
             {
                 var threshold = DateTime.UtcNow.AddDays(-policy.RetentionDays);
                 deletedByAge = await repository.DeleteRunsOlderThanAsync(threshold, CancellationToken.None);
+
+                // Engine state for finished workflows follows the same retention as run history.
+                // Only complete/terminated instances are purged; runnable and suspended ones (which
+                // stuck-run recovery and resume depend on) are never touched.
+                var purger = scope.ServiceProvider.GetRequiredService<IWorkflowPurger>();
+                await purger.PurgeWorkflows(WorkflowStatus.Complete, threshold, CancellationToken.None);
+                await purger.PurgeWorkflows(WorkflowStatus.Terminated, threshold, CancellationToken.None);
             }
 
             if (policy.MaxRunsPerAutomation > 0)
