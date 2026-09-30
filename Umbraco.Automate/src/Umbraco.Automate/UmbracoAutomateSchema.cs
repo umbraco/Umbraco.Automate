@@ -1,4 +1,8 @@
 using Umbraco.Automate.Core.Configuration;
+using Umbraco.Automate.Core.Execution;
+using Umbraco.Automate.Core.Messaging;
+using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Core.Versioning;
 
 // Schema wrapper consumed by the JsonSchemaGenerate MSBuild task at build time.
 // Describes the appsettings.json shape below Umbraco:Automate so tooling can give
@@ -36,9 +40,24 @@ internal sealed class UmbracoAutomateSchema
         public required ExecutionOptions Execution { get; set; }
 
         /// <summary>
-        /// Governance and audit configuration.
+        /// Run Script action sandbox configuration.
         /// </summary>
-        public required GovernanceOptions Governance { get; set; }
+        public required ScriptingOptions Scripting { get; set; }
+
+        /// <summary>
+        /// Outbox message dispatcher configuration.
+        /// </summary>
+        public required OutboxOptions Outbox { get; set; }
+
+        /// <summary>
+        /// Version history cleanup configuration.
+        /// </summary>
+        public required VersionCleanupPolicy VersionCleanup { get; set; }
+
+        /// <summary>
+        /// Run history cleanup configuration.
+        /// </summary>
+        public required RunCleanupPolicy RunCleanup { get; set; }
 
         /// <summary>
         /// Scheduled trigger background job configuration.
@@ -46,8 +65,18 @@ internal sealed class UmbracoAutomateSchema
         public required ScheduledTriggerOptions ScheduledTrigger { get; set; }
 
         /// <summary>
+        /// Per-automation rate limiting configuration.
+        /// </summary>
+        public required RateLimitingOptions RateLimiting { get; set; }
+
+        /// <summary>
         /// Circuit breaker (auto-disable) configuration.
         /// </summary>
         public required CircuitBreakerOptions CircuitBreaker { get; set; }
+
+        /// <summary>
+        /// WorkflowCore distributed lock configuration.
+        /// </summary>
+        public required WorkflowLockOptions WorkflowLock { get; set; }
     }
 }
