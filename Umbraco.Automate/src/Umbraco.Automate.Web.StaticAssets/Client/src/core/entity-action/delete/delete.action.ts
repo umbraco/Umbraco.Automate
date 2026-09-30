@@ -3,6 +3,7 @@ import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import { umbPeekError } from "@umbraco-cms/backoffice/notification";
 import type { UmbDetailRepository } from "@umbraco-cms/backoffice/repository";
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
+import { UA_SECTION_PATHNAME } from "../../../section/constants.js";
 
 export interface UaDeleteActionArgs {
     headline: string;
@@ -47,7 +48,7 @@ export abstract class UaDeleteActionBase extends UmbEntityActionBase<never> {
         }
 
         // Navigate away from the deleted entity
-        const target = navigateTo ?? "/umbraco/section/automate";
+        const target = navigateTo ?? `/umbraco/section/${UA_SECTION_PATHNAME}`;
         history.pushState(null, "", target);
     }
 }
