@@ -6,6 +6,7 @@ import { css, html, customElement, state } from "@umbraco-cms/backoffice/externa
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UA_AUTOMATION_ENTITY_TYPE } from "../../../../constants.js";
+import { UA_SECTION_PATHNAME } from "../../../../../section/constants.js";
 import { UA_EDIT_AUTOMATION_WORKSPACE_PATH_PATTERN } from "../../../../workspace/automation/paths.js";
 
 const elementName = "ua-automation-tree-item-table-collection-view";
@@ -70,7 +71,7 @@ export class UaAutomationTreeItemTableCollectionViewElement extends UmbLitElemen
         const isAutomation = item.entityType === UA_AUTOMATION_ENTITY_TYPE;
         const href = isAutomation
             ? UA_EDIT_AUTOMATION_WORKSPACE_PATH_PATTERN.generateAbsolute({ unique: item.unique! })
-            : `/umbraco/section/automate/workspace/${item.entityType}/edit/${item.unique}`;
+            : `/umbraco/section/${UA_SECTION_PATHNAME}/workspace/${item.entityType}/edit/${item.unique}`;
 
         return {
             id: item.unique!,
