@@ -54,10 +54,40 @@ public class StuckRunRecoveryTests : IDisposable
     }
 
     [Fact]
-    public async Task RecoverStuckRunsAsync_DurableRun_LeavesRunAndInstanceToResume()
+    public async Task RecoverStuckRunsAsync_InterruptedRun_LeavesItsCompletedStepsAlone()
+    {
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, WorkflowStatus.Runnable);
+        var completedStepId = await AddStepRunAsync(runId, StepRunStatus.Completed);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        var completed = await db.StepRuns.SingleAsync(sr => sr.Id == completedStepId);
+        completed.Status.ShouldBe((int)StepRunStatus.Completed);
+        completed.Error.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_PendingRun_FailsRunAndItsSteps()
+    {
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Pending, StepRunStatus.Pending, WorkflowStatus.Runnable);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+        (await db.StepRuns.SingleAsync(sr => sr.RunId == runId)).Status.ShouldBe((int)StepRunStatus.Failed);
+    }
+
+    [Theory]
+    [InlineData(StepRunStatus.Sleeping)]
+    [InlineData(StepRunStatus.WaitingForInput)]
+    public async Task RecoverStuckRunsAsync_DurableRun_LeavesRunAndInstanceToResume(StepRunStatus durableStatus)
     {
         var (runId, instanceId) = await SeedRunAsync(
-            AutomationRunStatus.Running, StepRunStatus.Sleeping, WorkflowStatus.Runnable);
+            AutomationRunStatus.Running, durableStatus, WorkflowStatus.Runnable);
 
         await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
 
@@ -76,6 +106,24 @@ public class StuckRunRecoveryTests : IDisposable
 
         await using var db = _fixture.CreateContext();
         (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Complete);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_CompletedRunWithOrphanedStep_FailsTheStepOnly()
+    {
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Completed, StepRunStatus.Running, WorkflowStatus.Complete);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        var run = await db.AutomationRuns.SingleAsync(r => r.Id == runId);
+        run.Status.ShouldBe((int)AutomationRunStatus.Completed);
+        run.Error.ShouldBeNull();
+
+        var step = await db.StepRuns.SingleAsync(sr => sr.RunId == runId);
+        step.Status.ShouldBe((int)StepRunStatus.Failed);
+        step.Error.ShouldBe("Recovered after application restart — parent run already completed");
     }
 
     [Fact]
@@ -137,6 +185,25 @@ public class StuckRunRecoveryTests : IDisposable
 
         await db.SaveChangesAsync();
         return (runId, instanceId);
+    }
+
+    private async Task<Guid> AddStepRunAsync(Guid runId, StepRunStatus status)
+    {
+        var stepRunId = Guid.NewGuid();
+
+        await using var db = _fixture.CreateContext();
+        db.StepRuns.Add(new StepRunEntity
+        {
+            Id = stepRunId,
+            RunId = runId,
+            StepId = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.logMessage",
+            Status = (int)status,
+            StartedUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+        return stepRunId;
     }
 
     public void Dispose() => _fixture.Dispose();
