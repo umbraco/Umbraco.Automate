@@ -103,6 +103,7 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
         if (stuckRuns.Count > 0)
         {
             var liveness = await WatchOtherNodesAsync(db, cancellationToken);
+            stoppedNodeIds = liveness.StoppedNodeIds;
 
             if (liveness.AnyLive)
             {
@@ -111,15 +112,10 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
                     stuckRuns.Count);
                 stuckRuns = [];
             }
-            else
+            else if (liveness.Waited)
             {
-                stoppedNodeIds = liveness.StoppedNodeIds;
-
-                if (liveness.Waited)
-                {
-                    // Runs finish while we wait, so the candidates read before it are stale: read them again.
-                    stuckRuns = await ReadCandidateRunsAsync(db, cancellationToken);
-                }
+                // Runs finish while we wait, so the candidates read before it are stale: read them again.
+                stuckRuns = await ReadCandidateRunsAsync(db, cancellationToken);
             }
         }
 
