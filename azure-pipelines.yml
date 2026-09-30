@@ -221,10 +221,21 @@ stages:
     # It uses nothing Build produces (it builds the site from source itself), so
     # waiting for Build only added ~3.5 min of wall-clock. Pack is not an option:
     # it is restricted to pushes on vN/main, vN/dev, vN/hotfix/*, vN/release/*.
-    # The site is scaffolded from source by scripts/install-demo-site.sh, the
+    # The site is scaffolded from source by scripts/install-demo-site.ps1, the
     # same script developers run, so the leg exercises project references
     # rather than a published package and matches the local workflow exactly.
-    # SQLite means this stays on Linux; there is no LocalDB leg to add.
+    #
+    # Windows + SQL Server LocalDB, not Linux + SQLite, matching Forms and the CMS
+    # acceptance legs. The CMS SQLite connection string carries Cache=Shared, and
+    # with a shared cache the CMS cache-instruction sync job and an end-of-request
+    # cache-instruction insert can deadlock on umbracoCacheInstruction. The pending
+    # write then blocks every connection in the process (SQLite Error 6 'database
+    # table is locked' on unrelated Automate and OpenIddict tables), and the CMS
+    # retry policy retries it 10x at the 30s command timeout, so the site stalls for
+    # ~9.5 min and every spec in that window fails in fixture setup (build 289321).
+    # SQL Server has no shared cache and no single-writer lock, so the stall cannot
+    # happen here. It also runs Automate's SQL Server migrations end to end.
+    # Local development stays on SQLite, where the stall is rare.
     # ============================================================
     - stage: AcceptanceTests
       displayName: Acceptance Tests
@@ -232,9 +243,11 @@ stages:
       jobs:
           - job: AcceptanceTests
             displayName: Run Playwright Acceptance Tests
-            timeoutInMinutes: 40
+            # Windows agents build more slowly, and the first boot against a cold LocalDB
+            # creates the database and runs the full unattended install.
+            timeoutInMinutes: 60
             pool:
-                vmImage: "ubuntu-latest"
+                vmImage: "windows-latest"
             variables:
                 # Makes playwright.config.ts pick its CI profile (junit reporter,
                 # retries, longer timeouts) and makes postinstall.js skip the
@@ -244,6 +257,13 @@ stages:
                 ASPNETCORE_URLS: https://localhost:44380
                 PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
                 acceptanceDir: $(Build.SourcesDirectory)/Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
+                # Override the scaffold's SQLite connection string. Automate shares it
+                # (Umbraco:Automate:UseNamedConnectionString = umbracoDbDSN), so this moves
+                # both the CMS and Automate onto LocalDB. InstallMissingDatabase lets the
+                # unattended install create the database file on first boot.
+                CONNECTIONSTRINGS__UMBRACODBDSN: Data Source=(localdb)\MSSQLLocalDB;AttachDbFilename=|DataDirectory|\Umbraco.mdf;Integrated Security=True
+                CONNECTIONSTRINGS__UMBRACODBDSN_PROVIDERNAME: Microsoft.Data.SqlClient
+                UMBRACO__CMS__GLOBAL__INSTALLMISSINGDATABASE: true
             steps:
                 # Full history, like the Build stage: the demo site builds the products from
                 # project references, and Nerdbank.GitVersioning cannot compute a version
@@ -264,34 +284,37 @@ stages:
                 # Builds the wwwroot bundles the demo site serves. Without this the
                 # Automate section silently fails to register and every UI spec fails
                 # with element-not-found, which looks like a product bug but is not.
-                - script: |
+                # bash, not script: on Windows `script` is cmd, where the first npm (a
+                # .cmd batch file) would end the step before the build ran.
+                - bash: |
+                      set -e
                       npm ci --include=optional
                       npm run build
                   displayName: Build frontend
 
-                - script: bash scripts/install-demo-site.sh
+                - pwsh: ./scripts/install-demo-site.ps1
                   displayName: Scaffold demo site
 
                 # The demo lives under demos/vN where N comes from Umbraco.Cms.Core in
                 # Directory.Packages.props, so resolve it rather than hard-coding a major.
-                # Backticks, not $(...), for command substitution: Azure macro-expands
-                # $(name) before bash ever sees the script.
-                - script: |
-                      set -e
-                      demoProject=`find demos -name 'Umbraco.Automate.DemoSite.csproj' | head -1`
-                      if [ -z "$demoProject" ]; then
-                        echo "##vso[task.logissue type=error]Demo site project not found under demos/"
+                - pwsh: |
+                      $demoProject = Get-ChildItem -Path demos -Recurse -Filter Umbraco.Automate.DemoSite.csproj | Select-Object -First 1
+                      if (-not $demoProject) {
+                        Write-Host "##vso[task.logissue type=error]Demo site project not found under demos/"
                         exit 1
-                      fi
-                      echo "Demo project: $demoProject"
-                      echo "##vso[task.setvariable variable=demoProject]$demoProject"
+                      }
+                      Write-Host "Demo project: $($demoProject.FullName)"
+                      Write-Host "##vso[task.setvariable variable=demoProject]$($demoProject.FullName)"
                   displayName: Resolve demo site path
 
                 - script: dotnet dev-certs https
-                  displayName: Trust HTTPS development certificate
+                  displayName: Create HTTPS development certificate
 
                 - script: dotnet build "$(demoProject)" --configuration Release
                   displayName: Build demo site
+
+                - pwsh: SqlLocalDB start MSSQLLocalDB
+                  displayName: Start SQL Server LocalDB
 
                 # Keyed on the acceptance package-lock, which pins the Playwright
                 # version that determines the required browser build.
@@ -307,11 +330,14 @@ stages:
                   displayName: Restore acceptance test packages
                   workingDirectory: $(acceptanceDir)
 
-                # --with-deps because the hosted Linux image lacks the browser's OS
-                # libraries. On a cache hit the download is skipped.
-                - script: npx playwright install --with-deps chromium
+                # script (cmd), not pwsh: under pwsh the install hangs after the download
+                # reaches 100% (seen in Forms). No --with-deps, which only installs Linux
+                # packages. On a cache hit the download is skipped.
+                - script: npx playwright install chromium
                   displayName: Install Playwright Chromium
                   workingDirectory: $(acceptanceDir)
+                  timeoutInMinutes: 15
+                  retryCountOnTaskFailure: 2
 
                 # config.js is interactive and reads the per-worktree port from git
                 # config, which is a local-development affordance. In CI the URL is fixed by
@@ -324,43 +350,37 @@ stages:
                 # the token auth.setup.ts saved, which the first refresh already used up, so each
                 # test fell back to a full re-login (24 in build 289321). Same file as
                 # playwright.config.ts's storageState, as in Forms' pipeline.
-                - script: |
-                      set -e
-                      cat > .env <<ENVEOF
-                      UMBRACO_USER_LOGIN=admin@example.com
-                      UMBRACO_USER_PASSWORD=password1234
-                      URL=$(ASPNETCORE_URLS)
-                      STORAGE_STATE_PATH=$(acceptanceDir)/playwright/.auth/user.json
-                      CONSOLE_ERRORS_PATH=$(acceptanceDir)/results/console-errors.json
-                      ENVEOF
-                      echo "Wrote .env targeting $(ASPNETCORE_URLS)"
+                - pwsh: |
+                      "UMBRACO_USER_LOGIN=admin@example.com",
+                      "UMBRACO_USER_PASSWORD=password1234",
+                      "URL=$(ASPNETCORE_URLS)",
+                      "STORAGE_STATE_PATH=$(acceptanceDir)/playwright/.auth/user.json",
+                      "CONSOLE_ERRORS_PATH=$(acceptanceDir)/results/console-errors.json" | Set-Content .env
+                      Write-Host "Wrote .env targeting $(ASPNETCORE_URLS)"
                   displayName: Generate .env
                   workingDirectory: $(acceptanceDir)
 
-                - script: |
-                      set -e
-                      nohup dotnet run --project "$(demoProject)" --configuration Release --no-build --no-launch-profile > "$(Build.ArtifactStagingDirectory)/demo-site.log" 2>&1 &
-                      echo "##vso[task.setvariable variable=demoSitePid]$!"
-                      echo "Demo site starting as PID $!"
+                - pwsh: |
+                      $process = Start-Process dotnet "run --project `"$(demoProject)`" --configuration Release --no-build --no-launch-profile" -PassThru -NoNewWindow -RedirectStandardOutput "$(Build.ArtifactStagingDirectory)/demo-site.log" -RedirectStandardError "$(Build.ArtifactStagingDirectory)/demo-site.err.log"
+                      Write-Host "##vso[task.setvariable variable=demoSitePid]$($process.Id)"
+                      Write-Host "Demo site starting as PID $($process.Id)"
                   displayName: Start demo site
 
-                # First boot runs the unattended install and the Automate schema
-                # migrations, so allow generous time before calling it a failure.
-                - script: |
-                      set -e
-                      # expr rather than $((...)): Azure's macro parser also reacts to
-                      # a leading "$(", so arithmetic expansion is best avoided here.
-                      i=0
-                      while [ $i -lt 90 ]; do
-                        if curl -ksSf "$(ASPNETCORE_URLS)/umbraco" -o /dev/null; then
-                          echo "Demo site is up (attempt $i)"
+                # First boot creates the LocalDB database and runs the unattended install and
+                # the Automate schema migrations, so allow generous time before calling it a failure.
+                - pwsh: |
+                      for ($i = 0; $i -lt 90; $i++) {
+                        try {
+                          Invoke-WebRequest "$(ASPNETCORE_URLS)/umbraco" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 10 | Out-Null
+                          Write-Host "Demo site is up (attempt $i)"
                           exit 0
-                        fi
-                        i=`expr $i + 1`
-                        sleep 10
-                      done
-                      echo "##vso[task.logissue type=error]Demo site did not respond within 15 minutes"
-                      tail -100 "$(Build.ArtifactStagingDirectory)/demo-site.log" || true
+                        } catch {
+                          Start-Sleep -Seconds 10
+                        }
+                      }
+                      Write-Host "##vso[task.logissue type=error]Demo site did not respond within 15 minutes"
+                      Get-Content "$(Build.ArtifactStagingDirectory)/demo-site.log" -Tail 100 -ErrorAction SilentlyContinue
+                      Get-Content "$(Build.ArtifactStagingDirectory)/demo-site.err.log" -Tail 100 -ErrorAction SilentlyContinue
                       exit 1
                   displayName: Wait for demo site
 
@@ -368,8 +388,18 @@ stages:
                   displayName: Run acceptance tests
                   workingDirectory: $(acceptanceDir)
 
-                - script: kill $(demoSitePid) || true
+                # always(), so the site is also stopped after a failed or cancelled test step.
+                # The recorded PID is the `dotnet run` launcher; the site it starts is a child
+                # that holds demo-site.log open, and killing only the launcher would orphan it
+                # and fail the log upload below. taskkill /T kills the whole tree.
+                - pwsh: |
+                      taskkill /PID $(demoSitePid) /T /F
+                      exit 0
                   displayName: Stop demo site
+                  condition: and(always(), ne(variables.demoSitePid, ''))
+
+                - pwsh: SqlLocalDB stop MSSQLLocalDB
+                  displayName: Stop SQL Server LocalDB
                   condition: always()
 
                 - task: PublishTestResults@2
@@ -382,21 +412,25 @@ stages:
                       mergeTestResults: true
 
                 # Traces, screenshots and video for every failed test, plus the site
-                # log, because a UI failure is rarely diagnosable from the error alone.
+                # logs, because a UI failure is rarely diagnosable from the error alone.
+                # always(), as in Forms: a job killed by its timeout is cancelled, and a
+                # cancelled job skips steps whose condition does not include always(), so
+                # the run that most needs diagnosing would upload nothing. The attempt number
+                # keeps a re-run from colliding with the first attempt's artifact.
                 - task: PublishPipelineArtifact@1
                   displayName: Upload failure diagnostics
-                  condition: failed()
+                  condition: always()
                   inputs:
                       targetPath: $(acceptanceDir)/results
-                      artifact: acceptance-test-results
+                      artifact: acceptance-test-results - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
                 - task: PublishPipelineArtifact@1
-                  displayName: Upload demo site log
-                  condition: failed()
+                  displayName: Upload demo site logs
+                  condition: always()
                   inputs:
-                      targetPath: $(Build.ArtifactStagingDirectory)/demo-site.log
-                      artifact: acceptance-demo-site-log
+                      targetPath: $(Build.ArtifactStagingDirectory)
+                      artifact: acceptance-demo-site-log - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
     # ============================================================
