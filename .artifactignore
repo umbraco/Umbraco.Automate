@@ -1,0 +1,4 @@
+# Keeps the Build job's build-outputs artifact small. The Pack jobs check out the
+# repo themselves, so they need neither the git history nor installed npm packages.
+.git
+**/node_modules
