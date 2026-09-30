@@ -246,12 +246,29 @@ public class AutomationRunServiceTests
     {
         var run = BuildRun(AutomationRunStatus.Suspended);
         _runRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(run);
+        _workflowHost.Setup(h => h.ResumeWorkflow("instance-1")).ReturnsAsync(true);
 
         var result = await _service.ResumeRunAsync(Guid.NewGuid());
 
         result.ShouldBe(RunLifecycleResult.Success);
         _workflowHost.Verify(h => h.ResumeWorkflow("instance-1"), Times.Once);
         run.Status.ShouldBe(AutomationRunStatus.Running);
+    }
+
+    [Fact]
+    public async Task ResumeRun_WorkflowNotSuspended_ReturnsInvalidStateAndStaysSuspended()
+    {
+        // A run waiting for an approval is Suspended, but its workflow is still Runnable, so
+        // WorkflowCore refuses to resume it — only the decision can.
+        var run = BuildRun(AutomationRunStatus.Suspended);
+        _runRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(run);
+        _workflowHost.Setup(h => h.ResumeWorkflow("instance-1")).ReturnsAsync(false);
+
+        var result = await _service.ResumeRunAsync(Guid.NewGuid());
+
+        result.ShouldBe(RunLifecycleResult.InvalidState);
+        run.Status.ShouldBe(AutomationRunStatus.Suspended);
+        _runRepo.Verify(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // --- Terminate ---

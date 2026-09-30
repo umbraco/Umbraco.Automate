@@ -210,6 +210,7 @@ internal sealed class ActionStepBody : StepBodyAsync
                 stepRun.Status = StepRunStatus.WaitingForInput;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
+                await SuspendRunForInputAsync(data, cancellationToken);
 
                 _logger.LogInformation(
                     "Step {StepId} is waiting for input (event: {EventName}/{EventKey})",
@@ -385,6 +386,32 @@ internal sealed class ActionStepBody : StepBodyAsync
         return DecideFailureOutcome(exception, category, context);
     }
 
+    /// <summary>
+    /// Marks the run Suspended while a step waits for input. WorkflowCore's WaitForEvent only parks
+    /// the execution pointer — the workflow itself stays Runnable — so RunFinalizer's
+    /// WorkflowStatus.Suspended sync never sees this pause and the run would otherwise read as
+    /// Running for as long as the approval is outstanding.
+    /// </summary>
+    private async Task SuspendRunForInputAsync(AutomationWorkflowData data, CancellationToken cancellationToken)
+    {
+        var run = await _runRepository.GetAsync(data.RunId, cancellationToken);
+
+        // Only Running → Suspended; a run already Suspended (another parallel branch is waiting too)
+        // or finished is left alone, so the Suspended notification fires once per pause.
+        if (run is null || run.Status is not AutomationRunStatus.Running)
+        {
+            return;
+        }
+
+        run.Status = AutomationRunStatus.Suspended;
+        await _runRepository.SaveAsync(run, cancellationToken);
+
+        // The dispatcher handles NotifyOn.Suspended via this notification, as it does for RunFinalizer.
+        await _eventAggregator.PublishAsync(
+            new AutomationRunCompletedNotification(run, new EventMessages()),
+            cancellationToken);
+    }
+
     private async Task<ExecutionResult> HandleResumeAsync(
         IStepExecutionContext context,
         AutomationWorkflowData data,
@@ -420,7 +447,7 @@ internal sealed class ActionStepBody : StepBodyAsync
             return ExecutionResult.Next();
         }
 
-        // The run was marked Suspended when WorkflowCore suspended on WaitForEvent;
+        // The run was marked Suspended when this step started waiting (SuspendRunForInputAsync);
         // bring it back to Running now that the event has fired.
         if (run is not null && run.Status == AutomationRunStatus.Suspended)
         {
