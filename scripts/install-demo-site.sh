@@ -61,7 +61,7 @@ if [ ! -f "$PACKAGES_PROPS_PATH" ]; then
     exit 1
 fi
 # Try range format first: Version="[17.0.0,...)"
-TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="\[[^,\]]+' "$PACKAGES_PROPS_PATH" | grep -oE '\[[^,\]]+' | tr -d '[')
+TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="\[[^],]+' "$PACKAGES_PROPS_PATH" | grep -oE '\[[^],]+' | tr -d '[')
 if [ -z "$TEMPLATE_VERSION" ]; then
     # Try fixed version format: Version="17.0.0"
     TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="[^"\[]*"' "$PACKAGES_PROPS_PATH" | grep -oE '"[^"\[]*"$' | tr -d '"')
@@ -201,7 +201,7 @@ add_product_projects() {
                 local proj_name=$(basename "$proj")
                 echo "  Adding $proj_name"
                 dotnet sln "Umbraco.Automate.local.slnx" add "$proj" --solution-folder "$solution_folder" 2>/dev/null || true
-                ((count++))
+                count=$((count + 1))
             done < <(find "$sub_path" -name "*.csproj" -print0)
         fi
     done

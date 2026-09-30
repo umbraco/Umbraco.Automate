@@ -186,6 +186,59 @@ public class MoveContentActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_MoveUnderOwnDescendant_FailsWithValidationError()
+    {
+        // The CMS refuses to move an item beneath itself with ParentInvalid; that must come back
+        // as an actionable validation failure naming the status, not an unknown error.
+        var contentKey = Guid.NewGuid();
+        var descendantKey = Guid.NewGuid();
+
+        _contentEditingService
+            .Setup(x => x.MoveAsync(contentKey, descendantKey, It.IsAny<Guid>()))
+            .ReturnsAsync(Attempt<IContent?, ContentEditingOperationStatus>.Fail(ContentEditingOperationStatus.ParentInvalid));
+
+        var context = CreateContext(
+            new MoveContentSettings { ContentKey = contentKey.ToString(), TargetParentKey = descendantKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        result.Exception.ShouldNotBeNull();
+        result.Exception.Message.ShouldContain(nameof(ContentEditingOperationStatus.ParentInvalid));
+        result.OutputData.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(ContentEditingOperationStatus.InvalidKey, StepRunErrorCategory.Validation)]
+    [InlineData(ContentEditingOperationStatus.NotAllowed, StepRunErrorCategory.Validation)]
+    [InlineData(ContentEditingOperationStatus.InTrash, StepRunErrorCategory.Validation)]
+    [InlineData(ContentEditingOperationStatus.CancelledByNotification, StepRunErrorCategory.Cancelled)]
+    [InlineData(ContentEditingOperationStatus.Unknown, StepRunErrorCategory.Unknown)]
+    public async Task ExecuteAsync_MoveFails_MapsStatusToErrorCategory(
+        ContentEditingOperationStatus status,
+        StepRunErrorCategory expectedCategory)
+    {
+        var contentKey = Guid.NewGuid();
+        var targetParentKey = Guid.NewGuid();
+
+        _contentEditingService
+            .Setup(x => x.MoveAsync(contentKey, targetParentKey, It.IsAny<Guid>()))
+            .ReturnsAsync(Attempt<IContent?, ContentEditingOperationStatus>.Fail(status));
+
+        var context = CreateContext(
+            new MoveContentSettings { ContentKey = contentKey.ToString(), TargetParentKey = targetParentKey.ToString() },
+            Guid.NewGuid());
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(expectedCategory);
+        result.Exception!.Message.ShouldContain(status.ToString());
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Unauthorised_ReturnsAuthenticationErrorNotCrash()
     {
         var contentKey = Guid.NewGuid();
