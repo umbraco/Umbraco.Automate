@@ -204,12 +204,21 @@ stages:
                 # config, which is a local-development affordance. In CI the URL is fixed by
                 # ASPNETCORE_URLS, and the credentials are the ones the scaffold
                 # installs unattended, so write .env directly.
+                #
+                # STORAGE_STATE_PATH is not optional. The CMS umbracoApi fixture refreshes the
+                # login before every test and, only when this is set, saves the browser state
+                # (with the rotated refresh token) afterwards. Without it every test starts from
+                # the token auth.setup.ts saved, which the first refresh already used up, so each
+                # test fell back to a full re-login (24 in build 289321). Same file as
+                # playwright.config.ts's storageState, as in Forms' pipeline.
                 - script: |
                       set -e
                       cat > .env <<ENVEOF
                       UMBRACO_USER_LOGIN=admin@example.com
                       UMBRACO_USER_PASSWORD=password1234
                       URL=$(ASPNETCORE_URLS)
+                      STORAGE_STATE_PATH=$(acceptanceDir)/playwright/.auth/user.json
+                      CONSOLE_ERRORS_PATH=$(acceptanceDir)/results/console-errors.json
                       ENVEOF
                       echo "Wrote .env targeting $(ASPNETCORE_URLS)"
                   displayName: Generate .env
