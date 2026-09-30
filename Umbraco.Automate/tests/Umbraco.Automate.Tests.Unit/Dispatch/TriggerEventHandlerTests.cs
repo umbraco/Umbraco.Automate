@@ -182,6 +182,42 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_AutomationOverRateLimit_SkipsItAndRunsTheOthersWithoutThrowing()
+    {
+        var a1 = CreatePublishedAutomation("myTrigger");
+        var overLimit = CreatePublishedAutomation("myTrigger");
+        var a3 = CreatePublishedAutomation("myTrigger");
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { a1, overLimit, a3 });
+
+        _executor.Setup(e => e.ExecuteAsync(
+                It.Is<Automation>(a => a.Id == overLimit.Id),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, object?>?>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IReadOnlyList<Guid>>()))
+            .ThrowsAsync(new RateLimitExceededException(overLimit.Id, "over the limit"));
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "myTrigger",
+            InitiatorType = "system",
+        });
+
+        // A throw here would fail the outbox message and retry it, re-running a1 each time.
+        await Should.NotThrowAsync(() => _handler.HandleAsync(body, CancellationToken.None));
+
+        _executor.Verify(e => e.ExecuteAsync(
+            It.IsAny<Automation>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Exactly(3));
+    }
+
+    [Fact]
     public async Task HandleAsync_TargetAutomationId_RunsOnlyTargetedAutomation()
     {
         // Two published automations share the alias (the webhook fan-out scenario). The event
