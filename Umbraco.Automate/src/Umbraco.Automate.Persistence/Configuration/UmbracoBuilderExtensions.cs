@@ -96,6 +96,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
         builder.Services.AddSingleton<IWorkflowPurger, EFCoreWorkflowPurger>();
         builder.Services.AddSingleton<IWorkflowLockStore, EFCoreWorkflowLockStore>();
+        builder.Services.AddSingleton<IWorkflowNodeHeartbeatStore, EFCoreWorkflowNodeHeartbeatStore>();
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
         builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
 

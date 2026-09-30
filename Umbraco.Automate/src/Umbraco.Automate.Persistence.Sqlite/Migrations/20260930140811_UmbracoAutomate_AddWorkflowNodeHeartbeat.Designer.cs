@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Umbraco.Automate.Persistence;
 
@@ -10,9 +11,11 @@ using Umbraco.Automate.Persistence;
 namespace Umbraco.Automate.Persistence.Sqlite.Migrations
 {
     [DbContext(typeof(UmbracoAutomateDbContext))]
-    partial class UmbracoAutomateDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930140811_UmbracoAutomate_AddWorkflowNodeHeartbeat")]
+    partial class UmbracoAutomate_AddWorkflowNodeHeartbeat
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");

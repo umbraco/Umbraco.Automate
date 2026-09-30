@@ -9,10 +9,18 @@ namespace Umbraco.Automate.Core.Execution;
 /// WorkflowCore <see cref="IDistributedLockProvider"/> backed by <see cref="IWorkflowLockStore"/>,
 /// using a lease (owner token + expiry) so locks are held across nodes rather than in a single
 /// process's memory (WorkflowCore's default <c>SingleNodeLockProvider</c>).
+/// <para>
+/// While the host runs it also writes this node's heartbeat (see <see cref="IWorkflowNodeHeartbeatStore"/>),
+/// keyed by the same owner token its leases carry, but only while the node is eligible to consume
+/// workflow work: a lease is held only during an execution pass, so startup recovery needs the
+/// heartbeat to see that a run with no lease will still be picked up by a live node.
+/// </para>
 /// </summary>
 internal sealed class WorkflowLockProvider : IDistributedLockProvider
 {
     private readonly IWorkflowLockStore _store;
+    private readonly IWorkflowNodeHeartbeatStore _heartbeatStore;
+    private readonly IExecutionNodeEligibility _nodeEligibility;
     private readonly IOptions<WorkflowLockOptions> _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<WorkflowLockProvider> _logger;
@@ -21,14 +29,19 @@ internal sealed class WorkflowLockProvider : IDistributedLockProvider
 
     private CancellationTokenSource? _renewalCts;
     private Task? _renewalLoop;
+    private bool _heartbeatWritten;
 
     public WorkflowLockProvider(
         IWorkflowLockStore store,
+        IWorkflowNodeHeartbeatStore heartbeatStore,
+        IExecutionNodeEligibility nodeEligibility,
         IOptions<WorkflowLockOptions> options,
         TimeProvider timeProvider,
         ILogger<WorkflowLockProvider> logger)
     {
         _store = store;
+        _heartbeatStore = heartbeatStore;
+        _nodeEligibility = nodeEligibility;
         _options = options;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -97,6 +110,10 @@ internal sealed class WorkflowLockProvider : IDistributedLockProvider
         }
 
         _owned.Clear();
+
+        // Likewise drop the heartbeat, so the next node to start does not wait for it to stop changing.
+        await RemoveHeartbeatAsync(CancellationToken.None);
+
         _renewalCts.Dispose();
         _renewalCts = null;
         _renewalLoop = null;
@@ -104,33 +121,82 @@ internal sealed class WorkflowLockProvider : IDistributedLockProvider
 
     private async Task RunRenewalLoopAsync(CancellationToken cancellationToken)
     {
-        using var timer = new PeriodicTimer(_options.Value.RenewalInterval);
+        using var timer = new PeriodicTimer(_options.Value.RenewalInterval, _timeProvider);
 
         try
         {
+            // Beat straight away rather than after the first interval, so a node that starts while
+            // this one is coming up sees it as soon as possible.
+            await WriteHeartbeatAsync(cancellationToken);
+
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                if (_owned.IsEmpty)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    var now = _timeProvider.GetUtcNow().UtcDateTime;
-                    var expiresUtc = now + _options.Value.LeaseDuration;
-                    var ids = _owned.Keys.ToList();
-
-                    await _store.RenewAsync(ids, _ownerToken, expiresUtc, cancellationToken);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logger.LogWarning(ex, "Failed to renew owned workflow locks");
-                }
+                await RenewOwnedLocksAsync(cancellationToken);
+                await WriteHeartbeatAsync(cancellationToken);
             }
         }
         catch (OperationCanceledException)
         {
+        }
+    }
+
+    private async Task RenewOwnedLocksAsync(CancellationToken cancellationToken)
+    {
+        if (_owned.IsEmpty)
+        {
+            return;
+        }
+
+        try
+        {
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var expiresUtc = now + _options.Value.LeaseDuration;
+            var ids = _owned.Keys.ToList();
+
+            await _store.RenewAsync(ids, _ownerToken, expiresUtc, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to renew owned workflow locks");
+        }
+    }
+
+    private async Task WriteHeartbeatAsync(CancellationToken cancellationToken)
+    {
+        // A node that is not consuming workflow work (a subscriber in SchedulerOnly mode, or any node
+        // before role election) would not run a waiting run's next pass, so it must not look live.
+        if (!_nodeEligibility.CanExecuteWorkflows())
+        {
+            await RemoveHeartbeatAsync(cancellationToken);
+            return;
+        }
+
+        try
+        {
+            await _heartbeatStore.BeatAsync(_ownerToken, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
+            _heartbeatWritten = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to write workflow node heartbeat");
+        }
+    }
+
+    private async Task RemoveHeartbeatAsync(CancellationToken cancellationToken)
+    {
+        if (!_heartbeatWritten)
+        {
+            return;
+        }
+
+        try
+        {
+            await _heartbeatStore.RemoveAsync(_ownerToken, cancellationToken);
+            _heartbeatWritten = false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to remove workflow node heartbeat");
         }
     }
 }
