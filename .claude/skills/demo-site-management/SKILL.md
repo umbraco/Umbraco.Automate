@@ -2,7 +2,7 @@
 name: demo-site-management
 description: Manages the Umbraco.Automate demo site for development. Handles starting with the DemoSite profile, per-worktree port lookup via git config, and stopping. Use when starting, stopping, or checking the demo site.
 argument-hint: [start|stop|status|restart|open]
-allowed-tools: Bash, Read, TaskOutput, TaskStop
+allowed-tools: Bash, PowerShell, Read, TaskOutput, TaskStop
 ---
 
 # Demo Site Management
@@ -39,7 +39,8 @@ Execute the requested demo site operation.
     - Read `Directory.Packages.props` and extract the major from the `Umbraco.Cms.Core` version (range lower bound or fixed, e.g. `[18.0.0, …)` or `18.0.0` → `18`)
     - Demo site path: `demos/v{major}/Umbraco.Automate.DemoSite`
 3. Ensure the frontend assets exist (a fresh clone or worktree has none, and the Automate section then renders blank with no error):
-    - Run `pwsh -NoProfile -File scripts/build-frontend.ps1` (Windows) or `bash scripts/build-frontend.sh` (macOS/Linux) from the repo root
+    - Run `scripts/build-frontend.ps1` (Windows) or `bash scripts/build-frontend.sh` (macOS/Linux) from the repo root
+    - On Windows, run it with the PowerShell tool, not `pwsh ...` through Bash: a worktree-isolated session's Bash tool refuses to shell out to `pwsh`
     - Safe to run every start: it is a no-op when both `wwwroot` folders are already populated
     - On a fresh worktree it runs `npm ci` + `npm run build` at the repo root and can take a few minutes - allow a long timeout and never run npm by hand instead
     - It handles the Node version itself (reads `engines.node`, and prepends an installed nvm-for-windows version to PATH for that process only - never run `nvm use`)
