@@ -25,7 +25,10 @@ test.describe('Error states', () => {
     await umbracoUi.goToBackOffice();
   });
 
+  // automateWorkspace is not used directly: the Approvals dashboard only registers once a workspace
+  // exists (UA_WORKSPACES_EXIST_CONDITION), and on a fresh site — each CI shard — there may be none.
   test('the Approvals dashboard reports a failed load instead of claiming there are none', async ({
+    automateWorkspace,
     umbracoAutomateUi
   }) => {
     // Arrange
