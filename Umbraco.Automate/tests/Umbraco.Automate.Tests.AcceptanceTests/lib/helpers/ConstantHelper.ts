@@ -30,6 +30,9 @@ export class ConstantHelper {
     bindingPickerModal: 'ua-binding-picker-modal',
     runsTable: 'ua-runs-table',
     runDetailModal: 'ua-run-detail-modal',
+    approvalDashboard: 'ua-approval-dashboard',
+    approvalDecisionModal: 'ua-approval-decision-modal',
+    edgeFilterModal: 'ua-edge-filter-modal',
     connectionTypePickerModal: 'ua-connection-type-picker-modal',
     oauthEditor: 'umb-automate-property-editor-ui-oauth'
   };
@@ -47,6 +50,7 @@ export class ConstantHelper {
     setVariable: 'umbracoAutomate.setVariable',
     slackSendMessage: 'slack.sendMessage',
     if: 'umbracoAutomate.if',
+    switch: 'umbracoAutomate.switch',
     while: 'umbracoAutomate.while'
   };
 

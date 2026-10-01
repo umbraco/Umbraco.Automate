@@ -291,6 +291,37 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         await WaitForStepRunStatusAsync(run, nextStep.Id, StepRunStatus.Completed, TestTimeouts.WorkflowWait);
     }
 
+    [Fact]
+    public async Task Run_IsSuspendedWhileWaiting_AndRunningAgainAfterTheDecision()
+    {
+        // WorkflowCore's WaitForEvent leaves the workflow Runnable, so nothing in the engine reports
+        // this pause: the step body has to mark the run Suspended itself, or the Runs dashboard shows
+        // an approval-blocked run as Running.
+        var approvalStep = ApprovalStep();
+        var nextStep = LogStep("afterApproval", "continued");
+
+        var automation = new AutomationBuilder()
+            .WithAlias("test-approval-run-status")
+            .WithName("test-approval-run-status")
+            .WithManualTrigger()
+            .AddStep(approvalStep)
+            .AddStep(nextStep)
+            .WithTriggerConnection(approvalStep.Id)
+            .WithConnection(approvalStep.Id, nextStep.Id)
+            .Build();
+
+        var run = await RunToApprovalAsync(automation, approvalStep);
+        await WaitForRunStatusAsync(run, AutomationRunStatus.Suspended, TestTimeouts.WorkflowWait);
+
+        await SubmitDecisionAsync(run.Id, approvalStep.Id, ApprovalOutcome.Approved);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        // This fixture runs on WorkflowCore's in-memory persistence, so RunFinalizer never marks the
+        // run Completed; what matters here is that the decision took it back out of Suspended.
+        var resumed = await _runRepository.GetAsync(run.Id);
+        resumed!.Status.ShouldBe(AutomationRunStatus.Running);
+    }
+
     private static StepConfiguration ApprovalStep() => new()
     {
         Id = Guid.NewGuid(),
@@ -388,6 +419,24 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         }
 
         throw new TimeoutException($"Step {stepId} in run {run.Id} did not reach {status} within {timeout}.");
+    }
+
+    private async Task WaitForRunStatusAsync(AutomationRun run, AutomationRunStatus status, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        AutomationRunStatus? last = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            last = (await _runRepository.GetAsync(run.Id))?.Status;
+            if (last == status)
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Run {run.Id} did not reach {status} within {timeout} (last seen: {last}).");
     }
 
     private async Task<WorkflowInstance> WaitForWorkflowStatusAsync(AutomationRun run, WorkflowStatus status, TimeSpan timeout)

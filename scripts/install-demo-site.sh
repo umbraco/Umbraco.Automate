@@ -14,11 +14,16 @@ cd "$REPO_ROOT" || exit 1
 # Parse arguments
 SKIP_TEMPLATE_INSTALL=false
 FORCE=false
+SKIP_SOLUTION=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-template-install|-s)
             SKIP_TEMPLATE_INSTALL=true
+            shift
+            ;;
+        --skip-solution)
+            SKIP_SOLUTION=true
             shift
             ;;
         --force|-f)
@@ -31,6 +36,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  -s, --skip-template-install  Skip reinstalling Umbraco.Templates"
             echo "  -f, --force                  Recreate demo if it already exists"
+            echo "      --skip-solution          Don't create Umbraco.Automate.local.slnx (CI builds the demo project directly)"
             echo "  -h, --help                   Show this help message"
             exit 0
             ;;
@@ -184,10 +190,6 @@ s.WorktreeDevPort.MainWorktreePort = 44380;
 fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
 ' "$DEV_SETTINGS_PATH"
 
-# Step 4: Create unified solution
-echo "Creating unified solution..."
-dotnet new sln -n "Umbraco.Automate.local" --force
-
 # Helper function to add all projects from a product's src and tests folders
 add_product_projects() {
     local product_folder="$1"
@@ -208,21 +210,29 @@ add_product_projects() {
     echo "  Added $count projects"
 }
 
-# Step 5: Add Core projects
-echo "Adding Umbraco.Automate projects..."
-add_product_projects "Umbraco.Automate" "Core"
+if [ "$SKIP_SOLUTION" = false ]; then
+    # Step 4: Create unified solution
+    echo "Creating unified solution..."
+    dotnet new sln -n "Umbraco.Automate.local" --force
 
-# Step 6: Add OpenIddict projects
-echo "Adding Umbraco.Automate.OpenIddict projects..."
-add_product_projects "Umbraco.Automate.OpenIddict" "OpenIddict"
+    # Step 5: Add Core projects
+    echo "Adding Umbraco.Automate projects..."
+    add_product_projects "Umbraco.Automate" "Core"
 
-# Step 7: Add Slack projects
-echo "Adding Umbraco.Automate.Slack projects..."
-add_product_projects "Umbraco.Automate.Slack" "Slack"
+    # Step 6: Add OpenIddict projects
+    echo "Adding Umbraco.Automate.OpenIddict projects..."
+    add_product_projects "Umbraco.Automate.OpenIddict" "OpenIddict"
 
-# Step 8: Add demo site to solution
-echo "Adding demo site to solution..."
-dotnet sln "Umbraco.Automate.local.slnx" add "$DEMO_SITE_DIR/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+    # Step 7: Add Slack projects
+    echo "Adding Umbraco.Automate.Slack projects..."
+    add_product_projects "Umbraco.Automate.Slack" "Slack"
+
+    # Step 8: Add demo site to solution
+    echo "Adding demo site to solution..."
+    dotnet sln "Umbraco.Automate.local.slnx" add "$DEMO_SITE_DIR/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+else
+    echo "Skipping the local solution (--skip-solution)"
+fi
 
 # Step 7: Add project references to demo site
 echo "Adding project references to demo site..."

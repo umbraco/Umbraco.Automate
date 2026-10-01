@@ -1,4 +1,4 @@
-import { css, html, customElement, state, repeat, when } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, state, repeat } from "@umbraco-cms/backoffice/external/lit";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UaCatalogueRepository } from "../../../catalogue/repository/catalogue.repository.js";
@@ -13,6 +13,9 @@ export class UaConnectionTypePickerModalElement extends UmbModalBaseElement<neve
     @state()
     private _loading = true;
 
+    @state()
+    private _error = false;
+
     #repository?: UaCatalogueRepository;
 
     override connectedCallback() {
@@ -23,11 +26,46 @@ export class UaConnectionTypePickerModalElement extends UmbModalBaseElement<neve
 
     async #loadTypes() {
         this._loading = true;
-        const { data } = await this.#repository!.requestConnectionTypes();
+        const { data, error } = await this.#repository!.requestConnectionTypes();
+        this._error = !!error;
         if (data) {
             this._types = data;
         }
         this._loading = false;
+    }
+
+    #renderBody() {
+        if (this._loading) {
+            return html`<div id="loader"><uui-loader></uui-loader></div>`;
+        }
+
+        if (this._error) {
+            return html`<p class="error">${this.localize.term("uaCatalogue_loadError")}</p>`;
+        }
+
+        if (this._types.length === 0) {
+            return html`<p class="empty">${this.localize.term("uaCatalogue_noResults")}</p>`;
+        }
+
+        return html`
+            <uui-box>
+                <uui-ref-list>
+                    ${repeat(
+                        this._types,
+                        (t) => t.alias,
+                        (t) => html`
+                            <uui-ref-node
+                                name=${t.name}
+                                detail=${t.description ?? ""}
+                                @open=${() => this.#onSelect(t.alias)}
+                            >
+                                <umb-icon slot="icon" name=${t.icon || "icon-plugin"}></umb-icon>
+                            </uui-ref-node>
+                        `,
+                    )}
+                </uui-ref-list>
+            </uui-box>
+        `;
     }
 
     #onSelect(alias: string) {
@@ -42,35 +80,7 @@ export class UaConnectionTypePickerModalElement extends UmbModalBaseElement<neve
     override render() {
         return html`
             <umb-body-layout headline=${this.localize.term("uaLabels_connectionType")}>
-                <div id="main">
-                    ${when(this._loading, () => html`<div id="loader"><uui-loader></uui-loader></div>`)}
-                    ${when(
-                        !this._loading && this._types.length === 0,
-                        () => html`<p class="empty">${this.localize.term("uaCatalogue_noResults")}</p>`,
-                    )}
-                    ${when(
-                        !this._loading,
-                        () => html`
-                            <uui-box>
-                                <uui-ref-list>
-                                    ${repeat(
-                                        this._types,
-                                        (t) => t.alias,
-                                        (t) => html`
-                                            <uui-ref-node
-                                                name=${t.name}
-                                                detail=${t.description ?? ""}
-                                                @open=${() => this.#onSelect(t.alias)}
-                                            >
-                                                <umb-icon slot="icon" name=${t.icon || "icon-plugin"}></umb-icon>
-                                            </uui-ref-node>
-                                        `,
-                                    )}
-                                </uui-ref-list>
-                            </uui-box>
-                        `,
-                    )}
-                </div>
+                <div id="main">${this.#renderBody()}</div>
 
                 <div slot="actions">
                     <uui-button
@@ -101,6 +111,11 @@ export class UaConnectionTypePickerModalElement extends UmbModalBaseElement<neve
 
             .empty {
                 color: var(--uui-color-text-alt);
+                text-align: center;
+            }
+
+            .error {
+                color: var(--uui-color-danger-standalone);
                 text-align: center;
             }
         `,

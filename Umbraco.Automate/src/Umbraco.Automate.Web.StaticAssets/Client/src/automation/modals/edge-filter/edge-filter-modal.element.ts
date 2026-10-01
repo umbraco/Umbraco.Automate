@@ -99,14 +99,14 @@ export class UaEdgeFilterModalElement extends UmbModalBaseElement<
                 ></ua-condition-builder>
                 <div slot="actions">
                     <uui-button
+                        label=${this.localize.term("uaGeneral_close")}
+                        @click=${this.#onClose}
+                    ></uui-button>
+                    <uui-button
                         label=${this.localize.term("uaEdgeFilter_removeFilter")}
                         color="danger"
                         look="secondary"
                         @click=${this.#onRemove}
-                    ></uui-button>
-                    <uui-button
-                        label=${this.localize.term("uaGeneral_close")}
-                        @click=${this.#onClose}
                     ></uui-button>
                     <uui-button
                         label=${this.localize.term("uaGeneral_save")}

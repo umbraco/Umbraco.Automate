@@ -1,6 +1,7 @@
 export { ApiHelpers } from './ApiHelpers';
 export { AutomateUiHelper } from './AutomateUiHelper';
 export { AutomationApiHelper } from './AutomationApiHelper';
+export type { ApprovalOutcome, CreateAutomationOptions, RunLifecycleAction } from './AutomationApiHelper';
 export { automationConnection, automationStep, manualTrigger } from './AutomationBuilder';
 export type { AutomationConnection, AutomationStep } from './AutomationBuilder';
 export { CatalogueApiHelper } from './CatalogueApiHelper';

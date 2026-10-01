@@ -1,12 +1,12 @@
 import { css, html, customElement, state, nothing, repeat, when } from "@umbraco-cms/backoffice/external/lit";
-import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
+import { UmbModalBaseElement, umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import { UaRunDetailServerDataSource } from "../repository/detail/run-detail.server.data-source.js";
 import { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repository.js";
 import { UaAutomationRunsChangedEvent } from "../../automation/events/automation-runs-changed.event.js";
-import { formatDateTime } from "../../core/index.js";
+import { formatDateTime, getRunStatusColor } from "../../core/index.js";
 import { RunsService } from "../../api/sdk.gen.js";
 import type { UaRunDetailModel } from "../types.js";
 import type { UaRunDetailModalData } from "./run-detail-modal.token.js";
@@ -78,24 +78,6 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
         this._loading = false;
     }
 
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            case "WaitingForInput":
-            case "Suspended":
-            // Used for both run and step status here. Either way a refusal is not an error.
-            case "Rejected":
-                return "warning";
-            case "Failed":
-                return "danger";
-            default:
-                return "default";
-        }
-    }
-
     async #onReplay() {
         if (!this._run) return;
         this._replaying = true;
@@ -146,6 +128,21 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
     async #callLifecycle(action: "suspend" | "resume" | "terminate") {
         if (!this._run) return;
+
+        // Suspend and resume can be undone; terminating cannot, so it asks first.
+        if (action === "terminate") {
+            try {
+                await umbConfirmModal(this, {
+                    headline: this.localize.term("uaRun_terminateHeadline"),
+                    content: this.localize.term("uaRun_terminateConfirm"),
+                    color: "danger",
+                    confirmLabel: this.localize.term("uaRun_terminate"),
+                });
+            } catch {
+                return;
+            }
+        }
+
         this._lifecycleBusy = true;
 
         const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
@@ -209,15 +206,21 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                     ? html`<div class="center"><uui-loader></uui-loader></div>`
                     : this._run
                       ? this.#renderContent()
-                      : html`<p class="center">${this.localize.term("uaRun_noRuns")}</p>`}
+                      : html`<p class="center load-error">${this.localize.term("uaRun_loadError")}</p>`}
 
                 <div slot="actions">
+                    <uui-button
+                        label=${this.localize.term("uaGeneral_close")}
+                        @click=${() => this.modalContext?.reject()}
+                    ></uui-button>
                     ${when(
                         this._run?.status === "Running",
                         () => html`
                             <uui-button
+                                look="primary"
+                                color="warning"
                                 label=${this.localize.term("uaRun_suspend")}
-                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                .state=${this._lifecycleBusy ? "waiting" : undefined}
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("suspend")}
                             >
@@ -227,12 +230,14 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                         `,
                     )}
                     ${when(
-                        this._run?.status === "Suspended",
+                        // A run paused on an approval is released by the decision, not by Resume.
+                        this._run?.status === "Suspended" &&
+                            !this._run.stepRuns.some((sr) => sr.status === "WaitingForInput"),
                         () => html`
                             <uui-button
                                 look="primary"
                                 label=${this.localize.term("uaRun_resume")}
-                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                .state=${this._lifecycleBusy ? "waiting" : undefined}
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("resume")}
                             >
@@ -245,9 +250,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                         this._run?.status === "Running" || this._run?.status === "Suspended",
                         () => html`
                             <uui-button
+                                look="primary"
                                 color="danger"
                                 label=${this.localize.term("uaRun_terminate")}
-                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                .state=${this._lifecycleBusy ? "waiting" : undefined}
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("terminate")}
                             >
@@ -256,10 +262,6 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                             </uui-button>
                         `,
                     )}
-                    <uui-button
-                        label=${this.localize.term("uaGeneral_close")}
-                        @click=${() => this.modalContext?.reject()}
-                    ></uui-button>
                     ${when(
                         this._run &&
                             (this._run.status === "Failed" ||
@@ -269,7 +271,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                             <uui-button
                                 look="primary"
                                 label=${this.localize.term("uaRun_replay")}
-                                ?state=${this._replaying ? "waiting" : undefined}
+                                .state=${this._replaying ? "waiting" : undefined}
                                 ?disabled=${this._replaying}
                                 @click=${this.#onReplay}
                             >
@@ -318,7 +320,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                     <uui-box headline=${this.localize.term("uaLabels_runInfo")}>
                         <umb-property-layout label=${this.localize.term("uaLabels_status")} orientation="vertical">
                             <div slot="editor">
-                                <uui-tag color=${this.#statusColor(this._run.status)} look="secondary">
+                                <uui-tag color=${getRunStatusColor(this._run.status)} look="secondary">
                                     ${this._run.status}
                                 </uui-tag>
                             </div>
@@ -388,7 +390,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
             .error-output {
                 background: var(--uui-color-danger-standalone);
-                color: white;
+                color: var(--uui-color-danger-contrast, white);
                 padding: var(--uui-size-space-3);
                 border-radius: var(--uui-border-radius);
                 font-size: var(--uui-size-4);
@@ -403,6 +405,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                 justify-content: center;
                 align-items: center;
                 padding: var(--uui-size-layout-3);
+            }
+
+            .load-error {
+                color: var(--uui-color-danger-standalone);
             }
 
             .empty {
