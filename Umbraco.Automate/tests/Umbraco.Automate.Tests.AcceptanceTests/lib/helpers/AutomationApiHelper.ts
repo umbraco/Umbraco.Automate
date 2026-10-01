@@ -102,6 +102,28 @@ export class AutomationApiHelper {
     return await response.json();
   }
 
+  /* Renames through the API, as another editor saving would. The save bumps the automation's
+   * version, so an editor that loaded it earlier now holds a stale copy. */
+  async rename(id: string, name: string) {
+    const current = await this.getById(id);
+    const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id;
+    const response = await this.api.put(requestUrl, {
+      alias: current.alias,
+      name,
+      description: current.description,
+      groupId: current.groupId,
+      trigger: current.trigger,
+      steps: current.steps,
+      connections: current.connections,
+      canvasState: current.canvasState,
+      notificationSettings: current.notificationSettings,
+      version: current.version
+    });
+    if (!response.ok()) {
+      throw new Error(`Renaming automation ${id} failed (${response.status()}): ${await response.text()}`);
+    }
+  }
+
   /* Publishes through the API. Throws with the server's problem detail on a validation failure,
    * so a spec that seeds a published automation fails on the real reason. */
   async publish(id: string) {
