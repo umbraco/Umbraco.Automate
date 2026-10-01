@@ -5,6 +5,13 @@ All notable changes to Umbraco.Automate.OpenIddict will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.1.5](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@18.1.4...Umbraco.Automate.OpenIddict@18.1.5) (2026-10-01)
+
+### fix
+
+* **oauth:** Add a same-tab fallback when the authentication popup is blocked (#348) ([f679454](https://github.com/umbraco/Umbraco.Automate/commit/f6794547fbc07fbfd698bd86abdadadf9513b989)), closes [#348](https://github.com/umbraco/Umbraco.Automate/issues/348)
+* **oauth:** Bind OAuth credentials to the connection they were authorised for (#361) ([1e753a4](https://github.com/umbraco/Umbraco.Automate/commit/1e753a4fca39f348a7131c6ff24face0c5df7f3e)), closes [#361](https://github.com/umbraco/Umbraco.Automate/issues/361)
+
 ## [18.1.4](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@18.1.3...Umbraco.Automate.OpenIddict@18.1.4) (2026-09-02)
 
 ### Internal
