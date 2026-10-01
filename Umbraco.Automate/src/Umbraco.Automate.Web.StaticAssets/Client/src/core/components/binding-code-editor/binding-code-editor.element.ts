@@ -97,9 +97,21 @@ export class UaBindingCodeEditorElement
      * public `insert()`. Monaco retains its selection state even after losing DOM focus
      * (e.g. while the binding-picker modal is open), so — unlike the textarea/text-box
      * variants — no manual caret capture-on-blur is needed here.
+     *
+     * Monaco loads asynchronously, and until it has, `insert()` is a silent no-op — so an
+     * expression picked while the editor is still loading would be lost. In that window there
+     * is no caret to honour, so append to the value instead; `.code` hands it to Monaco once
+     * it loads.
      */
     public insertAtCaret(expression: string): void {
-        this.#codeEditorRef.value?.insert(expression);
+        const codeEditor = this.#codeEditorRef.value;
+        if (codeEditor?.editor?.monacoEditor) {
+            codeEditor.insert(expression);
+            return;
+        }
+
+        this.value = `${(this.value as string) ?? ""}${expression}`;
+        this.dispatchEvent(new UmbChangeEvent());
     }
 
     #onInput(event: Event) {
