@@ -50,7 +50,15 @@ public sealed class CreateWorkspaceController : WorkspaceControllerBase
 
         var workspace = _mapper.Map<Core.Workspaces.Workspace>(requestModel)!;
 
-        var created = await _workspaceService.CreateWorkspaceAsync(workspace, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        Core.Workspaces.Workspace created;
+        try
+        {
+            created = await _workspaceService.CreateWorkspaceAsync(workspace, CurrentUserKey(_backOfficeSecurityAccessor), cancellationToken);
+        }
+        catch (WorkspaceServiceAccountValidationException ex)
+        {
+            return InvalidServiceAccount(ex);
+        }
 
         return CreatedAtAction(
             nameof(ByIdWorkspaceController.GetWorkspaceById),
