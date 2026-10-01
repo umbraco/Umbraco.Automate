@@ -2,7 +2,7 @@ import { css, html, customElement, property, repeat, state, when } from "@umbrac
 import { UmbLitElement, umbFocus } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
-import type { BindingLeaf } from "../../utils/binding-schema.utils.js";
+import { formatSchemaType, type BindingLeaf } from "../../utils/binding-schema.utils.js";
 
 /**
  * Picker component that displays available binding sources grouped by origin
@@ -33,16 +33,12 @@ export class UaBindingPickerElement extends UmbLitElement {
         );
     }
 
-    // Builds the text shown in the `detail` slot: the type alone when the property carries no
-    // description (so an undescribed property renders exactly as it did before this existed),
-    // or the type followed by the description, with any enum values listed at the end so users
-    // can see which values are actually allowed.
+    // Builds the text shown in the `detail` slot: the readable type and the description, either
+    // of which may be missing, with any enum values listed at the end so users can see which
+    // values are actually allowed.
     #formatDetail(leaf: BindingLeaf): string {
-        let detail = leaf.type;
-
-        if (leaf.description) {
-            detail += ` — ${leaf.description}`;
-        }
+        const type = formatSchemaType(leaf.type);
+        let detail = [type, leaf.description].filter(Boolean).join(" — ");
 
         if (leaf.enum && leaf.enum.length > 0) {
             detail += ` (one of: ${leaf.enum.join(", ")})`;

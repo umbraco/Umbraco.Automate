@@ -161,6 +161,7 @@ export default {
         replay: "Replay",
         replayStarted: "Run replayed",
         replayFailed: "Replay failed",
+        replayRequiresPublished: "Publish the automation to replay its runs",
         suspend: "Suspend",
         resume: "Resume",
         terminate: "Terminate",

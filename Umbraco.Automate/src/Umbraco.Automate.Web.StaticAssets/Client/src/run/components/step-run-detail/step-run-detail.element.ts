@@ -79,8 +79,11 @@ export class UaStepRunDetailElement extends UmbLitElement {
 
     #formatDuration(ms: number | null): string {
         if (ms == null) return "-";
-        if (ms < 1000) return `${ms}ms`;
-        const seconds = Math.floor(ms / 1000);
+        // The server sends fractional milliseconds (e.g. 3.1027); show whole ones, like the runs list.
+        if (ms < 1) return "<1ms";
+        const wholeMs = Math.round(ms);
+        if (wholeMs < 1000) return `${wholeMs}ms`;
+        const seconds = Math.floor(wholeMs / 1000);
         if (seconds < 60) return `${seconds}s`;
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;

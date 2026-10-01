@@ -89,6 +89,11 @@ export class AutomateUiHelper {
     return this.page.locator('umb-workspace-editor');
   }
 
+  /* The back arrow in the workspace (management) editor header. */
+  get workspaceEditorBackButton(): Locator {
+    return this.page.locator('ua-workspace-mgmt-workspace-editor #header > uui-button');
+  }
+
   get nameInput(): Locator {
     return this.page.getByRole('textbox', { name: 'Name', exact: true });
   }
@@ -340,6 +345,13 @@ export class AutomateUiHelper {
       .locator(`uui-ref-node[name="${path}"]`);
   }
 
+  /* The `detail` text of every leaf in the open binding picker. */
+  async bindingLeafDetails(): Promise<string[]> {
+    return await this.bindingPicker
+      .locator('uui-ref-node')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('detail') ?? ''));
+  }
+
   /* Picks a leaf in the open binding picker, which inserts its expression and closes the picker. */
   async chooseBindingLeaf(stepAlias: string, path: string) {
     await this.clickInModal(this.bindingLeaf(stepAlias, path).getByRole('button').first());
@@ -389,6 +401,16 @@ export class AutomateUiHelper {
    * of them shows depends on the run's status, so assert presence and absence here. */
   runDetailAction(label: string): Locator {
     return this.runDetailModal.locator('[slot="actions"]').getByRole('button', { name: label, exact: true });
+  }
+
+  /* The run-level error in the open run detail modal's Run Info sidebar. */
+  get runDetailError(): Locator {
+    return this.runDetailModal.locator('.sidebar .error-output');
+  }
+
+  /* The duration shown in a step run's header. */
+  runDetailStepDuration(index: number): Locator {
+    return this.runDetailStep(index).locator('.step-duration');
   }
 
   /* The open tab's content in a step run. */
