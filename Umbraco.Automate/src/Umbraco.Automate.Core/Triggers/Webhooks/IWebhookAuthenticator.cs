@@ -37,6 +37,20 @@ public interface IWebhookAuthenticator
     bool RequiresBody { get; }
 
     /// <summary>
+    /// Gets the names of the request headers that carry this strategy's credential, such as a
+    /// shared secret. They are left out of the trigger output, so the credential is never stored
+    /// with a run or passed to steps. List a body signature here too unless the strategy rejects
+    /// replays, since a stored signature and body together form a request that would still pass.
+    /// </summary>
+    IReadOnlyCollection<string> CredentialHeaderNames => [];
+
+    /// <summary>
+    /// Gets the names of the query string parameters that carry this strategy's credential.
+    /// They are left out of the trigger output for the same reason as <see cref="CredentialHeaderNames"/>.
+    /// </summary>
+    IReadOnlyCollection<string> CredentialQueryParameterNames => [];
+
+    /// <summary>
     /// Gets the CLR type of the authenticator's settings model (e.g.
     /// <c>PlainSecretWebhookAuthenticatorSettings</c>). Returns <c>null</c> when the strategy
     /// has no configuration.
@@ -90,6 +104,12 @@ public abstract class WebhookAuthenticatorBase<TSettings> : IWebhookAuthenticato
 
     /// <inheritdoc />
     public virtual bool RequiresBody => true;
+
+    /// <inheritdoc />
+    public virtual IReadOnlyCollection<string> CredentialHeaderNames => [];
+
+    /// <inheritdoc />
+    public virtual IReadOnlyCollection<string> CredentialQueryParameterNames => [];
 
     /// <inheritdoc />
     public Type? SettingsType => typeof(TSettings);
