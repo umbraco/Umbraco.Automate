@@ -250,6 +250,21 @@ public static partial class UmbracoBuilderExtensions
             {
                 PostRouting = app => app.UseRateLimiter(),
             });
+
+            // Buffer webhook bodies before routing. Umbraco's endpoint matching reads the form of a
+            // form-encoded request (looking for a `ufprt` token), which consumes the stream, so the
+            // endpoint could not otherwise read the raw body it hands to the automation.
+            options.AddFilter(new UmbracoPipelineFilter(
+                "UmbracoAutomateWebhookBodyBuffering")
+            {
+                PreRouting = app => app.UseWhen(
+                    context => context.Request.Path.StartsWithSegments("/" + Constants.WebhookApi.RoutePath),
+                    branch => branch.Use((context, next) =>
+                    {
+                        context.Request.EnableBuffering();
+                        return next(context);
+                    })),
+            });
         });
 
         return builder;

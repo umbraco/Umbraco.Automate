@@ -14,6 +14,7 @@ using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Automate.Web.Api.Webhook.Controllers;
 
 namespace Umbraco.Automate.Tests.Unit.Webhook;
@@ -58,22 +59,25 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_AutomationNotFound_Returns404()
+    public async Task ReceiveWebhook_AutomationNotFound_Returns401()
     {
+        // An unknown automation answers like a bad credential, so a caller can't probe for IDs.
         _automationService.Setup(s => s.GetAutomationAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Automation?)null);
 
         var result = await _controller.ReceiveWebhook(Guid.NewGuid(), CancellationToken.None);
 
-        result.ShouldBeOfType<NotFoundResult>();
+        result.ShouldBeOfType<UnauthorizedResult>();
     }
 
     [Fact]
     public async Task ReceiveWebhook_AutomationNotPublished_Returns409()
     {
-        var automation = CreateAutomation(AutomationStatus.Draft);
+        var automation = CreateAutomationWithSecret("tok", AutomationStatus.Draft);
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
 
         var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
@@ -83,9 +87,11 @@ public class WebhookEndpointControllerTests
     [Fact]
     public async Task ReceiveWebhook_AutomationUnpublished_Returns409()
     {
-        var automation = CreateAutomation(AutomationStatus.Unpublished);
+        var automation = CreateAutomationWithSecret("tok", AutomationStatus.Unpublished);
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
 
         var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
@@ -93,7 +99,20 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_TriggerNotWebhook_Returns404()
+    public async Task ReceiveWebhook_AutomationUnpublished_WithoutSecret_Returns401()
+    {
+        // The publish state is only reported to an authenticated caller.
+        var automation = CreateAutomationWithSecret("tok", AutomationStatus.Unpublished);
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<UnauthorizedResult>();
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_TriggerNotWebhook_Returns401()
     {
         var automation = CreateAutomation(triggerAlias: "umbracoAutomate.manual");
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
@@ -101,13 +120,29 @@ public class WebhookEndpointControllerTests
 
         var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
-        result.ShouldBeOfType<NotFoundResult>();
+        result.ShouldBeOfType<UnauthorizedResult>();
     }
 
     [Fact]
     public async Task ReceiveWebhook_MethodNotAllowed_Returns405()
     {
-        var automation = CreateAutomation();
+        var automation = CreateAutomationWithSecret("tok");
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Method = "DELETE";
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe(405);
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_MethodNotAllowed_WithoutSecret_Returns401()
+    {
+        // The allowed method is only reported to an authenticated caller.
+        var automation = CreateAutomationWithSecret("tok");
         _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
@@ -115,7 +150,149 @@ public class WebhookEndpointControllerTests
 
         var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
-        result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe(405);
+        result.ShouldBeOfType<UnauthorizedResult>();
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_PayloadTooLarge_Returns413BeforeLookingUpTheAutomation()
+    {
+        // Size is checked first, so an oversized request gets the same answer for every automation.
+        _controller.ControllerContext.HttpContext.Request.ContentLength = new WebhookOptions().MaxPayloadBytes + 1;
+
+        var result = await _controller.ReceiveWebhook(Guid.NewGuid(), CancellationToken.None);
+
+        result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe(413);
+        _automationService.Verify(s => s.GetAutomationAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_ChunkedBody_IsRead()
+    {
+        // A chunked request has no Content-Length, but still has a body.
+        var automation = CreateAutomationWithSecret("tok");
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
+        SetRequestBody("""{"chunked":true}""");
+        _controller.ControllerContext.HttpContext.Request.ContentLength = null;
+
+        var captured = CaptureDispatchedOutput();
+
+        await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        captured().ShouldNotBeNull();
+        captured()!.Body.ShouldBe("""{"chunked":true}""");
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_ChunkedBodyOverTheLimit_Returns413()
+    {
+        var automation = CreateAutomationWithSecret("tok");
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
+        SetRequestBody(new string('b', (int)new WebhookOptions().MaxPayloadBytes + 1));
+        _controller.ControllerContext.HttpContext.Request.ContentLength = null;
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe(413);
+        _dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_RewindsABodyAlreadyReadByRouting()
+    {
+        // Umbraco's routing parses a form-encoded body before the action runs. The body is
+        // buffered for this route, so the action rewinds it rather than reading an empty stream.
+        var automation = CreateAutomationWithSecret("tok");
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
+        SetRequestBody("a=1&b=two");
+        _controller.ControllerContext.HttpContext.Request.ContentType = "application/x-www-form-urlencoded";
+        _controller.ControllerContext.HttpContext.Request.Body.Seek(0, SeekOrigin.End);
+
+        var captured = CaptureDispatchedOutput();
+
+        await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        captured().ShouldNotBeNull();
+        captured()!.Body.ShouldBe("a=1&b=two");
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_LeavesSecretHeaderOutOfTheOutput()
+    {
+        // The output is stored with the run and readable by steps, so the credential must not be in it.
+        var automation = CreateAutomationWithSecret("tok");
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["x-webhook-secret"] = "tok";
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Request-Id"] = "abc";
+
+        var captured = CaptureDispatchedOutput();
+
+        await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        captured().ShouldNotBeNull();
+        captured()!.Headers.Keys.ShouldNotContain(k => k.Equals("X-Webhook-Secret", StringComparison.OrdinalIgnoreCase));
+        captured()!.Headers["X-Request-Id"].ShouldBe("abc");
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_LeavesSecretQueryParameterOutOfTheOutput()
+    {
+        var automation = CreateAutomationWithSecret("tok");
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?secret=tok&foo=bar");
+
+        var captured = CaptureDispatchedOutput();
+
+        await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        captured().ShouldNotBeNull();
+        captured()!.Query.Keys.ShouldNotContain("secret");
+        captured()!.Query["foo"].ShouldBe("bar");
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_KeepsHmacSignatureHeaderInTheOutput()
+    {
+        // A signature is derived from the body, not a credential, so it stays available to steps.
+        var key = "hmac-secret-key";
+        var automation = CreateAutomation(
+            authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new HmacSha256WebhookAuthenticatorSettings { SigningKey = key });
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var body = """{"event":"test"}""";
+        SetRequestBody(body);
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Signature"] = $"sha256={ComputeHmacSha256(body, key)}";
+
+        var captured = CaptureDispatchedOutput();
+
+        await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        captured().ShouldNotBeNull();
+        captured()!.Headers.Keys.ShouldContain("X-Webhook-Signature");
+    }
+
+    [Fact]
+    public void ReceiveWebhook_DisablesFormValueModelBinding()
+    {
+        // Without this, MVC reads a form-encoded body into its form value providers before the
+        // action runs, and the action then reads an empty stream.
+        var action = typeof(WebhookEndpointController).GetMethod(nameof(WebhookEndpointController.ReceiveWebhook))!;
+
+        action.GetCustomAttributes(typeof(DisableFormValueModelBindingAttribute), inherit: false).ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -383,6 +560,22 @@ public class WebhookEndpointControllerTests
 
         result.ShouldBeOfType<AcceptedResult>();
     }
+
+    private Func<WebhookTriggerOutput?> CaptureDispatchedOutput()
+    {
+        WebhookTriggerOutput? captured = null;
+        _dispatcher.Setup(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<TriggerEvent, CancellationToken>((e, _) => captured = (e as TriggerEvent<WebhookTriggerOutput>)?.Output)
+            .Returns(Task.CompletedTask);
+
+        return () => captured;
+    }
+
+    private static Automation CreateAutomationWithSecret(string secret, AutomationStatus status = AutomationStatus.Published)
+        => CreateAutomation(
+            status,
+            authenticatorAlias: PlainSecretWebhookAuthenticator.WellKnownAlias,
+            authenticatorSettings: new PlainSecretWebhookAuthenticatorSettings { Secret = secret });
 
     private void SetRequestBody(string body)
     {
