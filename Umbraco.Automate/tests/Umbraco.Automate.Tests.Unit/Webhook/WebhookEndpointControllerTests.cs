@@ -263,9 +263,9 @@ public class WebhookEndpointControllerTests
     }
 
     [Fact]
-    public async Task ReceiveWebhook_KeepsHmacSignatureHeaderInTheOutput()
+    public async Task ReceiveWebhook_LeavesHmacSignatureHeaderOutOfTheOutput()
     {
-        // A signature is derived from the body, not a credential, so it stays available to steps.
+        // The signature covers only the body, so a stored signature and body could be replayed.
         var key = "hmac-secret-key";
         var automation = CreateAutomation(
             authenticatorAlias: HmacSha256WebhookAuthenticator.WellKnownAlias,
@@ -282,7 +282,26 @@ public class WebhookEndpointControllerTests
         await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
 
         captured().ShouldNotBeNull();
-        captured()!.Headers.Keys.ShouldContain("X-Webhook-Signature");
+        captured()!.Headers.Keys.ShouldNotContain("X-Webhook-Signature");
+        captured()!.Body.ShouldBe(body);
+    }
+
+    [Fact]
+    public async Task ReceiveWebhook_ServerBodySizeLimitTripped_Returns413()
+    {
+        // The limit set before routing makes the server throw on a read past it.
+        var automation = CreateAutomationWithSecret("tok");
+        _automationService.Setup(s => s.GetAutomationAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        _controller.ControllerContext.HttpContext.Request.Headers["X-Webhook-Secret"] = "tok";
+        _controller.ControllerContext.HttpContext.Request.Body = new ThrowingStream(
+            new BadHttpRequestException("Request body too large.", StatusCodes.Status413PayloadTooLarge));
+
+        var result = await _controller.ReceiveWebhook(automation.Id, CancellationToken.None);
+
+        result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe(413);
+        _dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -583,6 +602,17 @@ public class WebhookEndpointControllerTests
         _controller.ControllerContext.HttpContext.Request.Body = new MemoryStream(bytes);
         _controller.ControllerContext.HttpContext.Request.ContentLength = bytes.Length;
         _controller.ControllerContext.HttpContext.Request.ContentType = "application/json";
+    }
+
+    private sealed class ThrowingStream(Exception exception) : MemoryStream
+    {
+        public override int Read(byte[] buffer, int offset, int count) => throw exception;
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            => throw exception;
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => throw exception;
     }
 
     private static string ComputeHmacSha256(string payload, string secret)

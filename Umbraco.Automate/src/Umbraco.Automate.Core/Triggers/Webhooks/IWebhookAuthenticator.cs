@@ -39,8 +39,8 @@ public interface IWebhookAuthenticator
     /// <summary>
     /// Gets the names of the request headers that carry this strategy's credential, such as a
     /// shared secret. They are left out of the trigger output, so the credential is never stored
-    /// with a run or passed to steps. A signature computed from the body is not a credential and
-    /// need not be listed.
+    /// with a run or passed to steps. List a body signature here too unless the strategy rejects
+    /// replays, since a stored signature and body together form a request that would still pass.
     /// </summary>
     IReadOnlyCollection<string> CredentialHeaderNames => [];
 

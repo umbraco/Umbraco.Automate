@@ -16,6 +16,7 @@ using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Realtime;
+using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 using Umbraco.Automate.Web.Api.Management.Common.Configuration;
@@ -251,19 +252,13 @@ public static partial class UmbracoBuilderExtensions
                 PostRouting = app => app.UseRateLimiter(),
             });
 
-            // Buffer webhook bodies before routing. Umbraco's endpoint matching reads the form of a
-            // form-encoded request (looking for a `ufprt` token), which consumes the stream, so the
-            // endpoint could not otherwise read the raw body it hands to the automation.
+            // Limit and buffer webhook bodies before routing, which reads the form of a form-encoded request.
             options.AddFilter(new UmbracoPipelineFilter(
-                "UmbracoAutomateWebhookBodyBuffering")
+                "UmbracoAutomateWebhookRequestBody")
             {
                 PreRouting = app => app.UseWhen(
                     context => context.Request.Path.StartsWithSegments("/" + Constants.WebhookApi.RoutePath),
-                    branch => branch.Use((context, next) =>
-                    {
-                        context.Request.EnableBuffering();
-                        return next(context);
-                    })),
+                    branch => branch.UseMiddleware<WebhookRequestBodyMiddleware>()),
             });
         });
 

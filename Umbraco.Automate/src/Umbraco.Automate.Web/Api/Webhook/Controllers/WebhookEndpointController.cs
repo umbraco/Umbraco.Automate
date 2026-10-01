@@ -148,6 +148,11 @@ public sealed class WebhookEndpointController : ControllerBase
             {
                 return PayloadTooLarge(maxPayloadBytes);
             }
+            catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
+            {
+                // The server's own limit, set before routing, tripped first.
+                return PayloadTooLarge(maxPayloadBytes);
+            }
 
             if (body.Length == 0)
             {
