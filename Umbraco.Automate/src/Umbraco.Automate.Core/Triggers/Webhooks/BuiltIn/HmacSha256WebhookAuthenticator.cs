@@ -19,6 +19,13 @@ public sealed class HmacSha256WebhookAuthenticator : WebhookAuthenticatorBase<Hm
     internal const string SignatureHeaderName = "X-Webhook-Signature";
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The signature covers only the body, so a stored signature and body together could be
+    /// replayed to the endpoint.
+    /// </remarks>
+    public override IReadOnlyCollection<string> CredentialHeaderNames => [SignatureHeaderName];
+
+    /// <inheritdoc />
     protected override bool Validate(WebhookAuthenticationContext context, HmacSha256WebhookAuthenticatorSettings settings)
     {
         if (string.IsNullOrEmpty(settings.SigningKey))

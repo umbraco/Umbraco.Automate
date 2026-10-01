@@ -22,6 +22,12 @@ public sealed class PlainSecretWebhookAuthenticator : WebhookAuthenticatorBase<P
     public override bool RequiresBody => false;
 
     /// <inheritdoc />
+    public override IReadOnlyCollection<string> CredentialHeaderNames => [SecretHeaderName];
+
+    /// <inheritdoc />
+    public override IReadOnlyCollection<string> CredentialQueryParameterNames => [SecretQueryParam];
+
+    /// <inheritdoc />
     protected override bool Validate(WebhookAuthenticationContext context, PlainSecretWebhookAuthenticatorSettings settings)
     {
         if (string.IsNullOrEmpty(settings.Secret))
