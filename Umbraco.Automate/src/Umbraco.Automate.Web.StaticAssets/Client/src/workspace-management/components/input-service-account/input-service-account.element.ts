@@ -49,9 +49,9 @@ export class UaInputServiceAccountElement extends UmbFormControlMixin<string | u
     constructor() {
         super();
 
-        // The user picker's collection view ignores `filter` and only honours `pickableFilter`, which
-        // leaves other users visible but not selectable. Set both so they're hidden wherever the
-        // picker supports it.
+        // The user picker applies only `pickableFilter`, so other users stay listed but can't be
+        // selected. It ignores `filter` in every view (umbraco/Umbraco-CMS#24049); it's set so they
+        // are hidden once that's fixed, at which point this element can go back to `<umb-user-input>`.
         const isApiUser = (user: UmbUserDetailModel) => user.kind === UmbUserKind.API;
         this.#pickerContext.max = 1;
         this.#pickerContext.setModalData({ filter: isApiUser, pickableFilter: isApiUser });
