@@ -83,16 +83,16 @@
 }
 
 .ua-action-bar__btn--active {
-    color: var(--uui-color-warning, #f59e0b);
+    color: var(--uui-color-warning-standalone, #f59e0b);
 }
 
 .ua-action-bar__btn--danger:hover {
     background: var(--uui-color-danger, #dc2626);
-    color: #fff;
+    color: var(--uui-color-danger-contrast, #fff);
 }
 
 .ua-action-bar__btn uui-icon {
-    font-size: 14px;
+    font-size: var(--uui-type-default-size, 14px);
 }
 
 /* Node action-bar — show on node hover only */
@@ -110,7 +110,7 @@
 .ua-node__title {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--uui-size-space-1, 3px);
     flex: 1;
     min-width: 0;
 }
@@ -151,7 +151,7 @@
     padding-left: calc(var(--uui-size-space-4, 12px) + 4px);
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--uui-size-space-1, 3px);
 }
 
 .ua-node__body:empty {
@@ -166,7 +166,7 @@
 .ua-node__chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--uui-size-space-1, 3px);
     min-width: 0;
 }
 
@@ -176,8 +176,8 @@
     font-size: 11px;
     color: var(--uui-color-text-alt, #6b7280);
     background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
-    padding: 1px 6px;
-    border-radius: 3px;
+    padding: 1px var(--uui-size-space-2, 6px);
+    border-radius: var(--uui-border-radius, 3px);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -264,14 +264,14 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    font-size: 12px;
+    font-size: var(--uui-size-4, 12px);
 }
 
 /* Handle labels for branching nodes */
 .ua-node__handle-labels {
     display: flex;
     justify-content: space-around;
-    padding: 2px 8px 6px;
+    padding: var(--uui-size-space-1, 3px) var(--uui-size-space-3, 9px) var(--uui-size-space-2, 6px);
     font-size: 10px;
     color: var(--uui-color-text-alt, #6b7280);
     text-transform: uppercase;
@@ -307,7 +307,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 12px;
+    font-size: var(--uui-size-4, 12px);
     color: var(--uui-color-text-alt, #6b7280);
 }
 
@@ -361,6 +361,22 @@
     background: var(--uui-color-interactive, #1b264f);
 }
 
+/* Minimap — framed like a node card in both modes. */
+.react-flow__minimap {
+    border: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    border-radius: var(--uui-border-radius, 3px);
+    box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24));
+    overflow: hidden;
+}
+
+/* In light mode React Flow draws the minimap white-on-white with a near-invisible viewport
+ * mask, so darken the mask enough to read. Dark mode's default colours already contrast. */
+.react-flow:not(.dark) .react-flow__minimap {
+    --xy-minimap-background-color: var(--uui-color-surface, #fff);
+    --xy-minimap-mask-background-color: rgba(0, 0, 0, 0.08);
+    --xy-minimap-mask-stroke-color: var(--uui-color-border, #c4c4c4);
+}
+
 /* Dark mode */
 .dark .ua-node {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -368,6 +384,10 @@
 
 .dark .ua-node:hover {
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.5);
+}
+
+.dark .react-flow__minimap {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* A step with no path from the trigger: the compiler drops it and it never runs. */
@@ -379,20 +399,20 @@
 
 /* Run status overlays */
 .run-status-completed .ua-node {
-    border-color: #22c55e;
+    border-color: var(--uui-color-positive-standalone, #22c55e);
 }
 
 .run-status-running .ua-node {
-    border-color: #f59e0b;
+    border-color: var(--uui-color-warning-standalone, #f59e0b);
 }
 
 .run-status-failed .ua-node {
-    border-color: #ef4444;
+    border-color: var(--uui-color-danger-standalone, #ef4444);
 }
 
 .run-status-waitingforinput .ua-node {
-    border-color: #f59e0b;
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+    border-color: var(--uui-color-warning-standalone, #f59e0b);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--uui-color-warning-standalone, #f59e0b) 30%, transparent);
 }
 
 .run-status-pending .ua-node {
@@ -406,6 +426,6 @@
 
 /* An approval that was refused. Amber rather than red — the step worked, the answer was no. */
 .run-status-rejected .ua-node {
-    border-color: #f59e0b;
+    border-color: var(--uui-color-warning-standalone, #f59e0b);
     border-style: dashed;
 }

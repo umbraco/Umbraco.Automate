@@ -158,7 +158,15 @@ internal sealed class AutomationRunService : IAutomationRunService
             return RunLifecycleResult.NoWorkflowInstance;
         }
 
-        await _workflowHost.ResumeWorkflow(run.WorkflowInstanceId);
+        // WorkflowCore only resumes a workflow it suspended itself. A run suspended while a step
+        // waits for an approval has a Runnable workflow, and only the decision can release it —
+        // marking the run Running here would misreport a run that is still waiting.
+        if (!await _workflowHost.ResumeWorkflow(run.WorkflowInstanceId))
+        {
+            _logger.LogWarning(
+                "Cannot resume run {RunId}: its workflow is not suspended (it may be waiting for input)", runId);
+            return RunLifecycleResult.InvalidState;
+        }
 
         run.Status = AutomationRunStatus.Running;
         await _runRepository.SaveAsync(run, cancellationToken);

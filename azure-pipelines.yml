@@ -243,6 +243,13 @@ stages:
       jobs:
           - job: AcceptanceTests
             displayName: Run Playwright Acceptance Tests
+            # Sharded across parallel agents, each with its own demo site and LocalDB. The
+            # specs share site data and the suite runs one worker, so shards cannot share a
+            # site; splitting across agents is what makes them run concurrently. Playwright
+            # splits by test (fullyParallel in playwright.config.ts, --shard below), and every shard runs
+            # auth.setup.ts itself.
+            strategy:
+                parallel: 4
             # Windows agents build more slowly, and the first boot against a cold LocalDB
             # creates the database and runs the full unattended install.
             timeoutInMinutes: 60
@@ -256,6 +263,10 @@ stages:
                 ASPNETCORE_ENVIRONMENT: Development
                 ASPNETCORE_URLS: https://localhost:44380
                 PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
+                # Cached below. Each shard otherwise restored NuGet cold three times (~1:20) and ran
+                # two cold `npm ci` (~1:50), a large share of its ~7:30 of setup (build 289743).
+                NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+                npm_config_cache: $(Pipeline.Workspace)/.npm
                 acceptanceDir: $(Build.SourcesDirectory)/Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
                 # Override the scaffold's SQLite connection string. Automate shares it
                 # (Umbraco:Automate:UseNamedConnectionString = umbracoDbDSN), so this moves
@@ -271,6 +282,22 @@ stages:
                 - checkout: self
                   fetchDepth: 0
 
+                # Started now and left running, so its 10-30s boot overlaps the builds instead of
+                # sitting on the critical path. "Wait for SQL Server LocalDB" below checks it is up.
+                - pwsh: |
+                      Start-Process SqlLocalDB -ArgumentList 'start', 'MSSQLLocalDB' -WindowStyle Hidden
+                      Write-Host "SQL Server LocalDB starting in the background"
+                  displayName: Start SQL Server LocalDB (background)
+
+                # The SDK global.json pins is not on the hosted image, so UseDotNet downloaded and
+                # extracted it on every shard (24-59s). UseDotNet finds a cached copy in its tool
+                # directory and skips the download.
+                - task: Cache@2
+                  displayName: Cache .NET SDK
+                  inputs:
+                      key: 'dotnet-sdk | "$(Agent.OS)" | global.json'
+                      path: $(Agent.ToolsDirectory)/dotnet
+
                 - task: UseDotNet@2
                   displayName: Setup .NET
                   inputs:
@@ -280,6 +307,27 @@ stages:
                   displayName: Setup Node.js
                   inputs:
                       version: $(NODE_VERSION)
+
+                # One npm cache for both installs: the frontend at the repo root and the acceptance
+                # test packages. The Build stage's npm and NuGet caches are keyed on its Linux agent,
+                # so these Windows jobs keep their own. PR builds read what their target branch saved.
+                - task: Cache@2
+                  displayName: Cache npm
+                  inputs:
+                      key: 'npm | "$(Agent.OS)" | package-lock.json | Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests/package-lock.json'
+                      restoreKeys: |
+                          npm | "$(Agent.OS)"
+                      path: $(npm_config_cache)
+
+                # Versions live in Directory.Packages.props; the demo site's own packages (the
+                # Umbraco template, Clean, WorktreeDevPort) come from install-demo-site.ps1.
+                - task: Cache@2
+                  displayName: Cache NuGet packages
+                  inputs:
+                      key: 'nuget | "$(Agent.OS)" | Directory.Packages.props | scripts/install-demo-site.ps1'
+                      restoreKeys: |
+                          nuget | "$(Agent.OS)"
+                      path: $(NUGET_PACKAGES)
 
                 # Builds the wwwroot bundles the demo site serves. Without this the
                 # Automate section silently fails to register and every UI spec fails
@@ -292,7 +340,8 @@ stages:
                       npm run build
                   displayName: Build frontend
 
-                - pwsh: ./scripts/install-demo-site.ps1
+                # -SkipSolution: CI builds the demo project directly and never opens the local .slnx.
+                - pwsh: ./scripts/install-demo-site.ps1 -SkipSolution
                   displayName: Scaffold demo site
 
                 # The demo lives under demos/vN where N comes from Umbraco.Cms.Core in
@@ -313,8 +362,20 @@ stages:
                 - script: dotnet build "$(demoProject)" --configuration Release
                   displayName: Build demo site
 
-                - pwsh: SqlLocalDB start MSSQLLocalDB
-                  displayName: Start SQL Server LocalDB
+                # Started in the background at the top of the job; by now it has usually been up for
+                # minutes, so this normally returns at once. Falls back to a blocking start if the
+                # background start did not take.
+                - pwsh: |
+                      for ($i = 0; $i -lt 60; $i++) {
+                        if ((SqlLocalDB info MSSQLLocalDB) -match 'State:\s+Running') {
+                          Write-Host "SQL Server LocalDB is running (check $i)"
+                          exit 0
+                        }
+                        Start-Sleep -Seconds 1
+                      }
+                      Write-Host "LocalDB not running after 60s; starting it in the foreground"
+                      SqlLocalDB start MSSQLLocalDB
+                  displayName: Wait for SQL Server LocalDB
 
                 # Keyed on the acceptance package-lock, which pins the Playwright
                 # version that determines the required browser build.
@@ -368,14 +429,16 @@ stages:
 
                 # First boot creates the LocalDB database and runs the unattended install and
                 # the Automate schema migrations, so allow generous time before calling it a failure.
+                # Polls every 3s (was 10s): the site is usually up in 20-35s, so a coarse poll
+                # added up to 10s of idle wait per shard.
                 - pwsh: |
-                      for ($i = 0; $i -lt 90; $i++) {
+                      for ($i = 0; $i -lt 300; $i++) {
                         try {
                           Invoke-WebRequest "$(ASPNETCORE_URLS)/umbraco" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 10 | Out-Null
                           Write-Host "Demo site is up (attempt $i)"
                           exit 0
                         } catch {
-                          Start-Sleep -Seconds 10
+                          Start-Sleep -Seconds 3
                         }
                       }
                       Write-Host "##vso[task.logissue type=error]Demo site did not respond within 15 minutes"
@@ -384,8 +447,8 @@ stages:
                       exit 1
                   displayName: Wait for demo site
 
-                - script: npx playwright test DefaultConfig
-                  displayName: Run acceptance tests
+                - script: npx playwright test DefaultConfig --shard=$(System.JobPositionInPhase)/$(System.TotalJobsInPhase)
+                  displayName: Run acceptance tests (shard $(System.JobPositionInPhase) of $(System.TotalJobsInPhase))
                   workingDirectory: $(acceptanceDir)
 
                 # always(), so the site is also stopped after a failed or cancelled test step.
@@ -408,21 +471,21 @@ stages:
                   inputs:
                       testResultsFormat: JUnit
                       testResultsFiles: "$(acceptanceDir)/results/results.xml"
-                      testRunTitle: Acceptance Tests
+                      testRunTitle: Acceptance Tests (shard $(System.JobPositionInPhase))
                       mergeTestResults: true
 
                 # Traces, screenshots and video for every failed test, plus the site
                 # logs, because a UI failure is rarely diagnosable from the error alone.
                 # always(), as in Forms: a job killed by its timeout is cancelled, and a
                 # cancelled job skips steps whose condition does not include always(), so
-                # the run that most needs diagnosing would upload nothing. The attempt number
-                # keeps a re-run from colliding with the first attempt's artifact.
+                # the run that most needs diagnosing would upload nothing. The shard and attempt
+                # numbers keep shards and re-runs from colliding on the same artifact name.
                 - task: PublishPipelineArtifact@1
                   displayName: Upload failure diagnostics
                   condition: always()
                   inputs:
                       targetPath: $(acceptanceDir)/results
-                      artifact: acceptance-test-results - Attempt $(System.JobAttempt)
+                      artifact: acceptance-test-results - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
                 - task: PublishPipelineArtifact@1
@@ -430,7 +493,7 @@ stages:
                   condition: always()
                   inputs:
                       targetPath: $(Build.ArtifactStagingDirectory)
-                      artifact: acceptance-demo-site-log - Attempt $(System.JobAttempt)
+                      artifact: acceptance-demo-site-log - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
     # ============================================================

@@ -2,7 +2,7 @@ import { css, html, customElement, state } from "@umbraco-cms/backoffice/externa
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
-import { formatDateTime } from "../../../core/index.js";
+import { formatDateTime, getRunStatusColor, onActivateKey } from "../../../core/index.js";
 import { UA_RUN_DETAIL_MODAL } from "../../../run/modals/run-detail-modal.token.js";
 
 export interface UaActivityItem {
@@ -16,21 +16,6 @@ export interface UaActivityItem {
 export class UaActivityListElement extends UmbLitElement {
     @state()
     items: UaActivityItem[] = [];
-
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            case "Rejected":
-                return "warning";
-            case "Failed":
-                return "danger";
-            default:
-                return "default";
-        }
-    }
 
     async #openRunModal(runId: string) {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
@@ -47,9 +32,15 @@ export class UaActivityListElement extends UmbLitElement {
             <div class="list">
                 ${this.items.map(
                     (item) => html`
-                        <div class="activity-item" @click=${() => this.#openRunModal(item.runId)}>
+                        <div
+                            class="activity-item"
+                            role="button"
+                            tabindex="0"
+                            @click=${() => this.#openRunModal(item.runId)}
+                            @keydown=${onActivateKey(() => this.#openRunModal(item.runId))}
+                        >
                             <span class="activity-name">${item.automationName}</span>
-                            <uui-tag color=${this.#statusColor(item.status)} look="secondary">
+                            <uui-tag color=${getRunStatusColor(item.status)} look="secondary">
                                 ${item.status}
                             </uui-tag>
                             <span class="activity-time">
@@ -82,6 +73,11 @@ export class UaActivityListElement extends UmbLitElement {
 
             .activity-item:hover {
                 background: var(--uui-color-surface-alt);
+            }
+
+            .activity-item:focus-visible {
+                outline: 2px solid var(--uui-color-focus);
+                outline-offset: -2px;
             }
 
             .activity-item:last-child {
