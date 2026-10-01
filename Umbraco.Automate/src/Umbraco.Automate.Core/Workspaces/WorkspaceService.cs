@@ -1,7 +1,9 @@
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Cms.Core.Events;
+using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Scoping;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Workspaces;
 
@@ -18,19 +20,22 @@ internal sealed class WorkspaceService : IWorkspaceService
     private readonly IEntityVersionService _versionService;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
+    private readonly IUserService _userService;
 
     public WorkspaceService(
         IWorkspaceRepository workspaceRepository,
         IWorkspaceGroupRepository groupRepository,
         IEntityVersionService versionService,
         ICoreScopeProvider scopeProvider,
-        IEventMessagesFactory eventMessagesFactory)
+        IEventMessagesFactory eventMessagesFactory,
+        IUserService userService)
     {
         _workspaceRepository = workspaceRepository;
         _groupRepository = groupRepository;
         _versionService = versionService;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
+        _userService = userService;
     }
 
     public Task<Workspace?> GetWorkspaceAsync(Guid id, CancellationToken cancellationToken = default)
@@ -57,6 +62,8 @@ internal sealed class WorkspaceService : IWorkspaceService
             workspace.Id = Guid.NewGuid();
         }
 
+        await ValidateServiceAccountAsync(workspace);
+
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
         var eventMessages = _eventMessagesFactory.Get();
@@ -79,6 +86,8 @@ internal sealed class WorkspaceService : IWorkspaceService
 
     public async Task<Workspace> UpdateWorkspaceAsync(Workspace workspace, Guid? userId = null, CancellationToken cancellationToken = default)
     {
+        await ValidateServiceAccountAsync(workspace);
+
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
         var eventMessages = _eventMessagesFactory.Get();
@@ -157,4 +166,34 @@ internal sealed class WorkspaceService : IWorkspaceService
         IEnumerable<Guid> userGroupKeys,
         CancellationToken cancellationToken = default)
         => _workspaceRepository.GetIdsByUserGroupKeysAsync(userGroupKeys, cancellationToken);
+
+    /// <summary>
+    /// Rejects a service account that is not an existing API user. Automations run as this user, so a
+    /// person's account would tie them to that person's permissions and lifecycle. A workspace without
+    /// a service account is allowed; it just can't run anything that needs one.
+    /// </summary>
+    /// <remarks>
+    /// Checked on every save, so a workspace saved before this rule existed keeps running untouched
+    /// until someone next saves it.
+    /// </remarks>
+    private async Task ValidateServiceAccountAsync(Workspace workspace)
+    {
+        if (workspace.ServiceAccountKey == Guid.Empty)
+        {
+            return;
+        }
+
+        var user = await _userService.GetAsync(workspace.ServiceAccountKey);
+        if (user is null)
+        {
+            throw new WorkspaceServiceAccountValidationException(
+                "The service account could not be found. Choose an existing API user.");
+        }
+
+        if (user.Kind != UserKind.Api)
+        {
+            throw new WorkspaceServiceAccountValidationException(
+                $"The service account must be an API user, but '{user.Name}' is a regular backoffice user. Choose an API user, or create one in the Users section.");
+        }
+    }
 }
