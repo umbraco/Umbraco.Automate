@@ -16,6 +16,22 @@ export interface BindingLeaf {
 const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
 
 /**
+ * Turns a JSON Schema `type` into a label for people. A union with `null` (`["string", "null"]`,
+ * which otherwise prints as "string,null") reads as "string (optional)". A missing or "unknown"
+ * type returns `undefined`, so the caller can leave it out rather than show a placeholder.
+ */
+export function formatSchemaType(type: unknown): string | undefined {
+    const types = (Array.isArray(type) ? type : [type]).filter(
+        (t): t is string => typeof t === "string" && t !== "unknown",
+    );
+    const nonNull = types.filter((t) => t !== "null");
+    if (nonNull.length === 0) return undefined;
+
+    const label = nonNull.join(" or ");
+    return nonNull.length < types.length ? `${label} (optional)` : label;
+}
+
+/**
  * Recursively walks a JSON Schema `properties` object and produces flat leaf entries.
  * Nested objects are dot-joined (e.g. `response.statusCode`).
  */

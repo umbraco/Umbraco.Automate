@@ -135,7 +135,12 @@ internal sealed class RunFinalizer
 
         if (workflow.Status == WorkflowStatus.Terminated)
         {
-            run.Error = "Workflow terminated";
+            // A terminated workflow is almost always a step failing with the Terminate error
+            // behaviour. Report that step's error, which says what went wrong; "Workflow
+            // terminated" only says that it did.
+            run.Error = run.StepRuns
+                .FirstOrDefault(sr => sr.Status == StepRunStatus.Failed && !string.IsNullOrEmpty(sr.Error))?
+                .Error ?? "Workflow terminated";
         }
 
         // Propagate the first step error to the run if no run-level error is set yet.

@@ -7,7 +7,7 @@ import { UaRunDetailServerDataSource } from "../repository/detail/run-detail.ser
 import { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repository.js";
 import { UaAutomationRunsChangedEvent } from "../../automation/events/automation-runs-changed.event.js";
 import { formatDateTime, getRunStatusColor } from "../../core/index.js";
-import { RunsService } from "../../api/sdk.gen.js";
+import { AutomationsService, RunsService } from "../../api/sdk.gen.js";
 import type { UaRunDetailModel } from "../types.js";
 import type { UaRunDetailModalData } from "./run-detail-modal.token.js";
 import "../components/step-run-detail/step-run-detail.element.js";
@@ -26,6 +26,11 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
     @state()
     private _replaying = false;
+
+    // The server only replays runs of a published automation. Unknown (lookup failed) leaves
+    // Replay enabled, so the server's own answer still reaches the user.
+    @state()
+    private _automationPublished?: boolean;
 
     @state()
     private _lifecycleBusy = false;
@@ -61,6 +66,9 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             if (firstFailed) {
                 this._expandedStep = firstFailed.id;
             }
+
+            const { data: automation } = await AutomationsService.getAutomationsById({ path: { id: run.automationId } });
+            this._automationPublished = automation ? automation.status === "Published" : undefined;
         }
 
         if (actions) {
@@ -271,8 +279,11 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                             <uui-button
                                 look="primary"
                                 label=${this.localize.term("uaRun_replay")}
+                                title=${this._automationPublished === false
+                                    ? this.localize.term("uaRun_replayRequiresPublished")
+                                    : nothing}
                                 .state=${this._replaying ? "waiting" : undefined}
-                                ?disabled=${this._replaying}
+                                ?disabled=${this._replaying || this._automationPublished === false}
                                 @click=${this.#onReplay}
                             >
                                 ${this.localize.term("uaRun_replay")}

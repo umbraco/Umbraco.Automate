@@ -38,6 +38,24 @@ async function seedCompletedWarningRun(umbracoAutomateApi: any, workspaceId: str
   return { name, id, runId };
 }
 
+/* Seeds, publishes and runs a one-step automation whose HTTP Request is refused by the SSRF guard,
+ * so the step fails with the default Terminate error behaviour, and waits for the run to fail. */
+async function seedFailedRun(umbracoAutomateApi: any, workspaceId: string) {
+  const request = automationStep(
+    actions.httpRequest,
+    'blocked',
+    { url: 'http://127.0.0.1/', method: 'GET', bodyMode: 'Raw', contentType: 'application/json' },
+    { x: 250, y: 200 }
+  );
+  const id = await umbracoAutomateApi.automations.create(uniqueName('Run View Failed'), workspaceId, {
+    trigger: manualTrigger(),
+    steps: [request],
+    connections: [automationConnection('trigger', request)]
+  });
+  const runId: string = await umbracoAutomateApi.automations.publishAndRunUntil(id, 'Failed');
+  return { id, runId };
+}
+
 test.describe('Run view', () => {
   test.beforeEach(async ({ umbracoUi }) => {
     await umbracoUi.goToBackOffice();
@@ -144,6 +162,60 @@ test.describe('Run view', () => {
     await expect(entries).toHaveCount(1);
     await expect(entries.first()).toHaveClass(/\blog-entry--warning\b/);
     await expect(entries.first().locator('.log-message')).toHaveText(message);
+  });
+
+  test("reports the failing step's error as the run's error, not just that it terminated", async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange
+    const { id, runId } = await seedFailedRun(umbracoAutomateApi, automateServiceAccountWorkspace.id);
+
+    // Assert — the run's error is the step's own. It is what the runs list and run summary show.
+    const run = await umbracoAutomateApi.automations.getRun(runId);
+    expect(run.error).not.toBe('Workflow terminated');
+    expect(run.error).toBe(run.stepRuns[0].error);
+
+    // Act
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationRunsUrl(id));
+    await umbracoAutomateUi.automate.openRun(runId);
+
+    // Assert — the run summary shows it too.
+    await expect(umbracoAutomateUi.automate.runDetailError).toHaveText(run.error);
+  });
+
+  test('shows step durations in whole milliseconds', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange — the server reports step durations as fractional milliseconds.
+    const { id, runId } = await seedCompletedWarningRun(umbracoAutomateApi, automateServiceAccountWorkspace.id, 'unused');
+
+    // Act
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationRunsUrl(id));
+    await umbracoAutomateUi.automate.openRun(runId);
+
+    // Assert — formatted like the runs list, with no decimals.
+    await expect(umbracoAutomateUi.automate.runDetailStepDuration(0)).toHaveText(/^(<1ms|\d+ms|\d+s|\d+m \d+s)$/);
+  });
+
+  test('disables Replay on a run of an automation that is no longer published', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange — the server only replays runs of a published automation.
+    const { id, runId } = await seedCompletedWarningRun(umbracoAutomateApi, automateServiceAccountWorkspace.id, 'unused');
+    await umbracoAutomateApi.automations.unpublish(id);
+
+    // Act
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationRunsUrl(id));
+    await umbracoAutomateUi.automate.openRun(runId);
+
+    // Assert
+    await expect(umbracoAutomateUi.automate.runDetailAction('Replay')).toBeDisabled();
   });
 
   test('opens a run from the dashboard recent activity with Enter', async ({
