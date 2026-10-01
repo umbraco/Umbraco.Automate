@@ -68,6 +68,24 @@ test.describe('Workspace management', () => {
     ).toBeVisible();
   });
 
+  test('returns to the Workspaces list from the editor back arrow', async ({
+    automateWorkspace,
+    umbracoUi,
+    umbracoAutomateUi
+  }) => {
+    // Arrange
+    await umbracoUi.goToBackOffice();
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.workspaceEditUrl(automateWorkspace.id));
+    await umbracoAutomateUi.automate.waitForWorkspaceEditor();
+
+    // Act
+    await umbracoAutomateUi.automate.workspaceEditorBackButton.click({ force: true });
+
+    // Assert — the management collection the sidebar's Workspaces item opens, listing this one.
+    await expect(umbracoAutomateUi.page).toHaveURL(/\/workspace\/ua:workspace-mgmt-root/);
+    await expect(umbracoAutomateUi.page.getByRole('row', { name: new RegExp(automateWorkspace.name) })).toBeVisible();
+  });
+
   test('deletes a workspace', async ({ umbracoUi, umbracoAutomateUi, umbracoAutomateApi }) => {
     // Arrange — created directly, not via the fixture, because the test removes it itself.
     const workspace = await umbracoAutomateApi.workspaces.createForTest('Deletable Workspace');

@@ -164,6 +164,50 @@ public class RunFinalizerTests
     }
 
     [Fact]
+    public async Task Terminated_ReportsTheFailedStepsError()
+    {
+        // A step failing with the Terminate error behaviour terminates the workflow. The run's
+        // error, shown in the runs list and run summary, should say what went wrong.
+        var run = BuildRun(AutomationRunStatus.Running);
+        run.StepRuns.Add(new StepRun
+        {
+            Id = Guid.NewGuid(),
+            RunId = run.Id,
+            StepId = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.httpRequest",
+            Status = StepRunStatus.Failed,
+            StartedUtc = DateTime.UtcNow,
+            Error = "Request to '127.0.0.1' blocked: resolved to a private or reserved address.",
+        });
+        _runRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(run);
+
+        await _finalizer.TryFinalizeAsync(BuildWorkflow(WorkflowStatus.Terminated, Guid.NewGuid()), CancellationToken.None);
+
+        run.Status.ShouldBe(AutomationRunStatus.Failed);
+        run.Error.ShouldBe("Request to '127.0.0.1' blocked: resolved to a private or reserved address.");
+    }
+
+    [Fact]
+    public async Task Terminated_FallsBackWhenTheFailedStepHasNoError()
+    {
+        var run = BuildRun(AutomationRunStatus.Running);
+        run.StepRuns.Add(new StepRun
+        {
+            Id = Guid.NewGuid(),
+            RunId = run.Id,
+            StepId = Guid.NewGuid(),
+            ActionAlias = "test.action",
+            Status = StepRunStatus.Failed,
+            StartedUtc = DateTime.UtcNow,
+        });
+        _runRepo.Setup(r => r.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(run);
+
+        await _finalizer.TryFinalizeAsync(BuildWorkflow(WorkflowStatus.Terminated, Guid.NewGuid()), CancellationToken.None);
+
+        run.Error.ShouldBe("Workflow terminated");
+    }
+
+    [Fact]
     public async Task Terminated_PersistsFailedStatusForStuckRunningStepRun()
     {
         // FinalizeTerminalAsync mutates stepRun.Status in memory for steps stuck in Running
