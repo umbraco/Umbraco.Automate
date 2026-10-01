@@ -73,7 +73,8 @@ test.describe('Error states', () => {
     }
   });
 
-  test('a failed approval decision keeps the modal open and marks the pressed button failed', async ({
+  test('a failed approval decision keeps the modal open, marks the pressed button failed and says why', async ({
+    page,
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi
@@ -105,8 +106,11 @@ test.describe('Error states', () => {
       const approve = modal.locator('uui-button[color="positive"]');
       await automate.clickInModal(approve);
 
-      // Assert — still open, the Approve button failed, and the approval is still pending.
+      // Assert — still open, the Approve button failed, the server's error was shown, and the
+      // approval is still pending. The notification only appears because the request opts into
+      // throwOnError: the SDK client otherwise resolves the 500, and tryExecute stays silent.
       await expect.poll(async () => await approve.evaluate((el: any) => el.state)).toBe('failed');
+      await expect(page.locator('uui-toast-notification').filter({ hasText: 'Stubbed failure' })).toBeVisible();
       await expect(modal).toBeVisible();
       expect(await modal.locator('uui-button[color="danger"]').evaluate((el: any) => el.state ?? null)).toBeNull();
       expect(await automations.getPendingApprovals(id)).toHaveLength(1);
