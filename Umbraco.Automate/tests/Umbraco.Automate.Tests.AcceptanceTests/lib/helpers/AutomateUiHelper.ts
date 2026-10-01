@@ -499,7 +499,13 @@ export class AutomateUiHelper {
    */
   async failRequests(pattern: string): Promise<() => Promise<void>> {
     const handler = (route: import('@playwright/test').Route) =>
-      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ title: 'Stubbed failure' }) });
+      // A ProblemDetails body, as the server sends: the backoffice only reads `title` from a body
+      // that also has `type` and `status`, so a bare `{ title }` would surface as the status text.
+      route.fulfill({
+        status: 500,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({ type: 'Error', title: 'Stubbed failure', status: 500 }),
+      });
     await this.page.route(pattern, handler);
     return async () => await this.page.unroute(pattern, handler);
   }

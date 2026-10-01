@@ -28,12 +28,15 @@ export class UaApprovalDecisionModalElement extends UmbModalBaseElement<
         this._submitting = true;
         this._decisionState = { outcome, state: "waiting" };
 
-        // tryExecute raises the error notification itself; the modal stays open so the user can retry.
+        // throwOnError: tryExecute only raises its error notification for a rejected promise, and the
+        // generated SDK client resolves 4xx/5xx responses normally by default — without it a failed
+        // decision would only mark the button. The modal stays open so the user can retry.
         const { error } = await tryExecute(
             this,
             ApprovalsService.postApprovalsByRunIdStepsByStepIdDecision({
                 path: { runId: this.data.runId, stepId: this.data.stepId },
                 body: { outcome: outcome, comment: this._comment || undefined },
+                throwOnError: true,
             }),
         );
 
