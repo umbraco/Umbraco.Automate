@@ -44,6 +44,8 @@ export class ConstantHelper {
 
   public static readonly actions = {
     delay: 'umbracoAutomate.delay',
+    getContent: 'umbracoAutomate.getContent',
+    httpRequest: 'umbracoAutomate.httpRequest',
     logMessage: 'umbracoAutomate.logMessage',
     requestApproval: 'umbracoAutomate.requestApproval',
     runScript: 'umbracoAutomate.runScript',

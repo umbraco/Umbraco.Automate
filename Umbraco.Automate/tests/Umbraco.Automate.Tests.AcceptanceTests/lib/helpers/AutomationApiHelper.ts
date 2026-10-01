@@ -112,6 +112,15 @@ export class AutomationApiHelper {
     }
   }
 
+  /* Unpublishes through the API, as the Unpublish workspace action does. */
+  async unpublish(id: string) {
+    const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/unpublish';
+    const response = await this.api.post(requestUrl, {});
+    if (!response.ok()) {
+      throw new Error(`Unpublishing automation ${id} failed (${response.status()}): ${await response.text()}`);
+    }
+  }
+
   /* Starts a run, as Run now does. The automation must be published and have a manual trigger. */
   async run(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/trigger';
