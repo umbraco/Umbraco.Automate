@@ -263,6 +263,12 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
   pushes on `vN/main`, `vN/dev`, `vN/hotfix/*` and `vN/release/*`, so the suite would never run
   on a pull request. The trade-off is that CI exercises **project references**, not a published
   package.
+- **Is sharded across four parallel agents** (`strategy: parallel: 4`), each running
+  `--shard=$(System.JobPositionInPhase)/$(System.TotalJobsInPhase)` against its **own** demo site
+  and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a
+  site. `fullyParallel: true` (with one worker) makes Playwright split by test rather than by file, so shards finish together; every shard runs `auth.setup.ts` itself. Each shard pays
+  the full setup (build, scaffold, first boot), so extra shards only help while the tests
+  themselves dominate; results and artifacts are named per shard.
 - **Scaffolds the site with `scripts/install-demo-site.ps1`**, the same script developers run, so
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to

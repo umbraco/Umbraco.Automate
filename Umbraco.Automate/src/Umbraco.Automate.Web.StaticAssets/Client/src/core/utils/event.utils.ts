@@ -6,3 +6,16 @@ export function dispatchActionEvent(host: any, event: Event) {
         context?.dispatchEvent(event);
     });
 }
+
+/**
+ * A `keydown` handler that runs `activate` on Enter or Space, as a native button would. Pair it with
+ * `role="button"` and `tabindex="0"` on a clickable element that is not a `<button>`, so keyboard
+ * users can reach and trigger it too.
+ */
+export function onActivateKey(activate: () => void) {
+    return (e: KeyboardEvent) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault(); // Space would otherwise scroll the page.
+        activate();
+    };
+}

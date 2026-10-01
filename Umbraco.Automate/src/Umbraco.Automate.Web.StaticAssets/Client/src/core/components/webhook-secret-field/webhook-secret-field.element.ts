@@ -82,6 +82,7 @@ export class UaWebhookSecretFieldElement
         return html`
             <div class="row">
                 <uui-input
+                    label=${this.localize.term("uaWebhook_secret")}
                     .value=${this.value ?? ""}
                     ?readonly=${this.readonly}
                     @input=${this.#onInput}

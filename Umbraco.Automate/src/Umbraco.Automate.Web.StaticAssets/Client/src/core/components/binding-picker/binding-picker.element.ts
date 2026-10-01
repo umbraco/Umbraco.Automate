@@ -1,5 +1,5 @@
 import { css, html, customElement, property, repeat, state, when } from "@umbraco-cms/backoffice/external/lit";
-import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
+import { UmbLitElement, umbFocus } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
 import type { BindingLeaf } from "../../utils/binding-schema.utils.js";
@@ -81,6 +81,7 @@ export class UaBindingPickerElement extends UmbLitElement {
                     @input=${this.#onSearchInput}
                     .value=${this._search}
                     label=${this.localize.term("uaLabels_search")}
+                    ${umbFocus()}
                 >
                     <uui-icon name="icon-search" slot="prepend"></uui-icon>
                 </uui-input>
@@ -162,14 +163,14 @@ export class UaBindingPickerElement extends UmbLitElement {
             .source-headline {
                 display: flex;
                 flex-direction: column;
-                gap: 2px;
+                gap: var(--uui-size-space-1);
                 line-height: 1.2;
             }
 
             .source-chips {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 4px;
+                gap: var(--uui-size-space-1);
             }
 
             .source-chip {
@@ -177,8 +178,8 @@ export class UaBindingPickerElement extends UmbLitElement {
                 font-size: 11px;
                 color: var(--uui-color-text-alt);
                 background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
-                padding: 1px 6px;
-                border-radius: 3px;
+                padding: 1px var(--uui-size-space-2);
+                border-radius: var(--uui-border-radius);
                 font-weight: normal;
                 white-space: nowrap;
                 overflow: hidden;

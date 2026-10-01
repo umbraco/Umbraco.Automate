@@ -1,4 +1,5 @@
 import { css, html, customElement, state, repeat, when } from "@umbraco-cms/backoffice/external/lit";
+import { umbFocus } from "@umbraco-cms/backoffice/lit-element";
 import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UaCatalogueRepository } from "../../repository/catalogue.repository.js";
@@ -222,6 +223,7 @@ export class UaNodePickerModalElement extends UmbModalBaseElement<UaNodePickerMo
                         @input=${this.#onSearchInput}
                         .value=${this._search}
                         label=${this.localize.term("uaLabels_search")}
+                        ${umbFocus()}
                     >
                         <uui-icon name="icon-search" slot="prepend"></uui-icon>
                     </uui-input>

@@ -162,9 +162,9 @@ export class UaAutomationMoveModalElement extends UmbModalBaseElement<UaAutomati
                 </uui-box>
                 <uui-button
                     slot="actions"
-                    label=${this.localize.term("general_cancel")}
+                    label=${this.localize.term("uaGeneral_close")}
                     @click="${this._rejectModal}"
-                >${this.localize.term("general_cancel")}</uui-button>
+                >${this.localize.term("uaGeneral_close")}</uui-button>
                 <uui-button
                     form="MoveForm"
                     ?disabled=${!this._canSubmit}

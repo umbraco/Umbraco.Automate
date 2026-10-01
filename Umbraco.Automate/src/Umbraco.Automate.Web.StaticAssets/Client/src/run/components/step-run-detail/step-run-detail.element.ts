@@ -3,7 +3,7 @@ import type { PropertyValues } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UaStepRunDataModel, UaStepRunLogEntryModel, UaStepRunModel } from "../../types.js";
-import { formatDateTime, formatLogTimestamp } from "../../../core/index.js";
+import { formatDateTime, formatLogTimestamp, getRunStatusColor, onActivateKey } from "../../../core/index.js";
 import { UaRunDetailServerDataSource } from "../../repository/detail/run-detail.server.data-source.js";
 import "../run-data-block/run-data-block.element.js";
 
@@ -65,24 +65,6 @@ export class UaStepRunDetailElement extends UmbLitElement {
                 ? [{ id: "logs" as const, label: this.localize.term("uaLabels_logs") }]
                 : []),
         ];
-    }
-
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            case "WaitingForInput":
-            case "Suspended":
-            // A refused approval is not an error.
-            case "Rejected":
-                return "warning";
-            case "Failed":
-                return "danger";
-            default:
-                return "default";
-        }
     }
 
     #logIcon(level: UaStepRunLogEntryModel["level"]): string {
@@ -255,11 +237,18 @@ export class UaStepRunDetailElement extends UmbLitElement {
 
         return html`
             <uui-box>
-                <div class="step-header" @click=${this.#toggle}>
+                <div
+                    class="step-header"
+                    role="button"
+                    tabindex="0"
+                    aria-expanded=${isExpanded ? "true" : "false"}
+                    @click=${this.#toggle}
+                    @keydown=${onActivateKey(() => this.#toggle())}
+                >
                     <uui-icon name=${isExpanded ? "icon-navigation-down" : "icon-navigation-right"}></uui-icon>
                     <span class="step-name">${this.actionName || this.stepRun.actionAlias}</span>
                     <span class="step-duration">${this.#formatDuration(this.stepRun.durationMs)}</span>
-                    <uui-tag color=${this.#statusColor(this.stepRun.status)} look="secondary">
+                    <uui-tag color=${getRunStatusColor(this.stepRun.status)} look="secondary">
                         ${this.stepRun.status}
                     </uui-tag>
                 </div>
@@ -304,6 +293,11 @@ export class UaStepRunDetailElement extends UmbLitElement {
                 background: var(--uui-color-surface-alt);
             }
 
+            .step-header:focus-visible {
+                outline: 2px solid var(--uui-color-focus);
+                outline-offset: -2px;
+            }
+
             .step-name {
                 flex: 1;
                 font-weight: 500;
@@ -324,7 +318,7 @@ export class UaStepRunDetailElement extends UmbLitElement {
 
             .error-output {
                 background: var(--uui-color-danger-standalone);
-                color: white;
+                color: var(--uui-color-danger-contrast, white);
                 padding: var(--uui-size-space-3);
                 border-radius: var(--uui-border-radius);
                 font-size: var(--uui-size-4);
@@ -343,48 +337,66 @@ export class UaStepRunDetailElement extends UmbLitElement {
             }
 
             .log-list {
-                display: flex;
-                flex-direction: column;
-                gap: var(--uui-size-space-2);
+                border: 1px solid var(--uui-color-border);
+                border-radius: var(--uui-border-radius);
+                overflow: hidden;
             }
 
             .log-entry {
-                display: flex;
-                align-items: baseline;
+                display: grid;
+                grid-template-columns: auto auto 1fr;
+                align-items: start;
                 gap: var(--uui-size-space-3);
                 padding: var(--uui-size-space-2) var(--uui-size-space-3);
-                border-radius: var(--uui-border-radius);
+                /* Always reserve the accent bar, so rows with and without one keep their columns aligned. */
+                border-left: 3px solid transparent;
                 font-size: var(--uui-size-4);
+                line-height: var(--uui-size-6);
+            }
+
+            .log-entry + .log-entry {
+                border-top: 1px solid var(--uui-color-divider);
             }
 
             .log-entry uui-icon {
-                flex-shrink: 0;
+                /* Centres the icon on the first line of a message that wraps. */
+                height: var(--uui-size-6);
             }
 
             .log-time {
-                flex-shrink: 0;
                 color: var(--uui-color-text-alt);
                 font-family: monospace;
+                font-variant-numeric: tabular-nums;
             }
 
             .log-message {
                 overflow-wrap: anywhere;
+                white-space: pre-wrap;
             }
 
+            /* The level colours the icon and accent bar only, so the message itself stays readable. */
             .log-entry--debug {
-                color: var(--uui-color-text-alt);
-                opacity: 0.75;
+                opacity: 0.7;
             }
 
-            .log-entry--info {
+            .log-entry--debug uui-icon,
+            .log-entry--info uui-icon {
                 color: var(--uui-color-text-alt);
             }
 
             .log-entry--warning {
+                border-left-color: var(--uui-color-warning-standalone);
+            }
+
+            .log-entry--warning uui-icon {
                 color: var(--uui-color-warning-standalone);
             }
 
             .log-entry--error {
+                border-left-color: var(--uui-color-danger-standalone);
+            }
+
+            .log-entry--error uui-icon {
                 color: var(--uui-color-danger-standalone);
             }
 

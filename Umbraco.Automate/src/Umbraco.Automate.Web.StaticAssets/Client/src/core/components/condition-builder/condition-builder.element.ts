@@ -1,7 +1,7 @@
 import { css, html, customElement, property, repeat, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
+import { UMB_MODAL_MANAGER_CONTEXT, umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import type { UmbPropertyEditorUiElement, UmbPropertyEditorConfigCollection } from "@umbraco-cms/backoffice/property-editor";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
@@ -119,7 +119,21 @@ export class UaConditionBuilderElement extends UmbLitElement implements UmbPrope
         this.#emitChange(newValue);
     }
 
-    #removeGroup(groupIndex: number) {
+    async #removeGroup(groupIndex: number) {
+        // Nothing to lose in an empty group, so only ask when it holds conditions.
+        if (this.value?.Groups?.[groupIndex]?.Conditions.length) {
+            try {
+                await umbConfirmModal(this, {
+                    headline: this.localize.term("uaConditionBuilder_removeGroup"),
+                    content: this.localize.term("uaConditionBuilder_removeGroupConfirm"),
+                    color: "danger",
+                    confirmLabel: "#actions_remove",
+                });
+            } catch {
+                return;
+            }
+        }
+
         const newValue = this.#cloneValue();
         newValue.Groups.splice(groupIndex, 1);
         this.#emitChange(newValue);

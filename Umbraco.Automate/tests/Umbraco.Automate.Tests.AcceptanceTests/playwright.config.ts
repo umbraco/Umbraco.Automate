@@ -27,6 +27,11 @@ export default defineConfig({
   maxFailures: process.env.CI ? 10 : undefined,
   /* Single worker: specs share the state of one running site. */
   workers: 1,
+  /* With one worker this does not run anything concurrently; it lets --shard split the suite by
+   * test rather than by file, so CI shards finish together instead of waiting on the slowest file.
+   * Safe because no spec shares state between its tests (no beforeAll, serial mode or
+   * worker-scoped fixtures) — keep it that way, or mark such a file test.describe.configure({ mode: 'serial' }). */
+  fullyParallel: true,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI ? [['line'], ['junit', { outputFile: 'results/results.xml' }]] : 'html',
   outputDir: './results',
