@@ -5,19 +5,52 @@ JavaScript function to transform or compute data between steps — so editors ca
 tweaks themselves instead of asking a developer to build a custom action. It executes in a
 sandboxed [Jint](https://github.com/sebastienros/jint) engine.
 
+## Settings
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| **Script** | (required) | The ES module to run. See the authoring contract below. |
+| **Output schema** | (empty) | Optional JSON Schema describing the returned value. See [Declaring the output shape](#declaring-the-output-shape). |
+| **Allow fetch** | Off | Lets this step's script make outbound HTTP requests. See [Allowing outbound requests](#allowing-outbound-requests). |
+
 ## Authoring contract
 
-Write an ES module that exports a **default function**. It receives the step's resolved inputs as
+Write an ES module that exports a **default function**. It receives the step's binding context as
 its single `data` argument and returns a value that becomes the step's output:
 
 ```javascript
 export default function (data) {
-    return { upper: data.name.toUpperCase() };
+    const bytes = data.steps.getMedia.properties.umbracoBytes;
+    return { name: data.trigger.name.toUpperCase(), sizeKb: Math.round(bytes / 1024) };
 }
 ```
 
-- **Input** — `data` is the step's input mappings (bindings to trigger output and prior step
-  outputs), as a plain JSON object.
+- **Input** — `data` exposes the values a binding can reach, at the same paths, as a plain JSON
+  object. If you would write `${ steps.getMedia.properties.umbracoBytes }` in a binding, the script
+  reads `data.steps.getMedia.properties.umbracoBytes`:
+
+  | Binding | Script |
+  | --- | --- |
+  | `${ trigger.<path> }` | `data.trigger.<path>` |
+  | `${ steps.<alias>.<path> }` | `data.steps.<alias>.<path>` |
+  | `${ previous.<path> }` | `data.previous.<path>` (absent for the first step) |
+  | `${ loop.item }` / `${ loop.index }` | `data.loop.item` / `data.loop.index` (inside a loop only) |
+
+  Steps appear under their alias — the name the binding picker uses — or under their ID if they
+  have no alias (`data.steps['<id>']`). Unlike bindings, script property access is
+  **case-sensitive**, so match the alias and property casing exactly. Only steps that ran before
+  this one are present; a step on a branch that did not run is simply missing, so guard optional
+  paths (`data.steps.maybe?.result`).
+- `data` is a **copy**. Changing it has no effect on later steps — return what they need instead.
+  Connection credentials are never part of it. It does include everything the trigger and prior
+  steps output (webhook headers, for example), exactly as bindings do.
+- `${ }` bindings are **not** resolved inside the script body — a binding substituted into code
+  would let step data inject script. Read values from `data` instead.
+- Large step outputs that were offloaded from the run's workflow state are loaded back in full
+  when the script runs, so a script placed after a very large output pays for reading it even if
+  it never touches it.
+- Input mappings, when a step has any (the backoffice does not currently set them), are added as
+  root-level keys of `data` and win over the binding context on a name clash.
 - **Output** — the returned value is serialized to JSON (via `JSON.stringify` semantics) and
   exposed as the step's `result` output, bindable downstream as `${ steps.<alias>.result... }`.
   Functions and `undefined` become `null`; `NaN`/`Infinity` become `null`; dates become ISO
@@ -73,6 +106,35 @@ export default async function (data) {
 addresses are blocked) and supports `method`, `body`, and headers as an object, an array of pairs,
 or a `Headers` instance. It is gated by both the tenant-wide master switch
 (`Scripting:FetchEnabled`) and the per-step **Allow fetch** toggle — both must be on.
+
+Destination checks follow the shared outbound HTTP rules (`Umbraco:Automate:Execution`):
+
+- **Direct connections** are validated at connect time against the address actually connected to.
+- **Through a proxy** (`AllowOutboundHttpProxy`, default `true`, honours the system/environment
+  proxy such as `HTTP_PROXY`/`HTTPS_PROXY`): the connection goes to the proxy, so the destination
+  host is resolved and validated *before* the request — and before every redirect hop — is sent,
+  and rejected if any resolved address is blocked. A short DNS-rebinding window remains between
+  that lookup and the proxy's own, so the proxy should still deny access to internal networks.
+  Set `AllowOutboundHttpProxy` to `false` to ignore any proxy and always connect directly.
+
+When a request fails, the returned promise rejects with an `Error` carrying a short, fixed reason
+rather than server-side exception details, for example `http request was blocked`,
+`http request timed out`, `fetch failed: connection refused`, `fetch failed: DNS lookup failed` or
+`fetch failed: invalid url`. The full exception is written to the server log.
+
+### Allowing outbound requests
+
+Outbound requests are opt-in per step, so a script cannot call out unless someone chose to let it
+(secure by default):
+
+- **Allow fetch** (per step) is **off** for new steps. Turn it on in the step's settings for each
+  script that needs `fetch`. With it off, `fetch` is not defined in the script at all. A step whose
+  saved settings do not include the value — for example one created through the Management API or
+  an import without `allowFetch` — is treated as off.
+- **`FetchEnabled`** (site-wide, `Umbraco:Automate:Scripting:FetchEnabled`) defaults to `true`.
+  Set it to `false` to turn `fetch` off for every Run Script step, whatever their toggle says.
+- **`FetchAllowedHosts`** (site-wide) restricts which hosts `fetch` may reach. Leave it empty to
+  allow any public host; list hosts to allow only those.
 
 ## Validation
 

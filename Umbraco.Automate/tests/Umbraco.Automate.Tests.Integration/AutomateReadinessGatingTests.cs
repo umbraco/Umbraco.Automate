@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Umbraco.Automate.Core;
@@ -57,9 +59,12 @@ public class AutomateReadinessGatingTests : IDisposable
 
         return new AutomationFactory(
             serializer,
-            new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>),
-            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
+            new AutomationSettingsProtector(
+                serializer,
+                new ActionCollection(Array.Empty<IAction>),
+                new TriggerCollection(Array.Empty<ITrigger>),
+                new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
+                new NotificationChannelCollection(Array.Empty<INotificationChannel>)));
     }
 
     /// <summary>

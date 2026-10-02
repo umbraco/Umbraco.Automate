@@ -96,6 +96,22 @@ The runtime data produced by a step after execution. Outputs are made available 
 - **Examples:** A "Create Content" step outputs the created content node ID
 - **WorkflowCore mapping:** `.Output()` bindings on step registration
 
+**Documenting outputs for the binding picker.** A step's output type (`TOutput` on
+`StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructure>`) is turned into a JSON Schema by
+`JsonSchemaBuilder().FromType()` (from `JsonSchema.Net.Generation`), and that schema is what
+drives the backoffice binding picker. Put a `[Json.Schema.Generation.Description("...")]`
+attribute (the `JsonSchema.Net.Generation` package's own attribute — `System.ComponentModel.DescriptionAttribute`
+is a different type and is **not** read by the generator) on every public output property so the
+picker can show what the value actually means — without it, an author only sees a property path
+and a JSON type (e.g. `state` or `recordFieldsJson`) and has to guess. When a property's allowed
+values are fixed, declare it as an enum type rather than a string with magic values:
+`JsonSchema.Net.Generation` emits the member names as the schema's `enum` keyword automatically,
+and the picker lists them for the author. This applies to every provider's output types, and
+matters most for third-party providers, since their output shapes are the least familiar to the
+person configuring an automation. All of this repo's built-in triggers and actions follow the
+same convention — see `Umbraco.Automate.Core/Actions/BuiltIn/*Output.cs` and
+`Umbraco.Automate.Core/Triggers/BuiltIn/*Output.cs` for examples.
+
 ### Filter
 
 Conditional logic that controls whether a step executes or which path an automation takes. Filters evaluate bindings against the current data context.

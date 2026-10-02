@@ -18,19 +18,22 @@ internal sealed class ConnectionService : IConnectionService
     private readonly IEntityVersionService _versionService;
     private readonly ICoreScopeProvider _scopeProvider;
     private readonly IEventMessagesFactory _eventMessagesFactory;
+    private readonly IReadOnlyList<IConnectionSettingsSaveHandler> _settingsSaveHandlers;
 
     public ConnectionService(
         IConnectionRepository connectionRepository,
         ConnectionTypeCollection connectionTypeCollection,
         IEntityVersionService versionService,
         ICoreScopeProvider scopeProvider,
-        IEventMessagesFactory eventMessagesFactory)
+        IEventMessagesFactory eventMessagesFactory,
+        IEnumerable<IConnectionSettingsSaveHandler> settingsSaveHandlers)
     {
         _connectionRepository = connectionRepository;
         _connectionTypeCollection = connectionTypeCollection;
         _versionService = versionService;
         _scopeProvider = scopeProvider;
         _eventMessagesFactory = eventMessagesFactory;
+        _settingsSaveHandlers = settingsSaveHandlers.ToList();
     }
 
     public Task<Connection?> GetConnectionAsync(Guid id, CancellationToken cancellationToken = default)
@@ -58,6 +61,8 @@ internal sealed class ConnectionService : IConnectionService
 
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
 
+        await PrepareSettingsAsync(connection, persistedSettings: null, isRollback: false, cancellationToken);
+
         var eventMessages = _eventMessagesFactory.Get();
 
         var savingNotification = new ConnectionSavingNotification(connection, eventMessages);
@@ -76,9 +81,18 @@ internal sealed class ConnectionService : IConnectionService
         return saved;
     }
 
-    public async Task<Connection> UpdateConnectionAsync(Connection connection, Guid? userId = null, CancellationToken cancellationToken = default)
+    public Task<Connection> UpdateConnectionAsync(Connection connection, Guid? userId = null, CancellationToken cancellationToken = default)
+        => UpdateConnectionAsync(connection, userId, isRollback: false, cancellationToken);
+
+    private async Task<Connection> UpdateConnectionAsync(Connection connection, Guid? userId, bool isRollback, CancellationToken cancellationToken)
     {
         using ICoreScope scope = _scopeProvider.CreateCoreScope();
+
+        // Callers usually mutate the instance they loaded, so re-read what is actually persisted.
+        var persisted = _settingsSaveHandlers.Count > 0
+            ? await _connectionRepository.GetAsync(connection.Id, cancellationToken)
+            : null;
+        await PrepareSettingsAsync(connection, persisted?.Settings, isRollback, cancellationToken);
 
         var eventMessages = _eventMessagesFactory.Get();
 
@@ -147,7 +161,41 @@ internal sealed class ConnectionService : IConnectionService
         current.Type = snapshot.Type;
         current.Settings = snapshot.Settings;
 
-        return await UpdateConnectionAsync(current, userId, cancellationToken);
+        return await UpdateConnectionAsync(current, userId, isRollback: true, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs every registered <see cref="IConnectionSettingsSaveHandler"/> against the connection about
+    /// to be saved. Handlers may rewrite its settings, or throw <see cref="ConnectionSettingsValidationException"/>.
+    /// </summary>
+    private async Task PrepareSettingsAsync(
+        Connection connection,
+        IReadOnlyDictionary<string, object?>? persistedSettings,
+        bool isRollback,
+        CancellationToken cancellationToken)
+    {
+        if (_settingsSaveHandlers.Count == 0)
+        {
+            return;
+        }
+
+        var connectionType = _connectionTypeCollection.GetByAlias(connection.Type);
+        if (connectionType is null)
+        {
+            return;
+        }
+
+        var context = new ConnectionSettingsSaveContext(
+            connection,
+            connectionType,
+            persistedSettings,
+            isRollback,
+            _connectionRepository.GetAllAsync);
+
+        foreach (var handler in _settingsSaveHandlers)
+        {
+            await handler.PrepareSettingsAsync(context, cancellationToken);
+        }
     }
 
     public async Task<ConfiguredConnection?> GetConfiguredConnectionAsync(Guid connectionId, CancellationToken cancellationToken = default)

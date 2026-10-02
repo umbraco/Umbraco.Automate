@@ -1,6 +1,6 @@
 import type { StepConfigurationModel, StepConnectionModel, TriggerConfigurationModel } from "../../api/types.gen.js";
 import type { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repository.js";
-import { type BindingLeaf, computePredecessors, flattenJsonSchema } from "./binding-schema.utils.js";
+import { type BindingLeaf, computePredecessors, computeStepOrder, flattenJsonSchema } from "./binding-schema.utils.js";
 
 const FOR_EACH_ALIAS = "umbracoAutomate.forEach";
 const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
@@ -40,6 +40,12 @@ export async function buildBindingSources(
 ): Promise<BindingSource[]> {
     const sources: BindingSource[] = [];
     const { predecessorIds, triggerReachable } = computePredecessors(currentStepId, connections);
+
+    // computePredecessors returns a BFS-from-current traversal order (nearest first), which
+    // does not reflect where a step actually sits in the flow. Re-order by flow position so
+    // the picker lists predecessors the way they run, earliest first.
+    const stepOrder = computeStepOrder(steps, connections);
+    predecessorIds.sort((a, b) => (stepOrder.get(a) ?? 0) - (stepOrder.get(b) ?? 0));
 
     // Fetch the catalogue listings up front (cached in the repo).
     const [triggersResult, actionsResult, controlFlowsResult] = await Promise.all([

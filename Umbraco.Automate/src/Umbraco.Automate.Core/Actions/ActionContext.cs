@@ -73,4 +73,52 @@ public sealed class ActionContext
     /// need to evaluate bindings directly (e.g. condition evaluation in the If action).
     /// </summary>
     public IReadOnlyDictionary<string, object?>? BindingData { get; init; }
+
+    /// <summary>
+    /// Gets the minimum level captured by <see cref="Log"/>; entries below this are dropped,
+    /// not persisted. Set from <see cref="Umbraco.Automate.Core.Configuration.ExecutionOptions.MinimumLogLevel"/>.
+    /// </summary>
+    public ActionLogLevel MinimumLogLevel { get; init; } = ActionLogLevel.Info;
+
+    /// <summary>
+    /// Gets the maximum number of log entries retained for this step, guarding against a
+    /// runaway loop spamming entries. Set from
+    /// <see cref="Umbraco.Automate.Core.Configuration.ExecutionOptions.MaxLogEntriesPerStep"/>.
+    /// </summary>
+    public int MaxLogEntries { get; init; } = 200;
+
+    private readonly List<ActionLogEntry> _logEntries = [];
+
+    /// <summary>
+    /// Gets the log entries recorded via <see cref="Log"/> so far, read by the pipeline
+    /// after execution completes.
+    /// </summary>
+    public IReadOnlyList<ActionLogEntry> LogEntries => _logEntries;
+
+    /// <summary>
+    /// Records a leveled log message that is persisted with the step run and shown in the
+    /// run detail UI. This is not the application log — use an injected <c>ILogger</c>
+    /// separately for operator/diagnostic logging.
+    /// </summary>
+    public void Log(ActionLogLevel level, string message)
+    {
+        if (level < MinimumLogLevel || _logEntries.Count >= MaxLogEntries)
+        {
+            return;
+        }
+
+        _logEntries.Add(new ActionLogEntry(DateTime.UtcNow, level, message));
+    }
+
+    /// <summary>Records a <see cref="ActionLogLevel.Debug"/> message. See <see cref="Log"/>.</summary>
+    public void LogDebug(string message) => Log(ActionLogLevel.Debug, message);
+
+    /// <summary>Records a <see cref="ActionLogLevel.Info"/> message. See <see cref="Log"/>.</summary>
+    public void LogInfo(string message) => Log(ActionLogLevel.Info, message);
+
+    /// <summary>Records a <see cref="ActionLogLevel.Warning"/> message. See <see cref="Log"/>.</summary>
+    public void LogWarning(string message) => Log(ActionLogLevel.Warning, message);
+
+    /// <summary>Records a <see cref="ActionLogLevel.Error"/> message. See <see cref="Log"/>.</summary>
+    public void LogError(string message) => Log(ActionLogLevel.Error, message);
 }

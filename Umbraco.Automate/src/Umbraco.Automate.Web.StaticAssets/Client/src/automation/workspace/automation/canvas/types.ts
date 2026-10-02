@@ -43,7 +43,16 @@ export interface NodeSettingsOpenDetail {
 
 export interface AddNodeRequestDetail {
     position: { x: number; y: number };
-    /** When set, auto-connect the new node to this source. */
+    /**
+     * True when `position` was computed by the canvas (the node "+" button) rather than chosen by
+     * the user (a drag dropped on the pane), so the view may move the node to a better slot.
+     */
+    autoPosition?: boolean;
+    /**
+     * When set, auto-connect the new node to this source. If that output already has a
+     * connection (other than a Parallel body branch), the new node is spliced in front of the
+     * existing target instead, as with `insertBetween`.
+     */
     connectFrom?: {
         sourceStepId: string;
         sourceHandle?: string | null;

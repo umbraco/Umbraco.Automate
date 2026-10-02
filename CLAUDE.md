@@ -35,6 +35,8 @@ A demo Umbraco site is available at `demos/vN/Umbraco.Automate.DemoSite/` (N = m
 
 - **Path convention:** demo sites live under `demos/vN/` — one directory per CMS major version line (e.g. `demos/v18/`, `demos/v17/`). Never the old top-level `demo/`. The whole `demos/` tree is gitignored and generated per-developer.
 - **If `demos/vN/` doesn't exist**, generate it with `scripts/install-demo-site.{sh,ps1}` (auto-detects the version from your branch) or run `/repo-setup`. Do not create demo files by hand.
+- One `DemoSite` profile for everyone — each worktree gets its own stable port, assigned once by the `Umbraco.Community.WorktreeDevPort` NuGet package and stored in that worktree's own git config. The main checkout gets the familiar `44380` when free; other worktrees get the next free port from the pool
+- Port lookup: `git config --worktree --get wdp.port 2>/dev/null`
 
 ## Build Commands
 
@@ -240,5 +242,7 @@ All commits should follow the [Conventional Commits](https://www.conventionalcom
 **Valid types:** `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `ci`, `revert`, `build`
 
 **Valid scopes:** `core`, `provider`, `action`, `trigger`, `automation`, `step`, `settings`, `ui`, `frontend`, `api`, `deps`, `ci`, `docs`, `release`
+
+**Scope must not repeat the type** - commitlint's `scope-not-type` rule rejects `ci(ci):`, `docs(docs):`, `build(build):`. Drop the scope (`ci: ...`) or use a more specific one (`ci(hooks): ...`).
 
 **Subject must be sentence-case** - Capitalize the first word after the scope.

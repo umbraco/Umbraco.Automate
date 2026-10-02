@@ -2,9 +2,11 @@ import { css, html, customElement, state, nothing, repeat } from "@umbraco-cms/b
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UA_RUN_WORKSPACE_CONTEXT } from "../run-workspace.context-token.js";
-import type { UaRunDetailModel, UaStepRunModel } from "../../../types.js";
+import type { UaRunDetailModel } from "../../../types.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import { formatDateTime } from "../../../../core/index.js";
+import { formatDateTime, getRunStatusColor } from "../../../../core/index.js";
+import "../../../components/step-run-detail/step-run-detail.element.js";
+import { UA_RUN_TRIGGER_ROW_ID } from "../../../components/run-trigger-detail/run-trigger-detail.element.js";
 
 @customElement("ua-run-details-view")
 export class UaRunDetailsViewElement extends UmbLitElement {
@@ -19,6 +21,9 @@ export class UaRunDetailsViewElement extends UmbLitElement {
     @state()
     private _actionNames = new Map<string, string>();
 
+    @state()
+    private _triggerNames = new Map<string, string>();
+
     constructor() {
         super();
         this.#catalogueRepository = new UaCatalogueRepository(this);
@@ -27,7 +32,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
             this.observe(context.run, (run) => {
                 this._run = run;
                 if (run) {
-                    this.#loadActionNames();
+                    this.#loadCatalogueNames();
                     const firstFailed = run.stepRuns.find((sr) => sr.status === "Failed");
                     if (firstFailed) {
                         this._expandedStep = firstFailed.id;
@@ -37,92 +42,28 @@ export class UaRunDetailsViewElement extends UmbLitElement {
         });
     }
 
-    async #loadActionNames() {
-        const { data } = await this.#catalogueRepository.requestActions();
-        if (!data) return;
-        const names = new Map<string, string>();
-        for (const a of data) {
-            names.set(a.alias, a.name);
-        }
-        this._actionNames = names;
-    }
+    async #loadCatalogueNames() {
+        const [{ data: actions }, { data: triggers }] = await Promise.all([
+            this.#catalogueRepository.requestActions(),
+            this.#catalogueRepository.requestTriggers(),
+        ]);
 
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            case "WaitingForInput":
-                return "warning";
-            case "Failed":
-                return "danger";
-            case "Skipped":
-            case "Cancelled":
-            case "Suspended":
-                return "default";
-            default:
-                return "default";
+        if (actions) {
+            const names = new Map<string, string>();
+            for (const a of actions) {
+                names.set(a.alias, a.name);
+            }
+            this._actionNames = names;
+        }
+
+        if (triggers) {
+            this._triggerNames = new Map(triggers.map((t) => [t.alias, t.name]));
         }
     }
 
-    #formatDuration(ms: number | null): string {
-        if (ms == null) return "-";
-        if (ms < 1000) return `${ms}ms`;
-        const seconds = Math.floor(ms / 1000);
-        if (seconds < 60) return `${seconds}s`;
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds}s`;
-    }
-
-    #toggleStep(stepId: string) {
+    #onToggleStep(e: CustomEvent<{ stepId: string }>) {
+        const stepId = e.detail.stepId;
         this._expandedStep = this._expandedStep === stepId ? undefined : stepId;
-    }
-
-    #renderStepRun(stepRun: UaStepRunModel) {
-        const isExpanded = this._expandedStep === stepRun.id;
-
-        return html`
-            <uui-box>
-                <div class="step-header" @click=${() => this.#toggleStep(stepRun.id)}>
-                    <uui-icon name=${isExpanded ? "icon-navigation-down" : "icon-navigation-right"}></uui-icon>
-                    <span class="step-name">${this._actionNames.get(stepRun.actionAlias) ?? stepRun.actionAlias}</span>
-                    <span class="step-duration">${this.#formatDuration(stepRun.durationMs)}</span>
-                    <uui-tag color=${this.#statusColor(stepRun.status)} look="secondary">
-                        ${stepRun.status}
-                    </uui-tag>
-                </div>
-                ${isExpanded
-                    ? html`
-                          <div class="step-details">
-                              <umb-property-layout label=${this.localize.term("uaLabels_started")} orientation="vertical">
-                                  <div slot="editor">
-                                      ${stepRun.startedUtc ? formatDateTime(stepRun.startedUtc) : "-"}
-                                  </div>
-                              </umb-property-layout>
-                              <umb-property-layout label=${this.localize.term("uaLabels_completed")} orientation="vertical">
-                                  <div slot="editor">
-                                      ${stepRun.completedUtc ? formatDateTime(stepRun.completedUtc) : "-"}
-                                  </div>
-                              </umb-property-layout>
-                              <umb-property-layout label=${this.localize.term("uaLabels_retryCount")} orientation="vertical">
-                                  <div slot="editor">${stepRun.retryCount}</div>
-                              </umb-property-layout>
-                              ${stepRun.error
-                                  ? html`
-                                        <umb-property-layout label=${this.localize.term("uaLabels_error")} orientation="vertical">
-                                            <div slot="editor">
-                                                <pre class="error-output">${stepRun.error}</pre>
-                                            </div>
-                                        </umb-property-layout>
-                                    `
-                                  : nothing}
-                          </div>
-                      `
-                    : nothing}
-            </uui-box>
-        `;
     }
 
     override render() {
@@ -131,13 +72,28 @@ export class UaRunDetailsViewElement extends UmbLitElement {
         return html`
             <div class="layout">
                 <div class="main">
-                    <uui-box headline=${this.localize.term("uaLabels_steps")}>
+                    <uui-box @ua-toggle-step=${this.#onToggleStep}>
+                        <ua-run-trigger-detail
+                            .runId=${this._run.unique}
+                            .triggerName=${this._run.triggerAlias
+                                ? (this._triggerNames.get(this._run.triggerAlias) ?? this._run.triggerAlias)
+                                : ""}
+                            .startedUtc=${this._run.startedUtc}
+                            .expanded=${this._expandedStep === UA_RUN_TRIGGER_ROW_ID}
+                        ></ua-run-trigger-detail>
                         ${this._run.stepRuns.length === 0
                             ? html`<p class="empty">${this.localize.term("uaRun_noStepRuns")}</p>`
                             : repeat(
                                   this._run.stepRuns,
                                   (sr) => sr.id,
-                                  (sr) => this.#renderStepRun(sr),
+                                  (sr) => html`
+                                      <ua-step-run-detail
+                                          .stepRun=${sr}
+                                          .actionName=${this._actionNames.get(sr.actionAlias) ?? sr.actionAlias}
+                                          .expanded=${this._expandedStep === sr.id}
+                                          .runId=${this._run!.unique}
+                                      ></ua-step-run-detail>
+                                  `,
                               )}
                     </uui-box>
                 </div>
@@ -145,7 +101,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                     <uui-box headline=${this.localize.term("uaLabels_runInfo")}>
                         <umb-property-layout label=${this.localize.term("uaLabels_status")} orientation="vertical">
                             <div slot="editor">
-                                <uui-tag color=${this.#statusColor(this._run.status)} look="secondary">
+                                <uui-tag color=${getRunStatusColor(this._run.status)} look="secondary">
                                     ${this._run.status}
                                 </uui-tag>
                             </div>
@@ -212,49 +168,18 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                 gap: var(--uui-size-layout-1);
             }
 
-            .main uui-box {
+            .main > uui-box {
                 --uui-box-default-padding: 0;
-                --uui-box-border-radius: 0;
+                overflow: hidden;
             }
 
-            .main uui-box > uui-box {
-                --uui-box-box-shadow: 0;
-            }
-
-            .main uui-box > uui-box + uui-box {
-                border-top: 1px solid var(--uui-color-border);
-            }
-
-            .step-header {
-                display: flex;
-                align-items: center;
-                gap: var(--uui-size-space-3);
-                padding: var(--uui-size-space-3);
-                cursor: pointer;
-            }
-
-            .step-header:hover {
-                background: var(--uui-color-surface-alt);
-            }
-
-            .step-name {
-                flex: 1;
-                font-weight: 500;
-            }
-
-            .step-duration {
-                color: var(--uui-color-text-alt);
-                font-size: var(--uui-size-4);
-            }
-
-            .step-details {
-                padding: var(--uui-size-space-5);
+            .main > uui-box > * + * {
                 border-top: 1px solid var(--uui-color-border);
             }
 
             .error-output {
                 background: var(--uui-color-danger-standalone);
-                color: white;
+                color: var(--uui-color-danger-contrast, white);
                 padding: var(--uui-size-space-3);
                 border-radius: var(--uui-border-radius);
                 font-size: var(--uui-size-4);

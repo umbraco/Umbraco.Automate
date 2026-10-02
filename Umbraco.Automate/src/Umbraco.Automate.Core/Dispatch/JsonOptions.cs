@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Dispatch;
@@ -38,7 +39,14 @@ internal static class JsonOptions
         // Order matters: SingleValueArrayConverterFactory must come first so it gets
         // first refusal on enum properties — otherwise JsonStringEnumConverter claims
         // them and chokes on the array shape before our flattening can run.
-        Converters = { new SingleValueArrayConverterFactory(), new JsonStringEnumConverter() },
+        // HttpRequestKeyValueListJsonConverter migrates the HTTP Request action's headers
+        // from the JSON-object string they were saved as before the key/value editor.
+        Converters =
+        {
+            new SingleValueArrayConverterFactory(),
+            new JsonStringEnumConverter(),
+            new HttpRequestKeyValueListJsonConverter(),
+        },
     };
 
     /// <summary>

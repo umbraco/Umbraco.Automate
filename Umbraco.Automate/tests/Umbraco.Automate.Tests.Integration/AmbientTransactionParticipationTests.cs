@@ -1,3 +1,5 @@
+using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Notifications.Channels;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -238,9 +240,12 @@ public sealed class AmbientTransactionParticipationTests : IDisposable
 
         return new AutomationFactory(
             serializer,
-            new ActionCollection(Array.Empty<IAction>),
-            new TriggerCollection(Array.Empty<ITrigger>),
-            new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>));
+            new AutomationSettingsProtector(
+                serializer,
+                new ActionCollection(Array.Empty<IAction>),
+                new TriggerCollection(Array.Empty<ITrigger>),
+                new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
+                new NotificationChannelCollection(Array.Empty<INotificationChannel>)));
     }
 
     private const string SqliteProviderName = Umbraco.Cms.Core.Constants.ProviderNames.SQLLite;

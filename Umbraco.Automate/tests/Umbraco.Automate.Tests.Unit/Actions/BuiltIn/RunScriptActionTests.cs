@@ -44,6 +44,145 @@ public class RunScriptActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ExposesStepOutputsByAliasAtBindingPaths()
+    {
+        var mediaOutput = new Dictionary<string, object?>
+        {
+            ["properties"] = new Dictionary<string, object?> { ["umbracoBytes"] = 2048L },
+        };
+        var context = CreateContext(
+            new RunScriptSettings
+            {
+                Script = "export default function (data) { return data.steps.getMedia.properties.umbracoBytes / 1024 }",
+            },
+            bindingData: CreateBindingData(steps: Steps((Guid.NewGuid(), "getMedia", mediaOutput))));
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<int>().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ExposesTriggerPreviousAndLoop()
+    {
+        var previous = new Dictionary<string, object?> { ["result"] = "prev" };
+        var bindingData = CreateBindingData(
+            trigger: new Dictionary<string, object?> { ["name"] = "Home" },
+            steps: Steps((Guid.NewGuid(), "first", previous)));
+        bindingData["previous"] = previous;
+        bindingData["loop"] = new Dictionary<string, object?> { ["item"] = "a", ["index"] = 3 };
+
+        var context = CreateContext(
+            new RunScriptSettings
+            {
+                Script = "export default (d) => [d.trigger.name, d.previous.result, d.loop.item, d.loop.index].join('|')",
+            },
+            bindingData: bindingData);
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("Home|prev|a|3");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AliasedStepIsListedOnce_UnaliasedStepByGuid()
+    {
+        var unaliasedId = Guid.NewGuid();
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default (d) => Object.keys(d.steps).sort()" },
+            bindingData: CreateBindingData(steps: Steps(
+                (Guid.NewGuid(), "named", new Dictionary<string, object?> { ["x"] = 1 }),
+                (unaliasedId, null, new Dictionary<string, object?> { ["y"] = 2 }))));
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        var keys = result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.AsArray()
+            .Select(n => n!.GetValue<string>())
+            .ToArray();
+        keys.ShouldBe(new[] { unaliasedId.ToString(), "named" }.Order(StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InputMappingsAreRootKeysAndWinOverBindingContext()
+    {
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default (d) => d.name + '/' + d.trigger" },
+            new Dictionary<string, object?> { ["name"] = "mapped", ["trigger"] = "override" },
+            CreateBindingData(trigger: new Dictionary<string, object?> { ["name"] = "Home" }));
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("mapped/override");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NormalisesPersistedJTokensAndPocos()
+    {
+        // After a WorkflowCore persistence round-trip outputs can surface as JTokens, and a trigger
+        // can put a POCO in its output — both must reach the script as plain JSON.
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default (d) => d.steps.jt.items[1].v + ':' + d.trigger.poco.method" },
+            bindingData: CreateBindingData(
+                trigger: new Dictionary<string, object?> { ["poco"] = new { Method = "POST" } },
+                steps: Steps((Guid.NewGuid(), "jt", new Dictionary<string, object?>
+                {
+                    ["items"] = Newtonsoft.Json.Linq.JArray.Parse("""[{ "v": 1 }, { "v": 2 }]"""),
+                }))));
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("2:POST");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PropertyAccessIsCaseSensitive()
+    {
+        // Documented behaviour: unlike bindings, script paths must match the alias casing.
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default (d) => [typeof d.steps.getMedia, typeof d.steps.getmedia].join('|')" },
+            bindingData: CreateBindingData(steps: Steps((Guid.NewGuid(), "getMedia", new Dictionary<string, object?> { ["x"] = 1 }))));
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("object|undefined");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MutatingDataDoesNotChangeBindingContext()
+    {
+        var output = new Dictionary<string, object?> { ["value"] = "original" };
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default (d) => { d.steps.s.value = 'changed'; return d.steps.s.value }" },
+            bindingData: CreateBindingData(steps: Steps((Guid.NewGuid(), "s", output))));
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        output["value"].ShouldBe("original");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SelfReferencingData_ReturnsValidationFailure()
+    {
+        var cyclic = new Dictionary<string, object?>();
+        cyclic["self"] = cyclic;
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default (d) => 1" },
+            bindingData: CreateBindingData(trigger: cyclic));
+
+        var result = await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_EmptyScript_ReturnsValidationFailure()
     {
         var action = CreateAction();
@@ -119,6 +258,63 @@ public class RunScriptActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Success);
         result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("undefined");
+    }
+
+    [Fact]
+    public void AllowFetch_DefaultsToFalse()
+    {
+        new RunScriptSettings().AllowFetch.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SettingsSchema_AllowFetchDefaultValueIsFalse()
+    {
+        // The backoffice pre-fills a new step's toggle from this schema default.
+        var field = CreateAction().GetSettingsSchema()!.Fields
+            .Single(f => f.PropertyName == nameof(RunScriptSettings.AllowFetch));
+
+        field.DefaultValue.ShouldBe(false);
+    }
+
+    [Fact]
+    public void ResolveSettings_AllowFetchMissingFromJson_IsFalse()
+    {
+        // Steps saved without the key (e.g. created through the API or an import) take the default.
+        var resolver = new EditableModelResolver(new ConfigurationReferenceResolver(new ConfigurationBuilder().Build()));
+        using var json = System.Text.Json.JsonDocument.Parse("""{ "script": "export default () => 1" }""");
+
+        var settings = resolver.ResolveModel<RunScriptSettings>("umbracoAutomate.runScript", json.RootElement);
+
+        settings.ShouldNotBeNull();
+        settings!.AllowFetch.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AllowFetchNotSet_FetchIsUndefined()
+    {
+        var action = CreateAction(new ScriptingOptions { FetchEnabled = true });
+        var context = CreateContext(new RunScriptSettings { Script = "export default function () { return typeof fetch }" });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("undefined");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AllowFetchAndFetchEnabled_FetchIsAvailable()
+    {
+        var action = CreateAction(new ScriptingOptions { FetchEnabled = true });
+        var context = CreateContext(new RunScriptSettings
+        {
+            Script = "export default function () { return typeof fetch }",
+            AllowFetch = true,
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        result.OutputData.ShouldBeOfType<RunScriptOutput>().Result!.GetValue<string>().ShouldBe("function");
     }
 
     [Fact]
@@ -221,9 +417,94 @@ public class RunScriptActionTests
         errors.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ConsoleCalls_AreWrittenToTheRunLogAtMatchingLevels()
+    {
+        var context = new ActionContext
+        {
+            AutomationId = Guid.NewGuid(),
+            RunId = Guid.NewGuid(),
+            StepId = Guid.NewGuid(),
+            ActionAlias = "umbracoAutomate.runScript",
+            MinimumLogLevel = ActionLogLevel.Debug,
+            Settings = new RunScriptSettings
+            {
+                Script = """
+                    export default function () {
+                        console.log('log', 1);
+                        console.info('info');
+                        console.warn('warn');
+                        console.error('error');
+                        console.debug('debug');
+                        return true;
+                    }
+                    """,
+            },
+        };
+
+        await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.Select(e => (e.Level, e.Message)).Take(5).ShouldBe(
+        [
+            (ActionLogLevel.Info, "log 1"),
+            (ActionLogLevel.Info, "info"),
+            (ActionLogLevel.Warning, "warn"),
+            (ActionLogLevel.Error, "error"),
+            (ActionLogLevel.Debug, "debug"),
+        ]);
+
+        var completed = context.LogEntries[5];
+        completed.Level.ShouldBe(ActionLogLevel.Info);
+        completed.Message.ShouldStartWith("Script completed in ");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ThrownError_LogsTheError()
+    {
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default function () { throw new Error('boom') }" });
+
+        await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("Script threw an error after ");
+        entry.Message.ShouldContain("boom");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InfiniteLoop_LogsTheTimeout()
+    {
+        var context = CreateContext(
+            new RunScriptSettings { Script = "export default function () { while (true) { let x = 1 } }" });
+
+        await CreateAction().ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("Script stopped after ");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FetchDisabledGlobally_WarnsWhenStepAllowsIt()
+    {
+        var context = CreateContext(new RunScriptSettings
+        {
+            Script = "export default function () { return 1 }",
+            AllowFetch = true,
+        });
+
+        await CreateAction(new ScriptingOptions { FetchEnabled = false }).ExecuteAsync(context, CancellationToken.None);
+
+        var warning = context.LogEntries[0];
+        warning.Level.ShouldBe(ActionLogLevel.Warning);
+        warning.Message.ShouldContain("fetch() is not available");
+    }
+
     private static ActionContext CreateContext(
         RunScriptSettings settings,
-        IReadOnlyDictionary<string, object?>? inputData = null) => new()
+        IReadOnlyDictionary<string, object?>? inputData = null,
+        IReadOnlyDictionary<string, object?>? bindingData = null) => new()
     {
         AutomationId = Guid.NewGuid(),
         RunId = Guid.NewGuid(),
@@ -231,7 +512,38 @@ public class RunScriptActionTests
         ActionAlias = "umbracoAutomate.runScript",
         Settings = settings,
         InputData = inputData ?? new Dictionary<string, object?>(),
+        BindingData = bindingData,
     };
+
+    /// <summary>
+    /// Mirrors the shape <c>BindingDataBuilder</c> produces for a run.
+    /// </summary>
+    private static Dictionary<string, object?> CreateBindingData(
+        Dictionary<string, object?>? trigger = null,
+        Dictionary<string, object?>? steps = null) => new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["trigger"] = trigger ?? new Dictionary<string, object?>(),
+        ["steps"] = steps ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+    };
+
+    /// <summary>
+    /// Registers each output under its GUID and, when present, its alias — the same object under
+    /// both keys, as <c>BindingDataBuilder</c> does.
+    /// </summary>
+    private static Dictionary<string, object?> Steps(params (Guid Id, string? Alias, Dictionary<string, object?> Output)[] steps)
+    {
+        var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, alias, output) in steps)
+        {
+            dict[id.ToString()] = output;
+            if (alias is not null)
+            {
+                dict[alias] = output;
+            }
+        }
+
+        return dict;
+    }
 
     private static RunScriptAction CreateAction(ScriptingOptions? scripting = null)
     {

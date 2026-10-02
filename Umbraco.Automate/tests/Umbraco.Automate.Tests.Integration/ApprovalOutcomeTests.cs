@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
@@ -56,6 +57,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
     private EfCoreTestFixture _fixture = null!;
     private TriggerEventHandler _handler = null!;
     private IAutomationRunRepository _runRepository = null!;
+    private WaitingForInputHookProxy _runRepositoryHook = null!;
     private IPersistenceProvider _persistence = null!;
     private Mock<IAutomationService> _automationServiceMock = null!;
 
@@ -91,7 +93,10 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         services.AddWorkflow();
 
         _runRepository = new EFCoreAutomationRunRepository(dbContextFactory);
-        services.AddSingleton(_runRepository);
+        var hookedRepository = DispatchProxy.Create<IAutomationRunRepository, WaitingForInputHookProxy>();
+        _runRepositoryHook = (WaitingForInputHookProxy)(object)hookedRepository;
+        _runRepositoryHook.Inner = _runRepository;
+        services.AddSingleton(hookedRepository);
 
         services.AddSingleton(actions);
         services.AddSingleton(triggers);
@@ -253,6 +258,70 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         doc.RootElement.GetProperty("comment").GetString().ShouldBe("not this time");
     }
 
+    [Fact]
+    public async Task Decision_PublishedTheMomentTheStepShowsWaiting_IsNotLost()
+    {
+        // The fastest possible approver: publish the decision from inside the save that marks the
+        // step WaitingForInput, then hold the step body so any timestamp it takes afterwards is
+        // later than the event. WorkflowCore drops an event that is older than its subscription's
+        // start time, so the step must take that time before it shows as waiting.
+        var approvalStep = ApprovalStep();
+        var nextStep = LogStep("afterApproval", "continued");
+
+        var automation = new AutomationBuilder()
+            .WithAlias("test-approval-immediate-decision")
+            .WithName("test-approval-immediate-decision")
+            .WithManualTrigger()
+            .AddStep(approvalStep)
+            .AddStep(nextStep)
+            .WithTriggerConnection(approvalStep.Id)
+            .WithConnection(approvalStep.Id, nextStep.Id)
+            .Build();
+
+        _runRepositoryHook.OnWaitingForInput = async stepRun =>
+        {
+            _runRepositoryHook.OnWaitingForInput = null;
+            await SubmitDecisionAsync(stepRun.RunId, stepRun.StepId, ApprovalOutcome.Approved);
+            await Task.Delay(TimeSpan.FromMilliseconds(20));
+        };
+
+        var run = await StartRunAsync(automation);
+
+        await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.Completed, TestTimeouts.WorkflowWait);
+        await WaitForStepRunStatusAsync(run, nextStep.Id, StepRunStatus.Completed, TestTimeouts.WorkflowWait);
+    }
+
+    [Fact]
+    public async Task Run_IsSuspendedWhileWaiting_AndRunningAgainAfterTheDecision()
+    {
+        // WorkflowCore's WaitForEvent leaves the workflow Runnable, so nothing in the engine reports
+        // this pause: the step body has to mark the run Suspended itself, or the Runs dashboard shows
+        // an approval-blocked run as Running.
+        var approvalStep = ApprovalStep();
+        var nextStep = LogStep("afterApproval", "continued");
+
+        var automation = new AutomationBuilder()
+            .WithAlias("test-approval-run-status")
+            .WithName("test-approval-run-status")
+            .WithManualTrigger()
+            .AddStep(approvalStep)
+            .AddStep(nextStep)
+            .WithTriggerConnection(approvalStep.Id)
+            .WithConnection(approvalStep.Id, nextStep.Id)
+            .Build();
+
+        var run = await RunToApprovalAsync(automation, approvalStep);
+        await WaitForRunStatusAsync(run, AutomationRunStatus.Suspended, TestTimeouts.WorkflowWait);
+
+        await SubmitDecisionAsync(run.Id, approvalStep.Id, ApprovalOutcome.Approved);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        // This fixture runs on WorkflowCore's in-memory persistence, so RunFinalizer never marks the
+        // run Completed; what matters here is that the decision took it back out of Suspended.
+        var resumed = await _runRepository.GetAsync(run.Id);
+        resumed!.Status.ShouldBe(AutomationRunStatus.Running);
+    }
+
     private static StepConfiguration ApprovalStep() => new()
     {
         Id = Guid.NewGuid(),
@@ -277,6 +346,13 @@ public class ApprovalOutcomeTests : IAsyncLifetime
 
     private async Task<AutomationRun> RunToApprovalAsync(Automation automation, StepConfiguration approvalStep)
     {
+        var run = await StartRunAsync(automation);
+        await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.WaitingForInput, TestTimeouts.WorkflowWait);
+        return run;
+    }
+
+    private async Task<AutomationRun> StartRunAsync(Automation automation)
+    {
         _automationServiceMock
             .Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { automation });
@@ -288,9 +364,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         };
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
 
-        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
-        await WaitForStepRunStatusAsync(run, approvalStep.Id, StepRunStatus.WaitingForInput, TestTimeouts.WorkflowWait);
-        return run;
+        return await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
     }
 
     /// <summary>Publishes the approval event exactly as <c>SubmitApprovalController</c> does.</summary>
@@ -347,6 +421,24 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         throw new TimeoutException($"Step {stepId} in run {run.Id} did not reach {status} within {timeout}.");
     }
 
+    private async Task WaitForRunStatusAsync(AutomationRun run, AutomationRunStatus status, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        AutomationRunStatus? last = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            last = (await _runRepository.GetAsync(run.Id))?.Status;
+            if (last == status)
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Run {run.Id} did not reach {status} within {timeout} (last seen: {last}).");
+    }
+
     private async Task<WorkflowInstance> WaitForWorkflowStatusAsync(AutomationRun run, WorkflowStatus status, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
@@ -374,5 +466,37 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         await _workflowHost.StopAsync(CancellationToken.None);
         await _provider.DisposeAsync();
         _fixture.Dispose();
+    }
+    /// <summary>
+    /// Passes every call through to the real repository, and runs <see cref="OnWaitingForInput"/>
+    /// once a step run has been saved as <see cref="StepRunStatus.WaitingForInput"/>, before the
+    /// step body carries on.
+    /// </summary>
+    internal class WaitingForInputHookProxy : DispatchProxy
+    {
+        public IAutomationRunRepository Inner { get; set; } = null!;
+
+        public Func<StepRun, Task>? OnWaitingForInput { get; set; }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            var result = targetMethod!.Invoke(Inner, args);
+
+            if (targetMethod.Name != nameof(IAutomationRunRepository.UpdateStepRunAsync)
+                || args?[0] is not StepRun { Status: StepRunStatus.WaitingForInput } stepRun
+                || OnWaitingForInput is not { } hook)
+            {
+                return result;
+            }
+
+            return AfterSaveAsync((Task<StepRun>)result!, stepRun, hook);
+        }
+
+        private static async Task<StepRun> AfterSaveAsync(Task<StepRun> save, StepRun stepRun, Func<StepRun, Task> hook)
+        {
+            var saved = await save;
+            await hook(stepRun);
+            return saved;
+        }
     }
 }

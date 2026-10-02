@@ -727,9 +727,10 @@ Registered via an ordered collection builder:
 builder.ActionMiddleware()
     .Append<StepRunLoggingMiddleware>()       // Captures input/output/duration per step
     .Append<ErrorHandlingMiddleware>()        // Retry, suspend, terminate logic
-    .Append<SensitiveDataMaskingMiddleware>() // Masks [Field(IsSensitive=true)] values in logs
     .Append<ValidationMiddleware>();          // Validates settings before execution
 ```
+
+Sensitive values are not masked by a middleware: `SensitiveDataMasker` masks step input when it is recorded (`ActionStepBody`) and all run data when it is read back (`RunDataSanitizer`). Masking is always on.
 
 Third parties can insert middleware:
 
@@ -843,17 +844,18 @@ Mirrors Umbraco.AI's hierarchical `IOptions` binding:
 {
     "Umbraco": {
         "Automate": {
-            "Enabled": true,
             "Execution": {
                 "DefaultTimeout": "00:05:00",
-                "DefaultRetryCount": 3,
-                "MaxConcurrentRuns": 10,
-                "PollInterval": "00:00:05"
+                "DefaultMaxRetries": 10,
+                "MaxConcurrentRuns": 0,
+                "PollInterval": "00:00:10"
             },
-            "Governance": {
-                "AuditLogEnabled": true,
-                "AuditLogRetentionDays": 90,
-                "SensitiveDataMasking": true
+            "RunCleanup": {
+                "RetentionDays": 90,
+                "MaxRunsPerAutomation": 1000
+            },
+            "RateLimiting": {
+                "MaxConcurrentRunsPerAutomation": 10
             }
         }
     }
@@ -861,10 +863,15 @@ Mirrors Umbraco.AI's hierarchical `IOptions` binding:
 ```
 
 ```csharp
-services.Configure<AutomationOptions>(config.GetSection("Umbraco:Automate"));
-services.Configure<ExecutionOptions>(config.GetSection("Umbraco:Automate:Execution"));
-services.Configure<GovernanceOptions>(config.GetSection("Umbraco:Automate:Governance"));
+builder.Services.Configure<AutomateOptions>(builder.Config.GetSection("Umbraco:Automate"));
+builder.Services.Configure<ExecutionOptions>(builder.Config.GetSection("Umbraco:Automate:Execution"));
+builder.Services.Configure<RunCleanupPolicy>(builder.Config.GetSection("Umbraco:Automate:RunCleanup"));
+// ...one Configure<T> per section; see AddUmbracoAutomateCore for the full list.
 ```
+
+`Execution:PollInterval` and `Execution:MaxConcurrentRuns` are WorkflowCore engine settings. WorkflowCore takes them only through its `AddWorkflow` callback, so they are read once at startup and passed to `UsePollInterval` / `UseMaxConcurrentWorkflows`. `MaxConcurrentRuns` is a per-node limit on runs actively executing (0 = WorkflowCore's default, processor count with a minimum of 4); the per-automation limit is `RateLimiting:MaxConcurrentRunsPerAutomation`.
+
+> **Obsolete, never read:** `Umbraco:Automate:Enabled` and the whole `Umbraco:Automate:Governance` section (`AuditLogEnabled`, `AuditLogRetentionDays`, `SensitiveDataMasking`, `DefaultNotifyOn`). They are marked `[Obsolete]` and scheduled for removal in Umbraco Automate 19. Run retention is `RunCleanup:*`; masking and the CMS audit trail are always on; notification policy is set per automation.
 
 ### Infrastructure Providers (Queue, Lock, Lifecycle)
 
@@ -1612,21 +1619,7 @@ Automation
         └── IsEnabled: bool
 ```
 
-**Global defaults** via `Umbraco:Automate:Governance` configuration:
-
-```json
-{
-    "Umbraco": {
-        "Automate": {
-            "Governance": {
-                "DefaultNotificationChannels": [
-                    { "Channel": "backoffice" }
-                ]
-            }
-        }
-    }
-}
-```
+There are no site-wide notification defaults: notification policy is configured per automation through its notification channels. (An earlier design proposed global defaults under `Umbraco:Automate:Governance`; it was not built.)
 
 **Integration with lifecycle notifications:** Failure notifications fire from a handler on `AutomationRunCompletedNotification` — this means third parties can also add their own notification channels via the same `INotificationChannel` collection builder:
 
@@ -1754,21 +1747,7 @@ This closes the loop: **agents can orchestrate automations, and automations can 
 All AI-related runs are fully auditable:
 - Runs initiated by an AI agent record `InitiatedBy: "ai-agent:{agentAlias}"`
 - Agent execution steps record the full prompt, response, and token usage in step-run data
-- HITL gates can be required for AI-initiated automations via `GovernanceOptions`:
-
-```json
-{
-    "Umbraco": {
-        "Automate": {
-            "Governance": {
-                "RequireApprovalForAIInitiatedRuns": true
-            }
-        }
-    }
-}
-```
-
-When enabled, any automation triggered by an AI agent automatically inserts an approval step before execution begins.
+- Approval gates for AI-initiated runs belong to Umbraco.AI.Automate, not Automate core. (An earlier design proposed a `Governance:RequireApprovalForAIInitiatedRuns` setting here; it was not built.)
 
 ---
 
@@ -2078,16 +2057,16 @@ These concerns are baked into the architecture, not bolted on later.
 | Concern | Approach |
 |---------|----------|
 | **Secrets management** | Settings marked `[Field(IsSensitive = true)]` are automatically encrypted at rest using ASP.NET Core Data Protection (already in Umbraco's dependency tree) — mirroring Umbraco.AI's `[AIField(IsSensitive = true)]` pattern. Sensitive values are encrypted in-place on the entity (Connection settings, action settings) via EF Core value converters. No separate secrets table — the Connection entity itself centralises shared credentials. |
-| **Configuration references** | Settings fields support a `$Key:Path` syntax that resolves to an `IConfiguration` value at run time (e.g. `$Umbraco:Automate:Secrets:SlackToken`), keeping credentials and per-environment values in app settings / environment variables rather than the database. Because automations run under an elevated service-account identity, resolution follows least-privilege and is **default-deny**: a key resolves only when it falls under one of `AutomateOptions.AllowedConfigurationKeyPrefixes` (default `Umbraco:Automate:Secrets` and `Umbraco:Automate:Variables`, segment-aware, case-insensitive), keeping settings scoped to configuration explicitly intended for automations. The allow-list lives in app settings by design, so only someone who already has the configuration decides which subset is exposable — it is deliberately **not** a backoffice-editable setting. The two default sections mirror the GitHub Actions **Secrets** (sensitive) / **Variables** (non-sensitive) split. Keys under a `SecretConfigurationKeyPrefixes` prefix (default `Umbraco:Automate:Secrets`) may only be referenced from fields marked `[Field(IsSensitive = true)]`, so a resolved secret stays in fields treated as credential-bearing; `Variables` are unrestricted. (General run-log masking of sensitive fields — `GovernanceOptions.SensitiveDataMasking` — remains unimplemented and is tracked separately.) |
+| **Configuration references** | Settings fields support a `$Key:Path` syntax that resolves to an `IConfiguration` value at run time (e.g. `$Umbraco:Automate:Secrets:SlackToken`), keeping credentials and per-environment values in app settings / environment variables rather than the database. Because automations run under an elevated service-account identity, resolution follows least-privilege and is **default-deny**: a key resolves only when it falls under one of `AutomateOptions.AllowedConfigurationKeyPrefixes` (default `Umbraco:Automate:Secrets` and `Umbraco:Automate:Variables`, segment-aware, case-insensitive), keeping settings scoped to configuration explicitly intended for automations. The allow-list lives in app settings by design, so only someone who already has the configuration decides which subset is exposable — it is deliberately **not** a backoffice-editable setting. The two default sections mirror the GitHub Actions **Secrets** (sensitive) / **Variables** (non-sensitive) split. Keys under a `SecretConfigurationKeyPrefixes` prefix (default `Umbraco:Automate:Secrets`) may only be referenced from fields marked `[Field(IsSensitive = true)]`, so a resolved secret stays in fields treated as credential-bearing; `Variables` are unrestricted. (Sensitive values in run payloads are always masked separately, by `SensitiveDataMasker`.) |
 | **Step-type permission gating** | Triggers and actions declare `RequiredSections` (and content actions `RequiredPermissions`, the CMS permission letters) on the `[Trigger(...)]` / `[Action(...)]` attribute. `ISectionAccessChecker` enforces section access at four points: the catalogue picker endpoint filters out items the workspace's service account cannot use; `AutomationService.ValidateForPublishAsync` rejects publishes that would violate them; `TriggerEventHandler` skips dispatch when the trigger requirement is no longer satisfied; `BackOfficeIdentityMiddleware` fails the step at runtime when the action requirement drifts. `IAutomationActionAuthorizer` wraps Umbraco's `IContentPermissionService` / `IMediaPermissionService` to enforce node-level access (start node + granular Browse/Update/Publish) inside each content/media action. `AutomationPermissionDriftHealthCheck` surfaces published automations whose service accounts no longer satisfy the requirements. See [identity-ownership-permissions.md](identity-ownership-permissions.md#step-type-permission-model) for the full model. |
-| **SSRF prevention** | HTTP Request action validates URLs against a configurable allowlist/denylist. Blocks internal IPs (`10.x`, `172.16.x`, `192.168.x`), link-local (`169.254.x`), and localhost by default. |
+| **SSRF prevention** | HTTP Request action validates URLs against a configurable allowlist/denylist. Blocks internal IPs (`10.x`, `172.16.x`, `192.168.x`), link-local (`169.254.x`), and localhost by default. Direct connections are validated at connect time; when a system/environment proxy is used (`Execution:AllowOutboundHttpProxy`, default `true`) the destination and every redirect hop are validated by DNS lookup before sending. Set it to `false` to force direct connections. |
 | **Step-level timeout enforcement** | `CancellationToken` linked to a `CancellationTokenSource` with the configured timeout. Enforced by the middleware pipeline — actions that ignore cancellation are terminated after a grace period. |
 | **Trigger deduplication** | Optional `IdempotencyKey` on trigger events. `TriggerService` deduplicates within a configurable window (default 5 minutes). Incoming webhooks use `X-Request-Id` header or body hash. |
 | **Optimistic concurrency** | EF Core concurrency token (`[Timestamp]`) on `Automation` entity. Management API returns HTTP 409 Conflict when saving a stale version. |
 | **Stuck workflow recovery** | Startup sweep identifies workflow instances in `Running` state that haven't progressed within 2x `DefaultTimeout`. Options: re-queue, mark as failed. Configurable behavior. |
 | **Graceful shutdown** | `IHostedService.StopAsync()` calls `WorkflowHost.StopAsync()` with a configurable drain timeout. In-flight steps complete or are cleanly suspended. |
 | **Health checks** | Suite of `HealthCheck` classes registered with Umbraco's health check system (see details below). |
-| **Data retention purge** | Recurring hosted service deletes `AutomationRun` + `StepRun` records older than `AuditLogRetentionDays`. Configurable per-automation for regulatory needs. |
+| **Data retention purge** | Recurring hosted service deletes terminal `AutomationRun` + `StepRun` records older than `RunCleanup:RetentionDays`, and trims each automation to `RunCleanup:MaxRunsPerAutomation`. |
 | **Queue depth limits** | `MaxQueueDepth` option. When exceeded, new runs are rejected with a "system busy" status. Warning logged at 80% capacity. |
 | **Basic observability** | Metrics emitted via OpenTelemetry: `automate.runs.total`, `automate.runs.failed`, `automate.step.duration` histogram. Compatible with Prometheus, Application Insights, etc. |
 | **Input validation** | Middleware validates action settings against POCO attributes before execution. Webhook payloads are size-limited (configurable, default 1MB). |
@@ -2153,7 +2132,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 - Background task queue for non-blocking run/step-run persistence
 - Draft/publish lifecycle with version snapshots and rollback
 - Automation lifecycle notifications (Saving/Saved, Publishing/Published, RunStarting/RunCompleted)
-- `AutomationOptions` / `ExecutionOptions` / `GovernanceOptions` configuration
+- `AutomateOptions` / `ExecutionOptions` configuration
 
 **Triggers & actions**:
 - Core triggers: Manual, Scheduled, Webhook Received
@@ -2262,7 +2241,7 @@ Registered as standard Umbraco health checks — for ops/infrastructure monitori
 | React-in-Lit integration friction | Low | Medium | Well-established pattern (React-in-custom-element). Isolate React to canvas only. Event bridging is straightforward via CustomEvent. |
 | Performance at scale (100s of automations, 1000s of runs/day) | High | Low (initially) | WorkflowCore supports distributed execution. Optimize poll intervals. Data retention purge + archival. Queue depth limits. |
 | SSRF via HTTP Request action | High | Medium | URL allowlist/denylist blocking internal IPs and metadata endpoints. Enforced by default, configurable. |
-| Credential exposure in run logs | High | Medium | `[Field(IsSensitive = true)]` encrypts values at rest. `SensitiveDataMaskingMiddleware` strips sensitive values from step-run data before persistence. |
+| Credential exposure in run logs | High | Medium | `[Field(IsSensitive = true)]` encrypts values at rest. `SensitiveDataMasker` masks sensitive values in step input when it is recorded, and in all run data when it is read back. |
 | Duplicate runs from duplicate events | Medium | High | Trigger deduplication with configurable idempotency window. Webhook dedup via `X-Request-Id` or body hash. |
 | Stuck workflows after crash | High | Medium | Startup recovery sweep. Health check monitors for stuck instances. Graceful shutdown drains in-flight steps. |
 | Third-party action takes down host | High | Low | Step-level timeout enforcement. Queue depth limits as backpressure. Document resource guidelines for action authors. |

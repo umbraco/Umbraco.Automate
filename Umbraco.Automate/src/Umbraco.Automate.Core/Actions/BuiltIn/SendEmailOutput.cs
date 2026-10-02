@@ -1,3 +1,5 @@
+using Json.Schema.Generation;
+
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
 /// <summary>
@@ -8,10 +10,12 @@ public sealed class SendEmailOutput
     /// <summary>
     /// Gets the number of recipients the email was sent to.
     /// </summary>
+    [Description("The number of recipients the email was sent to.")]
     public int RecipientCount { get; init; }
 
     /// <summary>
     /// Gets the subject line that was sent.
     /// </summary>
+    [Description("The subject line that was sent.")]
     public string Subject { get; init; } = string.Empty;
 }

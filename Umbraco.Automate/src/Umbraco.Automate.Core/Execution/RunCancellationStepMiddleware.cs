@@ -14,7 +14,7 @@ namespace Umbraco.Automate.Core.Execution;
 /// issued while a run is actively executing (the common case when a user cancels a long loop)
 /// silently fails and the workflow runs to completion. The run row is the durable source of
 /// truth for cancellation, so this middleware checks it before every step and, when the run
-/// is <see cref="AutomationRunStatus.Cancelled"/>, skips the step and flips the in-memory
+/// is <see cref="AutomationRunStatus.Cancelled"/> (or any other terminal status), skips the step and flips the in-memory
 /// instance to <see cref="WorkflowStatus.Terminated"/> — mirroring WorkflowCore's own
 /// <c>TerminateHandler</c>. The executor persists that status at the end of the pass and the
 /// consumer skips the workflow from then on. Because the check reads the shared database, it
@@ -75,15 +75,22 @@ internal sealed class RunCancellationStepMiddleware : IWorkflowStepMiddleware
             return await next();
         }
 
+        // Any terminal status stops the workflow, not only Cancelled. Only RunFinalizer writes the
+        // other terminal statuses in the normal course, once the workflow itself has finished, so
+        // seeing one here means the run row and the engine have diverged (e.g. startup recovery
+        // failed a run whose instance another node went on to resume). The run row wins: letting
+        // the step run would repeat its side effects behind a run the backoffice reports as over.
         var status = await GetRunStatusAsync(data.RunId, context.CancellationToken);
-        if (status is not AutomationRunStatus.Cancelled)
+        if (status is not (AutomationRunStatus.Cancelled or AutomationRunStatus.Failed
+            or AutomationRunStatus.Completed or AutomationRunStatus.Rejected))
         {
             return await next();
         }
 
         _logger.LogInformation(
-            "Run {RunId} is cancelled — skipping step and terminating workflow {WorkflowInstanceId}",
+            "Run {RunId} is {Status} — skipping step and terminating workflow {WorkflowInstanceId}",
             data.RunId,
+            status,
             context.Workflow.Id);
 
         // Two benign timing quirks, both bounded and safe to leave as-is:

@@ -80,7 +80,7 @@ internal sealed class Response : IDisposable
                 }
                 else
                 {
-                    reject(JsValue.FromObject(_engine, task.Exception?.Message));
+                    reject(JsValue.FromObject(_engine, "failed to read response body"));
                 }
             });
 
@@ -109,7 +109,7 @@ internal sealed class Response : IDisposable
                 }
                 else
                 {
-                    reject(JsValue.FromObject(_engine, task.Exception?.Message));
+                    reject(JsValue.FromObject(_engine, "failed to read response body"));
                 }
             });
 

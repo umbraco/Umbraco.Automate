@@ -1,11 +1,14 @@
 namespace Umbraco.Automate.Core.StepTypes;
 
 /// <summary>
-/// Implemented by step types (actions, control flow) that can validate their own resolved settings
+/// Implemented by actions that can validate their own resolved settings
 /// at author time. When an automation is saved, the automation service calls
 /// <see cref="ValidateSettingsAsync"/> for each step whose type implements this, and rejects the
 /// save if any errors are returned.
 /// </summary>
+/// <remarks>
+/// Only actions are validated; control-flow step types that implement this interface are not called.
+/// </remarks>
 public interface IValidatableStepType
 {
     /// <summary>

@@ -1,8 +1,15 @@
 import type { UmbEntityModel } from "@umbraco-cms/backoffice/entity";
 import type {
+    ActionLogLevelModel,
     AutomationRunStatusModel,
     StepRunStatusModel,
 } from "../api/types.gen.js";
+
+export interface UaStepRunLogEntryModel {
+    timestampUtc: string;
+    level: ActionLogLevelModel;
+    message: string;
+}
 
 export interface UaStepRunModel {
     id: string;
@@ -14,6 +21,21 @@ export interface UaStepRunModel {
     error: string | null;
     retryCount: number;
     durationMs: number | null;
+    logEntries: UaStepRunLogEntryModel[];
+}
+
+/**
+ * A recorded run payload prepared for display by the server: pretty-printed JSON with
+ * sensitive values masked, or `null` when nothing was recorded.
+ */
+export interface UaRunDataValueModel {
+    value: string | null;
+    truncated: boolean;
+}
+
+export interface UaStepRunDataModel {
+    input: UaRunDataValueModel;
+    output: UaRunDataValueModel;
 }
 
 export interface UaRunDetailModel extends UmbEntityModel {
@@ -27,6 +49,8 @@ export interface UaRunDetailModel extends UmbEntityModel {
     initiatedBy: string;
     correlationId: string | null;
     error: string | null;
+    /** The alias of the trigger that started the run, from the automation version that ran. */
+    triggerAlias: string | null;
     stepRuns: UaStepRunModel[];
 }
 

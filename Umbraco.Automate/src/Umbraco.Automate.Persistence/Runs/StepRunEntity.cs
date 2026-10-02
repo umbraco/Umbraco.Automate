@@ -23,6 +23,8 @@ internal sealed class StepRunEntity
 
     public string? OutputData { get; set; }
 
+    public string? LogEntries { get; set; }
+
     public string? Error { get; set; }
 
     public int? ErrorCategory { get; set; }

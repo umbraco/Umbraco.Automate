@@ -1,3 +1,4 @@
+using Json.Schema.Generation;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 
 namespace Umbraco.Automate.Core.Triggers.BuiltIn;
@@ -10,21 +11,25 @@ public sealed class MediaSavedTriggerOutput : IMediaScopedTriggerOutput
     /// <summary>
     /// Gets the media item's unique key.
     /// </summary>
+    [Description("The media item's unique key.")]
     public Guid MediaKey { get; init; }
 
     /// <summary>
     /// Gets the media item's name.
     /// </summary>
+    [Description("The media item's name.")]
     public string? MediaName { get; init; }
 
     /// <summary>
     /// Gets the media type's unique key.
     /// </summary>
+    [Description("The media type's unique key.")]
     public Guid? MediaTypeKey { get; init; }
 
     /// <summary>
     /// Gets the media type alias.
     /// </summary>
+    [Description("The media type alias.")]
     public string? MediaTypeAlias { get; init; }
 
     /// <summary>
@@ -33,6 +38,7 @@ public sealed class MediaSavedTriggerOutput : IMediaScopedTriggerOutput
     /// database date precision may vary, so downstream automations needing a hard
     /// guarantee should re-fetch.
     /// </summary>
+    [Description("Whether this save represents a newly-created media item.")]
     public bool IsNew { get; init; }
 
     Guid? IMediaScopedTriggerOutput.GetMediaKey() => MediaKey;

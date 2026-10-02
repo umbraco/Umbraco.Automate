@@ -112,9 +112,38 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     }
 
     #onNameAliasChange(event: UmbChangeEvent) {
-        const target = event.target as HTMLElement & { value?: string; alias: string };
+        const target = event.target as HTMLElement & {
+            value?: string;
+            alias: string;
+            autoGenerateAlias?: boolean;
+        };
+        const nameChanged = (target.value ?? "") !== this._name;
         this._name = target.value ?? "";
         this._alias = target.alias;
+
+        // The input regenerates the alias from the name on every keystroke, which would replace the
+        // unique alias the workspace assigned and trip the duplicate check when two steps share a
+        // name. Keep auto-generated aliases unique; a hand-typed alias is left as entered.
+        if (nameChanged && target.autoGenerateAlias) {
+            this._alias = this.#makeAliasUnique(this._alias);
+            target.alias = this._alias;
+        }
+    }
+
+    #makeAliasUnique(alias: string): string {
+        if (!alias) return alias;
+
+        const usedAliases = new Set(
+            (this.data?.automationContext?.steps ?? [])
+                .filter((s) => s.id !== this.data?.stepId)
+                .map((s) => s.alias?.toLowerCase())
+                .filter(Boolean),
+        );
+        if (!usedAliases.has(alias.toLowerCase())) return alias;
+
+        let suffix = 2;
+        while (usedAliases.has(`${alias}${suffix}`.toLowerCase())) suffix++;
+        return `${alias}${suffix}`;
     }
 
     #onErrorBehaviorChange(event: UUISelectEvent) {
@@ -256,6 +285,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                 .fields=${this.data!.schema.fields}
                 .values=${this._settings}
                 .bindingSources=${this._bindingSources}
+                .workspaceId=${this.data!.workspaceId}
                 @ua:settings-change=${this.#onSettingsChange}
             ></ua-settings-form>
         `;
@@ -289,6 +319,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                     orientation="vertical"
                 >
                     <uui-select
+                        label=${this.localize.term("uaLabels_errorBehavior")}
                         slot="editor"
                         .options=${errorBehaviorOptions}
                         @change=${this.#onErrorBehaviorChange}
@@ -307,6 +338,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                 orientation="vertical"
             >
                 <uui-input
+                    label=${this.localize.term("uaLabels_retryInterval")}
                     slot="editor"
                     .value=${this._retryInterval}
                     placeholder="00:00:30"
@@ -319,6 +351,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                 orientation="vertical"
             >
                 <uui-input
+                    label=${this.localize.term("uaLabels_maxRetries")}
                     slot="editor"
                     type="number"
                     min="0"
@@ -350,6 +383,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                     ${this.localize.term("uaAutomation_stepConnectionDescription")}
                 </p>
                 <uui-select
+                    label=${this.localize.term("uaLabels_connection")}
                     .options=${options}
                     @change=${this.#onConnectionChange}
                 ></uui-select>

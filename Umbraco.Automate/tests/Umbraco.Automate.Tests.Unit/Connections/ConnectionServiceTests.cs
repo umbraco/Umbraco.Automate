@@ -37,7 +37,131 @@ public class ConnectionServiceTests
             new ConnectionTypeCollection(() => []),
             Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
-            Mock.Of<IEventMessagesFactory>());
+            Mock.Of<IEventMessagesFactory>(),
+            []);
+    }
+
+    private ConnectionService CreateServiceWithHandler(
+        IConnectionSettingsSaveHandler handler,
+        IEntityVersionService? versionService = null)
+    {
+        var connectionType = new Mock<IConnectionType>();
+        connectionType.Setup(t => t.Alias).Returns("slack");
+
+        return new ConnectionService(
+            _repo.Object,
+            new ConnectionTypeCollection(() => [connectionType.Object]),
+            versionService ?? Mock.Of<IEntityVersionService>(),
+            _scopeProvider.Object,
+            Mock.Of<IEventMessagesFactory>(),
+            [handler]);
+    }
+
+    [Fact]
+    public async Task CreateConnectionAsync_RunsSettingsSaveHandlers_AndPersistsTheirChanges()
+    {
+        ConnectionSettingsSaveContext? captured = null;
+        var handler = new Mock<IConnectionSettingsSaveHandler>();
+        handler.Setup(h => h.PrepareSettingsAsync(It.IsAny<ConnectionSettingsSaveContext>(), It.IsAny<CancellationToken>()))
+            .Callback<ConnectionSettingsSaveContext, CancellationToken>((c, _) =>
+            {
+                captured = c;
+                c.Connection.Settings["value"] = "rewritten";
+            })
+            .Returns(Task.CompletedTask);
+
+        Connection? saved = null;
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback<Connection, Guid?, CancellationToken>((c, _, _) => saved = c)
+            .ReturnsAsync((Connection c, Guid? _, CancellationToken _) => c);
+
+        var service = CreateServiceWithHandler(handler.Object);
+        await service.CreateConnectionAsync(new Connection
+        {
+            Alias = "test",
+            Name = "Test",
+            Type = "slack",
+            Settings = new() { ["value"] = "submitted" },
+        });
+
+        captured.ShouldNotBeNull();
+        captured.PersistedSettings.ShouldBeNull();
+        captured.IsRollback.ShouldBeFalse();
+        captured.Connection.Id.ShouldNotBe(Guid.Empty);
+        saved.ShouldNotBeNull();
+        saved.Settings["value"].ShouldBe("rewritten");
+    }
+
+    [Fact]
+    public async Task UpdateConnectionAsync_PassesFreshlyLoadedPersistedSettings_ToHandlers()
+    {
+        var id = Guid.NewGuid();
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Connection { Id = id, Alias = "test", Name = "Test", Type = "slack", Settings = new() { ["value"] = "stored" } });
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Connection c, Guid? _, CancellationToken _) => c);
+
+        ConnectionSettingsSaveContext? captured = null;
+        var handler = new Mock<IConnectionSettingsSaveHandler>();
+        handler.Setup(h => h.PrepareSettingsAsync(It.IsAny<ConnectionSettingsSaveContext>(), It.IsAny<CancellationToken>()))
+            .Callback<ConnectionSettingsSaveContext, CancellationToken>((c, _) => captured = c)
+            .Returns(Task.CompletedTask);
+
+        var service = CreateServiceWithHandler(handler.Object);
+        await service.UpdateConnectionAsync(new Connection
+        {
+            Id = id,
+            Alias = "test",
+            Name = "Test",
+            Type = "slack",
+            Settings = new() { ["value"] = "submitted" },
+        });
+
+        captured.ShouldNotBeNull();
+        captured.PersistedSettings.ShouldNotBeNull();
+        captured.PersistedSettings!["value"].ShouldBe("stored");
+        captured.IsRollback.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateConnectionAsync_DoesNotSave_WhenHandlerRejectsSettings()
+    {
+        var handler = new Mock<IConnectionSettingsSaveHandler>();
+        handler.Setup(h => h.PrepareSettingsAsync(It.IsAny<ConnectionSettingsSaveContext>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ConnectionSettingsValidationException("nope"));
+
+        var service = CreateServiceWithHandler(handler.Object);
+
+        await Should.ThrowAsync<ConnectionSettingsValidationException>(() => service.UpdateConnectionAsync(
+            new Connection { Id = Guid.NewGuid(), Alias = "test", Name = "Test", Type = "slack" }));
+
+        _repo.Verify(r => r.SaveAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RollbackConnectionAsync_FlagsRollback_ToHandlers()
+    {
+        var id = Guid.NewGuid();
+        _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new Connection { Id = id, Alias = "test", Name = "Test", Type = "slack" });
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Connection c, Guid? _, CancellationToken _) => c);
+
+        var versions = new Mock<IEntityVersionService>();
+        versions.Setup(v => v.GetVersionSnapshotAsync<Connection>(id, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Connection { Id = id, Alias = "test", Name = "Test", Type = "slack" });
+
+        ConnectionSettingsSaveContext? captured = null;
+        var handler = new Mock<IConnectionSettingsSaveHandler>();
+        handler.Setup(h => h.PrepareSettingsAsync(It.IsAny<ConnectionSettingsSaveContext>(), It.IsAny<CancellationToken>()))
+            .Callback<ConnectionSettingsSaveContext, CancellationToken>((c, _) => captured = c)
+            .Returns(Task.CompletedTask);
+
+        var service = CreateServiceWithHandler(handler.Object, versions.Object);
+        await service.RollbackConnectionAsync(id, 1);
+
+        captured.ShouldNotBeNull();
+        captured.IsRollback.ShouldBeTrue();
     }
 
     [Fact]
@@ -158,7 +282,8 @@ public class ConnectionServiceTests
             new ConnectionTypeCollection(() => [type]),
             Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
-            Mock.Of<IEventMessagesFactory>());
+            Mock.Of<IEventMessagesFactory>(),
+            []);
 
         var id = Guid.NewGuid();
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
@@ -181,7 +306,8 @@ public class ConnectionServiceTests
             new ConnectionTypeCollection(() => [type]),
             Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
-            Mock.Of<IEventMessagesFactory>());
+            Mock.Of<IEventMessagesFactory>(),
+            []);
 
         var id = Guid.NewGuid();
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))
@@ -203,7 +329,8 @@ public class ConnectionServiceTests
             new ConnectionTypeCollection(() => [type]),
             Mock.Of<IEntityVersionService>(),
             _scopeProvider.Object,
-            Mock.Of<IEventMessagesFactory>());
+            Mock.Of<IEventMessagesFactory>(),
+            []);
 
         var id = Guid.NewGuid();
         _repo.Setup(r => r.GetAsync(id, It.IsAny<CancellationToken>()))

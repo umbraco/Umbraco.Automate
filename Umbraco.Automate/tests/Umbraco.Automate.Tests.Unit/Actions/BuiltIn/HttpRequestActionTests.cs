@@ -151,6 +151,171 @@ public class HttpRequestActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithHeaderRows_SendsEveryHeader()
+    {
+        HttpRequestMessage? sent = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req => sent = req);
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "GET",
+            Headers =
+            [
+                new HttpRequestKeyValue { Key = "Authorization", Value = "Bearer token" },
+                new HttpRequestKeyValue { Key = "X-Correlation-Id", Value = "abc-123" },
+
+                // The key/value editor leaves an empty row behind whenever one is added and
+                // not filled in; it must not fail the step.
+                new HttpRequestKeyValue { Key = "", Value = "" },
+            ],
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sent.ShouldNotBeNull();
+        sent.Headers.GetValues("Authorization").ShouldBe(["Bearer token"]);
+        sent.Headers.GetValues("X-Correlation-Id").ShouldBe(["abc-123"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithHeaderValueButNoName_ReturnsValidationFailure()
+    {
+        // The old JSON blob swallowed malformed header input and sent the request without it.
+        var action = CreateAction();
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Headers = [new HttpRequestKeyValue { Key = "  ", Value = "Bearer token" }],
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithUnusableHeaderName_ReturnsValidationFailure()
+    {
+        var action = CreateAction();
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Headers = [new HttpRequestKeyValue { Key = "Bad Header", Value = "x" }],
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        result.Exception!.Message.ShouldContain("Bad Header");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithContentTypeHeaderRow_AppliesItToTheBody()
+    {
+        // Content headers belong on the body, not on the request header collection, and an
+        // explicitly configured one wins over the Content Type setting.
+        HttpRequestMessage? sent = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req => sent = req);
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            Body = "<xml />",
+            ContentType = "application/json",
+            Headers = [new HttpRequestKeyValue { Key = "Content-Type", Value = "application/xml" }],
+        });
+
+        var result = await action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        sent!.Content!.Headers.ContentType!.ToString().ShouldBe("application/xml");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FormBodyMode_SendsUrlEncodedBodyAndSetsContentType()
+    {
+        string? sentBody = null;
+        string? sentContentType = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req =>
+        {
+            sentBody = req.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            sentContentType = req.Content?.Headers.ContentType?.ToString();
+        });
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            BodyMode = HttpRequestBodyMode.Form,
+
+            // Deliberately left at its default: a form post must not require the author to
+            // also set the Content-Type by hand.
+            ContentType = "application/json",
+            FormFields =
+            [
+                new HttpRequestKeyValue { Key = "name", Value = "a b" },
+                new HttpRequestKeyValue { Key = "note", Value = "x&y" },
+                new HttpRequestKeyValue { Key = "", Value = "dropped" },
+            ],
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sentBody.ShouldBe("name=a+b&note=x%26y");
+        sentContentType.ShouldBe("application/x-www-form-urlencoded");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FormBodyMode_IgnoresTheRawBody()
+    {
+        string? sentBody = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req =>
+            sentBody = req.Content?.ReadAsStringAsync().GetAwaiter().GetResult());
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            BodyMode = HttpRequestBodyMode.Form,
+            Body = "{\"ignored\":true}",
+            FormFields = [new HttpRequestKeyValue { Key = "a", Value = "b" }],
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sentBody.ShouldBe("a=b");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DefaultBodyMode_IsRaw()
+    {
+        // Automations saved before the body mode existed deserialize to the default, and must
+        // keep posting their raw body exactly as before.
+        new HttpRequestSettings().BodyMode.ShouldBe(HttpRequestBodyMode.Raw);
+
+        string? sentBody = null;
+        var action = CreateAction(HttpStatusCode.OK, "{}", req =>
+            sentBody = req.Content?.ReadAsStringAsync().GetAwaiter().GetResult());
+
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api",
+            Method = "POST",
+            Body = "{\"hello\":\"world\"}",
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        sentBody.ShouldBe("{\"hello\":\"world\"}");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_MissingUrl_ReturnsValidationFailure()
     {
         var action = CreateAction();
@@ -161,6 +326,83 @@ public class HttpRequestActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Failed);
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SuccessfulRequest_LogsStatusTimingAndSizeWithoutQueryString()
+    {
+        var action = CreateAction(HttpStatusCode.OK, "{\"ok\":true}");
+        var context = CreateContext(new HttpRequestSettings
+        {
+            Url = "https://example.com/api?token=secret",
+            Method = "GET",
+        });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Info);
+        entry.Message.ShouldStartWith("GET https://example.com/api?… → 200 OK in ");
+        entry.Message.ShouldEndWith(" ms (11 B)");
+        entry.Message.ShouldNotContain("secret");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ServerError_LogsStatusAsError()
+    {
+        var action = CreateAction(HttpStatusCode.InternalServerError, "error");
+        var context = CreateContext(new HttpRequestSettings { Url = "https://example.com/api", Method = "POST" });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("POST https://example.com/api → 500 Internal Server Error in ");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ResponseOverLimit_LogsError()
+    {
+        var action = CreateAction(HttpStatusCode.OK, new string('a', 2000), maxResponseBodyBytes: 1024);
+        var context = CreateContext(new HttpRequestSettings { Url = "https://example.com/api" });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldContain("exceeds the 1.0 KB limit");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RequestThrows_LogsErrorAndRethrows()
+    {
+        var action = CreateAction(new DelegateHandler(_ => throw new HttpRequestException("No such host is known.")));
+        var context = CreateContext(new HttpRequestSettings { Url = "https://missing.example.com/api?key=secret" });
+
+        await Should.ThrowAsync<HttpRequestException>(() => action.ExecuteAsync(context, CancellationToken.None));
+
+        var entry = context.LogEntries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(ActionLogLevel.Error);
+        entry.Message.ShouldStartWith("GET https://missing.example.com/api?… failed: No such host is known. after ");
+        entry.Message.ShouldNotContain("secret");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FollowedRedirect_LogsFinalUrl()
+    {
+        // A redirecting handler leaves the final address on the request, as SocketsHttpHandler does.
+        var action = CreateAction(new DelegateHandler(req =>
+        {
+            req.RequestUri = new Uri("https://other.example.com/moved?sig=secret");
+            return new HttpResponseMessage(HttpStatusCode.OK) { RequestMessage = req, Content = new StringContent("ok") };
+        }));
+        var context = CreateContext(new HttpRequestSettings { Url = "https://example.com/old" });
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.Count.ShouldBe(2);
+        context.LogEntries[0].Message.ShouldBe("Redirected to https://other.example.com/moved?…");
+        context.LogEntries[1].Message.ShouldStartWith("GET https://example.com/old → 200 OK in ");
     }
 
     private static ActionContext CreateContext(HttpRequestSettings settings) => new()
@@ -204,6 +446,21 @@ public class HttpRequestActionTests
 
         var deps = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
         return new HttpRequestAction(deps, factory.Object, Options.Create(options));
+    }
+
+    private static HttpRequestAction CreateAction(HttpMessageHandler handler)
+    {
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(Constants.HttpClients.Default)).Returns(new HttpClient(handler));
+
+        var deps = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
+        return new HttpRequestAction(deps, factory.Object, Options.Create(new ExecutionOptions()));
+    }
+
+    private sealed class DelegateHandler(Func<HttpRequestMessage, HttpResponseMessage> send) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(send(request));
     }
 
     /// <summary>

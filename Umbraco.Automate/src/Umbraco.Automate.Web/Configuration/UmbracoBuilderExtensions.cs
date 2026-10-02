@@ -21,6 +21,7 @@ using Umbraco.Automate.Web.Api.Mcp;
 using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Realtime;
+using Umbraco.Automate.Web.Api.Webhook;
 using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 using Umbraco.Automate.Web.Api.Management.Common.Configuration;
@@ -351,6 +352,15 @@ public static partial class UmbracoBuilderExtensions
                 "UmbracoAutomateWebhookRateLimiting")
             {
                 PostRouting = app => app.UseRateLimiter(),
+            });
+
+            // Limit and buffer webhook bodies before routing, which reads the form of a form-encoded request.
+            options.AddFilter(new UmbracoPipelineFilter(
+                "UmbracoAutomateWebhookRequestBody")
+            {
+                PreRouting = app => app.UseWhen(
+                    context => context.Request.Path.StartsWithSegments("/" + Constants.WebhookApi.RoutePath),
+                    branch => branch.UseMiddleware<WebhookRequestBodyMiddleware>()),
             });
         });
 

@@ -20,7 +20,7 @@ export class UaStatusCardsElement extends UmbLitElement {
                 ${this.cards.map(
                     (card) => html`
                         <div class="card">
-                            <div class="card-icon" style="color: var(--uui-color-${card.color});">
+                            <div class="card-icon" style="color: var(--uui-color-${card.color}-standalone);">
                                 <uui-icon name=${card.icon}></uui-icon>
                             </div>
                             <div class="card-content">

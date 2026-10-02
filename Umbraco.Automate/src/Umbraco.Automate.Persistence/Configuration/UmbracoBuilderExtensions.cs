@@ -94,11 +94,15 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<ISubscriptionRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
         builder.Services.AddSingleton<IEventRepository>(sp => sp.GetRequiredService<EFCoreWorkflowPersistenceProvider>());
         builder.Services.AddSingleton<IOutboxStore, EFCoreOutboxStore>();
+        builder.Services.AddSingleton<IWorkflowPurger, EFCoreWorkflowPurger>();
         builder.Services.AddSingleton<IWorkflowLockStore, EFCoreWorkflowLockStore>();
         builder.Services.AddSingleton<IEntityVersionRepository, EFCoreEntityVersionRepository>();
         builder.Services.AddSingleton<IScheduledTriggerStateStore, ScheduledTriggerStateStore>();
 
         builder.Services.AddSingleton<IAutomateSchemaInitializer, AutomateSchemaInitializer>();
+
+        // One-off repair: encrypt sensitive automation settings that earlier versions stored in plaintext.
+        builder.Services.AddHostedService<SensitiveSettingsReprotectionJob>();
 
         // Run pending EF Core migrations during component initialization, which both boot paths do
         // immediately before publishing UmbracoApplicationStartingNotification. That puts the schema
@@ -110,9 +114,9 @@ public static partial class UmbracoBuilderExtensions
         // component above has run.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunAutomateMigrationNotificationHandler>();
 
-        // Recover runs stuck in Running/Pending from the previous process.
-        // Registered after migrations so the schema is up-to-date.
-        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, StuckRunRecoveryNotificationHandler>();
+        // Recovers runs stuck in Running/Pending from the previous process. Invoked by
+        // WorkflowHostLifecycle once migrations are done and before the engine starts.
+        builder.Services.AddSingleton<IStuckRunRecovery, EFCoreStuckRunRecovery>();
 
         return builder;
     }
