@@ -117,8 +117,13 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
 
+            // Resolve settings even when none were saved. The flow editor does not persist a
+            // default value the user left untouched, so a step saved as {} still carries the
+            // settings type's property-initializer defaults, ${ } bindings included (for
+            // example "${ trigger.formId }"). Skipping resolution left the action to build its
+            // own default instance through GetSettings<T>(), and those bindings were never evaluated.
             settings = null;
-            if (_action.SettingsType is not null && _stepConfig.Settings.Count > 0)
+            if (_action.SettingsType is not null)
             {
                 settings = _action.ResolveSettings(_stepConfig.Settings);
             }
