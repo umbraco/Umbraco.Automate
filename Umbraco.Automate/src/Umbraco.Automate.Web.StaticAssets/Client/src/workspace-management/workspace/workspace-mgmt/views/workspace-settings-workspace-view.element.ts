@@ -9,6 +9,7 @@ import { UA_EMPTY_GUID } from "../../../../core/index.js";
 import { UA_WORKSPACE_MGMT_WORKSPACE_CONTEXT } from "../workspace-mgmt-workspace.context-token.js";
 
 import "../../../../connection/components/input-connection/input-connection.element.js";
+import "../../../components/input-service-account/input-service-account.element.js";
 
 @customElement("ua-workspace-settings-workspace-view")
 export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
@@ -17,7 +18,7 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
 
     // True when the workspace's serviceAccountKey doesn't resolve to a real user — e.g. a
     // Deploy import that carried over a GUID for an API user that isn't on this environment.
-    // Feeding that dangling GUID into <umb-user-input> as a "selection" leaves the picker in a
+    // Feeding that dangling GUID into the user picker as a "selection" leaves the picker in a
     // state its validation can't recover from when the user then tries to replace it, so we
     // treat it as unset instead and let the user pick a fresh one.
     @state()
@@ -130,8 +131,7 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
                                   ${this.localize.term("uaWorkspace_serviceAccountUnresolved")}
                               </p>`
                             : nothing}
-                        <umb-user-input
-                            max="1"
+                        <ua-input-service-account
                             required
                             .selection=${!this._serviceAccountUnresolved &&
                             this._model.serviceAccountKey &&
@@ -144,7 +144,7 @@ export class UaWorkspaceSettingsWorkspaceViewElement extends UmbLitElement {
                                 "$.serviceAccountKey",
                                 this._serviceAccountUnresolved ? "" : this._model.serviceAccountKey,
                             )}
-                        ></umb-user-input>
+                        ></ua-input-service-account>
                     </div>
                 </umb-property-layout>
 

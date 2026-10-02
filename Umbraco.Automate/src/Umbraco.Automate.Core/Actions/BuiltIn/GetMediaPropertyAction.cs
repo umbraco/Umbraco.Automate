@@ -95,6 +95,8 @@ public sealed class GetMediaPropertyAction : ActionBase<GetMediaPropertySettings
                 "Automation {AutomationId} / Run {RunId}: Media {MediaKey} not found in published cache.",
                 context.AutomationId, context.RunId, mediaKey);
 
+            context.LogWarning($"Media {mediaKey} was not found");
+
             return SuccessWithOutcome(OutcomeNotFound, new GetMediaPropertyOutput
             {
                 MediaKey = mediaKey,
@@ -109,6 +111,8 @@ public sealed class GetMediaPropertyAction : ActionBase<GetMediaPropertySettings
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Property {PropertyAlias} not found on {MediaTypeAlias}.",
                 context.AutomationId, context.RunId, settings.PropertyAlias, media.ContentType.Alias);
+
+            context.LogWarning($"Property '{settings.PropertyAlias}' does not exist on {media.ContentType.Alias}");
 
             return SuccessWithOutcome(OutcomePropertyNotFound, new GetMediaPropertyOutput
             {

@@ -11,17 +11,20 @@ namespace Umbraco.Automate.Core.Runs;
 internal sealed class AutomationRunService : IAutomationRunService
 {
     private readonly IAutomationRunRepository _runRepository;
+    private readonly IRunDataSanitizer _runDataSanitizer;
     private readonly IWorkflowHost _workflowHost;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutomationRunService> _logger;
 
     public AutomationRunService(
         IAutomationRunRepository runRepository,
+        IRunDataSanitizer runDataSanitizer,
         IWorkflowHost workflowHost,
         IEventAggregator eventAggregator,
         ILogger<AutomationRunService> logger)
     {
         _runRepository = runRepository;
+        _runDataSanitizer = runDataSanitizer;
         _workflowHost = workflowHost;
         _eventAggregator = eventAggregator;
         _logger = logger;
@@ -29,6 +32,18 @@ internal sealed class AutomationRunService : IAutomationRunService
 
     public Task<AutomationRun?> GetRunAsync(Guid id, CancellationToken cancellationToken = default)
         => _runRepository.GetAsync(id, cancellationToken);
+
+    public async Task<StepRunData?> GetStepRunDataAsync(Guid runId, Guid stepRunId, CancellationToken cancellationToken = default)
+    {
+        var stored = await _runRepository.GetStepRunDataAsync(runId, stepRunId, cancellationToken);
+        return stored is null ? null : StepRunData.Create(stored, _runDataSanitizer);
+    }
+
+    public async Task<RunTriggerData?> GetTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var stored = await _runRepository.GetTriggerDataAsync(runId, cancellationToken);
+        return stored is null ? null : RunTriggerData.Create(stored, _runDataSanitizer);
+    }
 
     public Task<(IEnumerable<AutomationRun> Items, int Total)> GetRunsByAutomationPagedAsync(
         Guid automationId,
@@ -143,7 +158,15 @@ internal sealed class AutomationRunService : IAutomationRunService
             return RunLifecycleResult.NoWorkflowInstance;
         }
 
-        await _workflowHost.ResumeWorkflow(run.WorkflowInstanceId);
+        // WorkflowCore only resumes a workflow it suspended itself. A run suspended while a step
+        // waits for an approval has a Runnable workflow, and only the decision can release it —
+        // marking the run Running here would misreport a run that is still waiting.
+        if (!await _workflowHost.ResumeWorkflow(run.WorkflowInstanceId))
+        {
+            _logger.LogWarning(
+                "Cannot resume run {RunId}: its workflow is not suspended (it may be waiting for input)", runId);
+            return RunLifecycleResult.InvalidState;
+        }
 
         run.Status = AutomationRunStatus.Running;
         await _runRepository.SaveAsync(run, cancellationToken);

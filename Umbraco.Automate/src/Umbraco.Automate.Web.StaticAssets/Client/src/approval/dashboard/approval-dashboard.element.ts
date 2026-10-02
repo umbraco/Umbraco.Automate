@@ -24,7 +24,16 @@ export class UaApprovalDashboardElement extends UmbLitElement {
     @state()
     private _loading = true;
 
+    @state()
+    private _error = false;
+
     #modalManager?: typeof UMB_MODAL_MANAGER_CONTEXT.TYPE;
+
+    /**
+     * Approvals decided here that the server may still list as pending: the engine updates the step
+     * only once it has processed the decision event, so a reload straight after can still return it.
+     */
+    #decidedIds = new Set<string>();
 
     private _columns: UmbTableColumn[] = [
         { name: this.localize.term("uaLabels_name"), alias: "automationName" },
@@ -38,7 +47,8 @@ export class UaApprovalDashboardElement extends UmbLitElement {
             clipText: true,
         },
         { name: this.localize.term("uaLabels_requestedAt"), alias: "requestedUtc" },
-        { name: "", alias: "actions" },
+        // Shrink to the button's width rather than sharing the row equally with the text columns.
+        { name: "", alias: "actions", align: "right", width: "1%" },
     ];
 
     constructor() {
@@ -56,21 +66,32 @@ export class UaApprovalDashboardElement extends UmbLitElement {
     async #loadData() {
         this._loading = true;
 
-        const { data } = await tryExecute(
+        const { data, error } = await tryExecute(
             this,
             ApprovalsService.getApprovalsPending(),
         );
 
+        this._error = !!error;
         if (data) {
-            this.#createTableItems(data);
+            // Once the server stops listing a decided approval, there is nothing left to hide.
+            const pendingIds = new Set(data.map((item) => this.#itemId(item)));
+            for (const id of this.#decidedIds) {
+                if (!pendingIds.has(id)) this.#decidedIds.delete(id);
+            }
+
+            this.#createTableItems(data.filter((item) => !this.#decidedIds.has(this.#itemId(item))));
         }
 
         this._loading = false;
     }
 
+    #itemId(item: PendingApprovalResponseModel) {
+        return `${item.runId}_${item.stepId}`;
+    }
+
     #createTableItems(items: PendingApprovalResponseModel[]) {
         this._items = items.map((item) => ({
-            id: `${item.runId}_${item.stepId}`,
+            id: this.#itemId(item),
             icon: "icon-check",
             data: [
                 {
@@ -87,21 +108,13 @@ export class UaApprovalDashboardElement extends UmbLitElement {
                 },
                 {
                     columnAlias: "actions",
+                    // One button: approve and reject both live in the decision modal, alongside the full prompt.
                     value: html`
-                        <div class="actions">
-                            <uui-button
-                                look="primary"
-                                color="positive"
-                                label=${this.localize.term("uaApproval_approve")}
-                                @click=${() => this.#onDecision(item)}
-                            ></uui-button>
-                            <uui-button
-                                look="primary"
-                                color="danger"
-                                label=${this.localize.term("uaApproval_reject")}
-                                @click=${() => this.#onDecision(item)}
-                            ></uui-button>
-                        </div>
+                        <uui-button
+                            look="primary"
+                            label=${this.localize.term("uaApproval_review")}
+                            @click=${() => this.#onDecision(item)}
+                        ></uui-button>
                     `,
                 },
             ],
@@ -122,17 +135,28 @@ export class UaApprovalDashboardElement extends UmbLitElement {
 
         try {
             await modal.onSubmit();
-            // Short delay to allow WorkflowCore to process the event and update step status
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            this.#loadData();
         } catch {
-            // Modal was cancelled — do nothing
+            return; // Modal was closed without a decision.
         }
+
+        // Drop the row now rather than waiting for the engine, and keep it hidden from any reload
+        // that lands before the engine has caught up.
+        const id = this.#itemId(item);
+        this.#decidedIds.add(id);
+        this._items = this._items.filter((row) => row.id !== id);
     }
 
     override render() {
         if (this._loading) {
             return html`<div class="center"><uui-loader></uui-loader></div>`;
+        }
+
+        if (this._error) {
+            return html`
+                <div class="center">
+                    <p class="error">${this.localize.term("uaApproval_loadError")}</p>
+                </div>
+            `;
         }
 
         if (this._items.length === 0) {
@@ -168,9 +192,8 @@ export class UaApprovalDashboardElement extends UmbLitElement {
                 color: var(--uui-color-text-alt);
             }
 
-            .actions {
-                display: flex;
-                gap: var(--uui-size-space-2);
+            .error {
+                color: var(--uui-color-danger-standalone);
             }
         `,
     ];

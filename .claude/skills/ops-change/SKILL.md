@@ -4,8 +4,8 @@ description: >-
   Build one change in Umbraco.Automate: implement it on a `vN/feature/*` branch, prove it with
   `dotnet build` + the affected product's tests and its dependents' tests, and close the issue
   once it has landed on every line a human confirmed as a target. Ports are never opened without
-  that confirmation. Called by name with (action, context-json). Not model-invoked.
-disable-model-invocation: true
+  that confirmation. Called by name with (action, context-json). NOT for direct use — never select it from a
+  description match.
 ---
 
 # ops-change
@@ -26,7 +26,7 @@ guess at one, and never silently succeed.
 
 | Action | What it must do |
 |---|---|
-| `implement` | Make the change the issue asks for on a work branch, and push it. Where the context carries a port source this is a port, not a replay: adapt the change to the target line, because a port that needs adapting is a real change. |
+| `implement` | Make the change the issue asks for on a work branch, push it, and open the PR onto that line's base via `ops-branching · open-pr`. Opening it is part of this action: `ops-branching` is `supporting`, so no loop may call it, and a branch pushed without a PR strands the change. Where the context carries a port source this is a port, not a replay: adapt the change to the target line, because a port that needs adapting is a real change. |
 | `verify` | Run this repo's build, tests and sanity checks against the change, and report pass or fail with enough detail for the caller to act on a failure. |
 | `close-issue` | Told that a PR has landed, work out which issue it was for and close that issue only once EVERY target line has landed — one logical change lands N times at N moments. The caller passes the PR, not the issue, because how a PR references its issue and which lines are targets are both repo facts. MUST close explicitly: a `Closes #N` keyword does not cross repos. MUST tolerate an already-closed issue, and MUST report `closed: false` with the lines still outstanding rather than closing early. |
 
@@ -60,20 +60,30 @@ port source this is a port, not a replay: adapt the change to the target line.
 {"issue":{"repo":"umbraco/Umbraco.Automate","number":159,"title":"Config references inside larger strings are not resolved"},"line":"v18","port":null}
 ```
 
-- `issue` — object — the issue being worked, including the repo that holds it
+- `issue` — object|null — the issue being worked, including the repo that holds it. `null` only
+  on a port whose source PR had no issue
 - `line` — string — the line to implement on, e.g. `v18`
-- `port` — object|null — the source line and commit when this is a port of an already-landed change
+- `port` — object|null — `{ from_line, commit, pr }` when this is a port of an already-landed
+  change; `pr` is the source PR number
 
 **Facts to return:**
 
 - `branch` — string — the branch the work was pushed to
-- `summary` — string — what was changed, for the PR body
+- `pr_number` — integer — the PR opened onto the line's base, or the existing one
+- `url` — string — that PR's URL, so the caller can comment it on the issue
+- `summary` — string — what was changed, used as the PR body
 
 ### Steps
 
 1. **Work out the branch name first**, because it is also the idempotency key:
    `<line>/feature/issue-<issue.number>-<slug>`, where `<slug>` is a short kebab-case phrase from
    the issue title. Example: `v18/feature/issue-159-embedded-config-references`.
+
+   **A port with no issue** (`issue` is `null`, `port` is set) is named from the source PR
+   instead: `<line>/feature/port-<port.pr>-<slug>`, with `<slug>` from the source PR's title.
+   Example: `v17/feature/port-348-oauth-popup-fallback`. Never invent an issue number to fit the
+   first pattern. **Neither an issue nor a port** → return `{"ok": false, "detail": "no issue
+   and no port source"}`; there is nothing to name the change from.
 
    > This action names and creates its own branch rather than calling
    > `ops-branching · start-branch`. **Reason:** the engine default names branches
@@ -82,14 +92,18 @@ port source this is a port, not a replay: adapt the change to the target line.
    > still belongs to `ops-branching` — see step 3.
 
 2. **Idempotency check.** Ask `github-ops` whether that branch already exists on the remote.
-   If it does, do not implement again: return the existing branch with a summary read from its
-   commits, and stop.
+   If it does, do not implement again: read a summary from its commits and **skip to step 9**.
+
+   > **Skip to step 9, do not stop here.** A branch an earlier run pushed may still have no PR,
+   > and stopping at step 2 leaves it that way forever. Step 9 is idempotent, so going through
+   > it either opens the PR that is missing or returns the one already open.
 
 3. **Get the workspace.** Call `ops-workspace · prepare` with the branch. Let it root the branch
    on the line's integration branch — do not resolve `v18/dev` here by hand. Everything below
    runs inside that workspace.
 
-4. **Read before writing.** Read the issue in full, then `CLAUDE.md` at the repo root and the
+4. **Read before writing.** Read the issue in full (or, on a port with no issue, the source PR
+   and its description), then `CLAUDE.md` at the repo root and the
    `CLAUDE.md` of the product you are about to touch. Follow the conventions already in the
    surrounding files.
 
@@ -109,8 +123,8 @@ port source this is a port, not a replay: adapt the change to the target line.
 
 7. **Push** the branch.
 
-8. Return `{"ok": true, "branch": "…", "summary": "…"}`. Write the summary as PR-body prose: what
-   changed, why, and how a reviewer can test it — the PR template asks for all three.
+8. **Write the summary** as PR-body prose: what changed, why, and how a reviewer can test it —
+   the PR template asks for all three.
 
    **Leave the port decision open, and say so.** End the summary with the template's *Other
    version lines* section, both boxes **unticked**, naming the other live lines and asking the
@@ -118,9 +132,24 @@ port source this is a port, not a replay: adapt the change to the target line.
    `close-issue` reads later, so an unanswered question there is what correctly holds the issue
    open instead of closing it early.
 
-**Idempotency (a MUST).** The branch name is derived purely from `issue.number` and `line`, so
-the same context always produces the same name. Step 2 detects an existing remote branch and
-returns it untouched instead of implementing a second time.
+9. **Open the PR.** Call `ops-branching · open-pr` with `{ branch, line, title, body: summary }`.
+   It resolves the base for the line itself, so pass the **line** (`v18`) and never a branch
+   name (`v18/dev`). The title is the change in conventional-commit form, sentence-case after
+   the type, matching the branch's commits — `feat(action): Add Move Content and Move Media
+   actions`. For a port, suffix the line the way this repo already does: `… (v17 backport)`.
+
+   > **Not optional, and no caller can do it instead.** `ops-branching` is a `supporting`
+   > capability, so a loop is forbidden from calling it, and `ops-issue-loop` treats an
+   > `implement` that returns no `pr_number` as a failure. Stopping at a pushed branch leaves
+   > the work with no PR and the issue blocked — which is what happened on #305 (18-09-2026).
+
+10. Return `{"ok": true, "branch": "…", "pr_number": …, "url": "…", "summary": "…"}`.
+
+**Idempotency (a MUST).** The branch name is derived purely from `issue.number` (or, on a port
+with no issue, `port.pr`) and `line`, so the same context always produces the same name. Step 2
+detects an existing remote branch and returns it untouched instead of implementing a second time. Step 9 is idempotent too:
+`open-pr` returns an existing open PR from that head branch rather than opening a second one, so
+a re-run of a change whose branch is already pushed still comes back with its `pr_number`.
 
 ## Action: `verify`
 
@@ -225,6 +254,11 @@ Told that a PR has landed, work out which issue it was for and close that issue 
    Fall back to a `#N` reference in the PR body or title only if the branch carries no number. If
    nothing resolves, return `{"ok": false, "detail": "cannot resolve an issue for PR #…"}` and
    close nothing.
+
+   **A `vN/feature/port-<N>-<slug>` branch carries a PR number, not an issue number.** It is a
+   port of a change that landed without an issue, so there is no issue to close. Return
+   `{"ok": true, "closed": false, "issue": null, "waiting_on": [], "detail": "no issue behind
+   this change"}`. That is a normal outcome, not a failure. Never read the `<N>` as an issue.
 
 2. **Work out the target lines from the human's confirmed port decision** — never from
    `lines.live` alone. Read the decision, in this order, and stop at the first one that answers:

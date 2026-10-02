@@ -38,6 +38,7 @@ public sealed class UpdateWorkspaceController : WorkspaceControllerBase
     [HttpPut("{id:guid}")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateWorkspace(
@@ -71,6 +72,10 @@ public sealed class UpdateWorkspaceController : WorkspaceControllerBase
         catch (ConcurrencyConflictException)
         {
             return ConcurrencyConflict("workspace");
+        }
+        catch (WorkspaceServiceAccountValidationException ex)
+        {
+            return InvalidServiceAccount(ex);
         }
 
         return Ok();

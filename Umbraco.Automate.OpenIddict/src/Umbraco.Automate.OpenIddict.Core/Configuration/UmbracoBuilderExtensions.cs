@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenIddict.Client;
+using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Extensions;
 using Umbraco.Cms.Core.Configuration.Models;
@@ -52,6 +54,15 @@ public static class UmbracoBuilderExtensions
         // Services
         builder.Services.AddSingleton<IOAuthProviderConfigurationSource, ConfigurationOAuthProviderConfigurationSource>();
         builder.Services.AddSingleton<IOAuthCredentialsService, OAuthCredentialsService>();
+
+        // Credential handoff: the callback returns a protected token instead of the credential id, and
+        // the binding handler exchanges it for the id when the connection is saved.
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<OAuthCredentialsHandoffProtector>();
+        builder.Services.AddSingleton<IConnectionSettingsSaveHandler, OAuthCredentialsBindingHandler>();
+
+        // Deletes credentials from abandoned authentications that no connection refers to.
+        builder.Services.AddRecurringBackgroundJob<OAuthCredentialsCleanupJob>();
 
         // Patches provider credentials from IOAuthProviderConfigurationSource at options resolution time,
         // allowing the source to be replaced (e.g. DB-backed) without changing provider packages.

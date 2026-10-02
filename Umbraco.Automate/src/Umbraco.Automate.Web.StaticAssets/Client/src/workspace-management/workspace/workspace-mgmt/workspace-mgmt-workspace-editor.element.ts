@@ -6,7 +6,7 @@ import { umbBindToValidation, UmbFormControlMixin } from "@umbraco-cms/backoffic
 import { UA_WORKSPACE_MGMT_WORKSPACE_CONTEXT } from "./workspace-mgmt-workspace.context-token.js";
 import { UA_WORKSPACE_MGMT_WORKSPACE_ALIAS } from "../../constants.js";
 import type { UaWorkspaceDetailModel } from "../../types.js";
-import { UA_WORKSPACE_ROOT_WORKSPACE_PATH } from "../workspace-root/paths.js";
+import { UA_WORKSPACE_MGMT_ROOT_WORKSPACE_PATH } from "../workspace-mgmt-root/paths.js";
 
 @customElement("ua-workspace-mgmt-workspace-editor")
 export class UaWorkspaceMgmtWorkspaceEditorElement extends UmbFormControlMixin(UmbLitElement) {
@@ -81,7 +81,7 @@ export class UaWorkspaceMgmtWorkspaceEditorElement extends UmbFormControlMixin(U
         return html`
             <umb-workspace-editor alias="${UA_WORKSPACE_MGMT_WORKSPACE_ALIAS}">
                 <div id="header" slot="header">
-                    <uui-button href=${UA_WORKSPACE_ROOT_WORKSPACE_PATH} label="Back to workspaces" compact>
+                    <uui-button href=${UA_WORKSPACE_MGMT_ROOT_WORKSPACE_PATH} label="Back to workspaces" compact>
                         <uui-icon name="icon-arrow-left"></uui-icon>
                     </uui-button>
                     <uui-input

@@ -46,6 +46,16 @@ internal sealed class EFCoreOAuthCredentialsRepository : IOAuthCredentialsReposi
         return credentials;
     }
 
+    public async Task<IReadOnlyList<Guid>> GetIdsNotModifiedSinceAsync(DateTime cutoffUtc, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.OAuthCredentials
+            .AsNoTracking()
+            .Where(c => c.DateCreated < cutoffUtc && c.DateModified < cutoffUtc)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);

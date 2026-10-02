@@ -48,9 +48,11 @@ export class UaWorkspaceDetailServerDataSource implements UmbDetailDataSource<Ua
     async create(model: UaWorkspaceDetailModel, _parentUnique: string | null) {
         const requestBody = UaWorkspaceTypeMapper.toCreateRequest(model);
 
+        // throwOnError: tryExecute only notifies (toast) on a rejected promise, and the generated SDK
+        // client resolves 4xx/5xx by default, so a failed save would otherwise report nothing.
         const { response, error } = await tryExecute(
             this.#host,
-            WorkspacesService.postWorkspaces({ body: requestBody }),
+            WorkspacesService.postWorkspaces({ body: requestBody, throwOnError: true }),
         );
 
         if (error) {
@@ -68,9 +70,11 @@ export class UaWorkspaceDetailServerDataSource implements UmbDetailDataSource<Ua
 
         const { error } = await tryExecute(
             this.#host,
+            // throwOnError: see create().
             WorkspacesService.putWorkspacesById({
                 path: { id: model.unique },
                 body: requestBody,
+                throwOnError: true,
             }),
         );
 

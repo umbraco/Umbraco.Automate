@@ -1,0 +1,27 @@
+{
+  "name": "acceptancetest",
+  "private": true,
+  "engines": {
+    "node": ">=24.13",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "postinstall": "node postinstall.js",
+    "config": "node config.js",
+    "test": "npx playwright test DefaultConfig",
+    "ui": "npx playwright test --ui DefaultConfig",
+    "all": "npx playwright test",
+    "smokeTest": "npx playwright test DefaultConfig --grep \"@smoke\""
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "@types/node": "^20.9.0",
+    "@umbraco-cms/backoffice": "^18.1.0",
+    "prompt": "^1.3.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@umbraco-cms/acceptance-test-helpers": "^18.1.0",
+    "dotenv": "^16.5.0"
+  }
+}

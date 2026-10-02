@@ -104,6 +104,8 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found in published cache.",
                 context.AutomationId, context.RunId, contentKey);
 
+            context.LogWarning($"Content {contentKey} was not found in the published cache");
+
             return SuccessWithOutcome(OutcomeNotFound, new GetContentOutput { ContentKey = contentKey });
         }
 

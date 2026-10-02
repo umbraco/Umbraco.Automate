@@ -89,7 +89,36 @@ public static class EditableModelSchemaBuilder
             Group = attr?.Group is null or "" ? null :
                 attr.Group.StartsWith('#') ? attr.Group : $"#uaFieldGroups_{attr.Group.ToCamelCase()}Label",
             SupportsBindings = attr?.SupportsBindings ?? false,
+            VisibleWhen = BuildVisibility(property, attr),
             ValidationRules = validationRules,
+        };
+    }
+
+    private static EditableModelFieldVisibility? BuildVisibility(
+        PropertyInfo property, EditableModelFieldAttribute? attr)
+    {
+        if (string.IsNullOrEmpty(attr?.VisibleWhen))
+        {
+            return null;
+        }
+
+        // Fail at schema build rather than silently showing the field forever: a typo in the
+        // controlling property name would otherwise only surface as a field that never hides.
+        var controllingProperty = property.DeclaringType?.GetProperty(attr.VisibleWhen, BindingFlags.Public | BindingFlags.Instance)
+            ?? throw new InvalidOperationException(
+                $"'{property.DeclaringType?.Name}.{property.Name}' is visible when '{attr.VisibleWhen}', which is not a public property of the same model.");
+
+        if (attr.VisibleWhenValues is not { Length: > 0 })
+        {
+            throw new InvalidOperationException(
+                $"'{property.DeclaringType?.Name}.{property.Name}' sets VisibleWhen without any VisibleWhenValues.");
+        }
+
+        return new EditableModelFieldVisibility
+        {
+            Key = controllingProperty.Name.ToCamelCase(),
+            PropertyName = controllingProperty.Name,
+            Values = attr.VisibleWhenValues,
         };
     }
 
@@ -106,7 +135,7 @@ public static class EditableModelSchemaBuilder
     /// already taken for <c>IsRequired</c>. A settings author who wants a sensitive field
     /// rendered some other way sets <see cref="EditableModelFieldAttribute.EditorUiAlias"/>,
     /// which the caller checks first and so always wins; that is the escape hatch for a
-    /// sensitive field masking would make unusable, such as the JSON headers on
+    /// sensitive field masking would make unusable, such as the key/value headers on
     /// <c>HttpRequestSettings</c>.
     /// </remarks>
     private static string InferEditorUiAlias(Type type, bool isSensitive)
@@ -152,11 +181,16 @@ public static class EditableModelSchemaBuilder
 
         // If the property is a non-nullable reference type and doesn't already have a
         // Required attribute, add one. Value types always have a default value so skip them.
+        // Collections are skipped too: non-nullable only means the list itself is never null,
+        // and an empty list is a legitimate value (no headers, no form fields). Implying
+        // Required there made the UI demand at least one row, while the server-side
+        // RequiredAttribute accepts an empty list anyway.
         var nullabilityContext = new NullabilityInfoContext();
         var nullabilityInfo = nullabilityContext.Create(property);
 
         if (nullabilityInfo.WriteState != NullabilityState.Nullable
             && !property.PropertyType.IsValueType
+            && !IsCollection(property.PropertyType)
             && !validationAttributes.OfType<RequiredAttribute>().Any())
         {
             validationAttributes.Add(new RequiredAttribute());
@@ -164,6 +198,9 @@ public static class EditableModelSchemaBuilder
 
         return validationAttributes;
     }
+
+    private static bool IsCollection(Type type)
+        => type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(type);
 
     /// <summary>
     /// Converts a PascalCase property name to a human-readable label

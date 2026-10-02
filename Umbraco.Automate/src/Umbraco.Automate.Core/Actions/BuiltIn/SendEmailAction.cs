@@ -77,6 +77,9 @@ public sealed class SendEmailAction : ActionBase<SendEmailSettings, SendEmailOut
             "Automation {AutomationId} / Run {RunId}: Sent email to {RecipientCount} recipient(s)",
             context.AutomationId, context.RunId, recipients.Length);
 
+        // A count only: recipient addresses and the message body are personal data.
+        context.LogInfo($"Sent email to {recipients.Length} {(recipients.Length == 1 ? "recipient" : "recipients")}");
+
         return Success(new SendEmailOutput
         {
             RecipientCount = recipients.Length,

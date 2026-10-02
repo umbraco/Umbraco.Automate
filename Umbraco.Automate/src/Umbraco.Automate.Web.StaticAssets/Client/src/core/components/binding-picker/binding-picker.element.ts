@@ -1,7 +1,8 @@
 import { css, html, customElement, property, repeat, state, when } from "@umbraco-cms/backoffice/external/lit";
-import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
+import { UmbLitElement, umbFocus } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
+import { formatSchemaType, type BindingLeaf } from "../../utils/binding-schema.utils.js";
 
 /**
  * Picker component that displays available binding sources grouped by origin
@@ -32,6 +33,20 @@ export class UaBindingPickerElement extends UmbLitElement {
         );
     }
 
+    // Builds the text shown in the `detail` slot: the readable type and the description, either
+    // of which may be missing, with any enum values listed at the end so users can see which
+    // values are actually allowed.
+    #formatDetail(leaf: BindingLeaf): string {
+        const type = formatSchemaType(leaf.type);
+        let detail = [type, leaf.description].filter(Boolean).join(" — ");
+
+        if (leaf.enum && leaf.enum.length > 0) {
+            detail += ` (one of: ${leaf.enum.join(", ")})`;
+        }
+
+        return detail;
+    }
+
     #getFilteredSources(): BindingSource[] {
         const query = this._search.toLowerCase().trim();
         if (!query) return this.sources;
@@ -40,9 +55,7 @@ export class UaBindingPickerElement extends UmbLitElement {
             .map((source) => ({
                 ...source,
                 leaves: source.leaves.filter(
-                    (leaf) =>
-                        leaf.path.toLowerCase().includes(query) ||
-                        leaf.label.toLowerCase().includes(query),
+                    (leaf) => leaf.path.toLowerCase().includes(query) || leaf.label.toLowerCase().includes(query),
                 ),
             }))
             .filter((source) => source.leaves.length > 0);
@@ -64,6 +77,7 @@ export class UaBindingPickerElement extends UmbLitElement {
                     @input=${this.#onSearchInput}
                     .value=${this._search}
                     label=${this.localize.term("uaLabels_search")}
+                    ${umbFocus()}
                 >
                     <uui-icon name="icon-search" slot="prepend"></uui-icon>
                 </uui-input>
@@ -71,11 +85,12 @@ export class UaBindingPickerElement extends UmbLitElement {
                 ${when(
                     filtered.length === 0,
                     () => html`<p class="empty">${this.localize.term("uaBindings_noResults")}</p>`,
-                    () => html`${repeat(
-                        filtered,
-                        (s) => s.id,
-                        (source) => this.#renderSource(source),
-                    )}`,
+                    () =>
+                        html`${repeat(
+                            filtered,
+                            (s) => s.id,
+                            (source) => this.#renderSource(source),
+                        )}`,
                 )}
             </div>
         `;
@@ -107,7 +122,7 @@ export class UaBindingPickerElement extends UmbLitElement {
                         (leaf) => html`
                             <uui-ref-node
                                 name=${leaf.path}
-                                detail=${leaf.type}
+                                detail=${this.#formatDetail(leaf)}
                                 @open=${() => this.#selectLeaf(source.bindingPrefix, leaf.path)}
                             >
                                 <uui-icon slot="icon" name="icon-code"></uui-icon>
@@ -144,14 +159,14 @@ export class UaBindingPickerElement extends UmbLitElement {
             .source-headline {
                 display: flex;
                 flex-direction: column;
-                gap: 2px;
+                gap: var(--uui-size-space-1);
                 line-height: 1.2;
             }
 
             .source-chips {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 4px;
+                gap: var(--uui-size-space-1);
             }
 
             .source-chip {
@@ -159,8 +174,8 @@ export class UaBindingPickerElement extends UmbLitElement {
                 font-size: 11px;
                 color: var(--uui-color-text-alt);
                 background: var(--uui-color-surface-alt, rgba(0, 0, 0, 0.04));
-                padding: 1px 6px;
-                border-radius: 3px;
+                padding: 1px var(--uui-size-space-2);
+                border-radius: var(--uui-border-radius);
                 font-weight: normal;
                 white-space: nowrap;
                 overflow: hidden;

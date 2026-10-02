@@ -14,11 +14,16 @@ cd "$REPO_ROOT" || exit 1
 # Parse arguments
 SKIP_TEMPLATE_INSTALL=false
 FORCE=false
+SKIP_SOLUTION=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-template-install|-s)
             SKIP_TEMPLATE_INSTALL=true
+            shift
+            ;;
+        --skip-solution)
+            SKIP_SOLUTION=true
             shift
             ;;
         --force|-f)
@@ -31,6 +36,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  -s, --skip-template-install  Skip reinstalling Umbraco.Templates"
             echo "  -f, --force                  Recreate demo if it already exists"
+            echo "      --skip-solution          Don't create Umbraco.Automate.local.slnx (CI builds the demo project directly)"
             echo "  -h, --help                   Show this help message"
             exit 0
             ;;
@@ -48,27 +54,8 @@ echo "========================================="
 echo "Working directory: $REPO_ROOT"
 echo ""
 
-# Toolchain check — required Node version comes from package.json's engines.node, so this
-# stays in lockstep with the npm-side enforcement and the .nvmrc.
-REQUIRED_NODE_RANGE=$(grep -oE '"node"[[:space:]]*:[[:space:]]*"[^"]+"' "$REPO_ROOT/package.json" | head -1 | grep -oE '"[^"]+"$' | tr -d '"')
-REQUIRED_NODE_MAJOR=$(echo "$REQUIRED_NODE_RANGE" | grep -oE '[0-9]+' | head -1)
-if [ -z "$REQUIRED_NODE_MAJOR" ]; then
-    echo "ERROR: Could not parse engines.node ('$REQUIRED_NODE_RANGE') from package.json." >&2
-    exit 1
-fi
-if ! command -v node >/dev/null 2>&1; then
-    echo "ERROR: Node.js is not installed or not on PATH. package.json requires '$REQUIRED_NODE_RANGE'." >&2
-    echo "Install Node $REQUIRED_NODE_MAJOR+ (e.g. 'nvm install $REQUIRED_NODE_MAJOR && nvm use $REQUIRED_NODE_MAJOR') and re-run." >&2
-    exit 1
-fi
-NODE_VERSION_RAW=$(node --version | sed 's/^v//')
-NODE_MAJOR=${NODE_VERSION_RAW%%.*}
-if [ "${NODE_MAJOR:-0}" -lt "$REQUIRED_NODE_MAJOR" ]; then
-    echo "ERROR: Node $NODE_VERSION_RAW detected; package.json requires '$REQUIRED_NODE_RANGE'." >&2
-    echo "Run 'nvm install $REQUIRED_NODE_MAJOR && nvm use $REQUIRED_NODE_MAJOR' (or equivalent) before re-running this script." >&2
-    exit 1
-fi
-echo "Node $NODE_VERSION_RAW detected (satisfies '$REQUIRED_NODE_RANGE')."
+# Toolchain check (shared with build-frontend.sh). Sourced so a PATH fix sticks.
+REQUIRE_NODE_REPO_ROOT="$REPO_ROOT" . "$SCRIPT_DIR/require-node.sh"
 echo ""
 
 # Detect template version and major from Directory.Packages.props.
@@ -80,7 +67,7 @@ if [ ! -f "$PACKAGES_PROPS_PATH" ]; then
     exit 1
 fi
 # Try range format first: Version="[18.0.0,...)"
-TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="\[[^,\]]+' "$PACKAGES_PROPS_PATH" | grep -oE '\[[^,\]]+' | tr -d '[')
+TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="\[[^],]+' "$PACKAGES_PROPS_PATH" | grep -oE '\[[^],]+' | tr -d '[')
 if [ -z "$TEMPLATE_VERSION" ]; then
     # Try fixed version format: Version="18.0.0"
     TEMPLATE_VERSION=$(grep -oE 'Include="Umbraco\.Cms\.Core" Version="[^"\[]*"' "$PACKAGES_PROPS_PATH" | grep -oE '"[^"\[]*"$' | tr -d '"')
@@ -170,22 +157,25 @@ else
 fi
 popd > /dev/null
 
-# Step 3.2: Set fixed port for consistent development
-echo "Configuring fixed port (44380)..."
+# Step 3.2: Install the launch profile (the dev port itself is assigned in step 3.3)
+echo "Installing launch profile..."
 mkdir -p "$DEMO_SITE_DIR/Properties"
 cp "$SCRIPT_DIR/templates/launchSettings.json" "$DEMO_SITE_DIR/Properties/launchSettings.json"
 
-# Step 3.3: Add NamedPipeListenerComposer for HTTP over named pipes
-echo "Adding NamedPipeListenerComposer for HTTP over named pipes..."
-mkdir -p "$DEMO_SITE_DIR/Composers"
-cp "$SCRIPT_DIR/templates/NamedPipeListenerComposer.cs" "$DEMO_SITE_DIR/Composers/NamedPipeListenerComposer.cs"
+# Step 3.3: Add Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port
+echo "Adding Umbraco.Community.WorktreeDevPort for a stable per-worktree dev port..."
+pushd "$DEMO_SITE_DIR" > /dev/null
+dotnet add package Umbraco.Community.WorktreeDevPort
+popd > /dev/null
 
-# Step 3.4: Point Umbraco.Automate at the CMS database
+# Step 3.4: Point Umbraco.Automate at the CMS database, and keep 44380 for the main checkout
 # Automate needs its own connection string (defaults to umbracoAutomateDbDSN) or it throws
 # on first run. For the demo we reuse the CMS SQLite connection (umbracoDbDSN) via
 # UseNamedConnectionString so a single database backs both CMS and Automate. This must be
 # configured before the first run, otherwise startup fails. Node is guaranteed present by the
 # toolchain check above, so we use it to edit the JSON robustly (no jq dependency).
+# WorktreeDevPort:MainWorktreePort keeps the familiar 44380 for the main checkout; linked
+# worktrees get their own port from the 44300+ pool and never take 44380.
 echo "Configuring Umbraco.Automate to share the CMS database..."
 DEV_SETTINGS_PATH="$DEMO_SITE_DIR/appsettings.Development.json"
 node -e '
@@ -195,12 +185,10 @@ const s = JSON.parse(fs.readFileSync(p, "utf8"));
 s.Umbraco = s.Umbraco || {};
 s.Umbraco.Automate = s.Umbraco.Automate || {};
 s.Umbraco.Automate.UseNamedConnectionString = "umbracoDbDSN";
+s.WorktreeDevPort = s.WorktreeDevPort || {};
+s.WorktreeDevPort.MainWorktreePort = 44380;
 fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
 ' "$DEV_SETTINGS_PATH"
-
-# Step 4: Create unified solution
-echo "Creating unified solution..."
-dotnet new sln -n "Umbraco.Automate.local" --force
 
 # Helper function to add all projects from a product's src and tests folders
 add_product_projects() {
@@ -215,28 +203,36 @@ add_product_projects() {
                 local proj_name=$(basename "$proj")
                 echo "  Adding $proj_name"
                 dotnet sln "Umbraco.Automate.local.slnx" add "$proj" --solution-folder "$solution_folder" 2>/dev/null || true
-                ((count++))
+                count=$((count + 1))
             done < <(find "$sub_path" -name "*.csproj" -print0)
         fi
     done
     echo "  Added $count projects"
 }
 
-# Step 5: Add Core projects
-echo "Adding Umbraco.Automate projects..."
-add_product_projects "Umbraco.Automate" "Core"
+if [ "$SKIP_SOLUTION" = false ]; then
+    # Step 4: Create unified solution
+    echo "Creating unified solution..."
+    dotnet new sln -n "Umbraco.Automate.local" --force
 
-# Step 6: Add OpenIddict projects
-echo "Adding Umbraco.Automate.OpenIddict projects..."
-add_product_projects "Umbraco.Automate.OpenIddict" "OpenIddict"
+    # Step 5: Add Core projects
+    echo "Adding Umbraco.Automate projects..."
+    add_product_projects "Umbraco.Automate" "Core"
 
-# Step 7: Add Slack projects
-echo "Adding Umbraco.Automate.Slack projects..."
-add_product_projects "Umbraco.Automate.Slack" "Slack"
+    # Step 6: Add OpenIddict projects
+    echo "Adding Umbraco.Automate.OpenIddict projects..."
+    add_product_projects "Umbraco.Automate.OpenIddict" "OpenIddict"
 
-# Step 8: Add demo site to solution
-echo "Adding demo site to solution..."
-dotnet sln "Umbraco.Automate.local.slnx" add "$DEMO_SITE_DIR/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+    # Step 7: Add Slack projects
+    echo "Adding Umbraco.Automate.Slack projects..."
+    add_product_projects "Umbraco.Automate.Slack" "Slack"
+
+    # Step 8: Add demo site to solution
+    echo "Adding demo site to solution..."
+    dotnet sln "Umbraco.Automate.local.slnx" add "$DEMO_SITE_DIR/Umbraco.Automate.DemoSite.csproj" --solution-folder "Demo"
+else
+    echo "Skipping the local solution (--skip-solution)"
+fi
 
 # Step 7: Add project references to demo site
 echo "Adding project references to demo site..."

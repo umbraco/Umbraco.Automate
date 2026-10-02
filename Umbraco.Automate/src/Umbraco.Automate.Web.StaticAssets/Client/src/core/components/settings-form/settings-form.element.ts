@@ -1,4 +1,4 @@
-import { css, html, customElement, nothing, property, state } from "@umbraco-cms/backoffice/external/lit";
+import { css, html, customElement, nothing, property, repeat, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
@@ -32,8 +32,23 @@ export class UaSettingsFormElement extends UmbLitElement {
     @property({ type: Array })
     bindingSources: BindingSource[] = [];
 
+    /**
+     * Id of the workspace that owns the automation being edited. Injected into every
+     * field's editor config so workspace-scoped pickers (e.g. the automation picker)
+     * can narrow their listing.
+     */
+    @property({ attribute: "workspace-id" })
+    workspaceId?: string;
+
     @state()
     private _propertyValues: UmbPropertyValueData[] = [];
+
+    /**
+     * The values as currently edited, keyed by field. Drives which `visibleWhen` fields are
+     * shown, so a change re-renders the form without re-populating from `values`.
+     */
+    @state()
+    private _currentValues: Record<string, unknown> = {};
 
     /**
      * Tracks whether the initial population has been done for the current fields.
@@ -72,7 +87,10 @@ export class UaSettingsFormElement extends UmbLitElement {
         return lastKeys.every((key) => this.#lastEmittedSettings![key] === incoming[key]);
     }
 
-    override updated(changedProperties: Map<string, unknown>) {
+    // Populated before render rather than after, so the first render already knows the values
+    // that decide which fields are visible. Populating in `updated` rendered every
+    // `visibleWhen` field hidden first and then showed it, churning the property elements.
+    override willUpdate(changedProperties: Map<string, unknown>) {
         if (changedProperties.has("fields")) {
             this.#isInitialized = false;
             this.#lastEmittedSettings = null;
@@ -89,6 +107,25 @@ export class UaSettingsFormElement extends UmbLitElement {
             alias: field.key,
             value: this.values?.[field.key] ?? field.defaultValue,
         }));
+        this._currentValues = Object.fromEntries(this._propertyValues.map((v) => [v.alias, v.value]));
+    }
+
+    /**
+     * A field with `visibleWhen` only applies while its controlling field holds one of the
+     * listed values. Hidden fields are not rendered, so their mandatory validation does not
+     * run either; their values stay in the dataset so switching back restores them.
+     */
+    #isVisible(field: EditableModelFieldDescriptorModel): boolean {
+        const condition = field.visibleWhen;
+        if (!condition) return true;
+
+        // Dropdown editors store their selection as an array, even for a single choice.
+        const raw = this._currentValues[condition.key];
+        const current = Array.isArray(raw) ? raw[0] : raw;
+        if (current === undefined || current === null) return false;
+
+        const text = String(current).toLowerCase();
+        return condition.values.some((v) => v.toLowerCase() === text);
     }
 
     #onChange(e: Event) {
@@ -99,6 +136,13 @@ export class UaSettingsFormElement extends UmbLitElement {
         );
 
         this.#lastEmittedSettings = settings;
+
+        // Keep the bound dataset value in step with the edit before re-rendering for visibility:
+        // Lit re-assigns object property bindings on every render, so a stale `_propertyValues`
+        // would push the initial values back into the dataset and undo the edit (e.g. a
+        // key/value "Add" row vanishing straight after it was added).
+        this._propertyValues = dataset.value;
+        this._currentValues = settings;
 
         this.dispatchEvent(
             new CustomEvent<SettingsChangeDetail>("ua:settings-change", {
@@ -174,6 +218,10 @@ export class UaSettingsFormElement extends UmbLitElement {
             config.push({ alias: "bindingSources", value: this.bindingSources });
         }
 
+        if (this.workspaceId) {
+            config.push({ alias: "workspaceId", value: this.workspaceId });
+        }
+
         return config;
     }
 
@@ -205,6 +253,17 @@ export class UaSettingsFormElement extends UmbLitElement {
         `;
     }
 
+    // Keyed by field, so showing or hiding a `visibleWhen` field never hands one field's
+    // umb-property (and its live editor) to another. Positional reuse pushed a hidden field's
+    // value into the next field's editor, e.g. Content Type's string into the Headers editor.
+    #renderFields(fields: EditableModelFieldDescriptorModel[]) {
+        return repeat(
+            fields,
+            (f) => f.key,
+            (f) => this.#renderField(f),
+        );
+    }
+
     override render() {
         if (!this.fields.length) {
             return html`<div class="empty">
@@ -212,23 +271,23 @@ export class UaSettingsFormElement extends UmbLitElement {
             </div>`;
         }
 
-        const grouped = this.#groupFields(this.fields);
+        const grouped = this.#groupFields(this.fields.filter((f) => this.#isVisible(f)));
 
         return html`
             <umb-property-dataset .value=${this._propertyValues} @change=${this.#onChange}>
                 ${grouped.map((g) =>
                     this.noBox
                         ? html`${g.group ? html`<span class="group-headline">${this.localize.string(g.group)}</span>` : nothing}
-                              ${g.fields.map((f) => this.#renderField(f))}`
+                              ${this.#renderFields(g.fields)}`
                         : this.localize.string(g.group)
                           ? html`
                                 <uui-box class="uui-text">
                                     <span slot="headline">${this.localize.string(g.group)}</span>
-                                    ${g.fields.map((f) => this.#renderField(f))}
+                                    ${this.#renderFields(g.fields)}
                                 </uui-box>
                             `
                           : html`<uui-box class="uui-text">
-                                ${g.fields.map((f) => this.#renderField(f))}
+                                ${this.#renderFields(g.fields)}
                             </uui-box>`,
                 )}
             </umb-property-dataset>

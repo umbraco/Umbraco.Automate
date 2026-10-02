@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
 using WorkflowCore.Interface;
@@ -41,6 +42,7 @@ public class WorkflowCoreDiCompositionTests
         {
             cfg.UseQueueProvider(sp => sp.GetRequiredService<OutboxQueueProvider>());
             cfg.UseDistributedLockManager(sp => sp.GetRequiredService<WorkflowLockProvider>());
+            WorkflowEngineSettings.Apply(cfg, new ExecutionOptions());
         });
 
         var serviceProvider = services.BuildServiceProvider();

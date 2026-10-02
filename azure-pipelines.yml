@@ -23,14 +23,17 @@ parameters:
             changeVar: SlackChanged
             hasNpm: false
 
+# Feature branches are not listed: their pull request builds them, and a branch
+# trigger as well would build every push twice.
+# batch: a burst of merges builds once, from the latest commit, rather than once per merge.
 trigger:
+    batch: true
     branches:
         include:
             - v*/main
             - v*/dev
             - v*/release/*
             - v*/hotfix/*
-            - v*/feature/*
 
 pr:
     branches:
@@ -46,6 +49,10 @@ variables:
       value: "true"
     - name: DOTNET_CLI_TELEMETRY_OPTOUT
       value: "true"
+    # A push to vN/main, vN/dev, vN/release/* or vN/hotfix/*: the builds that publish SBOMs and packages.
+    # Resolves to "True" or "False" at compile time; eq() compares case-insensitively.
+    - name: isPublishBuild
+      value: ${{ and(ne(variables['Build.Reason'], 'PullRequest'), or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/'), endsWith(variables['Build.SourceBranch'], '/main'), endsWith(variables['Build.SourceBranch'], '/dev'))) }}
 
 stages:
     # ============================================================
@@ -58,275 +65,32 @@ stages:
             displayName: Build & Test
             pool:
                 vmImage: "ubuntu-latest"
+            variables:
+                NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+                npm_config_cache: $(Pipeline.Workspace)/.npm
             steps:
                 - checkout: self
                   fetchDepth: 0
 
-                - task: UseDotNet@2
-                  displayName: Setup .NET
-                  inputs:
-                      useGlobalJson: true
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - script: |
-                      npm ci --include=optional
-                      npm run build
-                  displayName: Build frontend
-
-                - script: dotnet restore Umbraco.Automate.slnx
-                  displayName: Restore
-
-                - script: dotnet build Umbraco.Automate.slnx --configuration Release --no-restore -p:DisableCloudBuildNumber=true
-                  displayName: Build
-
-                - script: dotnet test Umbraco.Automate.slnx --configuration Release --no-build --verbosity normal --logger trx --results-directory $(Agent.TempDirectory)/TestResults
-                  displayName: Test
-
-                - task: PublishTestResults@2
-                  displayName: Publish test results
-                  condition: always()
-                  inputs:
-                      testResultsFormat: VSTest
-                      testResultsFiles: "$(Agent.TempDirectory)/TestResults/**/*.trx"
-                      mergeTestResults: true
-
-                - task: PublishPipelineArtifact@1
-                  displayName: Upload build outputs
-                  inputs:
-                      targetPath: $(Build.SourcesDirectory)
-                      artifact: build-outputs
-                      publishLocation: pipeline
-
-    # ============================================================
-    # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
-    # Generates per-product SBOMs and uploads to Dependency-Track
-    # ============================================================
-    - stage: GenerateSBOM
-      displayName: Generate & Upload SBOMs
-      dependsOn: Build
-      condition: |
-          and(
-            succeeded(),
-            ne(variables['Build.Reason'], 'PullRequest')
-          )
-      jobs:
-          # Core product
-          - job: GenerateSBOM_Core
-            displayName: Generate SBOM - Umbraco.Automate
-            continueOnError: true
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: self
-                  fetchDepth: 1
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
-                  parameters:
-                      product: Umbraco.Automate
-
-          # Level 1 products (matrix)
-          - job: GenerateSBOM_Level1
-            displayName: Generate SBOM - Level 1
-            continueOnError: true
-            pool:
-                vmImage: "ubuntu-latest"
-            strategy:
-                matrix:
-                    ${{ each product in parameters.level1Products }}:
-                        ${{ replace(replace(product.name, 'Umbraco.Automate.', ''), '.', '_') }}:
-                            product: ${{ product.name }}
-                maxParallel: 10
-            steps:
-                - checkout: self
-                  fetchDepth: 1
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
-                  parameters:
-                      product: $(product)
-
-          # Level 2 products (matrix)
-          - job: GenerateSBOM_Level2
-            displayName: Generate SBOM - Level 2
-            continueOnError: true
-            pool:
-                vmImage: "ubuntu-latest"
-            strategy:
-                matrix:
-                    ${{ each product in parameters.level2Products }}:
-                        ${{ replace(replace(product.name, 'Umbraco.Automate.', ''), '.', '_') }}:
-                            product: ${{ product.name }}
-                maxParallel: 10
-            steps:
-                - checkout: self
-                  fetchDepth: 1
-
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
-                  parameters:
-                      product: $(product)
-
-          # ============================================================
-          # Collect all SBOMs into single artifact
-          # Downloads artifacts from all SBOM jobs and combines them
-          # ============================================================
-          - job: CollectSBOMs
-            displayName: Collect All SBOMs
-            dependsOn:
-                - GenerateSBOM_Core
-                - GenerateSBOM_Level1
-                - GenerateSBOM_Level2
-            condition: |
-                and(
-                  not(failed()),
-                  not(canceled())
-                )
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: none
-
-                # Download Core SBOM
-                - task: DownloadPipelineArtifact@2
-                  displayName: Download Umbraco.Automate SBOM
-                  inputs:
-                      artifact: "Umbraco.Automate-sbom"
-                      targetPath: "$(Pipeline.Workspace)/sboms"
-
-                # Download Level 1 SBOMs
-                - ${{ each product in parameters.level1Products }}:
-                      - task: DownloadPipelineArtifact@2
-                        displayName: Download ${{ product.name }} SBOM
-                        inputs:
-                            artifact: "${{ product.name }}-sbom"
-                            targetPath: "$(Pipeline.Workspace)/sboms"
-
-                # Download Level 2 SBOMs
-                - ${{ each product in parameters.level2Products }}:
-                      - task: DownloadPipelineArtifact@2
-                        displayName: Download ${{ product.name }} SBOM
-                        inputs:
-                            artifact: "${{ product.name }}-sbom"
-                            targetPath: "$(Pipeline.Workspace)/sboms"
-
-                # Flatten SBOM files into single directory
+                # Set here rather than in a stage of its own, which cost an extra agent and
+                # its wait on every build. Safe to set early: every version.json disables
+                # nbgv's cloud build number, so the Pack stage's `nbgv cloud` leaves it alone.
                 - task: Bash@3
-                  displayName: Collect SBOM files
+                  displayName: Set build number (branch + date)
                   inputs:
                       targetType: inline
                       script: |
-                          mkdir -p all-sboms
+                          BUILD_DATE=$(date -u +%Y%m%d)
+                          echo "##vso[build.updatebuildnumber]$(Build.SourceBranchName)-${BUILD_DATE}-$(Build.BuildID)"
 
-                          # Find all SBOM JSON files and move to single directory
-                          if [ -d "$(Pipeline.Workspace)/sboms" ]; then
-                            find "$(Pipeline.Workspace)/sboms" -name "*-bom.json" -exec mv {} all-sboms/ \;
-                          fi
-
-                          # List collected SBOMs
-                          if [ -d "all-sboms" ] && [ "$(ls -A all-sboms 2>/dev/null)" ]; then
-                            echo "Collected SBOMs:"
-                            ls -la all-sboms/
-                          else
-                            echo "No SBOMs collected"
-                          fi
-
-                - task: PublishPipelineArtifact@1
-                  displayName: Upload combined SBOM artifact
-                  inputs:
-                      targetPath: $(Build.SourcesDirectory)/all-sboms
-                      artifact: all-sboms
-                      publishLocation: pipeline
-
-    # ============================================================
-    # Validate Changelogs - Only runs on release and hotfix branches
-    # Ensures CHANGELOGs are present and match version.json
-    # Runs in parallel with GenerateSBOM after Build
-    # ============================================================
-    - stage: ValidateChangelogs
-      displayName: Validate Changelogs
-      dependsOn: Build
-      # Only validate on release and hotfix branches (not main or dev)
-      condition: |
-          and(
-            succeeded(),
-            ne(variables['Build.Reason'], 'PullRequest'),
-            or(
-              contains(variables['Build.SourceBranch'], '/release/'),
-              contains(variables['Build.SourceBranch'], '/hotfix/')
-            )
-          )
-      jobs:
-          - job: ValidateChangelogFiles
-            displayName: Validate CHANGELOG.md Files
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: self
-                  fetchDepth: 0
-
-                - task: PowerShell@2
-                  displayName: Validate changelogs
-                  inputs:
-                      filePath: .azure-pipelines/scripts/validate-changelogs.ps1
-                      pwsh: true
-                      failOnStderr: false
-
-    # ============================================================
-    # Pack Stage - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
-    # Uses dynamic change detection to only pack products that changed
-    # Runs in parallel with GenerateSBOM after Build (through ValidateChangelogs dependency)
-    # ============================================================
-    - stage: Pack
-      displayName: Pack NuGet & NPM Packages
-      dependsOn:
-          - Build
-          - ValidateChangelogs
-      # Only pack on push (not PR) to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
-      # ValidateChangelogs may be skipped (on vN/main, vN/dev branches), which is OK
-      condition: |
-          and(
-            in(dependencies.Build.result, 'Succeeded'),
-            in(dependencies.ValidateChangelogs.result, 'Succeeded', 'Skipped'),
-            ne(variables['Build.Reason'], 'PullRequest'),
-            or(
-              contains(variables['Build.SourceBranch'], '/hotfix/'),
-              contains(variables['Build.SourceBranch'], '/release/'),
-              endsWith(variables['Build.SourceBranch'], '/main'),
-              endsWith(variables['Build.SourceBranch'], '/dev')
-            )
-          )
-      jobs:
-          # ============================================================
-          # Detect which products changed
-          # ============================================================
-          - job: DetectChanges
-            displayName: Detect Changed Products
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - checkout: self
-                  fetchDepth: 0
-
+                # Change detection runs here rather than as the first job of the Pack stage,
+                # which cost an agent and its wait before any packing could start. It only
+                # reads git history, so it runs before the build touches the working tree.
+                # The Pack stage reads its outputs via stageDependencies.
                 - task: PowerShell@2
                   displayName: Run change detection
                   name: detect
+                  condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
                   inputs:
                       filePath: .azure-pipelines/scripts/detect-changes.ps1
                       pwsh: true
@@ -337,6 +101,7 @@ stages:
 
                 - task: Bash@3
                   displayName: Summarize packed products + tag build
+                  condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
                   inputs:
                       targetType: inline
                       script: |
@@ -388,14 +153,464 @@ stages:
                             fi
                           done
 
+                - task: UseDotNet@2
+                  displayName: Setup .NET
+                  inputs:
+                      useGlobalJson: true
+
+                - task: UseNode@1
+                  displayName: Setup Node.js
+                  inputs:
+                      version: $(NODE_VERSION)
+
+                # PR builds read the cache saved by their target branch's builds.
+                - task: Cache@2
+                  displayName: Cache npm
+                  inputs:
+                      key: 'npm | "$(Agent.OS)" | package-lock.json'
+                      restoreKeys: |
+                          npm | "$(Agent.OS)"
+                      path: $(npm_config_cache)
+
+                # No packages.lock.json in this repo. Central package management puts every
+                # version in Directory.Packages.props, so key on that alone: keying on project
+                # files too would miss, and pay the cache save, on every PR that edits a .csproj.
+                - task: Cache@2
+                  displayName: Cache NuGet packages
+                  inputs:
+                      key: 'nuget | "$(Agent.OS)" | Directory.Packages.props'
+                      restoreKeys: |
+                          nuget | "$(Agent.OS)"
+                      path: $(NUGET_PACKAGES)
+
+                - script: |
+                      npm ci --include=optional
+                      npm run build
+                  displayName: Build frontend
+
+                - script: dotnet restore Umbraco.Automate.slnx
+                  displayName: Restore
+
+                - script: dotnet build Umbraco.Automate.slnx --configuration Release --no-restore -p:DisableCloudBuildNumber=true
+                  displayName: Build
+
+                - script: dotnet test Umbraco.Automate.slnx --configuration Release --no-build --verbosity normal --logger trx --results-directory $(Agent.TempDirectory)/TestResults
+                  displayName: Test
+
+                - task: PublishTestResults@2
+                  displayName: Publish test results
+                  condition: always()
+                  inputs:
+                      testResultsFormat: VSTest
+                      testResultsFiles: "$(Agent.TempDirectory)/TestResults/**/*.trx"
+                      mergeTestResults: true
+
+                # .artifactignore at the repo root keeps .git and node_modules out of this
+                # artifact: the Pack jobs check out the repo themselves and don't need them.
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload build outputs
+                  inputs:
+                      targetPath: $(Build.SourcesDirectory)
+                      artifact: build-outputs
+                      publishLocation: pipeline
+
+    # ============================================================
+    # Acceptance Tests - Playwright end-to-end against a real running site
+    #
+    # Depends on nothing, so it runs alongside Build and gates pull requests too.
+    # It uses nothing Build produces (it builds the site from source itself), so
+    # waiting for Build only added ~3.5 min of wall-clock. Pack is not an option:
+    # it is restricted to pushes on vN/main, vN/dev, vN/hotfix/*, vN/release/*.
+    # The site is scaffolded from source by scripts/install-demo-site.ps1, the
+    # same script developers run, so the leg exercises project references
+    # rather than a published package and matches the local workflow exactly.
+    #
+    # Windows + SQL Server LocalDB, not Linux + SQLite, matching Forms and the CMS
+    # acceptance legs. The CMS SQLite connection string carries Cache=Shared, and
+    # with a shared cache the CMS cache-instruction sync job and an end-of-request
+    # cache-instruction insert can deadlock on umbracoCacheInstruction. The pending
+    # write then blocks every connection in the process (SQLite Error 6 'database
+    # table is locked' on unrelated Automate and OpenIddict tables), and the CMS
+    # retry policy retries it 10x at the 30s command timeout, so the site stalls for
+    # ~9.5 min and every spec in that window fails in fixture setup (build 289321).
+    # SQL Server has no shared cache and no single-writer lock, so the stall cannot
+    # happen here. It also runs Automate's SQL Server migrations end to end.
+    # Local development stays on SQLite, where the stall is rare.
+    # ============================================================
+    - stage: AcceptanceTests
+      displayName: Acceptance Tests
+      dependsOn: []
+      jobs:
+          - job: AcceptanceTests
+            displayName: Run Playwright Acceptance Tests
+            # Sharded across parallel agents, each with its own demo site and LocalDB. The
+            # specs share site data and the suite runs one worker, so shards cannot share a
+            # site; splitting across agents is what makes them run concurrently. Playwright
+            # splits by test (fullyParallel in playwright.config.ts, --shard below), and every shard runs
+            # auth.setup.ts itself.
+            strategy:
+                parallel: 4
+            # Windows agents build more slowly, and the first boot against a cold LocalDB
+            # creates the database and runs the full unattended install.
+            timeoutInMinutes: 60
+            pool:
+                vmImage: "windows-latest"
+            variables:
+                # Makes playwright.config.ts pick its CI profile (junit reporter,
+                # retries, longer timeouts) and makes postinstall.js skip the
+                # interactive config prompt.
+                CI: "true"
+                ASPNETCORE_ENVIRONMENT: Development
+                ASPNETCORE_URLS: https://localhost:44380
+                PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
+                # Cached below. Each shard otherwise restored NuGet cold three times (~1:20) and ran
+                # two cold `npm ci` (~1:50), a large share of its ~7:30 of setup (build 289743).
+                NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+                npm_config_cache: $(Pipeline.Workspace)/.npm
+                acceptanceDir: $(Build.SourcesDirectory)/Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
+                # Override the scaffold's SQLite connection string. Automate shares it
+                # (Umbraco:Automate:UseNamedConnectionString = umbracoDbDSN), so this moves
+                # both the CMS and Automate onto LocalDB. InstallMissingDatabase lets the
+                # unattended install create the database file on first boot.
+                CONNECTIONSTRINGS__UMBRACODBDSN: Data Source=(localdb)\MSSQLLocalDB;AttachDbFilename=|DataDirectory|\Umbraco.mdf;Integrated Security=True
+                CONNECTIONSTRINGS__UMBRACODBDSN_PROVIDERNAME: Microsoft.Data.SqlClient
+                UMBRACO__CMS__GLOBAL__INSTALLMISSINGDATABASE: true
+            steps:
+                # Full history, like the Build stage: the demo site builds the products from
+                # project references, and Nerdbank.GitVersioning cannot compute a version
+                # height from a shallow clone.
+                - checkout: self
+                  fetchDepth: 0
+
+                # Started now and left running, so its 10-30s boot overlaps the builds instead of
+                # sitting on the critical path. "Wait for SQL Server LocalDB" below checks it is up.
+                - pwsh: |
+                      Start-Process SqlLocalDB -ArgumentList 'start', 'MSSQLLocalDB' -WindowStyle Hidden
+                      Write-Host "SQL Server LocalDB starting in the background"
+                  displayName: Start SQL Server LocalDB (background)
+
+                # The SDK global.json pins is not on the hosted image, so UseDotNet downloaded and
+                # extracted it on every shard (24-59s). UseDotNet finds a cached copy in its tool
+                # directory and skips the download.
+                - task: Cache@2
+                  displayName: Cache .NET SDK
+                  inputs:
+                      key: 'dotnet-sdk | "$(Agent.OS)" | global.json'
+                      path: $(Agent.ToolsDirectory)/dotnet
+
+                - task: UseDotNet@2
+                  displayName: Setup .NET
+                  inputs:
+                      useGlobalJson: true
+
+                - task: UseNode@1
+                  displayName: Setup Node.js
+                  inputs:
+                      version: $(NODE_VERSION)
+
+                # One npm cache for both installs: the frontend at the repo root and the acceptance
+                # test packages. The Build stage's npm and NuGet caches are keyed on its Linux agent,
+                # so these Windows jobs keep their own. PR builds read what their target branch saved.
+                - task: Cache@2
+                  displayName: Cache npm
+                  inputs:
+                      key: 'npm | "$(Agent.OS)" | package-lock.json | Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests/package-lock.json'
+                      restoreKeys: |
+                          npm | "$(Agent.OS)"
+                      path: $(npm_config_cache)
+
+                # Versions live in Directory.Packages.props; the demo site's own packages (the
+                # Umbraco template, Clean, WorktreeDevPort) come from install-demo-site.ps1.
+                - task: Cache@2
+                  displayName: Cache NuGet packages
+                  inputs:
+                      key: 'nuget | "$(Agent.OS)" | Directory.Packages.props | scripts/install-demo-site.ps1'
+                      restoreKeys: |
+                          nuget | "$(Agent.OS)"
+                      path: $(NUGET_PACKAGES)
+
+                # Builds the wwwroot bundles the demo site serves. Without this the
+                # Automate section silently fails to register and every UI spec fails
+                # with element-not-found, which looks like a product bug but is not.
+                # bash, not script: on Windows `script` is cmd, where the first npm (a
+                # .cmd batch file) would end the step before the build ran.
+                - bash: |
+                      set -e
+                      npm ci --include=optional
+                      npm run build
+                  displayName: Build frontend
+
+                # -SkipSolution: CI builds the demo project directly and never opens the local .slnx.
+                - pwsh: ./scripts/install-demo-site.ps1 -SkipSolution
+                  displayName: Scaffold demo site
+
+                # The demo lives under demos/vN where N comes from Umbraco.Cms.Core in
+                # Directory.Packages.props, so resolve it rather than hard-coding a major.
+                - pwsh: |
+                      $demoProject = Get-ChildItem -Path demos -Recurse -Filter Umbraco.Automate.DemoSite.csproj | Select-Object -First 1
+                      if (-not $demoProject) {
+                        Write-Host "##vso[task.logissue type=error]Demo site project not found under demos/"
+                        exit 1
+                      }
+                      Write-Host "Demo project: $($demoProject.FullName)"
+                      Write-Host "##vso[task.setvariable variable=demoProject]$($demoProject.FullName)"
+                  displayName: Resolve demo site path
+
+                - script: dotnet dev-certs https
+                  displayName: Create HTTPS development certificate
+
+                - script: dotnet build "$(demoProject)" --configuration Release
+                  displayName: Build demo site
+
+                # Started in the background at the top of the job; by now it has usually been up for
+                # minutes, so this normally returns at once. Falls back to a blocking start if the
+                # background start did not take.
+                - pwsh: |
+                      for ($i = 0; $i -lt 60; $i++) {
+                        if ((SqlLocalDB info MSSQLLocalDB) -match 'State:\s+Running') {
+                          Write-Host "SQL Server LocalDB is running (check $i)"
+                          exit 0
+                        }
+                        Start-Sleep -Seconds 1
+                      }
+                      Write-Host "LocalDB not running after 60s; starting it in the foreground"
+                      SqlLocalDB start MSSQLLocalDB
+                  displayName: Wait for SQL Server LocalDB
+
+                # Keyed on the acceptance package-lock, which pins the Playwright
+                # version that determines the required browser build.
+                - task: Cache@2
+                  displayName: Cache Playwright browsers
+                  inputs:
+                      key: 'playwright | "$(Agent.OS)" | $(acceptanceDir)/package-lock.json'
+                      restoreKeys: |
+                          playwright | "$(Agent.OS)"
+                      path: $(PLAYWRIGHT_BROWSERS_PATH)
+
+                - script: npm ci --no-fund --no-audit
+                  displayName: Restore acceptance test packages
+                  workingDirectory: $(acceptanceDir)
+
+                # script (cmd), not pwsh: under pwsh the install hangs after the download
+                # reaches 100% (seen in Forms). No --with-deps, which only installs Linux
+                # packages. On a cache hit the download is skipped.
+                - script: npx playwright install chromium
+                  displayName: Install Playwright Chromium
+                  workingDirectory: $(acceptanceDir)
+                  timeoutInMinutes: 15
+                  retryCountOnTaskFailure: 2
+
+                # config.js is interactive and reads the per-worktree port from git
+                # config, which is a local-development affordance. In CI the URL is fixed by
+                # ASPNETCORE_URLS, and the credentials are the ones the scaffold
+                # installs unattended, so write .env directly.
+                #
+                # STORAGE_STATE_PATH is not optional. The CMS umbracoApi fixture refreshes the
+                # login before every test and, only when this is set, saves the browser state
+                # (with the rotated refresh token) afterwards. Without it every test starts from
+                # the token auth.setup.ts saved, which the first refresh already used up, so each
+                # test fell back to a full re-login (24 in build 289321). Same file as
+                # playwright.config.ts's storageState, as in Forms' pipeline.
+                - pwsh: |
+                      "UMBRACO_USER_LOGIN=admin@example.com",
+                      "UMBRACO_USER_PASSWORD=password1234",
+                      "URL=$(ASPNETCORE_URLS)",
+                      "STORAGE_STATE_PATH=$(acceptanceDir)/playwright/.auth/user.json",
+                      "CONSOLE_ERRORS_PATH=$(acceptanceDir)/results/console-errors.json" | Set-Content .env
+                      Write-Host "Wrote .env targeting $(ASPNETCORE_URLS)"
+                  displayName: Generate .env
+                  workingDirectory: $(acceptanceDir)
+
+                - pwsh: |
+                      $process = Start-Process dotnet "run --project `"$(demoProject)`" --configuration Release --no-build --no-launch-profile" -PassThru -NoNewWindow -RedirectStandardOutput "$(Build.ArtifactStagingDirectory)/demo-site.log" -RedirectStandardError "$(Build.ArtifactStagingDirectory)/demo-site.err.log"
+                      Write-Host "##vso[task.setvariable variable=demoSitePid]$($process.Id)"
+                      Write-Host "Demo site starting as PID $($process.Id)"
+                  displayName: Start demo site
+
+                # First boot creates the LocalDB database and runs the unattended install and
+                # the Automate schema migrations, so allow generous time before calling it a failure.
+                # Polls every 3s (was 10s): the site is usually up in 20-35s, so a coarse poll
+                # added up to 10s of idle wait per shard.
+                - pwsh: |
+                      for ($i = 0; $i -lt 300; $i++) {
+                        try {
+                          Invoke-WebRequest "$(ASPNETCORE_URLS)/umbraco" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 10 | Out-Null
+                          Write-Host "Demo site is up (attempt $i)"
+                          exit 0
+                        } catch {
+                          Start-Sleep -Seconds 3
+                        }
+                      }
+                      Write-Host "##vso[task.logissue type=error]Demo site did not respond within 15 minutes"
+                      Get-Content "$(Build.ArtifactStagingDirectory)/demo-site.log" -Tail 100 -ErrorAction SilentlyContinue
+                      Get-Content "$(Build.ArtifactStagingDirectory)/demo-site.err.log" -Tail 100 -ErrorAction SilentlyContinue
+                      exit 1
+                  displayName: Wait for demo site
+
+                - script: npx playwright test DefaultConfig --shard=$(System.JobPositionInPhase)/$(System.TotalJobsInPhase)
+                  displayName: Run acceptance tests (shard $(System.JobPositionInPhase) of $(System.TotalJobsInPhase))
+                  workingDirectory: $(acceptanceDir)
+
+                # always(), so the site is also stopped after a failed or cancelled test step.
+                # The recorded PID is the `dotnet run` launcher; the site it starts is a child
+                # that holds demo-site.log open, and killing only the launcher would orphan it
+                # and fail the log upload below. taskkill /T kills the whole tree.
+                - pwsh: |
+                      taskkill /PID $(demoSitePid) /T /F
+                      exit 0
+                  displayName: Stop demo site
+                  condition: and(always(), ne(variables.demoSitePid, ''))
+
+                - pwsh: SqlLocalDB stop MSSQLLocalDB
+                  displayName: Stop SQL Server LocalDB
+                  condition: always()
+
+                - task: PublishTestResults@2
+                  displayName: Publish acceptance test results
+                  condition: always()
+                  inputs:
+                      testResultsFormat: JUnit
+                      testResultsFiles: "$(acceptanceDir)/results/results.xml"
+                      testRunTitle: Acceptance Tests (shard $(System.JobPositionInPhase))
+                      mergeTestResults: true
+
+                # Traces, screenshots and video for every failed test, plus the site
+                # logs, because a UI failure is rarely diagnosable from the error alone.
+                # always(), as in Forms: a job killed by its timeout is cancelled, and a
+                # cancelled job skips steps whose condition does not include always(), so
+                # the run that most needs diagnosing would upload nothing. The shard and attempt
+                # numbers keep shards and re-runs from colliding on the same artifact name.
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload failure diagnostics
+                  condition: always()
+                  inputs:
+                      targetPath: $(acceptanceDir)/results
+                      artifact: acceptance-test-results - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
+                      publishLocation: pipeline
+
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload demo site logs
+                  condition: always()
+                  inputs:
+                      targetPath: $(Build.ArtifactStagingDirectory)
+                      artifact: acceptance-demo-site-log - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
+                      publishLocation: pipeline
+
+    # ============================================================
+    # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
+    # Generates per-product SBOMs and uploads to Dependency-Track
+    # ============================================================
+    - stage: GenerateSBOM
+      displayName: Generate & Upload SBOMs
+      dependsOn: Build
+      condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
+      jobs:
+          # One job for every product: each SBOM takes about a minute, far less than the
+          # agent wait a job per product cost, and cdxgen is installed once, not per product.
+          - job: GenerateSBOMs
+            displayName: Generate SBOMs
+            continueOnError: true
+            pool:
+                vmImage: "ubuntu-latest"
+            steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - task: UseNode@1
+                  displayName: Setup Node.js
+                  inputs:
+                      version: $(NODE_VERSION)
+
+                - task: Npm@1
+                  displayName: Install cdxgen
+                  inputs:
+                      command: custom
+                      customCommand: install --global @cyclonedx/cdxgen
+
+                - template: .azure-pipelines/templates/generate-sbom.yml
+                  parameters:
+                      product: Umbraco.Automate
+
+                - ${{ each product in parameters.level1Products }}:
+                      - template: .azure-pipelines/templates/generate-sbom.yml
+                        parameters:
+                            product: ${{ product.name }}
+
+                - ${{ each product in parameters.level2Products }}:
+                      - template: .azure-pipelines/templates/generate-sbom.yml
+                        parameters:
+                            product: ${{ product.name }}
+
+                - task: PublishPipelineArtifact@1
+                  displayName: Upload combined SBOM artifact
+                  condition: succeededOrFailed()
+                  inputs:
+                      targetPath: $(Build.ArtifactStagingDirectory)/sbom
+                      artifact: all-sboms
+                      publishLocation: pipeline
+
+    # ============================================================
+    # Validate Changelogs - Only runs on release and hotfix branches
+    # Ensures CHANGELOGs are present and match version.json
+    # Runs in parallel with GenerateSBOM after Build
+    # ============================================================
+    - stage: ValidateChangelogs
+      displayName: Validate Changelogs
+      dependsOn: Build
+      # Only validate on release and hotfix branches (not main or dev)
+      condition: |
+          and(
+            succeeded(),
+            ne(variables['Build.Reason'], 'PullRequest'),
+            or(
+              contains(variables['Build.SourceBranch'], '/release/'),
+              contains(variables['Build.SourceBranch'], '/hotfix/')
+            )
+          )
+      jobs:
+          - job: ValidateChangelogFiles
+            displayName: Validate CHANGELOG.md Files
+            pool:
+                vmImage: "ubuntu-latest"
+            steps:
+                - checkout: self
+                  fetchDepth: 0
+
+                - task: PowerShell@2
+                  displayName: Validate changelogs
+                  inputs:
+                      filePath: .azure-pipelines/scripts/validate-changelogs.ps1
+                      pwsh: true
+                      failOnStderr: false
+
+    # ============================================================
+    # Pack Stage - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
+    # Uses dynamic change detection to only pack products that changed
+    # Runs in parallel with GenerateSBOM after Build (through ValidateChangelogs dependency)
+    # ============================================================
+    - stage: Pack
+      displayName: Pack NuGet & NPM Packages
+      dependsOn:
+          - Build
+          - ValidateChangelogs
+      # Only pack on push (not PR) to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches,
+      # and only when change detection (in the Build job) found something to pack.
+      # ValidateChangelogs may be skipped (on vN/main, vN/dev branches), which is OK
+      condition: |
+          and(
+            in(dependencies.Build.result, 'Succeeded'),
+            in(dependencies.ValidateChangelogs.result, 'Succeeded', 'Skipped'),
+            eq(variables.isPublishBuild, 'True'),
+            eq(dependencies.Build.outputs['BuildAndTest.detect.AnyChanged'], 'true')
+          )
+      jobs:
           # ============================================================
           # Pack Core (Level 0 - no internal dependencies)
           # Conditional based on change detection
           # ============================================================
           - job: PackCore
             displayName: Pack Umbraco.Automate
-            dependsOn: DetectChanges
-            condition: eq(dependencies.DetectChanges.outputs['detect.CoreChanged'], 'true')
+            condition: eq(stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'], 'true')
             pool:
                 vmImage: "ubuntu-latest"
             steps:
@@ -430,13 +645,12 @@ stages:
           - job: PackLevel1
             displayName: Pack Level 1
             dependsOn:
-                - DetectChanges
                 - PackCore
             condition: |
                 and(
                   not(failed()),
                   not(canceled()),
-                  eq(dependencies.DetectChanges.outputs['detect.Level1Changed'], 'true')
+                  eq(stageDependencies.Build.BuildAndTest.outputs['detect.Level1Changed'], 'true')
                 )
             pool:
                 vmImage: "ubuntu-latest"
@@ -450,9 +664,9 @@ stages:
                 maxParallel: 10
             variables:
                 # Pass all per-product change flags as job variables
-                CoreChanged: $[ dependencies.DetectChanges.outputs['detect.CoreChanged'] ]
+                CoreChanged: $[ stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'] ]
                 ${{ each product in parameters.level1Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
             steps:
                 - checkout: self
                   fetchDepth: 0
@@ -483,14 +697,13 @@ stages:
           - job: PackLevel2
             displayName: Pack Level 2
             dependsOn:
-                - DetectChanges
                 - PackCore
                 - PackLevel1
             condition: |
                 and(
                   not(failed()),
                   not(canceled()),
-                  eq(dependencies.DetectChanges.outputs['detect.Level2Changed'], 'true')
+                  eq(stageDependencies.Build.BuildAndTest.outputs['detect.Level2Changed'], 'true')
                 )
             pool:
                 vmImage: "ubuntu-latest"
@@ -504,11 +717,11 @@ stages:
                 maxParallel: 10
             variables:
                 # Pass all per-product change flags as job variables
-                CoreChanged: $[ dependencies.DetectChanges.outputs['detect.CoreChanged'] ]
+                CoreChanged: $[ stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'] ]
                 ${{ each product in parameters.level1Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
                 ${{ each product in parameters.level2Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
             steps:
                 - checkout: self
                   fetchDepth: 0
@@ -540,7 +753,6 @@ stages:
           - job: CollectPackages
             displayName: Collect All Packages
             dependsOn:
-                - DetectChanges
                 - PackCore
                 - PackLevel1
                 - PackLevel2
@@ -548,17 +760,17 @@ stages:
                 and(
                   not(failed()),
                   not(canceled()),
-                  eq(dependencies.DetectChanges.outputs['detect.AnyChanged'], 'true')
+                  eq(stageDependencies.Build.BuildAndTest.outputs['detect.AnyChanged'], 'true')
                 )
             pool:
                 vmImage: "ubuntu-latest"
             variables:
                 # Map dependency outputs to job variables (dependencies context only works at job level)
-                CoreChanged: $[ dependencies.DetectChanges.outputs['detect.CoreChanged'] ]
+                CoreChanged: $[ stageDependencies.Build.BuildAndTest.outputs['detect.CoreChanged'] ]
                 ${{ each product in parameters.level1Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
                 ${{ each product in parameters.level2Products }}:
-                    ${{ product.changeVar }}: $[ dependencies.DetectChanges.outputs['detect.${{ product.changeVar }}'] ]
+                    ${{ product.changeVar }}: $[ stageDependencies.Build.BuildAndTest.outputs['detect.${{ product.changeVar }}'] ]
             steps:
                 - checkout: self
                   fetchDepth: 0
@@ -769,26 +981,3 @@ stages:
                       artifact: all-npm-packages
                       publishLocation: pipeline
 
-    # ============================================================
-    # Finalize - set build number after both parallel paths complete
-    # Waits for both GenerateSBOM and Pack stages
-    # ============================================================
-    - stage: Finalize
-      displayName: Finalize Build
-      dependsOn:
-          - GenerateSBOM
-          - Pack
-      condition: not(canceled())
-      jobs:
-          - job: SetBuildNumber
-            displayName: Set build number
-            pool:
-                vmImage: "ubuntu-latest"
-            steps:
-                - task: Bash@3
-                  displayName: Set build number (branch + date)
-                  inputs:
-                      targetType: inline
-                      script: |
-                          BUILD_DATE=$(date -u +%Y%m%d)
-                          echo "##vso[build.updatebuildnumber]$(Build.SourceBranchName)-${BUILD_DATE}-$(Build.BuildID)"

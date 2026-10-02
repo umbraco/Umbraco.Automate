@@ -266,13 +266,25 @@ internal sealed class TriggerEventHandler : IMessageHandler
                 "Starting run for automation {AutomationAlias} ({AutomationId}) version {Version} from trigger {TriggerAlias}",
                 executionAutomation.Alias, executionAutomation.Id, executionAutomation.Version, message.TriggerAlias);
 
-            await _executor.ExecuteAsync(
-                executionAutomation,
-                message.InitiatorType,
-                message.InitiatorId,
-                triggerOutputData,
-                cancellationToken,
-                originChain: message.OriginAutomationChain);
+            try
+            {
+                await _executor.ExecuteAsync(
+                    executionAutomation,
+                    message.InitiatorType,
+                    message.InitiatorId,
+                    triggerOutputData,
+                    cancellationToken,
+                    originChain: message.OriginAutomationChain);
+            }
+            catch (RateLimitExceededException ex)
+            {
+                // An over-limit automation must not fail the whole message: the outbox would
+                // retry it and start a second run for every automation that already ran on
+                // this attempt, and dead-letter the event for all of them.
+                _logger.LogWarning(
+                    "Automation {AutomationAlias} ({AutomationId}) skipped for trigger {TriggerAlias} — rate limit exceeded: {Reason}",
+                    executionAutomation.Alias, executionAutomation.Id, message.TriggerAlias, ex.Message);
+            }
         }
     }
 

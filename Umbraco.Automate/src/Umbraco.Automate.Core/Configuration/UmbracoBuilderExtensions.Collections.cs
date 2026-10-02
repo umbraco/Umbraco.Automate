@@ -30,7 +30,9 @@ using Umbraco.Automate.Core.Triggers.Scheduling;
 using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Triggers.Webhooks.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.DependencyInjection;
 using WorkflowCore.Interface;
 
@@ -148,6 +150,7 @@ public static partial class UmbracoBuilderExtensions
         // Settings infrastructure
         builder.Services.AddSingleton<IConfigurationReferenceResolver, ConfigurationReferenceResolver>();
         builder.Services.AddSingleton<IEditableModelSerializer, EditableModelSerializer>();
+        builder.Services.AddSingleton<IAutomationSettingsProtector, AutomationSettingsProtector>();
         builder.Services.AddSingleton<IEditableModelResolver, EditableModelResolver>();
         builder.Services.AddSingleton<ActionInfrastructure>();
         builder.Services.AddSingleton<TriggerInfrastructure>();
@@ -178,6 +181,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
+        builder.Services.AddSingleton<IRunDataSanitizer, RunDataSanitizer>();
         builder.Services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
         builder.Services.AddSingleton<BindingEvaluator>();
@@ -186,16 +190,17 @@ public static partial class UmbracoBuilderExtensions
 
         // Shared outbound HTTP client — with SSRF protection
         builder.Services.AddHttpClient(Constants.HttpClients.Default)
-            .ConfigurePrimaryHttpMessageHandler(_ => SsrfProtectionHandler.Create());
+            .ConfigurePrimaryHttpMessageHandler(sp => SsrfProtectionHandler.Create(
+                sp.GetRequiredService<IOptions<ExecutionOptions>>().Value.AllowOutboundHttpProxy));
 
         // Non-redirecting variant used by the Run Script action's fetch() when redirect: "manual".
         builder.Services.AddHttpClient(Constants.HttpClients.NoRedirect)
-            .ConfigurePrimaryHttpMessageHandler(_ =>
-            {
-                var handler = SsrfProtectionHandler.Create();
-                handler.AllowAutoRedirect = false;
-                return handler;
-            });
+            .ConfigurePrimaryHttpMessageHandler(sp => SsrfProtectionHandler.Create(
+                sp.GetRequiredService<IOptions<ExecutionOptions>>().Value.AllowOutboundHttpProxy,
+                allowAutoRedirect: false));
+
+        // Downloads media files from a URL for the Create Media action.
+        builder.Services.AddSingleton<IMediaFileDownloader, MediaFileDownloader>();
 
         // Sandboxed JavaScript executor + save-time validator for the Run Script action.
         builder.Services.AddSingleton<IScriptExecutor, ScriptExecutor>();
@@ -237,10 +242,16 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IMessageHandler, WorkflowQueueHandler>();
         builder.Services.AddSingleton<IMessageHandler, EventQueueHandler>();
         builder.Services.AddSingleton<WorkflowLockProvider>();
+
+        // WorkflowCore takes its engine settings only through this callback, not IOptions, so
+        // they are read from configuration once at startup.
+        var executionOptions = builder.Config.GetSection("Umbraco:Automate:Execution").Get<ExecutionOptions>()
+            ?? new ExecutionOptions();
         builder.Services.AddWorkflow(cfg =>
         {
             cfg.UseQueueProvider(sp => sp.GetRequiredService<OutboxQueueProvider>());
             cfg.UseDistributedLockManager(sp => sp.GetRequiredService<WorkflowLockProvider>());
+            WorkflowEngineSettings.Apply(cfg, executionOptions);
         });
         // Per-step cooperative cancellation: TerminateWorkflow alone races the executor's
         // workflow lock and silently fails while a run is actively executing. AddMemoryCache

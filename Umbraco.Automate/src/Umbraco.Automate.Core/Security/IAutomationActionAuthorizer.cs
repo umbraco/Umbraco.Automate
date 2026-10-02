@@ -12,6 +12,9 @@ namespace Umbraco.Automate.Core.Security;
 /// </summary>
 public interface IAutomationActionAuthorizer
 {
+    private const string RootAuthorizationNotSupportedMessage =
+        "This authorizer does not implement root-level authorization, so access to the root is denied.";
+
     /// <summary>
     /// Authorises the service account currently set on the ambient backoffice accessor for
     /// the given content node and permission letters.
@@ -29,6 +32,30 @@ public interface IAutomationActionAuthorizer
     Task<AutomationAuthorizationResult> AuthorizeMediaAsync(
         Guid mediaKey,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for the
+    /// content root. Distinct from <see cref="AuthorizeContentAsync(Guid, IReadOnlySet{string}, CancellationToken)"/>
+    /// because the root is not a node and has no key: an account with a content start node is
+    /// confined to that subtree and cannot write to the root at all.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. Root access cannot be derived from the node-based members, so it fails closed.
+    Task<AutomationAuthorizationResult> AuthorizeContentRootAsync(
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+        => Task.FromResult(AutomationAuthorizationResult.Fail(RootAuthorizationNotSupportedMessage));
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for the
+    /// media root. Distinct from <see cref="AuthorizeMediaAsync(Guid, CancellationToken)"/>
+    /// because the root is not a node and has no key: an account with a media start node is
+    /// confined to that subtree and cannot write to the root at all.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. Root access cannot be derived from the node-based members, so it fails closed.
+    Task<AutomationAuthorizationResult> AuthorizeMediaRootAsync(CancellationToken cancellationToken)
+        => Task.FromResult(AutomationAuthorizationResult.Fail(RootAuthorizationNotSupportedMessage));
 
     /// <summary>
     /// Filters a set of content keys to only those the ambient service account is
@@ -68,4 +95,36 @@ public interface IAutomationActionAuthorizer
         IUser user,
         Guid mediaKey,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for a
+    /// target parent content node, or the content root when <paramref name="parentKey"/> is
+    /// <c>null</c>. Used by actions that relocate content (e.g. Move) and must authorise the
+    /// destination as well as the source — a node-only check would let an account escape its
+    /// start-node scope by moving into an unrelated, unauthorised subtree.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. It composes the node and root members, so a decorator's checks still apply.
+    Task<AutomationAuthorizationResult> AuthorizeContentParentAsync(
+        Guid? parentKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+        => parentKey.HasValue
+            ? AuthorizeContentAsync(parentKey.Value, permissions, cancellationToken)
+            : AuthorizeContentRootAsync(permissions, cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for a
+    /// target parent media node, or the media root when <paramref name="parentKey"/> is
+    /// <c>null</c>. See <see cref="AuthorizeContentParentAsync"/> for why this is separate from
+    /// <see cref="AuthorizeMediaAsync(Guid, CancellationToken)"/>.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. It composes the node and root members, so a decorator's checks still apply.
+    Task<AutomationAuthorizationResult> AuthorizeMediaParentAsync(
+        Guid? parentKey,
+        CancellationToken cancellationToken)
+        => parentKey.HasValue
+            ? AuthorizeMediaAsync(parentKey.Value, cancellationToken)
+            : AuthorizeMediaRootAsync(cancellationToken);
 }

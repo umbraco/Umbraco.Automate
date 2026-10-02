@@ -51,6 +51,11 @@ public class AutomationRunFactoryTests
             ErrorCategory = StepRunErrorCategory.Timeout,
             RetryCount = 2,
             Duration = TimeSpan.FromMilliseconds(1234),
+            LogEntries =
+            [
+                new ActionLogEntry(DateTime.UtcNow, ActionLogLevel.Info, "Starting"),
+                new ActionLogEntry(DateTime.UtcNow, ActionLogLevel.Error, "Boom"),
+            ],
         };
 
         StepRunEntity entity = StepRunFactory.BuildEntity(stepRun);
@@ -62,6 +67,11 @@ public class AutomationRunFactoryTests
         roundTripped.ErrorCategory.ShouldBe(StepRunErrorCategory.Timeout);
         roundTripped.RetryCount.ShouldBe(2);
         roundTripped.Duration.ShouldBe(TimeSpan.FromMilliseconds(1234));
+        roundTripped.LogEntries.Count.ShouldBe(2);
+        roundTripped.LogEntries[0].Level.ShouldBe(ActionLogLevel.Info);
+        roundTripped.LogEntries[0].Message.ShouldBe("Starting");
+        roundTripped.LogEntries[1].Level.ShouldBe(ActionLogLevel.Error);
+        roundTripped.LogEntries[1].Message.ShouldBe("Boom");
     }
 
     [Fact]
@@ -82,5 +92,7 @@ public class AutomationRunFactoryTests
 
         roundTripped.ErrorCategory.ShouldBeNull();
         roundTripped.Duration.ShouldBeNull();
+        entity.LogEntries.ShouldBeNull();
+        roundTripped.LogEntries.ShouldBeEmpty();
     }
 }
