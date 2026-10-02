@@ -87,6 +87,20 @@ internal interface IAutomationRunRepository
     Task<string?> GetRunTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the recorded input and output payloads of a single step run, with its parent run's
+    /// automation ID for authorization, or <c>null</c> when the step run does not exist or does not
+    /// belong to <paramref name="runId"/>. A projection of only the columns needed, so the backoffice
+    /// can load one step's payloads on demand without materialising the whole run.
+    /// </summary>
+    Task<StoredStepRunData?> GetStepRunDataAsync(Guid runId, Guid stepRunId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the recorded trigger payload of a run, with its automation ID for authorization,
+    /// or <c>null</c> when the run does not exist.
+    /// </summary>
+    Task<StoredRunTriggerData?> GetTriggerDataAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes all runs for an automation (cascade deletes step runs).
     /// </summary>
     Task<int> DeleteByAutomationAsync(Guid automationId, CancellationToken cancellationToken = default);

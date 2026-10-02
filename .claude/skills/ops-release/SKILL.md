@@ -4,8 +4,8 @@ description: >-
   Ship an Umbraco.Automate release for one version line. Delegates the mechanics to the repo's
   existing skills — `/release-management` for planning and cutting, `/post-release-cleanup` for
   the sync — then waits for the Azure pipeline, tags per product and per release, and publishes
-  the GitHub release. Called by name with (action, context-json). Not model-invoked.
-disable-model-invocation: true
+  the GitHub release. Called by name with (action, context-json). NOT for direct use — never select it from a
+  description match.
 ---
 
 # ops-release

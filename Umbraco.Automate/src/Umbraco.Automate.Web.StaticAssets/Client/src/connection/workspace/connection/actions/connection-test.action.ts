@@ -16,6 +16,15 @@ export class UaConnectionTestAction extends UmbWorkspaceActionBase {
 
         const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
 
+        // The server tests the persisted connection, not the form. Unsaved edits (e.g. a
+        // credential just returned by an OAuth callback) would be ignored and the test would
+        // report stale state, so save first. We deliberately don't post the unsaved settings
+        // with the test request: masked sensitive fields aren't re-posted during edit.
+        if (context.getHasUnpersistedChanges()) {
+            const saved = await this.#saveBeforeTest(context, notifications);
+            if (!saved) return;
+        }
+
         const { data, error } = await ConnectionsService.postConnectionsByIdTest({
             path: { id: unique },
         });
@@ -59,6 +68,28 @@ export class UaConnectionTestAction extends UmbWorkspaceActionBase {
                         message,
                     },
                 });
+        }
+    }
+
+    async #saveBeforeTest(
+        context: typeof UA_CONNECTION_WORKSPACE_CONTEXT.TYPE,
+        notifications: typeof UMB_NOTIFICATION_CONTEXT.TYPE | undefined,
+    ): Promise<boolean> {
+        // Validate separately so a validation failure gets a clear "save first" message.
+        // On 17.x the data source's plain tryExecute doesn't notify on error, so a
+        // server-side save failure gets the same message rather than failing silently.
+        try {
+            await context.validate();
+            await context.requestSubmit();
+            return true;
+        } catch {
+            notifications?.peek("warning", {
+                data: {
+                    headline: this.#localize.term("uaConnection_testFailure"),
+                    message: this.#localize.term("uaConnection_testSaveRequired"),
+                },
+            });
+            return false;
         }
     }
 }

@@ -102,6 +102,7 @@ export class UaConditionModalElement extends UmbModalBaseElement<UaConditionModa
                         <umb-property-layout label=${this.localize.term("uaConditionBuilder_operator")} orientation="vertical">
                             <div slot="editor">
                                 <uui-select
+                                    label=${this.localize.term("uaConditionBuilder_operator")}
                                     .options=${operatorOptions}
                                     @change=${this.#onOperatorChange}
                                 ></uui-select>
@@ -134,16 +135,23 @@ export class UaConditionModalElement extends UmbModalBaseElement<UaConditionModa
 
     #renderOperandInput(value: string, operand: "LeftOperand" | "RightOperand", hasBindings: boolean) {
         const onInput = operand === "LeftOperand" ? this.#onLeftChange : this.#onRightChange;
+        const label = this.localize.term(
+            operand === "LeftOperand"
+                ? "uaConditionBuilder_leftOperandPlaceholder"
+                : "uaConditionBuilder_rightOperandPlaceholder",
+        );
         return html`
             <div class="operand-input">
                 <uui-input
+                    label=${label}
                     .value=${value ?? ""}
                     @input=${onInput.bind(this)}
                 ></uui-input>
                 ${hasBindings
                     ? html`<uui-button
-                          look="outline"
+                          look="secondary"
                           compact
+                          label=${this.localize.term("uaBindings_insertExpression")}
                           title=${this.localize.term("uaBindings_insertExpression")}
                           @click=${() => this.#insertBinding(operand)}
                       >

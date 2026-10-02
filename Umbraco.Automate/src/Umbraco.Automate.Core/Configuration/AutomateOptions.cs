@@ -1,3 +1,4 @@
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 
@@ -16,6 +17,11 @@ public class AutomateOptions
     /// <summary>
     /// Gets or sets whether the automation engine is enabled.
     /// </summary>
+    /// <remarks>
+    /// Never read: setting this has no effect. Control who can work with automations through
+    /// access to the Automate section instead.
+    /// </remarks>
+    [Obsolete("This setting has no effect and is not read. Control access to automations through the Automate section instead. Scheduled for removal in Umbraco Automate 19.")]
     public bool Enabled { get; set; } = true;
 
     /// <summary>
@@ -36,7 +42,7 @@ public class AutomateOptions
     public string UseNamedConnectionString { get; set; } = "umbracoAutomateDbDSN";
 
     /// <summary>
-    /// Gets or sets the <see cref="Microsoft.Extensions.Configuration.IConfiguration"/> key
+    /// Gets or sets the <c>IConfiguration</c> key
     /// prefixes that automation settings may dereference via the <c>$Key:Path</c> syntax.
     /// </summary>
     /// <remarks>
@@ -149,14 +155,32 @@ public sealed class ExecutionOptions
     public TimeSpan DefaultRetryInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Gets or sets the maximum number of concurrent runs.
+    /// Gets or sets the maximum number of workflow executions each node processes at the same
+    /// time. Set to <c>0</c> or less to use WorkflowCore's default of the processor count, with a
+    /// minimum of 4. Default: <c>0</c>.
     /// </summary>
-    public int MaxConcurrentRuns { get; set; } = 10;
+    /// <remarks>
+    /// <para>
+    /// This is a per-node limit on runs actively executing, not on runs in progress: a run
+    /// waiting on a delay or an approval does not hold a slot. Work over the limit waits in the
+    /// queue rather than being rejected. For a per-automation limit, see
+    /// <see cref="RateLimitingOptions.MaxConcurrentRunsPerAutomation"/>.
+    /// </para>
+    /// <para>
+    /// Read once at startup; changing it requires a restart.
+    /// </para>
+    /// </remarks>
+    public int MaxConcurrentRuns { get; set; }
 
     /// <summary>
-    /// Gets or sets the WorkflowCore poll interval.
+    /// Gets or sets how often WorkflowCore polls persistence for workflows that are ready to
+    /// run, such as a run whose delay has elapsed. Values of zero or less use the default.
+    /// Default: 10 seconds, matching WorkflowCore's own default.
     /// </summary>
-    public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
+    /// <remarks>
+    /// Read once at startup; changing it requires a restart.
+    /// </remarks>
+    public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Gets or sets the maximum automation chain depth. When an event carries a chain
@@ -181,6 +205,52 @@ public sealed class ExecutionOptions
     /// error instead of flooding run storage with megabytes of payload. Default: 10 MB.
     /// </summary>
     public long MaxHttpResponseBodyBytes { get; set; } = 10_485_760;
+
+    /// <summary>
+    /// Gets or sets the maximum size, in bytes, of a file the Create Media action will download
+    /// and store. Separate from <see cref="MaxHttpResponseBodyBytes"/>: that caps a payload held
+    /// in run storage, whereas this caps a file written to the media filesystem, so a site that
+    /// imports large assets can raise one without loosening the other. Default: 10 MB.
+    /// </summary>
+    public long MaxMediaFileBytes { get; set; } = 10_485_760;
+
+    /// <summary>
+    /// Gets or sets whether outbound HTTP requests made by automations (HTTP Request, Run Script
+    /// <c>fetch()</c>, Create Media downloads, webhook notification channels) may be routed through
+    /// the system or environment-configured proxy. Default: <c>true</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Outbound requests are checked against a blocklist of private and reserved network ranges.
+    /// For a direct connection the check runs at connect time against the address actually
+    /// connected to. When a request goes through a proxy, the connection is made to the proxy
+    /// instead, so the destination host is validated by a DNS lookup before the request (and
+    /// every redirect hop) is sent, and rejected if any resolved address is blocked. A short
+    /// DNS-rebinding window remains between that lookup and the proxy's own lookup of the host,
+    /// so the proxy should still deny access to internal networks.
+    /// </para>
+    /// <para>
+    /// Set to <c>false</c> to ignore any configured proxy and always connect directly, with the
+    /// destination validated at connect time.
+    /// </para>
+    /// </remarks>
+    public bool AllowOutboundHttpProxy { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the minimum level of action log entry (see <see cref="ActionLogLevel"/>)
+    /// captured during step execution. Entries below this level are never persisted. Lower
+    /// to <see cref="ActionLogLevel.Debug"/> to troubleshoot a specific automation, or raise
+    /// to <see cref="ActionLogLevel.Warning"/>/<see cref="ActionLogLevel.Error"/> to cut noise.
+    /// Default: <see cref="ActionLogLevel.Info"/>.
+    /// </summary>
+    public ActionLogLevel MinimumLogLevel { get; set; } = ActionLogLevel.Info;
+
+    /// <summary>
+    /// Gets or sets the maximum number of log entries retained per step, guarding against a
+    /// runaway loop spamming entries. Applies independently of <see cref="MinimumLogLevel"/>.
+    /// Default: 200.
+    /// </summary>
+    public int MaxLogEntriesPerStep { get; set; } = 200;
 
     /// <summary>
     /// Gets or sets the execution mode for workflow processing.
@@ -221,28 +291,35 @@ public enum ExecutionMode
 
 /// <summary>
 /// Configuration options for governance and audit features.
-/// Bound to <c>Umbraco:Automate:Governance</c> in appsettings.json.
 /// </summary>
+/// <remarks>
+/// Never bound to configuration: <c>Umbraco:Automate:Governance</c> settings have no effect.
+/// </remarks>
+[Obsolete("Governance settings have no effect and are not read. Scheduled for removal in Umbraco Automate 19.")]
 public sealed class GovernanceOptions
 {
     /// <summary>
     /// Gets or sets whether the audit log is enabled.
     /// </summary>
+    [Obsolete("This setting has no effect. CMS actions always write to the Umbraco audit log, and runs are always recorded. Scheduled for removal in Umbraco Automate 19.")]
     public bool AuditLogEnabled { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the number of days to retain audit log data.
     /// </summary>
+    [Obsolete("This setting has no effect. Use Umbraco:Automate:RunCleanup:RetentionDays (RunCleanupPolicy.RetentionDays) instead. Scheduled for removal in Umbraco Automate 19.")]
     public int AuditLogRetentionDays { get; set; } = 90;
 
     /// <summary>
     /// Gets or sets whether sensitive data is masked in run logs.
     /// </summary>
+    [Obsolete("This setting has no effect. Sensitive data in run payloads is always masked. Scheduled for removal in Umbraco Automate 19.")]
     public bool SensitiveDataMasking { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the default notification policy for new automations.
     /// </summary>
+    [Obsolete("This setting has no effect. Configure notifications per automation through notification channels instead. Scheduled for removal in Umbraco Automate 19.")]
     public NotifyOn DefaultNotifyOn { get; set; } = NotifyOn.Failed;
 }
 

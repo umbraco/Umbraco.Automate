@@ -82,6 +82,10 @@ public sealed class UnpublishContentAction : ActionBase<UnpublishContentActionSe
 
         if (result.Success)
         {
+            context.LogInfo(cultures is null
+                ? $"Unpublished content {contentKey}"
+                : $"Unpublished content {contentKey} in {ActionLogFormat.Cultures(cultures)}");
+
             return Success(new UnpublishContentOutput
             {
                 ContentKey = contentKey,

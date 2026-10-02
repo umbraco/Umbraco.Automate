@@ -15,6 +15,14 @@ appsettings.Local.json
 demos/v17/
 *.local.slnx
 
+# Frontend build output (npm run build at the repo root).
+# Seeds a new worktree so the backoffice renders something instead of a blank
+# Automate section. These copies are whatever the main checkout last built, so
+# they are stale for any branch that touches the frontend - the demo site start
+# path rebuilds them (scripts/build-frontend.ps1).
+Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/wwwroot/
+Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/wwwroot/
+
 # Exclude non-source directories that contain pattern matches
 !refs/**
 !node_modules/**

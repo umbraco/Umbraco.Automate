@@ -57,6 +57,9 @@ internal sealed class OAuthCredentialsService : IOAuthCredentialsService
         await _repository.SaveAsync(credentials, cancellationToken);
     }
 
+    public Task<IReadOnlyList<Guid>> GetCredentialIdsNotModifiedSinceAsync(DateTime cutoffUtc, CancellationToken cancellationToken = default)
+        => _repository.GetIdsNotModifiedSinceAsync(cutoffUtc, cancellationToken);
+
     public Task DeleteCredentialsAsync(Guid id, CancellationToken cancellationToken = default)
         => _repository.DeleteAsync(id, cancellationToken).AsTask();
 

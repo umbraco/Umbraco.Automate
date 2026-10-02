@@ -5,7 +5,21 @@ import { UMB_MODAL_MANAGER_CONTEXT, UMB_CONFIRM_MODAL } from "@umbraco-cms/backo
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
-import { modelToNodes, modelToEdges, TRIGGER_NODE_ID, BODY_HANDLE, PARALLEL_ALIAS } from "../canvas/utils/model-to-flow.js";
+import {
+    modelToNodes,
+    modelToEdges,
+    getContinuationSourceHandle,
+    computeReachableFromTrigger,
+    TRIGGER_NODE_ID,
+    BODY_HANDLE,
+    PARALLEL_ALIAS,
+} from "../canvas/utils/model-to-flow.js";
+import {
+    DEFAULT_NODE_HEIGHT,
+    DEFAULT_NODE_WIDTH,
+    NEW_NODE_GAP,
+    findFreePosition,
+} from "../canvas/utils/placement.js";
 import { flowToSteps, flowToConnections, flowToCanvasState, flowToTrigger } from "../canvas/utils/flow-to-model.js";
 import type { CanvasState, CanvasChangeDetail, CatalogueLookupEntry, AddNodeRequestDetail, NodeSettingsOpenDetail, NodeDeleteRequestDetail, EdgeFilterOpenDetail } from "../canvas/types.js";
 import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/node-picker-modal.token.js";
@@ -13,15 +27,29 @@ import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-setti
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
 import { UA_EDGE_FILTER_MODAL } from "../../../modals/edge-filter/edge-filter-modal.token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import type { EditableModelSchemaModel } from "../../../../api/types.gen.js";
+import type {
+    EditableModelSchemaModel,
+    StepConfigurationModel,
+    StepConnectionModel,
+} from "../../../../api/types.gen.js";
 import { UA_EMPTY_GUID } from "../../../../core/index.js";
 import "../canvas/ua-automation-canvas.element.js";
+
+/**
+ * Room reserved for a step spliced into an existing connection. Node heights are content-driven
+ * and not known until React Flow measures the new node, so this is a generous estimate that covers
+ * the tallest freshly-added node (a container or branching step with its bottom handles).
+ */
+const INSERTED_NODE_HEIGHT = 140;
+const INSERTED_NODE_GAP = 60;
 
 @customElement("ua-automation-workflow-workspace-view")
 export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     #workspaceContext?: typeof UA_AUTOMATION_WORKSPACE_CONTEXT.TYPE;
     #catalogueRepository: UaCatalogueRepository;
     #isCanvasUpdate = false;
+    /** Unreachable step ids as last rendered, to tell when a canvas edit changes them. */
+    #lastUnreachableKey = "";
 
     @state()
     private _nodes: Node[] = [];
@@ -70,7 +98,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     async #syncFromModel(model: UaAutomationDetailModel) {
         const canvasState = this.#parseCanvasState(model.canvasState);
         const catalogue = await this.#buildCatalogueLookup();
-        this._nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogue);
+        this._nodes = this.#markUnreachableSteps(modelToNodes(model.trigger, model.steps, canvasState, catalogue), model);
         this._edges = modelToEdges(model.connections);
         // Capture saved viewport before the canvas mounts. React Flow's defaultViewport is only
         // honoured on initial render, so the canvas must not mount until this is set; otherwise
@@ -79,6 +107,28 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             this._viewport = canvasState?.viewport;
             this._canvasReady = true;
         }
+    }
+
+    /**
+     * Flags steps with no path from the trigger so they stand out on the canvas. The compiler drops
+     * them and they never run; until now the only signal was the save/publish warning toast.
+     * Skipped while there is no trigger, where every step would be flagged and the hint is noise.
+     */
+    #markUnreachableSteps(nodes: Node[], model: UaAutomationDetailModel): Node[] {
+        const unreachable = this.#getUnreachableStepIds(model);
+        this.#lastUnreachableKey = [...unreachable].join(",");
+        if (unreachable.size === 0) return nodes;
+        return nodes.map((node) => (unreachable.has(node.id) ? { ...node, className: "ua-node-unreachable" } : node));
+    }
+
+    #getUnreachableStepIds(model: UaAutomationDetailModel): Set<string> {
+        if (!model.trigger) return new Set();
+        const reachable = computeReachableFromTrigger(model.connections);
+        return new Set(model.steps.filter((s) => !reachable.has(s.id)).map((s) => s.id));
+    }
+
+    #unreachableKey(model: UaAutomationDetailModel): string {
+        return [...this.#getUnreachableStepIds(model)].join(",");
     }
 
     async #buildCatalogueLookup(): Promise<Map<string, CatalogueLookupEntry>> {
@@ -99,7 +149,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             lookup.set(a.alias, {
                 name: a.name,
                 icon: a.icon ?? undefined,
-                hasSettings: (a.settingsSchema?.fields?.length ?? 0) > 0,
+                hasSettings: (a.settingsSchema?.fields?.length ?? 0) > 0 || !!a.connectionTypeAlias,
             });
         }
         for (const cf of controlFlows.data ?? []) {
@@ -144,7 +194,9 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         // When the trigger is removed via the canvas (Delete key or trash button), the model
         // observer is suppressed by #isCanvasUpdate and the trigger-placeholder is never added
         // back. Force a re-sync so the placeholder reappears and the user can add a replacement.
-        if (triggerWasRemoved && this._model) {
+        // Likewise when a connection drawn or deleted on the canvas changes which steps are
+        // unreachable, so their muted styling stays accurate.
+        if (this._model && (triggerWasRemoved || this.#unreachableKey(this._model) !== this.#lastUnreachableKey)) {
             this.#syncFromModel(this._model);
         }
     }
@@ -263,7 +315,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         // Check actions first, then control flows
         const { data: actions } = await this.#catalogueRepository.requestActions();
         const action = actions?.find((a) => a.alias === alias);
-        if (action?.settingsSchema) return { name: action.name, schema: action.settingsSchema };
+        if (action) return { name: action.name, schema: action.settingsSchema ?? { fields: [] } };
 
         const { data: controlFlows } = await this.#catalogueRepository.requestControlFlows();
         const cf = controlFlows?.find((c) => c.alias === alias);
@@ -322,6 +374,12 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             const previousSteps = this._model.steps;
             const previousConnections = this._model.connections;
 
+            // "+" on an output that already has a connection splices the new step in front of the
+            // existing target rather than replacing that connection. Replacing it used to orphan
+            // the old target: an unreachable step that silently never runs.
+            const connectedInsert = this.#resolveConnectedHandleInsert(event.detail.connectFrom);
+            const insertBetween = event.detail.insertBetween ?? connectedInsert?.insertBetween;
+
             const newStepId = crypto.randomUUID();
             const newStep = {
                 id: newStepId,
@@ -331,42 +389,27 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 connectionId: null,
                 settings: {},
                 inputMappings: {},
-                position: event.detail.position,
+                // From the "+" button, a connected-handle insert takes the existing target's slot
+                // (the target and everything below it shift down to make room). A drag dropped on
+                // the pane keeps the position the user chose.
+                position: (event.detail.autoPosition ? connectedInsert?.targetPosition : undefined) ?? event.detail.position,
                 errorBehavior: "Terminate" as const,
                 retryInterval: null,
                 maxRetries: null,
             };
 
             const updatedSteps = [...this._model.steps, newStep];
-            this.#workspaceContext?.updateProperty("steps", updatedSteps);
 
-            // Auto-connect when the node was created by dragging from a handle.
-            if (event.detail.connectFrom) {
-                const { sourceStepId, sourceHandle } = event.detail.connectFrom;
-                const normalisedSourceId = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
-                const newConnection = {
-                    sourceStepId: normalisedSourceId,
-                    sourceHandle: sourceHandle ?? null,
-                    targetStepId: newStepId,
-                    targetHandle: null,
-                    outcome: sourceHandle ?? null,
-                    filter: null,
-                };
-                // Each handle carries one outgoing connection, replaced by a new one — except a
-                // Parallel branch, which adds alongside its existing branches instead.
-                const previousConnections = this.#isParallelBranchHandle(sourceStepId, sourceHandle ?? null)
-                    ? this._model.connections
-                    : this._model.connections.filter(
-                          (c) => !(c.sourceStepId === normalisedSourceId && (c.sourceHandle ?? null) === (sourceHandle ?? null)),
-                      );
-                const updatedConnections = [...previousConnections, newConnection];
-                this.#workspaceContext?.updateProperty("connections", updatedConnections);
-            } else if (event.detail.insertBetween) {
+            if (insertBetween) {
                 // Splice the new step onto an existing edge: A→B becomes A→new→B.
                 // Preserve the original edge's outcome and filter on the upstream half so
                 // branch labels and conditions stay attached to the source.
-                const { sourceStepId, sourceHandle, targetStepId, targetHandle } = event.detail.insertBetween;
+                const { sourceStepId, sourceHandle, targetStepId, targetHandle } = insertBetween;
                 const normalisedSource = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
+                // The downstream half leaves the new step through the handle that continues the
+                // original flow. A null handle only suits plain actions: on a container it would be
+                // read as a body edge, and If/Switch/Approval have no unnamed output at all.
+                const continuationHandle = getContinuationSourceHandle(newStep.actionAlias, newStep.settings);
                 const updatedConnections = this._model.connections.flatMap((conn) => {
                     const matchesSource = conn.sourceStepId === normalisedSource
                         && (conn.sourceHandle ?? null) === (sourceHandle ?? null);
@@ -377,15 +420,37 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                         { ...conn, targetStepId: newStepId, targetHandle: null },
                         {
                             sourceStepId: newStepId,
-                            sourceHandle: null,
+                            sourceHandle: continuationHandle,
                             targetStepId,
                             targetHandle: targetHandle ?? null,
-                            outcome: null,
+                            outcome: continuationHandle,
                             filter: null,
                         },
                     ];
                 });
-                this.#workspaceContext?.updateProperty("connections", updatedConnections);
+                const shiftedSteps = this.#shiftDownstreamSteps(updatedSteps, updatedConnections, newStep, normalisedSource, targetStepId);
+                this.#workspaceContext?.updateProperties({
+                    steps: this.#moveClearOfOtherSteps(shiftedSteps, newStepId),
+                    connections: updatedConnections,
+                });
+            } else if (event.detail.connectFrom) {
+                // Auto-connect a free output (or a further Parallel branch) to the new step.
+                const { sourceStepId, sourceHandle } = event.detail.connectFrom;
+                const normalisedSourceId = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
+                const newConnection = {
+                    sourceStepId: normalisedSourceId,
+                    sourceHandle: sourceHandle ?? null,
+                    targetStepId: newStepId,
+                    targetHandle: null,
+                    outcome: sourceHandle ?? null,
+                    filter: null,
+                };
+                this.#workspaceContext?.updateProperties({
+                    steps: updatedSteps,
+                    connections: [...this._model.connections, newConnection],
+                });
+            } else {
+                this.#workspaceContext?.updateProperty("steps", updatedSteps);
             }
 
             const saved = await this.#openNodeSettingsModal(newStepId, true);
@@ -459,6 +524,99 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         }
 
         return `${baseName}${Date.now()}`;
+    }
+
+    /**
+     * Makes room for a step spliced into an existing connection. The new step is placed at the
+     * connection's midpoint, which is usually closer to the downstream step than a node is tall,
+     * so the downstream step and everything reachable from it move down together until it sits
+     * below the new step. Nodes upstream of the insert point never move.
+     */
+    #shiftDownstreamSteps(
+        steps: StepConfigurationModel[],
+        connections: StepConnectionModel[],
+        insertedStep: StepConfigurationModel,
+        upstreamStepId: string,
+        downstreamStepId: string,
+    ): StepConfigurationModel[] {
+        const downstreamStep = steps.find((s) => s.id === downstreamStepId);
+        if (!downstreamStep) return steps;
+
+        const requiredTop = insertedStep.position.y + INSERTED_NODE_HEIGHT + INSERTED_NODE_GAP;
+        const shift = requiredTop - downstreamStep.position.y;
+        if (shift <= 0) return steps;
+
+        // Walk from the downstream step. The inserted step and the step it was inserted after are
+        // excluded, so a cycle back up the graph cannot drag them (or anything above them) down.
+        const toShift = new Set<string>([downstreamStepId]);
+        const queue = [downstreamStepId];
+        for (let i = 0; i < queue.length; i++) {
+            for (const conn of connections) {
+                if (conn.sourceStepId !== queue[i]) continue;
+                const target = conn.targetStepId;
+                if (target === insertedStep.id || target === upstreamStepId || toShift.has(target)) continue;
+                toShift.add(target);
+                queue.push(target);
+            }
+        }
+
+        return steps.map((s) =>
+            toShift.has(s.id) ? { ...s, position: { ...s.position, y: s.position.y + shift } } : s,
+        );
+    }
+
+    /**
+     * When "+" is clicked on an output that already carries a connection, returns that connection
+     * as an insert point plus the current target's position. Returns undefined for a free output,
+     * and for a Parallel body handle, which always adds a new branch alongside the existing ones.
+     */
+    #resolveConnectedHandleInsert(connectFrom: AddNodeRequestDetail["connectFrom"]):
+        | { insertBetween: NonNullable<AddNodeRequestDetail["insertBetween"]>; targetPosition: { x: number; y: number } }
+        | undefined {
+        if (!connectFrom || !this._model) return undefined;
+        const sourceHandle = connectFrom.sourceHandle ?? null;
+        if (this.#isParallelBranchHandle(connectFrom.sourceStepId, sourceHandle)) return undefined;
+
+        const normalisedSource = connectFrom.sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : connectFrom.sourceStepId;
+        const existing = this._model.connections.find(
+            (c) => c.sourceStepId === normalisedSource && (c.sourceHandle ?? null) === sourceHandle,
+        );
+        if (!existing) return undefined;
+
+        const target = this._model.steps.find((s) => s.id === existing.targetStepId);
+        if (!target) return undefined;
+
+        return {
+            insertBetween: {
+                sourceStepId: connectFrom.sourceStepId,
+                sourceHandle,
+                targetStepId: existing.targetStepId,
+                targetHandle: existing.targetHandle ?? null,
+            },
+            targetPosition: { x: target.position.x, y: target.position.y },
+        };
+    }
+
+    /**
+     * Nudges a spliced-in step sideways until it clears every other step. An edge insert lands at
+     * the connection's midpoint, which can sit on a sibling branch, and the downstream shift only
+     * moves steps below it. Saved positions carry no measured size, so default sizes are used.
+     */
+    #moveClearOfOtherSteps(steps: StepConfigurationModel[], stepId: string): StepConfigurationModel[] {
+        const step = steps.find((s) => s.id === stepId);
+        if (!step) return steps;
+
+        const obstacles = steps
+            .filter((s) => s.id !== stepId)
+            .map((s) => ({ x: s.position.x, y: s.position.y, width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT }));
+        const position = findFreePosition(
+            step.position,
+            { width: DEFAULT_NODE_WIDTH, height: INSERTED_NODE_HEIGHT },
+            { x: DEFAULT_NODE_WIDTH + NEW_NODE_GAP, y: 0 },
+            obstacles,
+        );
+        if (position.x === step.position.x && position.y === step.position.y) return steps;
+        return steps.map((s) => (s.id === stepId ? { ...s, position } : s));
     }
 
     /**

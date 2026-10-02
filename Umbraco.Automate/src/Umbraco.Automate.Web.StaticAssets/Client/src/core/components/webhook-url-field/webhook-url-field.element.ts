@@ -30,7 +30,12 @@ export class UaWebhookUrlFieldElement extends UmbLitElement {
 
     override render() {
         return html`
-            <uui-input readonly .value=${this._url ?? ""} ?disabled=${this._loading}></uui-input>
+            <uui-input
+                readonly
+                label=${this.localize.term("uaLabels_webhookUrl")}
+                .value=${this._url ?? ""}
+                ?disabled=${this._loading}
+            ></uui-input>
             <uui-button
                 compact
                 look="secondary"

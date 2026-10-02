@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Scripting;
 
 namespace Umbraco.Automate.Tests.Unit.Scripting;
 
+[Collection("Scripting")]
 public class ScriptValidatorTests
 {
     private readonly ScriptValidator _validator = new();

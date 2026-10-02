@@ -35,13 +35,16 @@ public class RunCancellationStepMiddlewareTests : IDisposable
             Times.Never);
     }
 
-    [Fact]
-    public async Task HandleAsync_RunNotCancelled_PassesThrough()
+    [Theory]
+    [InlineData(AutomationRunStatus.Running)]
+    [InlineData(AutomationRunStatus.Pending)]
+    [InlineData(AutomationRunStatus.Suspended)]
+    public async Task HandleAsync_RunNotTerminal_PassesThrough(AutomationRunStatus status)
     {
         var runId = Guid.NewGuid();
         _runRepository
             .Setup(r => r.GetRunStatusAsync(runId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AutomationRunStatus.Running);
+            .ReturnsAsync(status);
 
         var context = CreateContext(workflowData: new AutomationWorkflowData { RunId = runId });
 
@@ -52,13 +55,19 @@ public class RunCancellationStepMiddlewareTests : IDisposable
         context.Workflow.Status.ShouldBe(WorkflowStatus.Runnable);
     }
 
-    [Fact]
-    public async Task HandleAsync_RunCancelled_TerminatesWorkflowWithoutCallingNext()
+    // Failed covers the reported case: startup recovery failed a run the engine went on to resume,
+    // re-running an AI step behind a run the backoffice showed as failed and would not terminate.
+    [Theory]
+    [InlineData(AutomationRunStatus.Cancelled)]
+    [InlineData(AutomationRunStatus.Failed)]
+    [InlineData(AutomationRunStatus.Completed)]
+    [InlineData(AutomationRunStatus.Rejected)]
+    public async Task HandleAsync_RunTerminal_TerminatesWorkflowWithoutCallingNext(AutomationRunStatus status)
     {
         var runId = Guid.NewGuid();
         _runRepository
             .Setup(r => r.GetRunStatusAsync(runId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AutomationRunStatus.Cancelled);
+            .ReturnsAsync(status);
 
         var context = CreateContext(workflowData: new AutomationWorkflowData { RunId = runId });
         context.PersistenceData = "persisted-pointer-data";

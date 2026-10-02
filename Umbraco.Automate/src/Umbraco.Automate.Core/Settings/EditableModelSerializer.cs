@@ -91,53 +91,166 @@ internal sealed class EditableModelSerializer : IEditableModelSerializer
 
         foreach (var property in jsonObject.ToList())
         {
-            if (sensitiveKeys.Contains(property.Key) && property.Value is JsonValue jsonValue)
+            if (!sensitiveKeys.Contains(property.Key))
             {
-                var stringValue = jsonValue.GetValue<string>();
-                if (!string.IsNullOrEmpty(stringValue))
-                {
-                    // Skip encryption for values that contain a configuration reference under an
-                    // allowed prefix (e.g. "Bearer $Umbraco:Automate:Secrets:ApiKey"). These are
-                    // pointers to IConfiguration resolved at read time, not actual secrets, and the
-                    // reference may sit anywhere in the value — not just at the start. The same
-                    // service drives resolution, so the two decisions cannot drift.
-                    if (_configReferenceResolver.ContainsReference(stringValue))
+                continue;
+            }
+
+            switch (property.Value)
+            {
+                case JsonValue jsonValue:
+                    if (Encrypt(jsonValue) is { } encrypted)
                     {
-                        continue;
+                        jsonObject[property.Key] = encrypted;
                     }
 
-                    var encrypted = _protector.Protect(stringValue);
-                    jsonObject[property.Key] = encrypted;
-                }
+                    break;
+
+                // A sensitive field whose editor stores rows rather than a single scalar — the
+                // HTTP Request action's headers, for one. Without this the whole list would be
+                // stored in clear, because the field is still marked sensitive but no longer
+                // holds a string. Only each row's value is encrypted: key names are not secret,
+                // and the key/value editor has to render them to be usable at all.
+                case JsonArray jsonArray:
+                    EncryptArrayItems(jsonArray);
+                    break;
             }
         }
+    }
+
+    private void EncryptArrayItems(JsonArray jsonArray)
+    {
+        for (var i = 0; i < jsonArray.Count; i++)
+        {
+            switch (jsonArray[i])
+            {
+                case JsonValue itemValue:
+                    if (Encrypt(itemValue) is { } encryptedItem)
+                    {
+                        jsonArray[i] = encryptedItem;
+                    }
+
+                    break;
+
+                case JsonObject itemObject:
+                    EncryptRowValue(itemObject);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Protects the "value" member of a key/value row, whatever case it was written in. The
+    /// stored JSON keeps the casing the editor sent, and a case-sensitive lookup that missed
+    /// would store the secret in clear without any visible symptom, so the match is made on
+    /// the name rather than on the exact spelling.
+    /// </summary>
+    private void EncryptRowValue(JsonObject row)
+    {
+        foreach (var member in row.ToList())
+        {
+            if (!string.Equals(member.Key, "value", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (member.Value is JsonValue rowValue && Encrypt(rowValue) is { } encrypted)
+            {
+                row[member.Key] = encrypted;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns the protected form of a JSON string node, or null when there is nothing to
+    /// protect — a non-string node, an empty value, or a configuration reference.
+    /// </summary>
+    private string? Encrypt(JsonValue jsonValue)
+    {
+        if (!jsonValue.TryGetValue<string>(out var stringValue) || string.IsNullOrEmpty(stringValue))
+        {
+            return null;
+        }
+
+        // Skip encryption for values that contain a configuration reference under an
+        // allowed prefix (e.g. "Bearer $Umbraco:Automate:Secrets:ApiKey"). These are
+        // pointers to IConfiguration resolved at read time, not actual secrets, and the
+        // reference may sit anywhere in the value — not just at the start. The same
+        // service drives resolution, so the two decisions cannot drift.
+        if (_configReferenceResolver.ContainsReference(stringValue))
+        {
+            return null;
+        }
+
+        return _protector.Protect(stringValue);
     }
 
     private void DecryptFields(JsonObject jsonObject)
     {
         foreach (var property in jsonObject.ToList())
         {
-            if (property.Value is JsonValue jsonValue)
+            switch (property.Value)
             {
-                try
-                {
-                    var stringValue = jsonValue.GetValue<string>();
-                    if (_protector.IsProtected(stringValue))
+                case JsonValue jsonValue:
+                    if (Decrypt(jsonValue) is { } decrypted)
                     {
-                        var decrypted = _protector.Unprotect(stringValue);
                         jsonObject[property.Key] = decrypted;
                     }
-                }
-                catch (InvalidOperationException)
-                {
-                    // Not a string value, skip.
-                }
-            }
-            else if (property.Value is JsonObject nestedObject)
-            {
-                DecryptFields(nestedObject);
+
+                    break;
+
+                case JsonObject nestedObject:
+                    DecryptFields(nestedObject);
+                    break;
+
+                // Mirrors EncryptArrayItems so a sensitive list of rows round-trips. Decryption
+                // is driven by the value itself rather than by the schema, so every protected
+                // string is unwrapped wherever it sits — no assumption about which property
+                // inside a row held the secret.
+                case JsonArray nestedArray:
+                    DecryptArrayItems(nestedArray);
+                    break;
             }
         }
+    }
+
+    private void DecryptArrayItems(JsonArray jsonArray)
+    {
+        for (var i = 0; i < jsonArray.Count; i++)
+        {
+            switch (jsonArray[i])
+            {
+                case JsonValue itemValue:
+                    if (Decrypt(itemValue) is { } decryptedItem)
+                    {
+                        jsonArray[i] = decryptedItem;
+                    }
+
+                    break;
+
+                case JsonObject itemObject:
+                    DecryptFields(itemObject);
+                    break;
+
+                case JsonArray itemArray:
+                    DecryptArrayItems(itemArray);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns the unprotected form of a JSON string node, or null when the node is not a
+    /// protected string and should be left alone.
+    /// </summary>
+    private string? Decrypt(JsonValue jsonValue)
+    {
+        if (!jsonValue.TryGetValue<string>(out var stringValue) || !_protector.IsProtected(stringValue))
+        {
+            return null;
+        }
+
+        return _protector.Unprotect(stringValue);
     }
 
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
@@ -10,11 +11,11 @@ using Umbraco.Automate.Core.StepTypes;
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
 
 /// <summary>
-/// A built-in action that runs a user-authored JavaScript function against the step inputs and
-/// returns its result. The script is executed in a sandboxed Jint engine via <see cref="IScriptExecutor"/>.
+/// A built-in action that runs a user-authored JavaScript function against the step's binding
+/// context (trigger output, prior step outputs, loop item) and returns its result. The script is executed in a sandboxed Jint engine via <see cref="IScriptExecutor"/>.
 /// </summary>
 [Action("umbracoAutomate.runScript", "Run Script",
-    Description = "Runs a JavaScript function against the step inputs and returns its result.",
+    Description = "Runs a JavaScript function against the trigger and previous step outputs and returns its result.",
     Group = "Core",
     Icon = "icon-script")]
 public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOutput>, IValidatableStepType
@@ -167,13 +168,32 @@ public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOut
                 StepRunErrorCategory.Validation);
         }
 
-        var data = JsonSerializer.SerializeToNode(context.InputData);
+        JsonObject data;
+        try
+        {
+            data = RunScriptData.Build(context);
+        }
+        catch (JsonException ex)
+        {
+            return ActionResult.Failed(new InvalidOperationException(ex.Message, ex), StepRunErrorCategory.Validation);
+        }
 
         // Cap the script's total runtime at the smaller of the configured scripting timeout and
         // the step's own timeout budget, so a script can never outlive its step.
         var totalTimeout = scripting.TotalExecutionTimeout < _executionOptions.Value.DefaultTimeout
             ? scripting.TotalExecutionTimeout
             : _executionOptions.Value.DefaultTimeout;
+
+        if (settings.AllowFetch && !scripting.FetchEnabled)
+        {
+            context.LogWarning("fetch() is not available because it is disabled by 'Umbraco:Automate:Scripting:FetchEnabled'");
+        }
+
+        // The script runs on a worker thread, and one abandoned at its time budget can keep
+        // calling console after this method has returned, so run-log writes are serialised and
+        // stop once the executor hands back control.
+        var runLogLock = new object();
+        var runLogOpen = true;
 
         ScriptError? error = null;
         var options = new ScriptExecutorOptions
@@ -190,18 +210,48 @@ public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOut
             HttpRequestTimeout = scripting.HttpRequestTimeout,
             MaxResponseBodyBytes = scripting.MaxResponseBodyBytes,
             OnError = e => error = e,
-            OnLogMessage = message => WriteLog(context, message),
+            OnLogMessage = message =>
+            {
+                WriteLog(context, message);
+
+                lock (runLogLock)
+                {
+                    if (runLogOpen)
+                    {
+                        context.Log(MapActionLogLevel(message.Level), message.Message);
+                    }
+                }
+            },
         };
 
+        var started = Stopwatch.GetTimestamp();
         var result = await _executor.ExecuteAsync("script", settings.Script, data, options, cancellationToken);
+        var elapsed = ActionLogFormat.Elapsed(Stopwatch.GetElapsedTime(started));
+
+        lock (runLogLock)
+        {
+            runLogOpen = false;
+        }
 
         if (error is { } err)
         {
+            context.LogError(DescribeError(err, elapsed));
             return ActionResult.Failed(new InvalidOperationException(err.Message), MapCategory(err.Kind));
         }
 
+        context.LogInfo($"Script completed in {elapsed}");
+
         return Success(new RunScriptOutput { Result = result });
     }
+
+    private static string DescribeError(ScriptError error, string elapsed)
+        => error.Kind switch
+        {
+            ScriptErrorKind.Compilation => $"Script could not be compiled: {error.Message}",
+            ScriptErrorKind.Timeout => $"Script stopped after {elapsed} for exceeding its time or resource limits: {error.Message}",
+            ScriptErrorKind.Runtime => $"Script threw an error after {elapsed}: {error.Message}",
+            _ => $"Script failed after {elapsed}: {error.Message}",
+        };
 
     private void WriteLog(ActionContext context, LogMessage message) =>
         _logger.Log(
@@ -217,6 +267,15 @@ public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOut
             "debug" => LogLevel.Debug,
             "trace" => LogLevel.Trace,
             _ => LogLevel.Information,
+        };
+
+    private static ActionLogLevel MapActionLogLevel(string level)
+        => level switch
+        {
+            "error" => ActionLogLevel.Error,
+            "warn" => ActionLogLevel.Warning,
+            "debug" or "trace" => ActionLogLevel.Debug,
+            _ => ActionLogLevel.Info,
         };
 
     private static StepRunErrorCategory MapCategory(ScriptErrorKind kind)

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "answers": [
+    {
+      "id": "ci-status-readable",
+      "consumer": "ops-ci",
+      "action": "status",
+      "question": "Where does CI run, and can an agent read a build result there without a person fetching it?",
+      "verdict": "present",
+      "said": "Azure Pipelines posts its result back as a GitHub status check on the PR, so reading the PR reads the build. No separate Azure access needed.",
+      "answered": "16-09-2026"
+    },
+    {
+      "id": "dotnet-private-feed",
+      "consumer": "ops-workspace",
+      "action": "prepare",
+      "question": "Does restoring this repo need a credential for a private package feed?",
+      "verdict": "present",
+      "said": "No credential needed. NuGet.config and .npmrc are committed and point at public feeds (nuget.org, MyGet umbracoprereleases, umbraconightly). The 401 is a Claude Code web proxy issue the session hook fixes.",
+      "answered": "16-09-2026"
+    },
+    {
+      "id": "release-trigger",
+      "consumer": "ops-release",
+      "action": "publish",
+      "question": "What publishes a release here: which pipeline, feed or command?",
+      "verdict": "present",
+      "said": "Tag plus GitHub release plus pipeline artifacts is what publishing means here. CI holds packages as Azure Pipelines artifacts; nothing pushes them to a feed.",
+      "answered": "16-09-2026"
+    },
+    {
+      "id": "verify-build-command",
+      "consumer": "ops-change",
+      "action": "verify",
+      "question": "What commands build this product, and in what order? A short list is fine, so say if the front end and the back end build separately. Between them, do they cover every part?",
+      "verdict": "present",
+      "said": "Two commands, in order: `npm run build` at the repo root (npm workspaces), then `dotnet build Umbraco.Automate.slnx`. Between them every part is built. There is no single wrapper and that is fine.",
+      "answered": "16-09-2026"
+    },
+    {
+      "id": "verify-review-gate",
+      "consumer": "ops-change",
+      "action": "verify",
+      "question": "What reviews a change in this repo before it reaches a PR: a reviewer agent, a security scan, a required human?",
+      "verdict": "present",
+      "said": "A required human reviewer on the PR is the named gate, and that is deliberate. Nothing reviews before push by design.",
+      "answered": "16-09-2026"
+    },
+    {
+      "id": "verify-test-command",
+      "consumer": "ops-change",
+      "action": "verify",
+      "question": "What commands run this repo's tests, and in what order? A short list is fine, so say if the front end and the back end have separate suites. Between them, do they cover every part?",
+      "verdict": "gap",
+      "said": "`dotnet test Umbraco.Automate.slnx` is the whole of it. The Client workspaces have no test harness at all, so a front-end change gets no automated check. That part is the gap.",
+      "answered": "16-09-2026"
+    },
+    {
+      "id": "workspace-isolated-build",
+      "consumer": "ops-workspace",
+      "action": "prepare",
+      "question": "Starting from a fresh git worktree of this repo and nothing else, can someone build it and run its tests?",
+      "verdict": "present",
+      "said": "Yes. The loop path is build plus `dotnet test` only: tests use `:memory:` or GUID-named temp SQLite, and azure-pipelines.yml runs the same command with no services block and no container. No database, container or demo site is needed. The demo site only enters via `.worktreeinclude` for interactive human worktrees, which ops-workspace deliberately skips.",
+      "answered": "16-09-2026"
+    },
+    {
+      "id": "workspace-parallel",
+      "consumer": "ops-workspace",
+      "action": "prepare",
+      "question": "Can three builds of this repo run at the same time without sharing a port, a database name or an output directory?",
+      "verdict": "present",
+      "said": "Three at once is fine. Tests use GUID-named temp SQLite or `:memory:`; the only fixed port (44380) is on the human DemoSite profile, which loop workspaces never launch. DemoSite-Claude binds port 0.",
+      "answered": "16-09-2026"
+    }
+  ]
+}

@@ -184,5 +184,10 @@ public class Constants
         /// The rate limiter policy name applied to webhook endpoints.
         /// </summary>
         public const string RateLimitPolicy = "automate-webhook-rate-limit";
+
+        /// <summary>
+        /// The route the webhook endpoint is served under, without a leading slash.
+        /// </summary>
+        public const string RoutePath = "automate/webhook";
     }
 }

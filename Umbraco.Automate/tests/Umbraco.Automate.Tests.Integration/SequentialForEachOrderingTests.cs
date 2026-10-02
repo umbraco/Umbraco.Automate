@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -49,6 +50,7 @@ namespace Umbraco.Automate.Tests.Integration;
 ///   read the wrong iteration's output, because data.StepOutputs is keyed only by
 ///   step id and gets overwritten on every action invocation.)
 /// </summary>
+[Collection("WorkflowHost")]
 public class SequentialForEachOrderingTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;
@@ -285,8 +287,8 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
         var body = JsonSerializer.Serialize(triggerMessage, JsonOptions.Default);
         await _handler.HandleAsync(body, CancellationToken.None);
 
-        var run = await WaitForRunAsync(sequentialBindingsAutomation.Id, TimeSpan.FromSeconds(15));
-        var completed = await WaitForBodyStepRunsAsync(run.Id, expectedAtLeast: 6, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(sequentialBindingsAutomation.Id, TestTimeouts.WorkflowWait);
+        var completed = await WaitForBodyStepRunsAsync(run.Id, expectedAtLeast: 6, TestTimeouts.WorkflowWait);
 
         // Order by StartedUtc so we get the natural execution sequence: A0, B0, A1, B1, A2, B2.
         var bodyMessages = completed.StepRuns
@@ -377,8 +379,8 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
         var body = JsonSerializer.Serialize(triggerMessage, JsonOptions.Default);
         await _handler.HandleAsync(body, CancellationToken.None);
 
-        var run = await WaitForRunAsync(parallelAutomation.Id, TimeSpan.FromSeconds(15));
-        var completed = await WaitForBodyStepRunsAsync(run.Id, expectedAtLeast: 6, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(parallelAutomation.Id, TestTimeouts.WorkflowWait);
+        var completed = await WaitForBodyStepRunsAsync(run.Id, expectedAtLeast: 6, TestTimeouts.WorkflowWait);
 
         var logBMessages = completed.StepRuns
             .Where(s => s.ActionAlias == "umbracoAutomate.logMessage" && (s.OutputData ?? string.Empty).Contains("B-saw:"))
@@ -409,8 +411,8 @@ public class SequentialForEachOrderingTests : IAsyncLifetime
 
         await _handler.HandleAsync(body, CancellationToken.None);
 
-        var run = await WaitForRunAsync(_automation.Id, TimeSpan.FromSeconds(15));
-        var completed = await WaitForBodyStepRunsAsync(run.Id, expectedAtLeast: 6, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(_automation.Id, TestTimeouts.WorkflowWait);
+        var completed = await WaitForBodyStepRunsAsync(run.Id, expectedAtLeast: 6, TestTimeouts.WorkflowWait);
 
         // The body has two LogMessage steps; we expect 3 iterations × 2 = 6 body StepRuns,
         // plus one StepRun for the ForEach container itself. Filter to body steps only,

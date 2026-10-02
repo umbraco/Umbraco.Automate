@@ -40,12 +40,50 @@ export const REJECTED_OUTCOME = "rejected";
 export const BODY_HANDLE = "body";
 export const DONE_HANDLE = "done";
 
+/**
+ * Outcome names the If and Switch steps return, used as their source handle ids. Must stay in
+ * step with IfStepBody / SwitchStepBody on the server.
+ */
+export const IF_TRUE_OUTCOME = "true";
+export const SWITCH_DEFAULT_OUTCOME = "default";
+
 function getNodeType(actionAlias: string): string {
     if (actionAlias === IF_ALIAS) return "if";
     if (actionAlias === SWITCH_ALIAS) return "switch";
     if (actionAlias === APPROVAL_ALIAS) return "approval";
     if (CONTAINER_ALIASES.has(actionAlias)) return "container";
     return "action";
+}
+
+// Settings keys are camelCase (EditableModelSchemaBuilder derives field keys via ToCamelCase),
+// so the field is "cases" — the nested case objects keep their PascalCase Name/Conditions.
+function getSwitchCaseNames(settings: StepConfigurationModel["settings"] | undefined): string[] {
+    const cases = settings?.cases as Array<{ Name: string }> | undefined;
+    return cases?.map((c) => c.Name) ?? [];
+}
+
+/**
+ * The source handle a step continues through when it is spliced into an existing connection:
+ * the done handle for containers (so the downstream step still runs after the container, not
+ * inside it), the first branch for If/Switch/Request Approval, and null for plain actions that
+ * only have a single unnamed output.
+ */
+export function getContinuationSourceHandle(
+    actionAlias: string,
+    settings?: StepConfigurationModel["settings"],
+): string | null {
+    switch (getNodeType(actionAlias)) {
+        case "container":
+            return DONE_HANDLE;
+        case "if":
+            return IF_TRUE_OUTCOME;
+        case "switch":
+            return getSwitchCaseNames(settings)[0] ?? SWITCH_DEFAULT_OUTCOME;
+        case "approval":
+            return APPROVED_OUTCOME;
+        default:
+            return null;
+    }
 }
 
 export function modelToNodes(
@@ -102,11 +140,8 @@ export function modelToNodes(
         };
 
         // For switch nodes, extract case names from settings so the node can render dynamic handles.
-        // Settings keys are camelCase (EditableModelSchemaBuilder derives field keys via ToCamelCase),
-        // so the field is "cases" — the nested case objects keep their PascalCase Name/Conditions.
         if (nodeType === "switch") {
-            const cases = step.settings?.cases as Array<{ Name: string }> | undefined;
-            data.cases = cases?.map((c) => c.Name) ?? [];
+            data.cases = getSwitchCaseNames(step.settings);
         }
 
         nodes.push({

@@ -1,15 +1,17 @@
 import { css, html, customElement, state, nothing, repeat, when } from "@umbraco-cms/backoffice/external/lit";
-import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
+import { UmbModalBaseElement, umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import { UaRunDetailServerDataSource } from "../repository/detail/run-detail.server.data-source.js";
 import { UaCatalogueRepository } from "../../catalogue/repository/catalogue.repository.js";
 import { UaAutomationRunsChangedEvent } from "../../automation/events/automation-runs-changed.event.js";
-import { formatDateTime } from "../../core/index.js";
-import { RunsService } from "../../api/sdk.gen.js";
-import type { UaRunDetailModel, UaStepRunModel } from "../types.js";
+import { formatDateTime, getRunStatusColor } from "../../core/index.js";
+import { AutomationsService, RunsService } from "../../api/sdk.gen.js";
+import type { UaRunDetailModel } from "../types.js";
 import type { UaRunDetailModalData } from "./run-detail-modal.token.js";
+import "../components/step-run-detail/step-run-detail.element.js";
+import { UA_RUN_TRIGGER_ROW_ID } from "../components/run-trigger-detail/run-trigger-detail.element.js";
 
 @customElement("ua-run-detail-modal")
 export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModalData> {
@@ -25,6 +27,11 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
     @state()
     private _replaying = false;
 
+    // The server only replays runs of a published automation. Unknown (lookup failed) leaves
+    // Replay enabled, so the server's own answer still reaches the user.
+    @state()
+    private _automationPublished?: boolean;
+
     @state()
     private _lifecycleBusy = false;
 
@@ -33,6 +40,9 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
     @state()
     private _actionNames = new Map<string, string>();
+
+    @state()
+    private _triggerNames = new Map<string, string>();
 
     override connectedCallback() {
         super.connectedCallback();
@@ -44,9 +54,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
     async #loadRun(runId: string) {
         this._loading = true;
 
-        const [{ data: run }, { data: actions }] = await Promise.all([
+        const [{ data: run }, { data: actions }, { data: triggers }] = await Promise.all([
             this.#dataSource.read(runId),
             this.#catalogueRepository.requestActions(),
+            this.#catalogueRepository.requestTriggers(),
         ]);
 
         if (run) {
@@ -55,6 +66,9 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             if (firstFailed) {
                 this._expandedStep = firstFailed.id;
             }
+
+            const { data: automation } = await AutomationsService.getAutomationsById({ path: { id: run.automationId } });
+            this._automationPublished = automation ? automation.status === "Published" : undefined;
         }
 
         if (actions) {
@@ -65,35 +79,11 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
             this._actionNames = names;
         }
 
-        this._loading = false;
-    }
-
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            case "WaitingForInput":
-            case "Suspended":
-            // Used for both run and step status here. Either way a refusal is not an error.
-            case "Rejected":
-                return "warning";
-            case "Failed":
-                return "danger";
-            default:
-                return "default";
+        if (triggers) {
+            this._triggerNames = new Map(triggers.map((t) => [t.alias, t.name]));
         }
-    }
 
-    #formatDuration(ms: number | null): string {
-        if (ms == null) return "-";
-        if (ms < 1000) return `${ms}ms`;
-        const seconds = Math.floor(ms / 1000);
-        if (seconds < 60) return `${seconds}s`;
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds}s`;
+        this._loading = false;
     }
 
     async #onReplay() {
@@ -146,6 +136,21 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
     async #callLifecycle(action: "suspend" | "resume" | "terminate") {
         if (!this._run) return;
+
+        // Suspend and resume can be undone; terminating cannot, so it asks first.
+        if (action === "terminate") {
+            try {
+                await umbConfirmModal(this, {
+                    headline: this.localize.term("uaRun_terminateHeadline"),
+                    content: this.localize.term("uaRun_terminateConfirm"),
+                    color: "danger",
+                    confirmLabel: this.localize.term("uaRun_terminate"),
+                });
+            } catch {
+                return;
+            }
+        }
+
         this._lifecycleBusy = true;
 
         const notifications = await this.getContext(UMB_NOTIFICATION_CONTEXT);
@@ -193,53 +198,9 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
         }
     }
 
-    #toggleStep(stepId: string) {
+    #onToggleStep(e: CustomEvent<{ stepId: string }>) {
+        const stepId = e.detail.stepId;
         this._expandedStep = this._expandedStep === stepId ? undefined : stepId;
-    }
-
-    #renderStepRun(stepRun: UaStepRunModel) {
-        const isExpanded = this._expandedStep === stepRun.id;
-
-        return html`
-            <uui-box>
-                <div class="step-header" @click=${() => this.#toggleStep(stepRun.id)}>
-                    <uui-icon name=${isExpanded ? "icon-navigation-down" : "icon-navigation-right"}></uui-icon>
-                    <span class="step-name">${this._actionNames.get(stepRun.actionAlias) ?? stepRun.actionAlias}</span>
-                    <span class="step-duration">${this.#formatDuration(stepRun.durationMs)}</span>
-                    <uui-tag color=${this.#statusColor(stepRun.status)} look="secondary">
-                        ${stepRun.status}
-                    </uui-tag>
-                </div>
-                ${isExpanded
-                    ? html`
-                          <div class="step-details">
-                              <umb-property-layout label=${this.localize.term("uaLabels_started")} orientation="vertical">
-                                  <div slot="editor">
-                                      ${stepRun.startedUtc ? formatDateTime(stepRun.startedUtc) : "-"}
-                                  </div>
-                              </umb-property-layout>
-                              <umb-property-layout label=${this.localize.term("uaLabels_completed")} orientation="vertical">
-                                  <div slot="editor">
-                                      ${stepRun.completedUtc ? formatDateTime(stepRun.completedUtc) : "-"}
-                                  </div>
-                              </umb-property-layout>
-                              <umb-property-layout label=${this.localize.term("uaLabels_retryCount")} orientation="vertical">
-                                  <div slot="editor">${stepRun.retryCount}</div>
-                              </umb-property-layout>
-                              ${stepRun.error
-                                  ? html`
-                                        <umb-property-layout label=${this.localize.term("uaLabels_error")} orientation="vertical">
-                                            <div slot="editor">
-                                                <pre class="error-output">${stepRun.error}</pre>
-                                            </div>
-                                        </umb-property-layout>
-                                    `
-                                  : nothing}
-                          </div>
-                      `
-                    : nothing}
-            </uui-box>
-        `;
     }
 
     override render() {
@@ -253,35 +214,43 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                     ? html`<div class="center"><uui-loader></uui-loader></div>`
                     : this._run
                       ? this.#renderContent()
-                      : html`<p class="center">${this.localize.term("uaRun_noRuns")}</p>`}
+                      : html`<p class="center load-error">${this.localize.term("uaRun_loadError")}</p>`}
 
                 <div slot="actions">
+                    <uui-button
+                        label=${this.localize.term("uaGeneral_close")}
+                        @click=${() => this.modalContext?.reject()}
+                    ></uui-button>
                     ${when(
                         this._run?.status === "Running",
                         () => html`
                             <uui-button
+                                look="primary"
+                                color="warning"
                                 label=${this.localize.term("uaRun_suspend")}
-                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                .state=${this._lifecycleBusy ? "waiting" : undefined}
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("suspend")}
                             >
-                                <uui-icon name="icon-pause"></uui-icon>
                                 ${this.localize.term("uaRun_suspend")}
+                                <uui-icon name="icon-pause"></uui-icon>
                             </uui-button>
                         `,
                     )}
                     ${when(
-                        this._run?.status === "Suspended",
+                        // A run paused on an approval is released by the decision, not by Resume.
+                        this._run?.status === "Suspended" &&
+                            !this._run.stepRuns.some((sr) => sr.status === "WaitingForInput"),
                         () => html`
                             <uui-button
                                 look="primary"
                                 label=${this.localize.term("uaRun_resume")}
-                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                .state=${this._lifecycleBusy ? "waiting" : undefined}
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("resume")}
                             >
-                                <uui-icon name="icon-play"></uui-icon>
                                 ${this.localize.term("uaRun_resume")}
+                                <uui-icon name="icon-play"></uui-icon>
                             </uui-button>
                         `,
                     )}
@@ -289,21 +258,18 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                         this._run?.status === "Running" || this._run?.status === "Suspended",
                         () => html`
                             <uui-button
+                                look="primary"
                                 color="danger"
                                 label=${this.localize.term("uaRun_terminate")}
-                                ?state=${this._lifecycleBusy ? "waiting" : undefined}
+                                .state=${this._lifecycleBusy ? "waiting" : undefined}
                                 ?disabled=${this._lifecycleBusy}
                                 @click=${() => this.#callLifecycle("terminate")}
                             >
-                                <uui-icon name="icon-stop-alt"></uui-icon>
                                 ${this.localize.term("uaRun_terminate")}
+                                <uui-icon name="icon-stop-alt"></uui-icon>
                             </uui-button>
                         `,
                     )}
-                    <uui-button
-                        label=${this.localize.term("uaGeneral_close")}
-                        @click=${() => this.modalContext?.reject()}
-                    ></uui-button>
                     ${when(
                         this._run &&
                             (this._run.status === "Failed" ||
@@ -313,8 +279,11 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                             <uui-button
                                 look="primary"
                                 label=${this.localize.term("uaRun_replay")}
-                                ?state=${this._replaying ? "waiting" : undefined}
-                                ?disabled=${this._replaying}
+                                title=${this._automationPublished === false
+                                    ? this.localize.term("uaRun_replayRequiresPublished")
+                                    : nothing}
+                                .state=${this._replaying ? "waiting" : undefined}
+                                ?disabled=${this._replaying || this._automationPublished === false}
                                 @click=${this.#onReplay}
                             >
                                 ${this.localize.term("uaRun_replay")}
@@ -333,13 +302,28 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
         return html`
             <div class="layout">
                 <div class="main">
-                    <uui-box headline=${this.localize.term("uaLabels_steps")}>
+                    <uui-box @ua-toggle-step=${this.#onToggleStep}>
+                        <ua-run-trigger-detail
+                            .runId=${this._run.unique}
+                            .triggerName=${this._run.triggerAlias
+                                ? (this._triggerNames.get(this._run.triggerAlias) ?? this._run.triggerAlias)
+                                : ""}
+                            .startedUtc=${this._run.startedUtc}
+                            .expanded=${this._expandedStep === UA_RUN_TRIGGER_ROW_ID}
+                        ></ua-run-trigger-detail>
                         ${this._run.stepRuns.length === 0
                             ? html`<p class="empty">${this.localize.term("uaRun_noStepRuns")}</p>`
                             : repeat(
                                   this._run.stepRuns,
                                   (sr) => sr.id,
-                                  (sr) => this.#renderStepRun(sr),
+                                  (sr) => html`
+                                      <ua-step-run-detail
+                                          .stepRun=${sr}
+                                          .actionName=${this._actionNames.get(sr.actionAlias) ?? sr.actionAlias}
+                                          .expanded=${this._expandedStep === sr.id}
+                                          .runId=${this._run!.unique}
+                                      ></ua-step-run-detail>
+                                  `,
                               )}
                     </uui-box>
                 </div>
@@ -347,7 +331,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                     <uui-box headline=${this.localize.term("uaLabels_runInfo")}>
                         <umb-property-layout label=${this.localize.term("uaLabels_status")} orientation="vertical">
                             <div slot="editor">
-                                <uui-tag color=${this.#statusColor(this._run.status)} look="secondary">
+                                <uui-tag color=${getRunStatusColor(this._run.status)} look="secondary">
                                     ${this._run.status}
                                 </uui-tag>
                             </div>
@@ -406,49 +390,18 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                 gap: var(--uui-size-layout-1);
             }
 
-            .main uui-box {
+            .main > uui-box {
                 --uui-box-default-padding: 0;
-                --uui-box-border-radius: 0;
+                overflow: hidden;
             }
 
-            .main uui-box > uui-box {
-                --uui-box-box-shadow: 0;
-            }
-
-            .main uui-box > uui-box + uui-box {
-                border-top: 1px solid var(--uui-color-border);
-            }
-
-            .step-header {
-                display: flex;
-                align-items: center;
-                gap: var(--uui-size-space-3);
-                padding: var(--uui-size-space-3);
-                cursor: pointer;
-            }
-
-            .step-header:hover {
-                background: var(--uui-color-surface-alt);
-            }
-
-            .step-name {
-                flex: 1;
-                font-weight: 500;
-            }
-
-            .step-duration {
-                color: var(--uui-color-text-alt);
-                font-size: var(--uui-size-4);
-            }
-
-            .step-details {
-                padding: var(--uui-size-space-5);
+            .main > uui-box > * + * {
                 border-top: 1px solid var(--uui-color-border);
             }
 
             .error-output {
                 background: var(--uui-color-danger-standalone);
-                color: white;
+                color: var(--uui-color-danger-contrast, white);
                 padding: var(--uui-size-space-3);
                 border-radius: var(--uui-border-radius);
                 font-size: var(--uui-size-4);
@@ -463,6 +416,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                 justify-content: center;
                 align-items: center;
                 padding: var(--uui-size-layout-3);
+            }
+
+            .load-error {
+                color: var(--uui-color-danger-standalone);
             }
 
             .empty {

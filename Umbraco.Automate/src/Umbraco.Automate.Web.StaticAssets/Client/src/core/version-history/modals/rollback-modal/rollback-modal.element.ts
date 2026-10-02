@@ -37,10 +37,10 @@ export class UaRollbackModalElement extends UmbModalBaseElement<UaRollbackModalD
                 <uui-button
                     slot="actions"
                     id="close"
-                    label=${this.localize.term("general_close")}
+                    label=${this.localize.term("uaGeneral_close")}
                     @click=${this._rejectModal}
                 >
-                    ${this.localize.term("general_close")}
+                    ${this.localize.term("uaGeneral_close")}
                 </uui-button>
                 ${this.data.allowRollback === false
                     ? nothing
@@ -50,10 +50,10 @@ export class UaRollbackModalElement extends UmbModalBaseElement<UaRollbackModalD
                               id="rollback"
                               color="positive"
                               look="primary"
-                              label=${this.localize.term("uaVersionHistory_rollback", [this.data.fromVersion])}
+                              label=${this.localize.term("uaVersionHistory_rollback", this.data.fromVersion)}
                               @click=${this.#onRollback}
                           >
-                              ${this.localize.term("uaVersionHistory_rollback", [this.data.fromVersion])}
+                              ${this.localize.term("uaVersionHistory_rollback", this.data.fromVersion)}
                           </uui-button>
                       `}
             </umb-body-layout>

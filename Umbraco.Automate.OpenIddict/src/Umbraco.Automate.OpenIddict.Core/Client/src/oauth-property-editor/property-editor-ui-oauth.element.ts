@@ -4,6 +4,10 @@ import { UmbFormControlMixin } from "@umbraco-cms/backoffice/validation";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
 import { UMB_NOTIFICATION_CONTEXT, type UmbNotificationContext } from "@umbraco-cms/backoffice/notification";
 import { UMB_AUTH_CONTEXT, type UmbAuthContext } from "@umbraco-cms/backoffice/auth";
+import {
+    UMB_SUBMITTABLE_WORKSPACE_CONTEXT,
+    type UmbSubmittableWorkspaceContext,
+} from "@umbraco-cms/backoffice/workspace";
 import type {
     UmbPropertyEditorConfigCollection,
     UmbPropertyEditorUiElement,
@@ -12,7 +16,11 @@ import type {
 interface OAuthCompleteMessage {
     type: "oauth-complete";
     success: boolean;
-    credentialId?: string;
+    /**
+     * Short-lived token for the credential just stored. It is kept as this editor's value and the
+     * server exchanges it for the credential id when the connection is saved.
+     */
+    credentialToken?: string;
     error?: string;
 }
 
@@ -25,6 +33,28 @@ const elementName = "umb-automate-property-editor-ui-oauth";
 
 /** Interval (ms) to check if the popup was closed externally (user closed the window). */
 const POPUP_POLL_INTERVAL = 500;
+
+/**
+ * Fragment key the OAuth callback uses when it redirects the tab back after the same-tab flow
+ * (see OAuthReturnUrl.cs). A fragment is never sent to the server or in the Referer header.
+ */
+const REDIRECT_FRAGMENT_KEY = "automate-oauth";
+
+/**
+ * sessionStorage key (per provider) for the nonce the same-tab flow round-trips. sessionStorage is
+ * per tab, so a crafted `#automate-oauth=...&credentialToken=...` link opened anywhere else cannot
+ * match it — without this, a link could bind the user's connection to an attacker's account.
+ */
+const nonceStorageKey = (provider: string) => `umb-automate-oauth-nonce:${provider.toLowerCase()}`;
+
+/**
+ * How long (ms) to wait for the workspace to move from its "create" route to its "edit" route after
+ * saving a new entity. UmbWorkspaceIsNewRedirectController does that on a 500ms timeout.
+ */
+const SAVE_REDIRECT_TIMEOUT = 3000;
+
+/** Duck-typed so this editor keeps working in workspaces that don't track unpersisted changes. */
+type WorkspaceWithChangeTracking = UmbSubmittableWorkspaceContext & { getHasUnpersistedChanges?: () => boolean };
 
 @customElement(elementName)
 export class UmbAutomatePropertyEditorUIOAuthElement
@@ -47,11 +77,16 @@ export class UmbAutomatePropertyEditorUIOAuthElement
     @state()
     private _setupDocsUrl: string | undefined;
 
+    /** True after the browser blocked the popup — offers the same-tab fallback. */
+    @state()
+    private _popupBlocked = false;
+
     #popup: Window | null = null;
     #popupPollTimer?: ReturnType<typeof setInterval>;
     #boundMessageHandler = this.#onMessage.bind(this);
     #notificationContext?: UmbNotificationContext;
     #authContext?: UmbAuthContext;
+    #workspaceContext?: WorkspaceWithChangeTracking;
     /** The provider whose status has been requested, to dedupe the two triggers (config setter + auth context). */
     #checkedProvider?: string;
 
@@ -64,12 +99,16 @@ export class UmbAutomatePropertyEditorUIOAuthElement
             this.#authContext = context;
             this.#checkProviderStatus();
         });
+        this.consumeContext(UMB_SUBMITTABLE_WORKSPACE_CONTEXT, (context) => {
+            this.#workspaceContext = context as WorkspaceWithChangeTracking | undefined;
+        });
     }
 
     public set config(config: UmbPropertyEditorConfigCollection | undefined) {
         if (!config) return;
         this._provider = config.getValueByAlias<string>("provider") ?? "";
         this.#checkProviderStatus();
+        this.#consumeRedirectResult();
     }
 
     async #checkProviderStatus() {
@@ -108,6 +147,7 @@ export class UmbAutomatePropertyEditorUIOAuthElement
     override connectedCallback() {
         super.connectedCallback();
         window.addEventListener("message", this.#boundMessageHandler);
+        this.#consumeRedirectResult();
     }
 
     override disconnectedCallback() {
@@ -129,13 +169,59 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         this.#cleanup();
         this._authenticating = false;
 
-        if (data.success && data.credentialId) {
-            this.value = data.credentialId;
-            this.dispatchEvent(new UmbChangeEvent());
-            this.#notify("positive", `Connected to ${this._provider || "provider"}.`);
+        if (data.success && data.credentialToken) {
+            this.#applyCredential(data.credentialToken);
+            this.#notify("positive", `Connected to ${this._provider || "provider"}. Save to keep the new authentication.`);
         } else {
             this.#notify("danger", data.error ?? "Authentication failed. Please try again.");
         }
+    }
+
+    #applyCredential(credentialToken: string) {
+        this._popupBlocked = false;
+        this.value = credentialToken;
+        this.dispatchEvent(new UmbChangeEvent());
+    }
+
+    /**
+     * Picks up the result of the same-tab flow: the OAuth callback redirects back to the workspace
+     * URL with `#automate-oauth=1&provider=...&credentialToken=...` (or `&error=...`). Called from both
+     * the config setter and connectedCallback because either may run last. It needs the provider so
+     * that, with several OAuth editors on one page, only the matching one claims the result.
+     */
+    #consumeRedirectResult() {
+        if (!this.isConnected || !this._provider) return;
+
+        const hash = window.location.hash;
+        if (!hash.includes(`${REDIRECT_FRAGMENT_KEY}=`)) return;
+
+        const params = new URLSearchParams(hash.slice(1));
+        if (params.get(REDIRECT_FRAGMENT_KEY) !== "1") return;
+        if (params.get("provider")?.toLowerCase() !== this._provider.toLowerCase()) return;
+
+        // Strip the fragment first so a re-render or reload cannot apply the result twice.
+        history.replaceState(history.state, "", window.location.pathname + window.location.search);
+
+        // Only accept a result this tab asked for (see nonceStorageKey). Fail closed if storage is
+        // unavailable — the popup flow still works.
+        let expectedNonce: string | null = null;
+        try {
+            const key = nonceStorageKey(this._provider);
+            expectedNonce = sessionStorage.getItem(key);
+            sessionStorage.removeItem(key);
+        } catch {
+            expectedNonce = null;
+        }
+        if (!expectedNonce || params.get("nonce") !== expectedNonce) return;
+
+        const credentialToken = params.get("credentialToken");
+        if (credentialToken) {
+            this.#applyCredential(credentialToken);
+            this.#notify("positive", `Connected to ${this._provider}. Save to keep the new authentication.`);
+            return;
+        }
+
+        this.#notify("danger", params.get("error") ?? "Authentication failed. Please try again.");
     }
 
     #cleanup() {
@@ -192,11 +278,85 @@ export class UmbAutomatePropertyEditorUIOAuthElement
 
         if (!this.#popup) {
             this._authenticating = false;
-            this.#notify("danger", "Could not open authentication window. Please allow popups for this site and try again.");
+            // Don't navigate away on our own — the user may have unsaved changes. Offer the same-tab
+            // fallback and let them choose it.
+            this._popupBlocked = true;
             return;
         }
 
+        this._popupBlocked = false;
         this.#startPopupPolling();
+    }
+
+    /**
+     * Same-tab fallback for a blocked popup: navigates this tab to the challenge endpoint with a
+     * return URL, and the callback redirects back here with the result in the fragment.
+     *
+     * The workspace is saved first — leaving the page would otherwise discard unsaved edits, and for
+     * a new entity the "create" URL would come back to a fresh scaffold (and a duplicate on the next
+     * save). So: save, wait for a new entity's route to switch to "edit", then navigate.
+     */
+    async #onContinueInTab() {
+        const workspace = this.#workspaceContext;
+        const wasNew = workspace?.getIsNew() === true;
+
+        if (workspace && (wasNew || workspace.getHasUnpersistedChanges?.())) {
+            const pathBeforeSave = window.location.pathname;
+            this._authenticating = true;
+            try {
+                await workspace.requestSubmit();
+            } catch {
+                // Validation or save failure — the workspace shows its own messages; checked below.
+            }
+
+            if (workspace.getIsNew() !== false || workspace.getHasUnpersistedChanges?.()) {
+                this._authenticating = false;
+                this.#notify("danger", "Save your changes before continuing, then try again.");
+                return;
+            }
+
+            if (wasNew && !(await this.#waitForPathChange(pathBeforeSave))) {
+                this._authenticating = false;
+                this.#notify("warning", 'Saved. Select "Continue in this tab" again to authenticate.');
+                return;
+            }
+        }
+
+        let nonce: string;
+        try {
+            // randomUUID needs a secure context; sessionStorage can throw when site data is blocked.
+            nonce = crypto.randomUUID();
+            sessionStorage.setItem(nonceStorageKey(this._provider), nonce);
+        } catch {
+            this._authenticating = false;
+            this.#notify(
+                "danger",
+                "Authentication cannot continue in this tab in this browser. Allow popups for this site and try again.",
+            );
+            return;
+        }
+
+        this._authenticating = true;
+        const returnUrl = window.location.pathname + window.location.search;
+        window.location.assign(
+            `/umbraco/automate/oauth/challenge/${encodeURIComponent(this._provider)}` +
+                `?returnUrl=${encodeURIComponent(returnUrl)}&nonce=${encodeURIComponent(nonce)}`,
+        );
+    }
+
+    #waitForPathChange(from: string): Promise<boolean> {
+        return new Promise((resolve) => {
+            const started = Date.now();
+            const timer = setInterval(() => {
+                if (window.location.pathname !== from) {
+                    clearInterval(timer);
+                    resolve(true);
+                } else if (Date.now() - started > SAVE_REDIRECT_TIMEOUT) {
+                    clearInterval(timer);
+                    resolve(false);
+                }
+            }, 100);
+        });
     }
 
     #onDisconnect() {
@@ -238,6 +398,7 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         return html`
             <div class="oauth-state disconnected">
                 ${isUnconfigured ? this.#renderNotConfiguredWarning(providerLabel) : nothing}
+                ${this._popupBlocked && !isUnconfigured ? this.#renderPopupBlocked(providerLabel) : nothing}
                 <uui-button
                     look="primary"
                     label=${`Authenticate with ${providerLabel}`}
@@ -247,6 +408,35 @@ export class UmbAutomatePropertyEditorUIOAuthElement
                     ${this._authenticating
                         ? html`<uui-loader-bar></uui-loader-bar>`
                         : html`Authenticate with ${providerLabel}`}
+                </uui-button>
+            </div>
+        `;
+    }
+
+    #renderPopupBlocked(providerLabel: string) {
+        const workspace = this.#workspaceContext;
+        const needsSave = workspace?.getIsNew() === true || workspace?.getHasUnpersistedChanges?.() === true;
+        const buttonLabel = needsSave ? "Save and continue in this tab" : "Continue in this tab";
+
+        return html`
+            <div class="popup-blocked-warning">
+                <div class="heading">
+                    <uui-icon name="icon-alert"></uui-icon>
+                    <strong>Your browser blocked the ${providerLabel} sign-in window</strong>
+                </div>
+                <p>
+                    Allow popups for this site and try again, or continue in this tab. You will come back
+                    here after signing in to ${providerLabel}.
+                </p>
+                <uui-button
+                    look="primary"
+                    color="warning"
+                    compact
+                    label=${buttonLabel}
+                    ?disabled=${this.readonly || this._authenticating}
+                    @click=${this.#onContinueInTab}
+                >
+                    ${buttonLabel}
                 </uui-button>
             </div>
         `;
@@ -273,17 +463,15 @@ export class UmbAutomatePropertyEditorUIOAuthElement
                 ${this._setupDocsUrl
                     ? html`
                           <uui-button
-                              class="docs-link"
                               look="secondary"
                               color="warning"
-                              compact
                               href=${this._setupDocsUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               label=${`Get ${providerLabel} credentials`}
                           >
                               Get ${providerLabel} credentials
-                              <uui-icon name="icon-out" slot="extra"></uui-icon>
+                              <uui-icon name="icon-out"></uui-icon>
                           </uui-button>
                       `
                     : nothing}
@@ -315,7 +503,8 @@ export class UmbAutomatePropertyEditorUIOAuthElement
             align-items: flex-start;
         }
 
-        .not-configured-warning {
+        .not-configured-warning,
+        .popup-blocked-warning {
             padding: var(--uui-size-space-4) var(--uui-size-space-5);
             border-radius: var(--uui-border-radius);
             border: 1px solid var(--uui-color-warning-standalone);
@@ -323,16 +512,13 @@ export class UmbAutomatePropertyEditorUIOAuthElement
             color: var(--uui-color-warning-contrast);
         }
 
-        .not-configured-warning p {
+        .not-configured-warning p,
+        .popup-blocked-warning p {
             margin-top: 0;
         }
 
         .not-configured-warning code {
             font-size: 0.9em;
-        }
-
-        .not-configured-warning .docs-link uui-icon {
-            margin-left: var(--uui-size-space-2);
         }
     `;
 }

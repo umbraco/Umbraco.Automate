@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -39,6 +40,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// End-to-end test: a Manual Trigger executes a Run Script action, and the script's returned
 /// value is persisted as the step's output through the real execution pipeline.
 /// </summary>
+[Collection("WorkflowHost")]
 public class ManualTriggerRunScriptTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;
@@ -136,8 +138,9 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
             .Build();
 
         var automationService = new Mock<IAutomationService>();
+        // Resolved per call so a test can swap in its own automation before triggering.
         automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[] { _automation });
+            .ReturnsAsync(() => new[] { _automation });
 
         var nodeEligibility = new Mock<IExecutionNodeEligibility>();
         nodeEligibility.Setup(e => e.CanExecuteWorkflows()).Returns(true);
@@ -166,7 +169,7 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
 
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
 
-        var completedRun = await WaitForStepRunAsync(TimeSpan.FromSeconds(10));
+        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait, expectedStepRuns: 1);
 
         completedRun.StepRuns.ShouldNotBeEmpty();
         var stepRun = completedRun.StepRuns.First();
@@ -179,7 +182,102 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
         doc.RootElement.GetProperty("result").GetProperty("answer").GetInt32().ShouldBe(42);
     }
 
-    private async Task<AutomationRun> WaitForStepRunAsync(TimeSpan timeout)
+    [Fact]
+    public async Task RunScript_ReadsTriggerAndPreviousStepOutputsFromData()
+    {
+        // The script's `data` argument carries the binding context, so a script can read a prior
+        // step's output at the same path a binding would (${ steps.first.result.answer }).
+        var first = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.runScript")
+            .WithName("First")
+            .WithAlias("first")
+            .WithSetting("script", "export default function () { return { answer: 42, tags: ['a', 'b', 'c'] }; }")
+            .Build();
+        var second = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.runScript")
+            .WithName("Second")
+            .WithAlias("second")
+            .WithSetting(
+                "script",
+                "export default function (data) { return [data.trigger.name, data.steps.first.result.answer, data.previous.result.tags.length].join('|'); }")
+            .Build();
+
+        _automation = new AutomationBuilder()
+            .WithAlias("test-manual-runscript-binding-context")
+            .WithName("Test Run Script Binding Context")
+            .WithManualTrigger()
+            .AddStep(first)
+            .AddStep(second)
+            .WithTriggerConnection(first.Id)
+            .WithConnection(first.Id, second.Id)
+            .Build();
+
+        var triggerMessage = new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.manual",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(new Dictionary<string, object?> { ["name"] = "Home" }, JsonOptions.Default),
+        };
+
+        await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
+
+        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait, expectedStepRuns: 2);
+
+        var secondRun = completedRun.StepRuns.Single(s => s.StepId == second.Id);
+        secondRun.Status.ShouldBe(StepRunStatus.Completed, secondRun.Error);
+        using var doc = JsonDocument.Parse(secondRun.OutputData!);
+        doc.RootElement.GetProperty("result").GetString().ShouldBe("Home|42|3");
+    }
+
+    [Fact]
+    public async Task RunScript_DoesNotResolveBindingsInsideTheScriptBody()
+    {
+        // `${ }` in the script source is JavaScript, not an Automate binding: the Script field does
+        // not support bindings, so a string that looks like one reaches the engine verbatim and a
+        // template literal keeps its JS meaning. Values come in through `data` instead.
+        const string script =
+            "export default function (data) {\n" +
+            "    return {\n" +
+            "        literal: '${ trigger.name }',\n" +
+            "        template: `Hello ${data.trigger.name}`,\n" +
+            "    };\n" +
+            "}";
+
+        var step = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.runScript")
+            .WithName("No Bindings")
+            .WithAlias("noBindings")
+            .WithSetting("script", script)
+            .Build();
+
+        _automation = new AutomationBuilder()
+            .WithAlias("test-manual-runscript-no-bindings")
+            .WithName("Test Run Script No Bindings")
+            .WithManualTrigger()
+            .AddStep(step)
+            .WithTriggerConnection(step.Id)
+            .Build();
+
+        var triggerMessage = new TriggerEventMessage
+        {
+            TriggerAlias = "umbracoAutomate.manual",
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(new Dictionary<string, object?> { ["name"] = "Home" }, JsonOptions.Default),
+        };
+
+        await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
+
+        var completedRun = await WaitForStepRunAsync(TestTimeouts.WorkflowWait, expectedStepRuns: 1);
+
+        var stepRun = completedRun.StepRuns.Single();
+        stepRun.Status.ShouldBe(StepRunStatus.Completed, stepRun.Error);
+        using var doc = JsonDocument.Parse(stepRun.OutputData!);
+        var result = doc.RootElement.GetProperty("result");
+        result.GetProperty("literal").GetString().ShouldBe("${ trigger.name }");
+        result.GetProperty("template").GetString().ShouldBe("Hello Home");
+    }
+
+    private async Task<AutomationRun> WaitForStepRunAsync(TimeSpan timeout, int expectedStepRuns)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
@@ -188,7 +286,7 @@ public class ManualTriggerRunScriptTests : IAsyncLifetime
             if (paged.Items.FirstOrDefault() is { } run)
             {
                 var full = await _runRepository.GetAsync(run.Id);
-                if (full?.StepRuns.Count > 0 && full.StepRuns.All(s => s.Status != StepRunStatus.Running))
+                if (full?.StepRuns.Count >= expectedStepRuns && full.StepRuns.All(s => s.Status != StepRunStatus.Running))
                 {
                     return full;
                 }

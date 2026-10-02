@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Automate.Tests.Common;
 using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
@@ -44,6 +45,7 @@ namespace Umbraco.Automate.Tests.Integration;
 /// automation and count what actually executed, which is the only place that mistake shows up:
 /// the step body's return value on its own looks reasonable either way.
 /// </summary>
+[Collection("WorkflowHost")]
 public class ParallelContainerTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;
@@ -239,8 +241,8 @@ public class ParallelContainerTests : IAsyncLifetime
         };
         await _handler.HandleAsync(JsonSerializer.Serialize(triggerMessage, JsonOptions.Default), CancellationToken.None);
 
-        var run = await WaitForRunAsync(automation.Id, TimeSpan.FromSeconds(15));
-        var instance = await WaitForWorkflowCompleteAsync(run, TimeSpan.FromSeconds(15));
+        var run = await WaitForRunAsync(automation.Id, TestTimeouts.WorkflowWait);
+        var instance = await WaitForWorkflowCompleteAsync(run, TestTimeouts.WorkflowWait);
         return (automation, instance);
     }
 
