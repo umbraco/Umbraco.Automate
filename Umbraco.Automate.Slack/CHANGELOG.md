@@ -5,6 +5,12 @@ All notable changes to Umbraco.Automate.Slack will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.0.6](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@17.0.5...Umbraco.Automate.Slack@17.0.6) (2026-10-01)
+
+### Internal
+
+* Bump to align with Umbraco.Automate 17.5.0 and Umbraco.Automate.OpenIddict 17.1.5.
+
 ## [17.0.5](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@17.0.4...Umbraco.Automate.Slack@17.0.5) (2026-09-02)
 
 ### Internal
