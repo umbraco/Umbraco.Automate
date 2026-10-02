@@ -6,6 +6,7 @@ import { bindingPickerManifests } from "./components/binding-picker/manifests.js
 import { bindingTextBoxManifests } from "./components/binding-text-box/manifests.js";
 import { bindingTextAreaManifests } from "./components/binding-text-area/manifests.js";
 import { bindingCodeEditorManifests } from "./components/binding-code-editor/manifests.js";
+import { bindableEditorManifests } from "./components/bindable-editor/manifests.js";
 import { webhookAuthenticatorPickerManifests } from "./components/webhook-authenticator-picker/manifests.js";
 import { webhookMethodPickerManifests } from "./components/webhook-method-picker/manifests.js";
 import { webhookSecretFieldManifests } from "./components/webhook-secret-field/manifests.js";
@@ -24,6 +25,7 @@ export const manifests: UmbExtensionManifest[] = [
     ...bindingTextBoxManifests,
     ...bindingTextAreaManifests,
     ...bindingCodeEditorManifests,
+    ...bindableEditorManifests,
     ...webhookAuthenticatorPickerManifests,
     ...webhookMethodPickerManifests,
     ...webhookSecretFieldManifests,
