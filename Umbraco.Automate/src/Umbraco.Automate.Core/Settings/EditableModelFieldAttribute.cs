@@ -67,6 +67,14 @@ public class EditableModelFieldAttribute : Attribute
     /// Gets or sets a value indicating whether <c>${ binding }</c> syntax is evaluated
     /// at runtime against automation run data (trigger output, step outputs).
     /// </summary>
+    /// <remarks>
+    /// Text editors (the default text box, <c>Umb.PropertyEditorUi.TextArea</c>,
+    /// <c>Umb.PropertyEditorUi.CodeEditor</c>) gain an "Insert binding" action. Any other
+    /// <see cref="EditorUiAlias"/>, such as a content or form picker, keeps its editor and gains
+    /// a switch to a binding text box instead, so the field takes either a picked value or a
+    /// binding. Only <c>string</c> properties and lists of <c>string</c> are resolved; a binding
+    /// on a list is stored as a one-item list and resolves to one string.
+    /// </remarks>
     public bool SupportsBindings { get; set; }
 
     /// <summary>

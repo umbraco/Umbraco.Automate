@@ -1,6 +1,8 @@
+export const CONDITION_BUILDER_UI_ALIAS = "UmbracoAutomate.PropertyEditorUi.ConditionBuilder";
+
 const conditionBuilder: UmbExtensionManifest = {
     type: "propertyEditorUi",
-    alias: "UmbracoAutomate.PropertyEditorUi.ConditionBuilder",
+    alias: CONDITION_BUILDER_UI_ALIAS,
     name: "Automate Condition Builder",
     element: () => import("./condition-builder.element.js"),
     meta: {
