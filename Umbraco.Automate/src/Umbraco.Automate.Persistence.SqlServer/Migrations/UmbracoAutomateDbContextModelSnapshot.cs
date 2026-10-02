@@ -17,7 +17,7 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.7")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -670,6 +670,22 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.HasKey("LockId");
 
                     b.ToTable("umbracoAutomateWorkflowLock", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowNodeHeartbeatEntity", b =>
+                {
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Beat")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("HeartbeatUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("NodeId");
+
+                    b.ToTable("umbracoAutomateWorkflowNodeHeartbeat", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
