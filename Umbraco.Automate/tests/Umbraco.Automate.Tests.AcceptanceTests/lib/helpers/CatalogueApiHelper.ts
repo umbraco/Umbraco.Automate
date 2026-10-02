@@ -72,4 +72,14 @@ export class CatalogueApiHelper {
     }
     return description;
   }
+
+  /* The description of one settings field of an action, as the settings form receives it. */
+  async getFieldDescription(actionAlias: string, fieldKey: string): Promise<string> {
+    const action = await this.getActionByAlias(actionAlias);
+    const description = action.settingsSchema?.fields?.find((f: any) => f.key === fieldKey)?.description;
+    if (!description) {
+      throw new Error(`Setting "${fieldKey}" of "${actionAlias}" has no description.`);
+    }
+    return description;
+  }
 }
