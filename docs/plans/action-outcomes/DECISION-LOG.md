@@ -1,0 +1,23 @@
+# Decision log
+
+- **02-10-2026 (umb-explore):** Target v18 only, no v17 backport. It's a new feature, and a backport would be a support promise for a second frontend.
+- **02-10-2026 (umb-explore):** Reversed the v18-only decision. v17 is LTS and still in active development, so the feature must be ported to `v17/dev` too. Build on v18 first, then backport.
+- **02-10-2026 (umb-explore):** Reuse WorkflowCore's native outcome routing (`ExecutionResult.Outcome` + `ValueOutcome`). The engine already forks on every matching outcome, so there's no reason for custom routing.
+- **02-10-2026 (umb-explore):** Leave If/Switch/Approval migration out of the first slice. It's a refactor of working features with no new user value, so it waits until the new mechanism has proved itself.
+- **02-10-2026 (umb-explore):** Leave error exits out of scope. `docs/plans/internal/custom-error-paths.md` already covers them, and the design phase must check the two fit together.
+- **02-10-2026 (umb-design):** Declare outcomes on `IStepType`/`StepTypeBase`, mirroring output schema (static `GetOutcomes`, `HasDynamicOutcomes`, `GetOutcomesAsync(settings)`). An attribute can't depend on settings, and a separate opt-in interface would split one pattern in two.
+- **02-10-2026 (umb-design):** Use default interface members on `IStepType`, so a direct third-party implementer doesn't break inside a major.
+- **02-10-2026 (umb-design):** A declared default outcome replaces "no outcome", rather than a reserved `"default"` key. Switch already uses that string, and actions should name their own default.
+- **02-10-2026 (umb-design):** Resolve outcomes lazily in `ActionStepBody`, not `WorkflowCompiler`. Compile is sync and also runs in recovery, so resolving there means sync-over-async.
+- **02-10-2026 (umb-design, with user):** Old unnamed lines keep "run on every result" behaviour and show as an "Any result" exit. Moving them to the default exit on save would quietly change saved automations inside a major and on LTS.
+- **02-10-2026 (umb-design):** An undeclared outcome gets a warning, not a step failure. A stale line blocks publish but not saving a draft, matching how dangling step references are handled.
+- **02-10-2026 (umb-design):** Extend `ActionNode` instead of adding an `OutcomeNode` type. A fourth hard-coded branching node is the pattern this feature exists to retire.
+- **02-10-2026 (umb-design):** The 11 built-in actions that already return outcomes declare them in this feature, each with a `success` default.
+- **02-10-2026 (umb-design, with user):** Outcome labels are localizable using the existing `#key` convention from settings fields. No separate key property.
+- **02-10-2026 (umb-design, with user):** Outcomes come from saved, unbound settings everywhere. Bound values contribute no exits, so the editor, publish and run time always agree. Per-option paths for run-time options use a Switch after the step.
+- **02-10-2026 (umb-plan, with user):** Invalid settings return 400 "Invalid settings" from both the outcomes endpoint and the existing output-schema endpoint. Today the output-schema endpoint throws unhandled. This resolves the SPEC TODO.
+- **02-10-2026 (umb-plan, with user):** First slice is contract + runtime + API + canvas. The built-in actions are slice 2, so Umbraco.AI can build against slice 1 early.
+- **02-10-2026 (umb-plan):** Get Content moves into slice 1 as the proving action. The demo site has no test-only actions, and wire tasks must be proven through the real artifact.
+- **02-10-2026 (umb-plan):** Dynamic canvas behaviour is proven with Playwright route stubbing. No built-in action has dynamic outcomes, and adding one only for tests would ship test code.
+- **02-10-2026 (umb-plan):** T19 runs after T18 because both edit `lang/en.ts`.
+- **02-10-2026 (umb-plan):** Added a public `string.ContainsBinding()` helper (ARCHITECTURE updated). `BindingTokenizer` is internal, and action authors need it to follow the unbound-settings rule.
