@@ -53,6 +53,7 @@ export default {
         connection: "Connection",
         settings: "Settings",
         webhookUrl: "Webhook URL",
+        mcpUrl: "MCP URL",
         steps: "Steps",
         logs: "Logs",
         runInfo: "Run Info",
@@ -133,6 +134,14 @@ export default {
         urlCopied: "Webhook URL copied to clipboard.",
         urlCopyFailed: "Could not copy the URL. Select the value manually.",
         urlLoadFailed: "Could not load the webhook URL.",
+    },
+    uaMcp: {
+        headline: "MCP",
+        unsavedHint: "Save this automation to get its MCP URL.",
+        copyUrl: "Copy URL",
+        urlCopied: "MCP URL copied to clipboard.",
+        urlCopyFailed: "Could not copy the URL. Select the value manually.",
+        urlLoadFailed: "Could not load the MCP URL.",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>

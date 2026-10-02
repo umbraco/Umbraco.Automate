@@ -345,6 +345,10 @@ export type ImportAutomationRequestModel = {
     exportModel: AutomationExportModel;
 };
 
+export type McpUrlResponseModel = {
+    url: string;
+};
+
 export type NotificationChannelItemResponseModel = {
     alias: string;
     name: string;
@@ -940,6 +944,41 @@ export type PutAutomationsByIdImportResponses = {
 };
 
 export type PutAutomationsByIdImportResponse = PutAutomationsByIdImportResponses[keyof PutAutomationsByIdImportResponses];
+
+export type GetAutomationsByIdMcpUrlData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/automations/{id}/mcp-url';
+};
+
+export type GetAutomationsByIdMcpUrlErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have access to this resource
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetAutomationsByIdMcpUrlError = GetAutomationsByIdMcpUrlErrors[keyof GetAutomationsByIdMcpUrlErrors];
+
+export type GetAutomationsByIdMcpUrlResponses = {
+    /**
+     * OK
+     */
+    200: McpUrlResponseModel;
+};
+
+export type GetAutomationsByIdMcpUrlResponse = GetAutomationsByIdMcpUrlResponses[keyof GetAutomationsByIdMcpUrlResponses];
 
 export type PostAutomationsByIdPublishData = {
     body?: never;

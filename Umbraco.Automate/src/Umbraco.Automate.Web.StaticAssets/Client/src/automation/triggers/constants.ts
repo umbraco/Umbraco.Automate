@@ -6,3 +6,6 @@ export const UA_SCHEDULED_TRIGGER_ALIAS = "umbracoAutomate.scheduled";
 
 /** Alias of the built-in Webhook trigger (Umbraco.Automate.Core.Triggers.BuiltIn.WebhookTrigger). */
 export const UA_WEBHOOK_TRIGGER_ALIAS = "umbracoAutomate.webhook";
+
+/** Alias of the built-in MCP trigger (Umbraco.Automate.Core.Triggers.BuiltIn.McpTrigger). */
+export const UA_MCP_TRIGGER_ALIAS = "umbracoAutomate.mcp";
