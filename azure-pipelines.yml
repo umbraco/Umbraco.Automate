@@ -241,15 +241,129 @@ stages:
       displayName: Acceptance Tests
       dependsOn: []
       jobs:
+          # Decides whether a pull request needs the acceptance suite at all, and how much of it.
+          # A job in this stage rather than a step in Build (as in Forms), because this stage
+          # deliberately runs alongside Build: waiting on Build would put the whole .NET build
+          # and test run back on the acceptance critical path. It needs only the PR merge commit
+          # and its two parents, so a depth-2 checkout on a Linux agent is enough.
+          - job: Changes
+            displayName: Detect acceptance changes
+            pool:
+                vmImage: "ubuntu-latest"
+            steps:
+                - checkout: self
+                  fetchDepth: 2
+
+                # A PR build sorts its changed files (the PR merge commit against its first
+                # parent, the target branch tip) into areas, first match wins:
+                #   none         *.md, docs/, .claude/, .github/, .githooks/, assets/, templates/
+                #                (the dotnet new templates, not scripts/templates/), LICENSE and
+                #                repo tooling (commitlint, prettier, .mcp.json, changelog and
+                #                release-manifest scripts and config, git-hook setup,
+                #                marketplace JSON)                -> no acceptance
+                #   tests        the .NET unit, integration and common test projects
+                #                                                 -> no acceptance (Build runs them)
+                #   specs        tests/...AcceptanceTests/ tests/, lib/ and umbraco.config.ts
+                #                                                 -> acceptance, CHANGED SPECS only
+                #   acceptance   the rest of tests/...AcceptanceTests/ (package*.json,
+                #                playwright.config.ts, tsconfig.json, postinstall.js, ...)
+                #                                                 -> acceptance, whole suite
+                #   shared       anything else: product code, the frontend, the demo-site
+                #                scripts and templates, pipeline YAML, Directory.*.props,
+                #                global.json, version.json, NuGet config, ...
+                #                                                 -> acceptance, whole suite
+                # A PR touching only none/tests files skips the suite. Pushes, and anything
+                # unexpected (not a PR merge commit, empty diff), run the whole suite. The
+                # acceptance job's condition skips only on an explicit 'false', so a missing
+                # variable runs the suite rather than silently skipping it.
+                #
+                # acceptanceChangedOnly is true only when acceptance runs because of `specs` files
+                # and nothing else. The matrix step then picks one leg running Playwright's
+                # --only-changed, which runs the changed spec files plus any spec that imports a
+                # changed file. That import graph is why `specs` is limited to TypeScript the specs
+                # import: package.json, the Playwright config or the npm install scripts are not
+                # imported by any spec (playwright.config.ts only by auth.setup.ts), so
+                # --only-changed would run next to nothing for them, and they run the whole suite.
+                - bash: |
+                      runAcceptance=true
+                      acceptanceChangedOnly=false
+                      acc=Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
+                      if [ "$(Build.Reason)" = "PullRequest" ] && git rev-parse -q --verify HEAD^2 >/dev/null; then
+                        # --no-renames lists a moved file's old path too, so moving code out of src/
+                        # into docs/ can't hide the src/ side and skip the suite.
+                        changed=$(git diff --name-only --no-renames HEAD^1 HEAD)
+                        if [ -n "$changed" ]; then
+                          runAcceptance=false
+                          # Set by any area that needs the whole suite, not just changed specs.
+                          fullAcceptance=false
+                          while IFS= read -r file; do
+                            case "$file" in
+                              *.md|docs/*|.claude/*|.github/*|.githooks/*|assets/*|templates/*|LICENSE|commitlint.config.js|.git-blame-ignore-revs|.prettierrc|.prettierignore|.mcp.json|.worktreeinclude|*/changelog.config.json|*/umbraco-marketplace*.json|scripts/generate-changelog*|scripts/generate-release-manifest*|scripts/list-commit-options.js|scripts/setup-git-hooks*|.azure-pipelines/scripts/validate-changelogs.ps1)
+                                area=none ;;
+                              Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/*|Umbraco.Automate/tests/Directory.*|Umbraco.Automate.OpenIddict/tests/*|Umbraco.Automate.Slack/tests/*)
+                                area=tests ;;
+                              "$acc"/tests/*|"$acc"/lib/*|"$acc"/umbraco.config.ts)
+                                area=specs ;;
+                              "$acc"/*)
+                                area=acceptance ;;
+                              *)
+                                area=shared ;;
+                            esac
+                            echo "$area: $file"
+                            case "$area" in
+                              specs) runAcceptance=true ;;
+                              acceptance|shared) runAcceptance=true; fullAcceptance=true ;;
+                            esac
+                          done <<< "$changed"
+                          if [ "$runAcceptance" = true ] && [ "$fullAcceptance" = false ]; then
+                            acceptanceChangedOnly=true
+                          fi
+                        fi
+                      else
+                        echo "Not a PR merge commit: running the whole acceptance suite."
+                      fi
+                      echo "Acceptance tests: $runAcceptance (changed specs only: $acceptanceChangedOnly)"
+                      echo "##vso[task.setvariable variable=runAcceptance;isOutput=true]$runAcceptance"
+                      echo "##vso[task.setvariable variable=acceptanceChangedOnly;isOutput=true]$acceptanceChangedOnly"
+                  name: changes
+                  displayName: Detect whether acceptance tests run
+
+                # STANDARD: four shards of the whole suite. CHANGED (a PR whose only
+                # acceptance-relevant changes are specs - see acceptanceChangedOnly above): ONE
+                # unsharded leg running --only-changed against the PR's target branch tip. A
+                # handful of specs don't need four agents each paying the build, scaffold and
+                # LocalDB first boot. HEAD~1 rather than HEAD^1, because npm runs the script through
+                # cmd.exe on Windows, where ^ is the escape character; on the PR merge commit both
+                # name the same first parent, which the acceptance job's full-history checkout has.
+                # --pass-with-no-tests keeps a PR that only deletes specs green.
+                #
+                # Each leg carries its own testCommand (incl. any --shard) and a `leg` name for
+                # step titles and artifact names; the run step just executes testCommand. There
+                # is no release-type matrix or force-full parameter here: every non-PR build
+                # leaves acceptanceChangedOnly false and gets STANDARD.
+                - bash: |
+                      STANDARD='{"Shard 1 of 4":{"leg":"Shard 1 of 4","testCommand":"npm run test -- --shard=1/4"},"Shard 2 of 4":{"leg":"Shard 2 of 4","testCommand":"npm run test -- --shard=2/4"},"Shard 3 of 4":{"leg":"Shard 3 of 4","testCommand":"npm run test -- --shard=3/4"},"Shard 4 of 4":{"leg":"Shard 4 of 4","testCommand":"npm run test -- --shard=4/4"}}'
+                      CHANGED='{"Changed specs":{"leg":"Changed specs","testCommand":"npm run test -- --only-changed=HEAD~1 --pass-with-no-tests"}}'
+                      matrix="$STANDARD"
+                      if [ "$(changes.acceptanceChangedOnly)" = "true" ]; then matrix="$CHANGED"; fi
+                      echo "Acceptance matrix: $matrix"
+                      echo "##vso[task.setvariable variable=acceptanceMatrix;isOutput=true]$matrix"
+                  name: acceptance
+                  displayName: Compute acceptance matrix
+
           - job: AcceptanceTests
             displayName: Run Playwright Acceptance Tests
-            # Sharded across parallel agents, each with its own demo site and LocalDB. The
+            dependsOn: Changes
+            condition: and(succeeded(), ne(dependencies.Changes.outputs['changes.runAcceptance'], 'false'))
+            # Computed by the Changes job: four shards of the whole suite, or one leg running
+            # just the changed specs. Each shard gets its own demo site and LocalDB. The
             # specs share site data and the suite runs one worker, so shards cannot share a
             # site; splitting across agents is what makes them run concurrently. Playwright
-            # splits by test (fullyParallel in playwright.config.ts, --shard below), and every shard runs
-            # auth.setup.ts itself.
+            # splits by test (fullyParallel in playwright.config.ts, --shard in each leg's
+            # testCommand), and every leg runs auth.setup.ts itself. maxParallel is left at the
+            # default so all shards run concurrently.
             strategy:
-                parallel: 4
+                matrix: $[ dependencies.Changes.outputs['acceptance.acceptanceMatrix'] ]
             # Windows agents build more slowly, and the first boot against a cold LocalDB
             # creates the database and runs the full unattended install.
             timeoutInMinutes: 60
@@ -278,7 +392,8 @@ stages:
             steps:
                 # Full history, like the Build stage: the demo site builds the products from
                 # project references, and Nerdbank.GitVersioning cannot compute a version
-                # height from a shallow clone.
+                # height from a shallow clone. It also gives a changed-specs leg the merge
+                # commit's first parent that --only-changed=HEAD~1 diffs against.
                 - checkout: self
                   fetchDepth: 0
 
@@ -447,8 +562,8 @@ stages:
                       exit 1
                   displayName: Wait for demo site
 
-                - script: npx playwright test DefaultConfig --shard=$(System.JobPositionInPhase)/$(System.TotalJobsInPhase)
-                  displayName: Run acceptance tests (shard $(System.JobPositionInPhase) of $(System.TotalJobsInPhase))
+                - script: $(testCommand)
+                  displayName: Run acceptance tests ($(leg))
                   workingDirectory: $(acceptanceDir)
 
                 # always(), so the site is also stopped after a failed or cancelled test step.
@@ -471,21 +586,21 @@ stages:
                   inputs:
                       testResultsFormat: JUnit
                       testResultsFiles: "$(acceptanceDir)/results/results.xml"
-                      testRunTitle: Acceptance Tests (shard $(System.JobPositionInPhase))
+                      testRunTitle: Acceptance Tests ($(leg))
                       mergeTestResults: true
 
                 # Traces, screenshots and video for every failed test, plus the site
                 # logs, because a UI failure is rarely diagnosable from the error alone.
                 # always(), as in Forms: a job killed by its timeout is cancelled, and a
                 # cancelled job skips steps whose condition does not include always(), so
-                # the run that most needs diagnosing would upload nothing. The shard and attempt
-                # numbers keep shards and re-runs from colliding on the same artifact name.
+                # the run that most needs diagnosing would upload nothing. The leg name and attempt
+                # number keep shards and re-runs from colliding on the same artifact name.
                 - task: PublishPipelineArtifact@1
                   displayName: Upload failure diagnostics
                   condition: always()
                   inputs:
                       targetPath: $(acceptanceDir)/results
-                      artifact: acceptance-test-results - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
+                      artifact: acceptance-test-results - $(leg) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
                 - task: PublishPipelineArtifact@1
@@ -493,7 +608,7 @@ stages:
                   condition: always()
                   inputs:
                       targetPath: $(Build.ArtifactStagingDirectory)
-                      artifact: acceptance-demo-site-log - Shard $(System.JobPositionInPhase) - Attempt $(System.JobAttempt)
+                      artifact: acceptance-demo-site-log - $(leg) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
     # ============================================================
