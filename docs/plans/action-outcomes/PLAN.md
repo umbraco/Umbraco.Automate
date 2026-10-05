@@ -24,7 +24,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S4 AC9 and AC13 specs pass.
 - [x] **T3** Return a 400 `ProblemDetails` "Invalid settings" from `ResolveStepTypeOutputSchemaController` when `ResolveSettings` throws `InvalidOperationException` · story: S8 · depends-on: none · parallel-group: A
   - Done when: S8 AC1–AC2 specs pass (extend `ResolveStepTypeOutputSchemaControllerTests`).
-- [ ] **T4** Add the internal `StepOutcomeValidator` (unique non-empty keys, no `__` prefix, at most one default) · story: S1 · depends-on: T1 · parallel-group: B
+- [x] **T4** Add the internal `StepOutcomeValidator` (unique non-empty keys, no `__` prefix, at most one default) · story: S1 · depends-on: T1 · parallel-group: B
   - Done when: S1 AC5–AC9 and AC8 (no default allowed) specs pass.
 - [ ] **T5** Add `AddDanglingOutcomeErrors` to `AutomationService.ValidateForPublishAsync`, resolving each declaring step's outcomes (`HasDynamicOutcomes || GetOutcomes().Count > 0`) from its saved settings, and reporting a resolution failure as its own error · story: S5 · depends-on: T1 · parallel-group: B
   - Done when: S5 AC5–AC9 and AC11 specs pass, and S5 AC3 (draft save allowed) passes.
