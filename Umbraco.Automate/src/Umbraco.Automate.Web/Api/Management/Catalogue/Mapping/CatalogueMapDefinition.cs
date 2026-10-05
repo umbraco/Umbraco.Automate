@@ -1,7 +1,11 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Notifications.Channels;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
@@ -14,6 +18,24 @@ namespace Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 /// </summary>
 public class CatalogueMapDefinition : IMapDefinition
 {
+    private readonly ILogger<CatalogueMapDefinition> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CatalogueMapDefinition"/> class without logging.
+    /// </summary>
+    [Obsolete("Use the constructor taking a logger. This constructor will be removed in a future major version.")]
+    public CatalogueMapDefinition()
+        : this(NullLogger<CatalogueMapDefinition>.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CatalogueMapDefinition"/> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    [ActivatorUtilitiesConstructor]
+    public CatalogueMapDefinition(ILogger<CatalogueMapDefinition> logger) => _logger = logger;
+
     /// <inheritdoc />
     public void DefineMaps(IUmbracoMapper mapper)
     {
@@ -29,7 +51,7 @@ public class CatalogueMapDefinition : IMapDefinition
     }
 
     // Umbraco.Code.MapAll
-    private static void MapToActionItem(IAction source, ActionItemResponseModel target, MapperContext context)
+    private void MapToActionItem(IAction source, ActionItemResponseModel target, MapperContext context)
     {
         target.Alias = source.Alias;
         target.Name = source.Name;
@@ -40,6 +62,8 @@ public class CatalogueMapDefinition : IMapDefinition
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
         target.HasDynamicOutputSchema = source.HasDynamicOutputSchema;
+        target.Outcomes = MapOutcomes(source);
+        target.HasDynamicOutcomes = source.HasDynamicOutcomes;
         target.Type = "action";
     }
 
@@ -58,11 +82,14 @@ public class CatalogueMapDefinition : IMapDefinition
         // Opting into the capability is what makes "Run now" available for the trigger, so the
         // backoffice can ask the catalogue rather than keep its own list of runnable aliases.
         target.SupportsManualRun = source is ISupportsManualRun;
+        // Triggers start an automation rather than finish with a result, so they never expose outcomes.
+        target.Outcomes = [];
+        target.HasDynamicOutcomes = false;
         target.Type = "trigger";
     }
 
     // Umbraco.Code.MapAll
-    private static void MapToControlFlowItem(IControlFlow source, ControlFlowItemResponseModel target, MapperContext context)
+    private void MapToControlFlowItem(IControlFlow source, ControlFlowItemResponseModel target, MapperContext context)
     {
         target.Alias = source.Alias;
         target.Name = source.Name;
@@ -73,7 +100,40 @@ public class CatalogueMapDefinition : IMapDefinition
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
         target.HasDynamicOutputSchema = source.HasDynamicOutputSchema;
+        target.Outcomes = MapOutcomes(source);
+        target.HasDynamicOutcomes = source.HasDynamicOutcomes;
         target.Type = "controlFlow";
+    }
+
+    // Static outcomes only: dynamic ones depend on a step's settings and are resolved per step.
+    // A third-party step type that throws or returns null must not take the whole catalogue down.
+    private List<StepOutcomeResponseModel> MapOutcomes(IStepType source)
+    {
+        IReadOnlyList<StepOutcome>? outcomes;
+        try
+        {
+            outcomes = source.GetOutcomes();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Step type '{Alias}' threw while listing its outcomes; exposing none.", source.Alias);
+            return [];
+        }
+
+        if (outcomes is null)
+        {
+            _logger.LogWarning("Step type '{Alias}' returned no outcome list; exposing none.", source.Alias);
+            return [];
+        }
+
+        return outcomes
+            .Select(outcome => new StepOutcomeResponseModel
+            {
+                Key = outcome.Key,
+                Label = outcome.Label,
+                IsDefault = outcome.IsDefault,
+            })
+            .ToList();
     }
 
     // Umbraco.Code.MapAll
