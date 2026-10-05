@@ -2,7 +2,7 @@ import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { CatalogueService } from "../../api/sdk.gen.js";
 import { UaCatalogueTypeMapper } from "../type-mapper.js";
-import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
+import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaStepOutcome, UaTriggerCatalogueItemModel } from "../types.js";
 
 export class UaCatalogueServerDataSource {
     #host: UmbControllerHost;
@@ -85,5 +85,28 @@ export class UaCatalogueServerDataSource {
         }
 
         return { data: (data as Record<string, unknown> | null) ?? null };
+    }
+
+    /**
+     * Resolves the outcomes for a step type using its configured settings. Used for step types
+     * that declare `hasDynamicOutcomes`, whose exits depend on settings.
+     */
+    async resolveOutcomes(
+        alias: string,
+        settings: Record<string, unknown>,
+    ): Promise<{ data?: UaStepOutcome[]; error?: unknown }> {
+        const { data, error } = await tryExecute(
+            this.#host,
+            CatalogueService.postCatalogueStepTypesByAliasOutcomes({
+                path: { alias },
+                body: { settings },
+            }),
+        );
+
+        if (error || !data) {
+            return { error };
+        }
+
+        return { data: data.map(UaCatalogueTypeMapper.toOutcomeModel) };
     }
 }
