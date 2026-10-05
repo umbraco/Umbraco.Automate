@@ -19,7 +19,7 @@ import { test, ConstantHelper } from '../../../lib/index';
 const { actions } = ConstantHelper;
 
 test.describe('Field value kind', () => {
-  test.fixme('reports contentKey on Publish Content as String', async ({ umbracoAutomateApi }) => {
+  test('reports contentKey on Publish Content as String', async ({ umbracoAutomateApi }) => {
     // Arrange / Act: read Publish Content from the catalogue.
     const action = await umbracoAutomateApi.catalogue.getActionByAlias('umbracoAutomate.publishContent');
     const field = action.settingsSchema.fields.find((f: any) => f.key === 'contentKey');
