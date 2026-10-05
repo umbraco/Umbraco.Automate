@@ -99,6 +99,18 @@ public class CatalogueOutcomesMappingTests
 
     #endregion
 
+    #region Given an action whose outcome list contains a null item
+
+    [Fact]
+    public void Map_ActionWithNullOutcomeItem_SkipsTheNullAndKeepsTheRest()
+    {
+        var result = MapAction(new NullItemOutcomesAction(ActionDeps));
+
+        result.Outcomes.Select(o => o.Key).ShouldBe(["yes", "no"]);
+    }
+
+    #endregion
+
     #region Given the dynamic options action
 
     [Fact]
@@ -185,6 +197,16 @@ public class CatalogueOutcomesMappingTests
     private class ThrowingOutcomesAction(ActionInfrastructure infrastructure) : ActionBase<object>(infrastructure)
     {
         public override IReadOnlyList<StepOutcome> GetOutcomes() => throw new InvalidOperationException("Broken declaration.");
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+    }
+
+    [Action("test.nulloutcomeitem", "Null Outcome Item Action")]
+    private class NullItemOutcomesAction(ActionInfrastructure infrastructure) : ActionBase<object>(infrastructure)
+    {
+        public override IReadOnlyList<StepOutcome> GetOutcomes()
+            => [new StepOutcome("yes", "Yes"), null!, new StepOutcome("no", "No")];
 
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => throw new NotImplementedException();

@@ -39,6 +39,7 @@ public class CatalogueMapDefinition : IMapDefinition
     /// <inheritdoc />
     public void DefineMaps(IUmbracoMapper mapper)
     {
+        mapper.Define<StepOutcome, StepOutcomeResponseModel>((_, _) => new StepOutcomeResponseModel(), MapToStepOutcome);
         mapper.Define<IAction, ActionItemResponseModel>((_, _) => new ActionItemResponseModel(), MapToActionItem);
         mapper.Define<ITrigger, TriggerItemResponseModel>((_, _) => new TriggerItemResponseModel(), MapToTriggerItem);
         mapper.Define<IControlFlow, ControlFlowItemResponseModel>((_, _) => new ControlFlowItemResponseModel(), MapToControlFlowItem);
@@ -62,7 +63,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
         target.HasDynamicOutputSchema = source.HasDynamicOutputSchema;
-        target.Outcomes = MapOutcomes(source);
+        target.Outcomes = MapOutcomes(source, context);
         target.HasDynamicOutcomes = source.HasDynamicOutcomes;
         target.Type = "action";
     }
@@ -100,40 +101,32 @@ public class CatalogueMapDefinition : IMapDefinition
         target.SettingsSchema = source.GetSettingsSchema();
         target.OutputSchema = OutputSchemaSerializer.Serialize(source.GetOutputSchema());
         target.HasDynamicOutputSchema = source.HasDynamicOutputSchema;
-        target.Outcomes = MapOutcomes(source);
+        target.Outcomes = MapOutcomes(source, context);
         target.HasDynamicOutcomes = source.HasDynamicOutcomes;
         target.Type = "controlFlow";
     }
 
-    // Static outcomes only: dynamic ones depend on a step's settings and are resolved per step.
-    // A third-party step type that throws or returns null must not take the whole catalogue down.
-    private List<StepOutcomeResponseModel> MapOutcomes(IStepType source)
+    // Umbraco.Code.MapAll
+    private static void MapToStepOutcome(StepOutcome source, StepOutcomeResponseModel target, MapperContext context)
     {
-        IReadOnlyList<StepOutcome>? outcomes;
+        target.Key = source.Key;
+        target.Label = source.Label;
+        target.IsDefault = source.IsDefault;
+    }
+
+    // Static outcomes only: dynamic ones depend on a step's settings and are resolved per step.
+    // A third-party step type that throws or returns junk must not take the whole catalogue down.
+    private List<StepOutcomeResponseModel> MapOutcomes(IStepType source, MapperContext context)
+    {
         try
         {
-            outcomes = source.GetOutcomes();
+            return StepOutcomeResponseMapping.MapOutcomes(outcome => context.Map<StepOutcomeResponseModel>(outcome)!, _logger, source.Alias, source.GetOutcomes());
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Step type '{Alias}' threw while listing its outcomes; exposing none.", source.Alias);
             return [];
         }
-
-        if (outcomes is null)
-        {
-            _logger.LogWarning("Step type '{Alias}' returned no outcome list; exposing none.", source.Alias);
-            return [];
-        }
-
-        return outcomes
-            .Select(outcome => new StepOutcomeResponseModel
-            {
-                Key = outcome.Key,
-                Label = outcome.Label,
-                IsDefault = outcome.IsDefault,
-            })
-            .ToList();
     }
 
     // Umbraco.Code.MapAll
