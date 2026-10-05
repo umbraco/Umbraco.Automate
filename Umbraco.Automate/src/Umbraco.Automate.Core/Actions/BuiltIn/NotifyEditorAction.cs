@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Realtime;
 using Umbraco.Cms.Core.Services;
@@ -15,6 +16,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     Icon = "icon-megaphone")]
 public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, NotifyEditorOutput>
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when no content item exists for the configured key.
     /// </summary>
@@ -41,6 +48,14 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
         _editorNotifier = editorNotifier;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_sent") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Extensions;
@@ -23,6 +24,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySettings, GetContentPropertyOutput>
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when the item is not present in the published cache.
     /// </summary>
@@ -64,6 +71,15 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+            new StepOutcome(OutcomePropertyNotFound, "#uaOutcomes_propertyNotFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<GetContentPropertySettings>();
@@ -83,9 +99,23 @@ public sealed class GetContentPropertyAction : ActionBase<GetContentPropertySett
                 StepRunErrorCategory.Validation);
         }
 
-        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        // A key the CMS reports as not existing (e.g. deleted) is not a permission problem, so it
+        // routes to the notFound outcome like an unpublished item does.
+        var authorization = await _authorizer.AuthorizeContentAsync(contentKey, RequiredPermissions, cancellationToken);
+        if (authorization.IsNotFound)
         {
-            return failure;
+            context.LogWarning($"Content {contentKey} was not found");
+
+            return SuccessWithOutcome(OutcomeNotFound, new GetContentPropertyOutput
+            {
+                ContentKey = contentKey,
+                PropertyAlias = settings.PropertyAlias,
+            });
+        }
+
+        if (!authorization.Authorized)
+        {
+            return authorization.ToFailedActionResult();
         }
 
         using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();
