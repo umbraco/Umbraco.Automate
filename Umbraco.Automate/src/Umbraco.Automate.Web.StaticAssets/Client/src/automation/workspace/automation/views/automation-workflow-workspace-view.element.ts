@@ -2,6 +2,7 @@ import { css, html, customElement, state } from "@umbraco-cms/backoffice/externa
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UMB_MODAL_MANAGER_CONTEXT, UMB_CONFIRM_MODAL } from "@umbraco-cms/backoffice/modal";
+import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import type { UaAutomationDetailModel } from "../../../types.js";
@@ -56,6 +57,12 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     #syncGeneration = 0;
     /** Catalogue as of the last canvas rebuild, so edits can look up an action's static outcomes. */
     #catalogueLookup = new Map<string, CatalogueLookupEntry>();
+    /**
+     * Last good outcomes per dynamic step, used only as the fallback when a re-resolve fails.
+     * Request de-duplication is the repository's job (it caches successes per alias + settings).
+     */
+    #lastGoodOutcomes = new Map<string, UaStepOutcome[]>();
+    #notificationContext?: typeof UMB_NOTIFICATION_CONTEXT.TYPE;
     /** Unreachable step ids as last rendered, to tell when a canvas edit changes them. */
     #lastUnreachableKey = "";
 
@@ -80,6 +87,10 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         super();
         this.#catalogueRepository = new UaCatalogueRepository(this);
 
+        this.consumeContext(UMB_NOTIFICATION_CONTEXT, (context) => {
+            this.#notificationContext = context;
+        });
+
         this.consumeContext(UA_AUTOMATION_WORKSPACE_CONTEXT, (context) => {
             if (!context) return;
             this.#workspaceContext = context;
@@ -103,16 +114,19 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         document.removeEventListener("ua:edge-filter-open", this.#boundEdgeFilterOpen as unknown as EventListener);
     }
 
-    async #syncFromModel(model: UaAutomationDetailModel) {
+    async #syncFromModel(requested: UaAutomationDetailModel) {
         const generation = ++this.#syncGeneration;
-        const canvasState = this.#parseCanvasState(model.canvasState);
         const catalogue = await this.#buildCatalogueLookup();
-        const resolvedOutcomes = await this.#resolveDynamicOutcomes(model.steps, catalogue);
         if (generation !== this.#syncGeneration) return;
+
+        // Phase 1: render the latest model immediately, with each dynamic step's last good exits
+        // (unknown if it has none). Node data (settings, name) is then always current, so a canvas
+        // edit made while outcomes load can't write stale values back to the model.
         this.#catalogueLookup = catalogue;
-        const nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogue, resolvedOutcomes);
-        this._nodes = this.#markUnreachableSteps(nodes, model);
-        this._edges = modelToEdges(model.connections, getOutcomeDeclaringNodeIds(nodes));
+        const model = this._model ?? requested;
+        const canvasState = this.#parseCanvasState(model.canvasState);
+        const renderedOutcomes = new Map(this.#lastGoodOutcomes);
+        this.#renderModel(model, canvasState, catalogue, renderedOutcomes);
         // Capture saved viewport before the canvas mounts. React Flow's defaultViewport is only
         // honoured on initial render, so the canvas must not mount until this is set; otherwise
         // it falls back to fitView and the saved position is lost.
@@ -120,32 +134,78 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             this._viewport = canvasState?.viewport;
             this._canvasReady = true;
         }
+
+        // Phase 2: resolve, then patch only the exits of the dynamic nodes (no spinner meanwhile).
+        const resolvedOutcomes = await this.#resolveDynamicOutcomes(model.steps, catalogue, generation);
+        if (!resolvedOutcomes || generation !== this.#syncGeneration) return;
+        const latest = this._model ?? model;
+        // Skip the re-render (a nodes prop reset) when no step's exits differ from phase 1.
+        const outcomesKey = (outcomes: ReadonlyMap<string, readonly UaStepOutcome[]>) =>
+            JSON.stringify(latest.steps.map((s) => outcomes.get(s.id) ?? null));
+        if (outcomesKey(renderedOutcomes) === outcomesKey(resolvedOutcomes)) return;
+        // Rebuild from the latest model, which already holds every canvas edit made during the wait.
+        this.#renderModel(latest, this.#parseCanvasState(latest.canvasState), catalogue, resolvedOutcomes);
+    }
+
+    #renderModel(
+        model: UaAutomationDetailModel,
+        canvasState: CanvasState | null,
+        catalogue: Map<string, CatalogueLookupEntry>,
+        resolvedOutcomes: ReadonlyMap<string, UaStepOutcome[]>,
+    ) {
+        const nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogue, resolvedOutcomes);
+        this._nodes = this.#markUnreachableSteps(nodes, model);
+        this._edges = modelToEdges(model.connections, getOutcomeDeclaringNodeIds(nodes));
     }
 
     /**
-     * Resolves the outcomes of every plain action step whose action has dynamic outcomes, in
-     * parallel (one request per step). A step whose request fails or returns nothing is left out
-     * of the map: modelToNodes then marks it as "unknown" and keeps its lines, instead of treating
-     * the failure as "no outcomes" (which would make every line look stale).
+     * Returns the outcomes of every plain action step whose action has dynamic outcomes, requested
+     * in parallel. The repository caches successes per (alias, settings), so unchanged steps cost
+     * nothing and a settings change re-resolves that step alone.
+     *
+     * If a request fails (error, or neither data nor error), the step falls back to its last good
+     * outcomes and is retried on the next sync. A step that never resolved is left out of the map:
+     * modelToNodes then marks it "unknown" and keeps its lines, instead of treating the failure as
+     * "no outcomes" (which would make every line look stale). Returns undefined when a newer sync
+     * has superseded this one; nothing is written in that case.
      */
     async #resolveDynamicOutcomes(
         steps: StepConfigurationModel[],
         catalogue: Map<string, CatalogueLookupEntry>,
-    ): Promise<Map<string, UaStepOutcome[]>> {
+        generation: number,
+    ): Promise<Map<string, UaStepOutcome[]> | undefined> {
         const dynamicSteps = steps.filter(
             (s) => isActionNodeType(s.actionAlias) && catalogue.get(s.actionAlias)?.hasDynamicOutcomes === true,
         );
         const results = await Promise.all(
             dynamicSteps.map(async (step) => {
                 const { data, error } = await this.#catalogueRepository.resolveOutcomes(step.actionAlias, step.settings);
-                return { stepId: step.id, outcomes: error ? undefined : data };
+                return { step, outcomes: error ? undefined : data, notify: !error && !data };
             }),
         );
-        const resolved = new Map<string, UaStepOutcome[]>();
-        for (const { stepId, outcomes } of results) {
-            if (outcomes) resolved.set(stepId, outcomes);
+        if (generation !== this.#syncGeneration) return undefined;
+
+        const dynamicIds = new Set(dynamicSteps.map((s) => s.id));
+        for (const stepId of this.#lastGoodOutcomes.keys()) {
+            if (!dynamicIds.has(stepId)) this.#lastGoodOutcomes.delete(stepId);
         }
-        return resolved;
+        for (const { step, outcomes, notify } of results) {
+            if (outcomes) this.#lastGoodOutcomes.set(step.id, outcomes);
+            if (notify) this.#notifyOutcomesFailed(step.name || catalogue.get(step.actionAlias)?.name || step.actionAlias);
+        }
+        return new Map(
+            results.flatMap(({ step }) => {
+                const outcomes = this.#lastGoodOutcomes.get(step.id);
+                return outcomes ? [[step.id, outcomes] as const] : [];
+            }),
+        );
+    }
+
+    /** tryExecute already notifies on an error; this covers a response with neither data nor error. */
+    #notifyOutcomesFailed(stepName: string) {
+        this.#notificationContext?.peek("danger", {
+            data: { message: this.localize.term("uaOutcomeExits_resolveFailed", stepName) },
+        });
     }
 
     /**

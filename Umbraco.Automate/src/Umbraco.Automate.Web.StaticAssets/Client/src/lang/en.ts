@@ -85,6 +85,7 @@ export default {
         missingTooltip: "This outcome no longer exists. The automation won't publish until the line is moved or removed.",
         bothPathsWarning: "Both paths run on this result. Move the Any result line to a named exit.",
         propertyFoundTooltip: "The item and the property were both found.",
+        resolveFailed: (stepName: string) => `Couldn't load the exits for "${stepName}". Its lines are kept.`,
     },
     uaPlaceholders: {
         enterName: "Enter a name...",
