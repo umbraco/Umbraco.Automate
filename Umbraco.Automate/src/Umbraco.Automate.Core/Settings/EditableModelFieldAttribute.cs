@@ -78,6 +78,18 @@ public class EditableModelFieldAttribute : Attribute
     public bool SupportsBindings { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether a <c>${ }</c> binding on this field that resolves to
+    /// an empty or whitespace value fails the step, instead of handing the action an empty string.
+    /// Use it on optional fields where empty has a meaning of its own, such as "the root" for a
+    /// parent key.
+    /// </summary>
+    /// <remarks>
+    /// Only applies together with <see cref="SupportsBindings"/>, and only to <c>string</c>
+    /// properties. A field left empty with no binding in it is unaffected.
+    /// </remarks>
+    public bool BindingMustResolve { get; set; }
+
+    /// <summary>
     /// Gets or sets the name of another property on the same settings model that controls
     /// whether this field applies (e.g. <c>nameof(BodyMode)</c>). Used with
     /// <see cref="VisibleWhenValues"/>; when null the field always applies.
