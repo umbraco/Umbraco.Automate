@@ -32,7 +32,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S3 AC1–AC2 and S7 AC3 (catalogue part) specs pass (extend `CatalogueMapDefinitionTests`).
 - [x] **T7** Add `ResolveStepTypeOutcomesController`, `POST step-types/{alias}/outcomes`, with `ResolveOutcomesRequestModel` / `StepOutcomeResponseModel`, using the same 404 and 400 handling as output schema · story: S4, S7 · depends-on: T1, T3 · parallel-group: B
   - Done when: S4 AC2, AC3, AC10, AC11 and S7 AC3 (endpoint part) specs pass.
-- [ ] **T8** Make Get Content declare `success` (default, `#uaOutcomes_found`) and `notFound` (`#uaOutcomes_notFound`), and add English terms to `lang/en.ts` · story: S9, S7 · depends-on: T1 · parallel-group: B
+- [x] **T8** Make Get Content declare `success` (default, `#uaOutcomes_found`) and `notFound` (`#uaOutcomes_notFound`), and add English terms to `lang/en.ts` · story: S9, S7 · depends-on: T1 · parallel-group: B
   - Done when: S9 AC1–AC3 specs pass for Get Content.
 - [ ] **T9** In `ActionStepBody`: resolve outcomes lazily from `_stepConfig.Settings` when the action declares any; validate them with `StepOutcomeValidator` (a failure, or `GetOutcomesAsync` throwing, becomes a step failure with category `Validation`); map "no outcome" to the default, or fail the step when there's no default; set `StepRun.BranchOutcome` for every returned outcome; log a warning for an undeclared outcome · story: S2, S4 · depends-on: T1, T4 · parallel-group: C
   - Confirm while building: `IStepErrorClassifier` treats `Validation` as terminal (SPEC assumption).
