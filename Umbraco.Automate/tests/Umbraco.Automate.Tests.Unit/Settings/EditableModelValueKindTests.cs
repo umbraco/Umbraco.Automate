@@ -8,45 +8,38 @@ namespace Umbraco.Automate.Tests.Unit.Settings;
 
 public class EditableModelValueKindTests
 {
-    private const string Pending = "Pending: bindable-settings T2 adds EditableModelFieldDescriptor.ValueKind";
-
-    // Pending specs must compile before ValueKind exists, so they read it by reflection.
-    // T2 replaces this helper with `field.ValueKind` and compares against the enum.
-    private static string? ValueKindOf(string propertyName)
-    {
-        var field = EditableModelSchemaBuilder.Build(typeof(ValueKindSettings))!.Fields
-            .First(f => f.PropertyName == propertyName);
-        return field.GetType().GetProperty("ValueKind")?.GetValue(field)?.ToString();
-    }
+    private static EditableModelValueKind ValueKindOf(string propertyName)
+        => EditableModelSchemaBuilder.Build(typeof(ValueKindSettings))!.Fields
+            .First(f => f.PropertyName == propertyName).ValueKind;
 
     public class GivenAStringProperty
     {
-        [Fact(Skip = Pending)]
-        public void StringIsString() => ValueKindOf(nameof(ValueKindSettings.Text)).ShouldBe("String");
+        [Fact]
+        public void StringIsString() => ValueKindOf(nameof(ValueKindSettings.Text)).ShouldBe(EditableModelValueKind.String);
     }
 
     public class GivenAnotherSingleValueProperty
     {
-        [Fact(Skip = Pending)]
-        public void NullableGuidIsScalar() => ValueKindOf(nameof(ValueKindSettings.Key)).ShouldBe("Scalar");
+        [Fact]
+        public void NullableGuidIsScalar() => ValueKindOf(nameof(ValueKindSettings.Key)).ShouldBe(EditableModelValueKind.Scalar);
 
-        [Fact(Skip = Pending)]
-        public void EnumIsScalar() => ValueKindOf(nameof(ValueKindSettings.Mode)).ShouldBe("Scalar");
+        [Fact]
+        public void EnumIsScalar() => ValueKindOf(nameof(ValueKindSettings.Mode)).ShouldBe(EditableModelValueKind.Scalar);
 
-        [Fact(Skip = Pending)]
-        public void ObjectIsScalar() => ValueKindOf(nameof(ValueKindSettings.Conditions)).ShouldBe("Scalar");
+        [Fact]
+        public void ObjectIsScalar() => ValueKindOf(nameof(ValueKindSettings.Conditions)).ShouldBe(EditableModelValueKind.Scalar);
     }
 
     public class GivenACollectionProperty
     {
-        [Fact(Skip = Pending)]
-        public void ListOfStringsIsCollection() => ValueKindOf(nameof(ValueKindSettings.Tags)).ShouldBe("Collection");
+        [Fact]
+        public void ListOfStringsIsCollection() => ValueKindOf(nameof(ValueKindSettings.Tags)).ShouldBe(EditableModelValueKind.Collection);
 
-        [Fact(Skip = Pending)]
-        public void ArrayIsCollection() => ValueKindOf(nameof(ValueKindSettings.Names)).ShouldBe("Collection");
+        [Fact]
+        public void ArrayIsCollection() => ValueKindOf(nameof(ValueKindSettings.Names)).ShouldBe(EditableModelValueKind.Collection);
 
-        [Fact(Skip = Pending)]
-        public void ListOfRowsIsCollection() => ValueKindOf(nameof(ValueKindSettings.Rows)).ShouldBe("Collection");
+        [Fact]
+        public void ListOfRowsIsCollection() => ValueKindOf(nameof(ValueKindSettings.Rows)).ShouldBe(EditableModelValueKind.Collection);
     }
 
     private enum ValueKindMode
