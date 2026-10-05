@@ -196,6 +196,11 @@ export default {
         dataTruncated: "This value is too large to show in full, so it has been truncated.",
         dataLoadFailed: "This data could not be loaded.",
         details: "Details",
+        exitTaken: "Exit taken",
+        exitTrue: "True",
+        exitFalse: "False",
+        exitApproved: "Approved",
+        exitRejected: "Rejected",
     },
     uaNotifications: {
         headline: "Notification Channels",

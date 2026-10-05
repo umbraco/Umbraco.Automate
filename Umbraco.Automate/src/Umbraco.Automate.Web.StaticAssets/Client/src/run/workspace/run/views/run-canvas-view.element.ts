@@ -5,9 +5,14 @@ import type { Node, Edge } from "@xyflow/react";
 import { UA_RUN_WORKSPACE_CONTEXT } from "../run-workspace.context-token.js";
 import type { UaRunDetailModel } from "../../../types.js";
 import type { UaAutomationDetailModel } from "../../../../automation/types.js";
-import { modelToNodes, modelToEdges } from "../../../../automation/workspace/automation/canvas/utils/model-to-flow.js";
+import {
+    modelToNodes,
+    modelToEdges,
+    getOutcomeDeclaringNodeIds,
+} from "../../../../automation/workspace/automation/canvas/utils/model-to-flow.js";
 import type { CanvasState, CatalogueLookupEntry } from "../../../../automation/workspace/automation/canvas/types.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
+import { applyBranchStyling, resolveDynamicStepOutcomes } from "../../../utils/run-outcomes.js";
 import "../../../../automation/workspace/automation/canvas/ua-automation-canvas.element.js";
 
 const TRIGGER_NODE_ID = "__trigger__";
@@ -51,8 +56,22 @@ export class UaRunCanvasViewElement extends UmbLitElement {
 
         const canvasState = this.#parseCanvasState(this.#automation.canvasState);
         const catalogue = await this.#buildCatalogueLookup();
-        const nodes = modelToNodes(this.#automation.trigger, this.#automation.steps, canvasState, catalogue);
-        const edges = modelToEdges(this.#automation.connections);
+        const resolvedOutcomes = await resolveDynamicStepOutcomes(
+            this.#catalogueRepository,
+            this.#automation.steps,
+            catalogue,
+        );
+        const nodes = modelToNodes(
+            this.#automation.trigger,
+            this.#automation.steps,
+            canvasState,
+            catalogue,
+            resolvedOutcomes,
+        );
+        const edges = applyBranchStyling(
+            modelToEdges(this.#automation.connections, getOutcomeDeclaringNodeIds(nodes)),
+            this._run.stepRuns,
+        );
 
         // Apply step run status as CSS classes via node data
         this._nodes = nodes.map((node) => {
@@ -98,7 +117,12 @@ export class UaRunCanvasViewElement extends UmbLitElement {
             lookup.set(t.alias, { name: t.name, icon: t.icon ?? undefined });
         }
         for (const a of actions.data ?? []) {
-            lookup.set(a.alias, { name: a.name, icon: a.icon ?? undefined });
+            lookup.set(a.alias, {
+                name: a.name,
+                icon: a.icon ?? undefined,
+                outcomes: a.outcomes ?? [],
+                hasDynamicOutcomes: a.hasDynamicOutcomes ?? false,
+            });
         }
         return lookup;
     }
