@@ -315,68 +315,19 @@ internal sealed class ActionStepBody : StepBodyAsync
     }
 
     /// <summary>
-    /// Works out which exit a successful action result follows. Reads the action's declared
-    /// outcomes the same way the publish check does: a static declaration is read without touching
-    /// settings, a dynamic one is resolved from the step's saved, unbound settings — never the
-    /// binding-resolved settings the action ran with — so run time agrees with what the author
-    /// published. Nothing is read for an action that declares nothing but names no outcome.
+    /// Works out which exit a successful action result follows, from the step's saved, unbound
+    /// settings (never the binding-resolved settings the action ran with) so run time agrees with
+    /// what the author published. The rule itself lives in <see cref="StepOutcomeRouter"/>.
     /// </summary>
-    private async Task<OutcomeRouting> ResolveOutcomeRoutingAsync(string? returnedOutcome, CancellationToken cancellationToken)
+    private async Task<StepOutcomeRouting> ResolveOutcomeRoutingAsync(string? returnedOutcome, CancellationToken cancellationToken)
     {
-        IReadOnlyList<StepOutcome>? declared;
-        try
+        var routing = await StepOutcomeRouter.ResolveAsync(_action, _stepConfig.Settings, returnedOutcome, cancellationToken);
+        if (routing.Exception is not null)
         {
-            declared = _action.HasDynamicOutcomes
-                ? await _action.GetOutcomesAsync(_stepConfig.Settings, cancellationToken)
-                : _action.GetOutcomes();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            _logger.LogError(ex, "Action '{ActionAlias}' could not list its outcomes for step {StepId}", _action.Alias, _stepConfig.Id);
-            return OutcomeRouting.Failure($"Action '{_action.Alias}' could not list its outcomes: {ex.Message}");
+            _logger.LogError(routing.Exception, "Action '{ActionAlias}' could not list its outcomes for step {StepId}", _action.Alias, _stepConfig.Id);
         }
 
-        if (declared is null)
-        {
-            return OutcomeRouting.Failure($"Action '{_action.Alias}' could not list its outcomes: the action returned no list.");
-        }
-
-        // Nothing declared: behave as before, routing on whatever the action returned.
-        if (!_action.HasDynamicOutcomes && declared.Count == 0)
-        {
-            return OutcomeRouting.Route(returnedOutcome);
-        }
-
-        var declarationErrors = StepOutcomeValidator.Validate(declared);
-        if (declarationErrors.Count > 0)
-        {
-            return OutcomeRouting.Failure(
-                $"Action '{_action.Alias}' declares invalid outcomes: {string.Join(" ", declarationErrors)}");
-        }
-
-        if (returnedOutcome is null)
-        {
-            var defaultOutcome = declared.FirstOrDefault(o => o.IsDefault);
-            return defaultOutcome is null
-                ? OutcomeRouting.Failure($"Action '{_action.Alias}' must return one of its declared outcomes.")
-                : OutcomeRouting.Route(defaultOutcome.Key);
-        }
-
-        // An undeclared key still routes (an "Any result" line fires; named exits do not), but is
-        // flagged so the author can see the action and its declaration disagree.
-        return declared.Any(o => string.Equals(o.Key, returnedOutcome, StringComparison.Ordinal))
-            ? OutcomeRouting.Route(returnedOutcome)
-            : OutcomeRouting.Route(
-                returnedOutcome,
-                $"Action returned outcome '{returnedOutcome}', which it does not declare.");
-    }
-
-    private readonly record struct OutcomeRouting(string? Outcome, string? FailureMessage, string? UndeclaredOutcomeWarning)
-    {
-        public static OutcomeRouting Route(string? outcome, string? undeclaredOutcomeWarning = null)
-            => new(outcome, null, undeclaredOutcomeWarning);
-
-        public static OutcomeRouting Failure(string message) => new(null, message, null);
+        return routing;
     }
 
     /// <summary>
