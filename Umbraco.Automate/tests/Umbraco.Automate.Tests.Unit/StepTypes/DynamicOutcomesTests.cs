@@ -5,6 +5,7 @@
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
+using Umbraco.Automate.Extensions;
 
 namespace Umbraco.Automate.Tests.Unit.StepTypes;
 
@@ -46,11 +47,14 @@ public class DynamicOutcomesTests
 
     #region Given the options setting is a binding expression
 
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task GetOutcomesAsync_BoundOptions_ReturnsOnlyOther()
     {
-        // Given options "${ steps.x.output.options }" — Then the keys are [other].
-        await Task.CompletedTask;
+        IStepType action = new OptionsAction(ActionDeps);
+
+        var outcomes = await action.GetOutcomesAsync(new Dictionary<string, object?> { ["options"] = new List<string> { "${ steps.x.output.options }" } });
+
+        outcomes.Select(o => o.Key).ShouldBe(["other"]);
     }
 
     #endregion
@@ -108,6 +112,7 @@ public class DynamicOutcomesTests
             OptionsSettings? settings, CancellationToken cancellationToken)
         {
             var outcomes = (settings?.Options ?? [])
+                .Where(o => !o.ContainsBinding())
                 .Select(o => new StepOutcome(o, o))
                 .Append(new StepOutcome("other", "Other") { IsDefault = true })
                 .ToList();
