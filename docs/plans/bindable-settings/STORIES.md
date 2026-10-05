@@ -45,7 +45,7 @@ Specs: `Umbraco.Automate.Tests.Unit/Settings/EditableModelValueKindTests.cs`,
 - **AC6: List of rows.** Given a `List<HttpRequestKeyValue>` property, when its schema is
   built, then the field's value kind is `Collection`.
 - **AC7: Real endpoint.** Given the Publish Content action, when the catalogue API returns its
-  settings schema, then the `contentKey` field has `valueKind` `"string"`.
+  settings schema, then the `contentKey` field has `valueKind` `"String"`.
 
 ### STORY-2: Pick or bind any single-value picker field (M)
 

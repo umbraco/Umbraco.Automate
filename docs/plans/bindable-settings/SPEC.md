@@ -5,13 +5,13 @@
 No new routes. One additive response field, and one run-time behaviour:
 
 - Every settings field descriptor returned by the existing schema endpoints (action, trigger,
-  control-flow and connection settings) includes `valueKind`: `"string"`, `"scalar"` or
-  `"collection"`.
-  - `string` gives `"string"`.
+  control-flow and connection settings) includes `valueKind`: `"String"`, `"Scalar"` or
+  `"Collection"`.
+  - `string` gives `"String"`.
   - Other single values (numbers, `bool`, `Guid`, `DateTime`, enums, their nullable forms, and
-    objects such as `ConditionSet`) give `"scalar"`.
+    objects such as `ConditionSet`) give `"Scalar"`.
   - Any other `IEnumerable` (`List<string>`, `string[]`, lists of rows, dictionaries) gives
-    `"collection"`.
+    `"Collection"`.
   - Existing fields and their values are unchanged.
 - **Run time:** a field marked `[Field(BindingMustResolve = true)]` whose stored value holds a
   `${ }` binding that resolves to an empty or whitespace string fails the step. The run view shows
@@ -19,8 +19,9 @@ No new routes. One additive response field, and one run-time behaviour:
   The action doesn't run. The same field left really empty (no binding) is passed through as
   today, so it still means "the root".
 
-> ASSUMPTION: The enum is serialised camelCase like the descriptor's other members. Match
-> whatever `JsonOptions` already does for `VisibleWhen`.
+Enum values are PascalCase strings. That's the Management API's existing convention:
+`JsonStringEnumConverter` with no naming policy (`UmbracoBuilderExtensions.ConfigureManagementApiJson`).
+The property name is camelCase (`valueKind`). This was confirmed against the running site in T2.
 
 ## Frontend components
 
@@ -30,12 +31,12 @@ For each field, in order:
 
 1. A `SupportsBindings` field using a text box, text area, code editor or sensitive field takes
    its binding version when bindings are in scope. This is unchanged.
-2. A `SupportsBindings` field with `valueKind: "string"` and any other editor, except those that
+2. A `SupportsBindings` field with `valueKind: "String"` and any other editor, except those that
    bind inside themselves (condition builder, switch-case builder, key/value editor), renders as
    `ua-bindable-editor` wrapping its declared editor. This applies when bindings are in scope, or
    when the stored value is a `${ }` string.
 3. Everything else renders its declared editor, as today. That includes every
-   `valueKind: "scalar"` and `"collection"` field, whatever its editor.
+   `valueKind: "Scalar"` and `"Collection"` field, whatever its editor.
 
 The form decides each field's editor **once, when its values are first loaded**, and doesn't
 change it as the value changes. Switching off, emptying the box or deleting a `}` mid-edit never
