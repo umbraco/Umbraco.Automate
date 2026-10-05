@@ -34,3 +34,5 @@
 - **05-10-2026 (umb-plan, review):** Added T23, a hand-off to Umbraco.AI to raise its Automate minimum version once outcomes ship on both lines.
 - **05-10-2026 (umb-build-loop, T1):** S4 AC7 (bound options give only `other`) moved from T1 to T2, since it needs `ContainsBinding()`. T2 must also make the test action skip bound values.
 - **05-10-2026 (umb-build-loop):** Smoke for tasks with no entry point yet (T1, T2, T4) is the full test suite. Demo-site smoke starts at T11, the first task that exposes an endpoint.
+- **05-10-2026 (umb-build-loop, T2):** `ContainsBinding()` lives in a new public `BindingStringExtensions` class. Making the existing internal `StringExtensions` public would also have exposed `ToCamelCase`.
+- **05-10-2026 (umb-build-loop, T2):** The S4 AC7 spec binds a single list entry, not the whole list. A whole list setting can't be bound (see the consumer contract), so this is the shape that really happens. Recheck in T9 how a bound setting reaches `GetOutcomesAsync`.
