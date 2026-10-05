@@ -7,6 +7,6 @@ Read these in order:
 3. [x] [SPEC.md](./SPEC.md) — Catalogue gains outcomes plus a resolve endpoint, publish blocks stale lines, run records the exit taken, and ActionNode draws one exit per outcome.
 4. [x] [STORIES.md](./STORIES.md) — 10 stories in two epics, revised after Rick's review and during the build: actions branch on their own outcomes (slice 1), and the built-in actions get real exits (slice 2).
 5. [x] [PLAN.md](./PLAN.md) — 27 tasks, T1 to T27 (T23 is a hand-off to Umbraco.AI; T24 to T27 were added during the build). The first parallel group (T1 to T3) is the contract, the binding helper and the output-schema 400 fix.
-6. [x] [BUILD-LOG.md](./BUILD-LOG.md) — All 24 v18 tasks built and reviewed, plus 4 review follow-ups, over 54 commits. The v17 port (T21, T22) and the Umbraco.AI hand-off (T23) are still open.
+6. [x] [BUILD-LOG.md](./BUILD-LOG.md) — All 24 v18 tasks built and reviewed, plus 4 review follow-ups, over 54 commits. The v17 port (T21, T22) is done on `v17/feature/action-outcomes`. The Umbraco.AI hand-off (T23) is still open.
 
 See [DECISION-LOG.md](./DECISION-LOG.md) for why things changed along the way.

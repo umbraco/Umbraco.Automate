@@ -76,9 +76,9 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 
 ## Port to v17
 
-- [ ] **T21** Port slice 1 to `v17/dev` (including T24's migrations, regenerated on the v17 line) via the Backport Workflow (`CONTRIBUTING.md`): a `v17/feature/*` branch from `v17/dev`, then build, unit, integration and acceptance tests on v17 · story: all of Epic A · depends-on: T16, T17 · parallel-group: L
+- [x] **T21** Port slice 1 to `v17/dev` (including T24's migrations, regenerated on the v17 line) via the Backport Workflow (`CONTRIBUTING.md`): a `v17/feature/*` branch from `v17/dev`, then build, unit, integration and acceptance tests on v17 · story: all of Epic A · depends-on: T16, T17 · parallel-group: L
   - Done when: the v17 PR is green and the same acceptance specs pass against a v17 demo site.
-- [ ] **T22** Port slice 2 to `v17/dev` · story: S9 · depends-on: T20, T21 · parallel-group: M
+- [x] **T22** Port slice 2 to `v17/dev` · story: S9 · depends-on: T20, T21 · parallel-group: M
 
 ## Consumers
 
