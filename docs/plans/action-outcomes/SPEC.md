@@ -108,7 +108,7 @@ The step run model returned by the run endpoints (`AutomationRunResponseModel.St
 `branchOutcome: string | null`.
 
 - It's the outcome key the step left through: an action's returned or default outcome, an If's
-  `true`/`false`, a Switch's case name or `default`.
+  `true`/`false`, a Switch's case name or `default`, or a Request Approval's `approved`/`rejected`.
 - `null` for steps that don't branch, steps that failed, and every run recorded before this
   feature (it was never saved).
 - Read back exactly as saved. A run started, then reloaded from the database, returns the same
@@ -196,7 +196,7 @@ and are never deleted silently.
   that branched are styled as taken, since they always fire.
 - Steps with no `branchOutcome` (non-branching, failed, or old runs) leave their lines styled as
   today.
-- This applies to If and Switch steps too.
+- This applies to If, Switch and Request Approval steps too.
 - The step run detail shows "Exit taken: <label>", using the outcome's label from the catalogue
   or resolved outcomes when available, and the raw key otherwise. It's hidden when there's no
   `branchOutcome`.
