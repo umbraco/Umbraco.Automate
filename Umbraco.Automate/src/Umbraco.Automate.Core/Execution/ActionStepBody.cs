@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,6 +14,7 @@ using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -189,6 +191,31 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Execute through the middleware pipeline with the timeout-linked token.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
 
+        // Map what the action returned onto the exit the run follows. Done before the log entries
+        // are captured so a warning about an undeclared outcome lands in the step's run log. A
+        // broken declaration or a missing outcome turns the result into a Validation failure, which
+        // the Failed handling below records and (being a terminal category) never retries.
+        var routedOutcome = result.Outcome;
+        if (result.Status == ActionResultStatus.Success && result.Suspension is null)
+        {
+            var routing = await ResolveOutcomeRoutingAsync(result.Outcome, cancellationToken);
+            if (routing.FailureMessage is not null)
+            {
+                result = ActionResult.Failed(new ValidationException(routing.FailureMessage), StepRunErrorCategory.Validation);
+            }
+            else
+            {
+                routedOutcome = routing.Outcome;
+                if (routing.UndeclaredOutcomeWarning is not null)
+                {
+                    actionContext.LogWarning(routing.UndeclaredOutcomeWarning);
+                    _logger.LogWarning(
+                        "Action '{ActionAlias}' returned outcome '{Outcome}', which it does not declare, for step {StepId}",
+                        _action.Alias, routedOutcome, _stepConfig.Id);
+                }
+            }
+        }
+
         // Capture any log entries the action recorded, regardless of outcome. Reads from
         // the same ActionContext instance the pipeline just executed — ErrorHandlingMiddleware
         // catches exceptions on this same context, so entries recorded before a throw survive
@@ -245,6 +272,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             case ActionResultStatus.Success:
                 stepRun.Status = StepRunStatus.Completed;
+                stepRun.BranchOutcome = routedOutcome;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 _metrics.StepExecuted(_action.Alias);
                 break;
@@ -276,13 +304,79 @@ internal sealed class ActionStepBody : StepBodyAsync
             return DecideFailureOutcome(exception, result.ErrorCategory ?? StepRunErrorCategory.Unknown, context);
         }
 
-        // If the action returned a named outcome, route via WorkflowCore's outcome matching.
-        if (result.Status == ActionResultStatus.Success && result.Outcome is not null)
+        // Route via WorkflowCore's outcome matching: the action's own outcome, or the default
+        // exit it declared when it returned none.
+        if (result.Status == ActionResultStatus.Success && routedOutcome is not null)
         {
-            return ExecutionResult.Outcome(result.Outcome);
+            return ExecutionResult.Outcome(routedOutcome);
         }
 
         return ExecutionResult.Next();
+    }
+
+    /// <summary>
+    /// Works out which exit a successful action result follows. Reads the action's declared
+    /// outcomes the same way the publish check does: a static declaration is read without touching
+    /// settings, a dynamic one is resolved from the step's saved, unbound settings — never the
+    /// binding-resolved settings the action ran with — so run time agrees with what the author
+    /// published. Nothing is read for an action that declares nothing but names no outcome.
+    /// </summary>
+    private async Task<OutcomeRouting> ResolveOutcomeRoutingAsync(string? returnedOutcome, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<StepOutcome>? declared;
+        try
+        {
+            declared = _action.HasDynamicOutcomes
+                ? await _action.GetOutcomesAsync(_stepConfig.Settings, cancellationToken)
+                : _action.GetOutcomes();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "Action '{ActionAlias}' could not list its outcomes for step {StepId}", _action.Alias, _stepConfig.Id);
+            return OutcomeRouting.Failure($"Action '{_action.Alias}' could not list its outcomes: {ex.Message}");
+        }
+
+        if (declared is null)
+        {
+            return OutcomeRouting.Failure($"Action '{_action.Alias}' could not list its outcomes: the action returned no list.");
+        }
+
+        // Nothing declared: behave as before, routing on whatever the action returned.
+        if (!_action.HasDynamicOutcomes && declared.Count == 0)
+        {
+            return OutcomeRouting.Route(returnedOutcome);
+        }
+
+        var declarationErrors = StepOutcomeValidator.Validate(declared);
+        if (declarationErrors.Count > 0)
+        {
+            return OutcomeRouting.Failure(
+                $"Action '{_action.Alias}' declares invalid outcomes: {string.Join(" ", declarationErrors)}");
+        }
+
+        if (returnedOutcome is null)
+        {
+            var defaultOutcome = declared.FirstOrDefault(o => o.IsDefault);
+            return defaultOutcome is null
+                ? OutcomeRouting.Failure($"Action '{_action.Alias}' must return one of its declared outcomes.")
+                : OutcomeRouting.Route(defaultOutcome.Key);
+        }
+
+        // An undeclared key still routes (an "Any result" line fires; named exits do not), but is
+        // flagged so the author can see the action and its declaration disagree.
+        return declared.Any(o => string.Equals(o.Key, returnedOutcome, StringComparison.Ordinal))
+            ? OutcomeRouting.Route(returnedOutcome)
+            : OutcomeRouting.Route(
+                returnedOutcome,
+                $"Action returned outcome '{returnedOutcome}', which it does not declare.");
+    }
+
+    private readonly record struct OutcomeRouting(string? Outcome, string? FailureMessage, string? UndeclaredOutcomeWarning)
+    {
+        public static OutcomeRouting Route(string? outcome, string? undeclaredOutcomeWarning = null)
+            => new(outcome, null, undeclaredOutcomeWarning);
+
+        public static OutcomeRouting Failure(string message) => new(null, message, null);
     }
 
     /// <summary>
