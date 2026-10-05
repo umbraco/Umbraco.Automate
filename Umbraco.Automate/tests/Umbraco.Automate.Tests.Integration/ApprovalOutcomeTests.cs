@@ -198,6 +198,34 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         messages.ShouldBe([expectedMessage]);
     }
 
+    [Theory]
+    [InlineData(ApprovalOutcome.Approved, "approved")]
+    [InlineData(ApprovalOutcome.Rejected, "rejected")]
+    public async Task Decision_IsRecordedAsTheApprovalStepRunsBranchOutcome(
+        ApprovalOutcome outcome, string expectedBranchOutcome)
+    {
+        var approvalStep = ApprovalStep();
+        var nextStep = LogStep("afterApproval", "continued");
+
+        var automation = new AutomationBuilder()
+            .WithAlias($"test-approval-branch-outcome-{outcome}")
+            .WithName($"test-approval-branch-outcome-{outcome}")
+            .WithManualTrigger()
+            .AddStep(approvalStep)
+            .AddStep(nextStep)
+            .WithTriggerConnection(approvalStep.Id)
+            .WithConnection(approvalStep.Id, nextStep.Id)
+            .Build();
+
+        var run = await RunToApprovalAsync(automation, approvalStep);
+        await SubmitDecisionAsync(run.Id, approvalStep.Id, outcome);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        var completed = await _runRepository.GetAsync(run.Id);
+
+        completed!.StepRuns.Single(s => s.StepId == approvalStep.Id).BranchOutcome.ShouldBe(expectedBranchOutcome);
+    }
+
     /// <summary>
     /// The compatibility guard. An automation built before the handles existed has one unlabelled
     /// edge out of its approval step; a named outcome must still traverse it, for both decisions.

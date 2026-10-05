@@ -543,13 +543,16 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             var approved = decision.Outcome == ApprovalOutcome.Approved;
 
+            var outcome = approved
+                ? RequestApprovalAction.ApprovedOutcome
+                : RequestApprovalAction.RejectedOutcome;
+
             stepRun.Status = approved ? StepRunStatus.Completed : StepRunStatus.Rejected;
+            stepRun.BranchOutcome = outcome;
             await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
             _metrics.StepExecuted(_action.Alias);
 
-            return ExecutionResult.Outcome(approved
-                ? RequestApprovalAction.ApprovedOutcome
-                : RequestApprovalAction.RejectedOutcome);
+            return ExecutionResult.Outcome(outcome);
         }
 
         // No decision on the event — the step was resumed by something that is not an approval
