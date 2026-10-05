@@ -101,4 +101,34 @@ public interface IStepType : IDiscoverable
     Task<JsonSchema?> GetOutputSchemaAsync(
         Dictionary<string, object?>? settings,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the fixed named outcomes this step type can finish with, in declaration order.
+    /// The default implementation declares none.
+    /// </summary>
+    /// <returns>The declared outcomes, or an empty list if none are declared.</returns>
+    IReadOnlyList<StepOutcome> GetOutcomes() => [];
+
+    /// <summary>
+    /// Gets whether this step type's outcomes depend on the step's settings. When true, outcomes
+    /// should be resolved via <see cref="GetOutcomesAsync"/> rather than <see cref="GetOutcomes"/>.
+    /// </summary>
+    bool HasDynamicOutcomes => false;
+
+    /// <summary>
+    /// Resolves the outcomes, optionally using the step's saved settings for step types whose
+    /// outcomes are dynamic. For static step types, returns the same result as <see cref="GetOutcomes"/>.
+    /// </summary>
+    /// <remarks>
+    /// Outcomes must be computed from the saved, unbound settings (binding expressions are not
+    /// evaluated at this point). Implementations must be cheap and side-effect free: no network
+    /// or database access.
+    /// </remarks>
+    /// <param name="settings">The step's saved settings dictionary, or null if unconfigured.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The outcomes for the given settings, or an empty list if none.</returns>
+    Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
+        Dictionary<string, object?>? settings,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(GetOutcomes());
 }
