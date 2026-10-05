@@ -291,6 +291,9 @@ export class UaSettingsFormElement extends UmbLitElement {
 
         if (this.#usesBindableEditor(field)) {
             config.push({ alias: BINDABLE_EDITOR_CONFIG_ALIASES.editorUiAlias, value: field.editorUiAlias });
+            // Routing already required bindings in scope or a loaded binding, which is exactly
+            // when the switch is wanted, and it is never withdrawn once the field is wrapped.
+            config.push({ alias: BINDABLE_EDITOR_CONFIG_ALIASES.bindingSwitchAvailable, value: true });
         }
 
         if (this.workspaceId) {

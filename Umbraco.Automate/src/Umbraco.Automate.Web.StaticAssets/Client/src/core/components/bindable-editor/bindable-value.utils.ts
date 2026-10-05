@@ -14,6 +14,17 @@ export function getBindingExpression(value: unknown): string | undefined {
     return isBindingExpression(value) ? value : undefined;
 }
 
+/**
+ * Whether a value is a GUID written out as text: the whole trimmed string, braces optional, any
+ * case. Not normalised, so the caller passes the original string on unchanged.
+ */
+export function isGuidText(value: unknown): value is string {
+    return (
+        typeof value === "string" &&
+        /^\{?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}?$/i.test(value.trim())
+    );
+}
+
 /** Whether a value counts as "nothing entered", for mandatory validation. */
 export function isEmptySettingsValue(value: unknown): boolean {
     if (value === undefined || value === null) return true;

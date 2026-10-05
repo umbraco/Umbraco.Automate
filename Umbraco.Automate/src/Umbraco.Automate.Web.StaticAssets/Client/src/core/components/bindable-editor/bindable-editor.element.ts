@@ -10,11 +10,10 @@ import type {
     UmbPropertyEditorConfigCollection,
     UmbPropertyEditorUiElement,
 } from "@umbraco-cms/backoffice/property-editor";
-import type { BindingSource } from "../../utils/binding-context.utils.js";
 import type { UaBindingInsertable } from "../binding-text-box/binding-editor.types.js";
 import type { UaBindingTextBoxElement } from "../binding-text-box/binding-text-box.element.js";
 import "../binding-text-box/binding-text-box.element.js";
-import { getBindingExpression, isEmptySettingsValue } from "./bindable-value.utils.js";
+import { getBindingExpression, isEmptySettingsValue, isGuidText } from "./bindable-value.utils.js";
 import { BINDABLE_EDITOR_CONFIG_ALIASES, BINDABLE_EDITOR_UI_ALIAS } from "./constants.js";
 
 type UaBindableEditorMode = "editor" | "binding";
@@ -64,9 +63,6 @@ export class UaBindableEditorElement
     @property({ attribute: false })
     dataSourceAlias?: string;
 
-    @state()
-    private _bindingSources: BindingSource[] = [];
-
     /**
      * Mode the author explicitly switched to. Undefined until they touch the switch, at which
      * point it overrides the mode derived from the value, otherwise emptying the expression
@@ -84,11 +80,12 @@ export class UaBindableEditorElement
     private _editorMissing = false;
 
     /**
-     * Latched once bindings are in scope or the value given was a binding. It never flips back:
-     * switching off or emptying the expression must not remove the switch, or the author could
-     * not return to binding mode (the switch is decided once, never by edits).
+     * What each mode last held while this panel was open, so toggling the switch does not lose
+     * work. Only ever held here: the stored value is always what the visible mode shows, and a
+     * new element instance (the panel reopened) starts with neither.
      */
-    #switchAvailable = false;
+    #rememberedExpression?: string;
+    #rememberedPick?: unknown;
 
     #config?: UmbPropertyEditorConfigCollection;
     #editorUiAlias?: string;
@@ -96,7 +93,6 @@ export class UaBindableEditorElement
     public set config(config: UmbPropertyEditorConfigCollection | undefined) {
         if (!config) return;
         this.#config = config;
-        this._bindingSources = config.getValueByAlias<BindingSource[]>("bindingSources") ?? [];
 
         // The wrapped editor reads the same collection, so it sees its own `editorConfig` entries.
         if (this._editorElement) {
@@ -213,10 +209,6 @@ export class UaBindableEditorElement
     protected override willUpdate(changed: PropertyValues) {
         super.willUpdate(changed);
 
-        if (!this.#switchAvailable) {
-            this.#switchAvailable = this._bindingSources.length > 0 || getBindingExpression(this.value) !== undefined;
-        }
-
         if (
             changed.has("value") ||
             changed.has("name") ||
@@ -272,13 +264,37 @@ export class UaBindableEditorElement
         this._chosenMode = mode;
 
         if (mode === "editor") {
-            // A binding can't be shown in the editor, so switching back drops it.
-            if (getBindingExpression(this.value) !== undefined) this.#setValue(undefined);
+            this.#switchToEditor();
             return;
         }
 
-        // A literal string (a picked GUID) is kept: it is still a valid value and gives the
-        // author something to edit. Anything else (a selection array) has no text form.
+        this.#switchToBinding();
+    }
+
+    /**
+     * The expression is remembered. The picker then shows the GUID in the box if it holds one,
+     * else the node last picked, else nothing; any other text is dropped.
+     */
+    #switchToEditor() {
+        const expression = getBindingExpression(this.value);
+        if (expression !== undefined) this.#rememberedExpression = expression;
+
+        if (isGuidText(this.value)) return;
+        this.#setValue(this.#rememberedPick);
+    }
+
+    /**
+     * An expression entered earlier is restored. Otherwise a literal string (a picked GUID) is
+     * kept as editable text; anything else (a selection array) has no text form.
+     */
+    #switchToBinding() {
+        this.#rememberedPick = this.value;
+
+        if (this.#rememberedExpression !== undefined) {
+            this.#setValue(this.#rememberedExpression);
+            return;
+        }
+
         if (typeof this.value !== "string") this.#setValue(undefined);
     }
 
@@ -302,18 +318,20 @@ export class UaBindableEditorElement
             }
         }
 
+        this.#rememberedPick = this.value;
         this._chosenMode = "binding";
         this.#setValue(expression);
     }
 
     /**
      * The switch is pointless with nothing to bind to, so it only shows where bindings are in
-     * scope. A field that started out holding an expression keeps it regardless, and once shown it
-     * stays (see `#switchAvailable`), so the author is never stranded in a mode they can't leave.
+     * scope. A field that started out holding an expression keeps it regardless, and the form
+     * decides that once per field and passes it down, so it holds across edits and a `visibleWhen`
+     * remount and the author is never stranded in a mode they can't leave.
      */
     #canSwitch(): boolean {
         if (this.readonly || this._editorMissing) return false;
-        return this.#switchAvailable;
+        return this.#config?.getValueByAlias<boolean>(BINDABLE_EDITOR_CONFIG_ALIASES.bindingSwitchAvailable) === true;
     }
 
     override render() {
