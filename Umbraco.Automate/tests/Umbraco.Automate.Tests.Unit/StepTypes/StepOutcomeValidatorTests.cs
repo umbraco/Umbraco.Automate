@@ -1,57 +1,90 @@
 // S1 — Declare fixed outcomes on an action: declaration rules (docs/plans/action-outcomes/STORIES.md)
-//
-// Pending: StepOutcomeValidator doesn't exist yet. The builder fills in each body and removes Skip.
+
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Tests.Unit.StepTypes;
 
 public class StepOutcomeValidatorTests
 {
+    private static StepOutcome Outcome(string key, bool isDefault = false) =>
+        new(key, key) { IsDefault = isDefault };
+
     #region Given a valid declaration
 
-    [Fact(Skip = "Pending: T4")]
+    [Fact]
     public void Validate_UniqueKeysAndOneDefault_Passes()
     {
-        // Given [yes, no(default)] — Then validation passes.
+        var errors = StepOutcomeValidator.Validate([Outcome("yes"), Outcome("no", isDefault: true)]);
+
+        errors.ShouldBeEmpty();
     }
 
-    [Fact(Skip = "Pending: T4")]
+    [Fact]
     public void Validate_EmptyDeclaration_Passes()
     {
-        // Given no outcomes — Then validation passes.
+        var errors = StepOutcomeValidator.Validate([]);
+
+        errors.ShouldBeEmpty();
     }
 
-    [Fact(Skip = "Pending: T4")]
+    [Fact]
     public void Validate_NoDefault_Passes()
     {
-        // Given [true, false] with no default — Then validation passes (a default is optional).
+        var errors = StepOutcomeValidator.Validate([Outcome("true"), Outcome("false")]);
+
+        errors.ShouldBeEmpty();
     }
 
     #endregion
 
     #region Sad path: broken declarations
 
-    [Fact(Skip = "Pending: T4")]
+    [Fact]
     public void Validate_DuplicateKey_FailsNamingTheKey()
     {
-        // Given two outcomes keyed "yes" — Then the error names "yes".
+        var errors = StepOutcomeValidator.Validate([Outcome("yes"), Outcome("yes")]);
+
+        errors.ShouldHaveSingleItem().ShouldContain("'yes'");
     }
 
-    [Fact(Skip = "Pending: T4")]
+    [Fact]
     public void Validate_EmptyKey_Fails()
     {
-        // Given an outcome with an empty key — Then validation fails for the empty key.
+        var errors = StepOutcomeValidator.Validate([Outcome("yes"), Outcome("")]);
+
+        errors.ShouldHaveSingleItem().ShouldBe("Outcome #2 has an empty key.");
     }
 
-    [Fact(Skip = "Pending: T4")]
+    [Fact]
+    public void Validate_WhitespaceKey_Fails()
+    {
+        var errors = StepOutcomeValidator.Validate([Outcome(" ")]);
+
+        errors.ShouldHaveSingleItem().ShouldBe("Outcome #1 has an empty key.");
+    }
+
+    [Fact]
+    public void Validate_NullOutcome_Fails()
+    {
+        var errors = StepOutcomeValidator.Validate([Outcome("yes"), null!]);
+
+        errors.ShouldHaveSingleItem().ShouldBe("Outcome #2 is null.");
+    }
+
+    [Fact]
     public void Validate_ReservedPrefix_FailsSayingKeysCannotStartWithDoubleUnderscore()
     {
-        // Given an outcome keyed "__any__" — Then the error says keys can't start with "__".
+        var errors = StepOutcomeValidator.Validate([Outcome("__any__")]);
+
+        errors.ShouldHaveSingleItem().ShouldBe("Outcome keys can't start with '__': '__any__'.");
     }
 
-    [Fact(Skip = "Pending: T4")]
+    [Fact]
     public void Validate_TwoDefaults_FailsSayingAtMostOneDefaultIsAllowed()
     {
-        // Given [yes(default), no(default)] — Then the error says at most one default is allowed.
+        var errors = StepOutcomeValidator.Validate([Outcome("yes", true), Outcome("no", true)]);
+
+        errors.ShouldHaveSingleItem().ShouldBe("At most one outcome can be the default; found 2: 'yes', 'no'.");
     }
 
     #endregion
