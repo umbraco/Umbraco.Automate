@@ -1,5 +1,9 @@
-import type { ActionItemResponseModel, ConnectionTypeItemResponseModel, ControlFlowItemResponseModel, TriggerItemResponseModel } from "../api/types.gen.js";
-import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "./types.js";
+import type { StepOutcomeResponseModel, ActionItemResponseModel, ConnectionTypeItemResponseModel, ControlFlowItemResponseModel, TriggerItemResponseModel } from "../api/types.gen.js";
+import type { UaActionCatalogueItemModel, UaStepOutcome, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "./types.js";
+
+function toOutcome(response: StepOutcomeResponseModel): UaStepOutcome {
+    return { key: response.key, label: response.label, isDefault: response.isDefault };
+}
 
 export const UaCatalogueTypeMapper = {
     toActionModel(response: ActionItemResponseModel): UaActionCatalogueItemModel {
@@ -13,6 +17,8 @@ export const UaCatalogueTypeMapper = {
             connectionTypeAlias: response.connectionTypeAlias ?? null,
             outputSchema: response.outputSchema ?? null,
             hasDynamicOutputSchema: response.hasDynamicOutputSchema,
+            outcomes: response.outcomes.map(toOutcome),
+            hasDynamicOutcomes: response.hasDynamicOutcomes,
         };
     },
 
@@ -26,6 +32,8 @@ export const UaCatalogueTypeMapper = {
             settingsSchema: response.settingsSchema ?? null,
             outputSchema: response.outputSchema ?? null,
             hasDynamicOutputSchema: response.hasDynamicOutputSchema,
+            outcomes: response.outcomes.map(toOutcome),
+            hasDynamicOutcomes: response.hasDynamicOutcomes,
             supportsManualRun: response.supportsManualRun,
         };
     },
@@ -41,6 +49,8 @@ export const UaCatalogueTypeMapper = {
         };
     },
 
+    toOutcomeModel: toOutcome,
+
     toControlFlowModel(response: ControlFlowItemResponseModel): UaControlFlowCatalogueItemModel {
         return {
             alias: response.alias,
@@ -51,6 +61,8 @@ export const UaCatalogueTypeMapper = {
             settingsSchema: response.settingsSchema ?? null,
             outputSchema: response.outputSchema ?? null,
             hasDynamicOutputSchema: response.hasDynamicOutputSchema,
+            outcomes: response.outcomes.map(toOutcome),
+            hasDynamicOutcomes: response.hasDynamicOutcomes,
         };
     },
 };
