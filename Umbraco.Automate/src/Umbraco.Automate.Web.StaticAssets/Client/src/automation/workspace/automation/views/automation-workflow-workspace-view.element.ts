@@ -9,6 +9,9 @@ import {
     modelToNodes,
     modelToEdges,
     getContinuationSourceHandle,
+    getOutcomeDeclaringNodeIds,
+    isActionNodeType,
+    ANY_RESULT_HANDLE,
     computeReachableFromTrigger,
     TRIGGER_NODE_ID,
     BODY_HANDLE,
@@ -26,6 +29,7 @@ import { UA_NODE_PICKER_MODAL } from "../../../../catalogue/modals/node-picker/n
 import { UA_NODE_SETTINGS_MODAL } from "../../../modals/node-settings/node-settings-modal.token.js";
 import { UA_TRIGGER_SETTINGS_MODAL } from "../../../modals/trigger-settings/trigger-settings-modal.token.js";
 import { UA_EDGE_FILTER_MODAL } from "../../../modals/edge-filter/edge-filter-modal.token.js";
+import type { UaStepOutcome } from "../../../../catalogue/types.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import type {
     EditableModelSchemaModel,
@@ -48,6 +52,10 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     #workspaceContext?: typeof UA_AUTOMATION_WORKSPACE_CONTEXT.TYPE;
     #catalogueRepository: UaCatalogueRepository;
     #isCanvasUpdate = false;
+    /** Bumped per sync so a slower, older sync can't overwrite the nodes of a newer one. */
+    #syncGeneration = 0;
+    /** Catalogue as of the last canvas rebuild, so edits can look up an action's static outcomes. */
+    #catalogueLookup = new Map<string, CatalogueLookupEntry>();
     /** Unreachable step ids as last rendered, to tell when a canvas edit changes them. */
     #lastUnreachableKey = "";
 
@@ -96,10 +104,15 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
     }
 
     async #syncFromModel(model: UaAutomationDetailModel) {
+        const generation = ++this.#syncGeneration;
         const canvasState = this.#parseCanvasState(model.canvasState);
         const catalogue = await this.#buildCatalogueLookup();
-        this._nodes = this.#markUnreachableSteps(modelToNodes(model.trigger, model.steps, canvasState, catalogue), model);
-        this._edges = modelToEdges(model.connections);
+        const resolvedOutcomes = await this.#resolveDynamicOutcomes(model.steps, catalogue);
+        if (generation !== this.#syncGeneration) return;
+        this.#catalogueLookup = catalogue;
+        const nodes = modelToNodes(model.trigger, model.steps, canvasState, catalogue, resolvedOutcomes);
+        this._nodes = this.#markUnreachableSteps(nodes, model);
+        this._edges = modelToEdges(model.connections, getOutcomeDeclaringNodeIds(nodes));
         // Capture saved viewport before the canvas mounts. React Flow's defaultViewport is only
         // honoured on initial render, so the canvas must not mount until this is set; otherwise
         // it falls back to fitView and the saved position is lost.
@@ -107,6 +120,32 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             this._viewport = canvasState?.viewport;
             this._canvasReady = true;
         }
+    }
+
+    /**
+     * Resolves the outcomes of every plain action step whose action has dynamic outcomes, in
+     * parallel (one request per step). A step whose request fails or returns nothing is left out
+     * of the map: modelToNodes then marks it as "unknown" and keeps its lines, instead of treating
+     * the failure as "no outcomes" (which would make every line look stale).
+     */
+    async #resolveDynamicOutcomes(
+        steps: StepConfigurationModel[],
+        catalogue: Map<string, CatalogueLookupEntry>,
+    ): Promise<Map<string, UaStepOutcome[]>> {
+        const dynamicSteps = steps.filter(
+            (s) => isActionNodeType(s.actionAlias) && catalogue.get(s.actionAlias)?.hasDynamicOutcomes === true,
+        );
+        const results = await Promise.all(
+            dynamicSteps.map(async (step) => {
+                const { data, error } = await this.#catalogueRepository.resolveOutcomes(step.actionAlias, step.settings);
+                return { stepId: step.id, outcomes: error ? undefined : data };
+            }),
+        );
+        const resolved = new Map<string, UaStepOutcome[]>();
+        for (const { stepId, outcomes } of results) {
+            if (outcomes) resolved.set(stepId, outcomes);
+        }
+        return resolved;
     }
 
     /**
@@ -150,6 +189,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 name: a.name,
                 icon: a.icon ?? undefined,
                 hasSettings: (a.settingsSchema?.fields?.length ?? 0) > 0 || !!a.connectionTypeAlias,
+                outcomes: a.outcomes ?? [],
+                hasDynamicOutcomes: a.hasDynamicOutcomes ?? false,
             });
         }
         for (const cf of controlFlows.data ?? []) {
@@ -369,6 +410,17 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             const { item } = await modal.onSubmit();
             if (!item || !this._model) return;
 
+            // Resolve a dynamic action's outcomes before reading any model state, so the awaited
+            // request can't leave the steps/connections built below stale (e.g. a node dragged
+            // meanwhile). A new step has no settings yet, hence {}.
+            const catalogueEntry = this.#catalogueLookup.get(item.alias);
+            let newStepOutcomes = catalogueEntry?.outcomes;
+            if (catalogueEntry?.hasDynamicOutcomes) {
+                const resolved = await this.#catalogueRepository.resolveOutcomes(item.alias, {});
+                newStepOutcomes = resolved.error ? undefined : (resolved.data ?? undefined);
+            }
+            if (!this._model) return;
+
             // Snapshot state before inserting so we can roll back the whole add (step plus any
             // auto-connected/spliced edges) if the settings modal is closed without saving.
             const previousSteps = this._model.steps;
@@ -378,7 +430,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
             // existing target rather than replacing that connection. Replacing it used to orphan
             // the old target: an unreachable step that silently never runs.
             const connectedInsert = this.#resolveConnectedHandleInsert(event.detail.connectFrom);
-            const insertBetween = event.detail.insertBetween ?? connectedInsert?.insertBetween;
+            const insertBetween = this.#normaliseInsertBetween(event.detail.insertBetween) ?? connectedInsert?.insertBetween;
 
             const newStepId = crypto.randomUUID();
             const newStep = {
@@ -409,7 +461,16 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 // The downstream half leaves the new step through the handle that continues the
                 // original flow. A null handle only suits plain actions: on a container it would be
                 // read as a body edge, and If/Switch/Approval have no unnamed output at all.
-                const continuationHandle = getContinuationSourceHandle(newStep.actionAlias, newStep.settings);
+                //
+                // A dynamic action's static list is empty, so resolve it first. If that fails, or
+                // the step genuinely has no exits yet (e.g. nothing configured), the handle is
+                // null and the downstream line stays unnamed, shown as "Any result". That keeps the
+                // line rather than dropping it; the user moves it once the step has exits.
+                const continuationHandle = getContinuationSourceHandle(
+                    newStep.actionAlias,
+                    newStep.settings,
+                    newStepOutcomes,
+                );
                 const updatedConnections = this._model.connections.flatMap((conn) => {
                     const matchesSource = conn.sourceStepId === normalisedSource
                         && (conn.sourceHandle ?? null) === (sourceHandle ?? null);
@@ -435,7 +496,11 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 });
             } else if (event.detail.connectFrom) {
                 // Auto-connect a free output (or a further Parallel branch) to the new step.
-                const { sourceStepId, sourceHandle } = event.detail.connectFrom;
+                const { sourceStepId } = event.detail.connectFrom;
+                // "__any__" is display-only and must never be saved as a handle or outcome.
+                const sourceHandle = event.detail.connectFrom.sourceHandle === ANY_RESULT_HANDLE
+                    ? null
+                    : event.detail.connectFrom.sourceHandle;
                 const normalisedSourceId = sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : sourceStepId;
                 const newConnection = {
                     sourceStepId: normalisedSourceId,
@@ -465,6 +530,14 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         } catch {
             // Modal was dismissed
         }
+    }
+
+    /** "Any result" is a display-only handle; the saved unnamed connection has a null handle. */
+    #normaliseInsertBetween(
+        insertBetween: AddNodeRequestDetail["insertBetween"],
+    ): AddNodeRequestDetail["insertBetween"] {
+        if (insertBetween?.sourceHandle !== ANY_RESULT_HANDLE) return insertBetween;
+        return { ...insertBetween, sourceHandle: null };
     }
 
     async #onAddTrigger() {
@@ -574,7 +647,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         | { insertBetween: NonNullable<AddNodeRequestDetail["insertBetween"]>; targetPosition: { x: number; y: number } }
         | undefined {
         if (!connectFrom || !this._model) return undefined;
-        const sourceHandle = connectFrom.sourceHandle ?? null;
+        const sourceHandle = connectFrom.sourceHandle === ANY_RESULT_HANDLE ? null : (connectFrom.sourceHandle ?? null);
         if (this.#isParallelBranchHandle(connectFrom.sourceStepId, sourceHandle)) return undefined;
 
         const normalisedSource = connectFrom.sourceStepId === TRIGGER_NODE_ID ? UA_EMPTY_GUID : connectFrom.sourceStepId;
@@ -633,7 +706,8 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
         if (!modalManager || !this._model) return;
 
-        const { source, sourceHandle, target, targetHandle, filter } = event.detail;
+        const { source, target, targetHandle, filter } = event.detail;
+        const sourceHandle = event.detail.sourceHandle === ANY_RESULT_HANDLE ? null : event.detail.sourceHandle;
 
         const modal = modalManager.open(this, UA_EDGE_FILTER_MODAL, {
             data: {
