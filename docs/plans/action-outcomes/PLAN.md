@@ -41,7 +41,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S1 AC4 spec passes, plus one harness spec for the default mapping.
 - [x] **T24** Persist `StepRun.BranchOutcome`: add `BranchOutcome` to `StepRunEntity`, map it both ways in `StepRunFactory`, configure it in the DbContext like the other short strings, and add the `UmbracoAutomate_AddStepRunBranchOutcome` migration for SQL Server and SQLite (same shape as `UmbracoAutomate_AddStepRunLogEntries`) · story: S10 · depends-on: T9 · parallel-group: D
   - Done when: S10 AC1–AC2 and AC7 pass as integration tests against a real database, and both migrations apply cleanly to an existing database.
-- [ ] **T25** Return `branchOutcome` on step runs from the run API (the step run response model and its mapping) · story: S10 · depends-on: T24 · parallel-group: E
+- [x] **T25** Return `branchOutcome` on step runs from the run API (the step run response model and its mapping) · story: S10 · depends-on: T24 · parallel-group: E
   - Done when: S10 AC3 passes, plus a spec that a step run with no exit returns `null`.
 - [ ] **T11** **wire: outcomes into the Management API.** Regenerate the OpenAPI client (`api/types.gen.ts`, `sdk.gen.ts`) · story: S3, S4, S10 · depends-on: T3, T6, T7, T8, T25 · parallel-group: F
   - Done when: against the running demo site, a real run of an automation with a Get Content step, reloaded through the run API, returns `branchOutcome` for that step; a real `GET` of the actions catalogue returns Get Content with its two outcomes; a real `POST .../step-types/<getContent alias>/outcomes` returns them; a real `POST .../step-types/nope/outcomes` returns 404; and the regenerated client builds.
