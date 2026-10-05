@@ -72,7 +72,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 - [x] **T19** Media actions declare outcomes: `GetMedia`, `GetMediaProperty`, `FindMedia`, `CreateMedia`, `UpdateMediaProperty`, with English terms in `lang/en.ts`. Each one that authorizes an item by key also routes a missing item to its not-found outcome, using T27's authorizer support (media side) · story: S9 · depends-on: T18 · parallel-group: J
   - Runs after T18, not alongside it, because both edit `lang/en.ts`.
   - Done when: S9 AC1–AC3 and AC6 specs pass for each, plus S9 AC7 for Get Media Property.
-- [ ] **T20** **wire: built-in exits in the demo site.** One Playwright spec per group (Get Media and Find Content) proving the not-found exit routes through the real site · story: S9 · depends-on: T19 · parallel-group: K
+- [x] **T20** **wire: built-in exits in the demo site.** One Playwright spec per group (Get Media and Find Content) proving the not-found exit routes through the real site · story: S9 · depends-on: T19 · parallel-group: K
 
 ## Port to v17
 
