@@ -79,6 +79,8 @@ export default {
         propertyNotFound: "Property not found",
         parentNotFound: "Parent not found",
         contentTypeNotFound: "Content type not found",
+        mediaTypeNotFound: "Media type not found",
+        fileDownloadFailed: "File download failed",
         created: "Created",
         updated: "Updated",
         sent: "Sent",

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -21,6 +22,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class GetMediaPropertyAction : ActionBase<GetMediaPropertySettings, GetMediaPropertyOutput>
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when the item is not present in the published media cache.
     /// </summary>
@@ -62,6 +69,15 @@ public sealed class GetMediaPropertyAction : ActionBase<GetMediaPropertySettings
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+            new StepOutcome(OutcomePropertyNotFound, "#uaOutcomes_propertyNotFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<GetMediaPropertySettings>();
@@ -81,9 +97,21 @@ public sealed class GetMediaPropertyAction : ActionBase<GetMediaPropertySettings
                 StepRunErrorCategory.Validation);
         }
 
-        if (await _authorizer.AuthorizeMediaOrFailAsync(mediaKey, cancellationToken) is { } failure)
+        var authorization = await _authorizer.AuthorizeMediaAsync(mediaKey, cancellationToken);
+        if (authorization.IsNotFound)
         {
-            return failure;
+            context.LogWarning($"Media {mediaKey} was not found");
+
+            return SuccessWithOutcome(OutcomeNotFound, new GetMediaPropertyOutput
+            {
+                MediaKey = mediaKey,
+                PropertyAlias = settings.PropertyAlias,
+            });
+        }
+
+        if (!authorization.Authorized)
+        {
+            return authorization.ToFailedActionResult();
         }
 
         using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();

@@ -74,6 +74,33 @@ public class GetMediaActionTests
         => _action.Alias.ShouldBe("umbracoAutomate.getMedia");
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetMediaSettings { MediaKey = key.ToString() }), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetMediaSettings { MediaKey = key.ToString() }), CancellationToken.None);
+
+        result.Outcome.ShouldBe("notFound");
+    }
+
+
+    [Fact]
     public void HasCorrectName()
         => _action.Name.ShouldBe("Get Media");
 

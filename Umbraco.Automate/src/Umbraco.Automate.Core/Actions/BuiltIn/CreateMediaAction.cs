@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
@@ -23,6 +24,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMediaOutput>, ICmsAction
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when the parent media item does not exist.
     /// </summary>
@@ -75,6 +82,16 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_created") { IsDefault = true },
+            new StepOutcome(OutcomeParentNotFound, "#uaOutcomes_parentNotFound"),
+            new StepOutcome(OutcomeMediaTypeNotFound, "#uaOutcomes_mediaTypeNotFound"),
+            new StepOutcome(OutcomeFileDownloadFailed, "#uaOutcomes_fileDownloadFailed"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<CreateMediaSettings>();
@@ -107,13 +124,34 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
 
         // The root is not a node, so it takes its own check: a service account confined to a
         // start node can reach folders inside it but must not write to the root.
-        var failure = atRoot
-            ? await _authorizer.AuthorizeMediaRootOrFailAsync(cancellationToken)
-            : await _authorizer.AuthorizeMediaOrFailAsync(parentKey, cancellationToken);
-
-        if (failure is not null)
+        if (atRoot)
         {
-            return failure;
+            if (await _authorizer.AuthorizeMediaRootOrFailAsync(cancellationToken) is { } rootFailure)
+            {
+                return rootFailure;
+            }
+        }
+        else
+        {
+            // A parent the CMS reports as not existing (deleted, or in the recycle bin) is not a
+            // permission problem, so it routes to the parentNotFound outcome.
+            var authorization = await _authorizer.AuthorizeMediaAsync(parentKey, cancellationToken);
+            if (authorization.IsNotFound)
+            {
+                context.LogWarning($"Parent media {parentKey} was not found, so nothing was created");
+
+                return SuccessWithOutcome(OutcomeParentNotFound, new CreateMediaOutput
+                {
+                    Name = settings.Name,
+                    MediaTypeKey = mediaTypeKey,
+                    ParentKey = parentKey,
+                });
+            }
+
+            if (!authorization.Authorized)
+            {
+                return authorization.ToFailedActionResult();
+            }
         }
 
         var parent = atRoot ? null : _mediaService.GetById(parentKey);
