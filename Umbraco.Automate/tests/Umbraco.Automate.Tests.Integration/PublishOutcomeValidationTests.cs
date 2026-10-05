@@ -89,6 +89,7 @@ public class PublishOutcomeValidationTests
             new NullItemOutcomesAction(actionDeps),
             new DuplicateKeyOutcomesAction(actionDeps),
             new StaticOutcomesAction(new ActionInfrastructure(throwingResolver.Object)),
+            new ThrowingStaticOutcomesAction(actionDeps),
         ]);
         var triggers = new TriggerCollection(() => []);
         var controlFlows = new ControlFlowCollection(() =>
@@ -193,6 +194,17 @@ public class PublishOutcomeValidationTests
             () => _service.PublishAutomationAsync(automation.Id));
 
         ex.Errors.ShouldContain($"Step 'Decide' could not list its outcomes: {ThrowingOutcomesAction.Message}");
+    }
+
+    [Fact]
+    public async Task Publish_StaticGetOutcomesThrows_FailsWithCouldNotListOutcomesError()
+    {
+        var automation = SetupAutomation(StepWithLines("test.throwingStaticOutcomes", [], "a"));
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain($"Step 'Decide' could not list its outcomes: {ThrowingStaticOutcomesAction.Message}");
     }
 
     [Fact]
@@ -334,6 +346,17 @@ public class PublishOutcomeValidationTests
         protected override Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
             OptionsSettings? settings, CancellationToken cancellationToken)
             => throw new InvalidOperationException(Message);
+    }
+
+    [Action("test.throwingStaticOutcomes", "Throwing Static Outcomes")]
+    private sealed class ThrowingStaticOutcomesAction(ActionInfrastructure infrastructure) : ActionBase<OptionsSettings>(infrastructure)
+    {
+        public const string Message = "The static declaration is broken.";
+
+        public override IReadOnlyList<StepOutcome> GetOutcomes() => throw new InvalidOperationException(Message);
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
     }
 
     [Action("test.nullItemOutcomes", "Null Item Outcomes")]

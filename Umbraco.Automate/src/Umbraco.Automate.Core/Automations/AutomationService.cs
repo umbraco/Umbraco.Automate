@@ -298,8 +298,7 @@ internal sealed class AutomationService : IAutomationService
     {
         foreach (var step in automation.Steps)
         {
-            if (_actions.GetByAlias(step.ActionAlias) is not IStepType stepType
-                || !(stepType.HasDynamicOutcomes || stepType.GetOutcomes().Count > 0))
+            if (_actions.GetByAlias(step.ActionAlias) is not IStepType stepType)
             {
                 continue;
             }
@@ -320,6 +319,12 @@ internal sealed class AutomationService : IAutomationService
             if (outcomes is null)
             {
                 errors.Add($"Step '{step.Name}' could not list its outcomes: the action returned no list.");
+                continue;
+            }
+
+            // Nothing declared: the step has no outcome lines to check.
+            if (!stepType.HasDynamicOutcomes && outcomes.Count == 0)
+            {
                 continue;
             }
 
