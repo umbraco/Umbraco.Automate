@@ -49,6 +49,22 @@ public class PublishOutcomeValidationTests
         await Task.CompletedTask;
     }
 
+    [Fact(Skip = "Pending: T5")]
+    public async Task Publish_EmptyDynamicListWithNamedLine_FailsWithStaleOutcomeError()
+    {
+        // Given a dynamic step resolving to no outcomes, with a line from "a" — Then publish fails
+        // with the stale-outcome error for "a".
+        await Task.CompletedTask;
+    }
+
+    [Fact(Skip = "Pending: T5")]
+    public async Task Publish_GetOutcomesAsyncThrows_FailsWithCouldNotListOutcomesError()
+    {
+        // Given a dynamic step whose GetOutcomesAsync throws — Then the error is
+        // "Step '<name>' could not list its outcomes: <message>".
+        await Task.CompletedTask;
+    }
+
     #endregion
 
     #region Lines this rule must not flag

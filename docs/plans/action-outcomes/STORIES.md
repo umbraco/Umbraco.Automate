@@ -46,6 +46,10 @@ so that authors can branch on my action's result without adding an If or Switch.
   Given an `ActionTestHarness` for the yes/no action
   When the test asks for the action's outcomes
   Then it gets `yes`, `no`
+- **AC8: No default is allowed**
+  Given a non-empty declaration with no default (e.g. `true`, `false`)
+  When it is validated by `StepOutcomeValidator`
+  Then validation passes
 
 **Sad path**
 
@@ -61,14 +65,10 @@ so that authors can branch on my action's result without adding an If or Switch.
   Given a declaration with an outcome keyed `__any__`
   When it is validated
   Then validation fails saying keys can't start with `__`
-- **AC8: No default rejected**
-  Given a non-empty declaration with no default
-  When it is validated
-  Then validation fails saying exactly one default is required
 - **AC9: Two defaults rejected**
   Given a declaration with two defaults
   When it is validated
-  Then validation fails saying exactly one default is required
+  Then validation fails saying at most one default is allowed
 
 Out of scope: triggers and control flows declaring outcomes.
 
@@ -127,6 +127,14 @@ so that each result leads to the steps I connected to it.
   Given the yes/no step
   When the action fails
   Then neither A nor B runs, and the configured error behaviour applies
+- **AC12: No outcome without a default fails**
+  Given an action declaring `true`, `false` with no default
+  When it returns success with no outcome
+  Then the step fails with `Action '<alias>' must return one of its declared outcomes.`
+- **AC13: Outcome resolution throwing fails the step**
+  Given a dynamic action whose `GetOutcomesAsync` throws
+  When the step runs
+  Then the step fails with a terminal `Validation` error naming the action
 
 ### S3: See and connect one exit per outcome
 
@@ -160,6 +168,22 @@ so that I can connect each result to what should happen next.
   Given a line leaving a yes/no step
   When the author inserts a step onto that line from the yes/no step's continuation
   Then the yes/no step continues through its default (`no`) exit
+- **AC8: Insert-between without a default uses the first exit**
+  Given a step declaring `true`, `false` with no default
+  When the author inserts a step from its continuation
+  Then it continues through the `true` exit
+- **AC9: Declaring nodes use the right edge**
+  Given a yes/no step
+  When the canvas renders
+  Then its exits are on the node's right edge
+- **AC10: One declared outcome still uses the right edge**
+  Given a Pick-One style step with a single option
+  When the canvas renders
+  Then its one exit is on the right edge, not the bottom
+- **AC11: Auto-layout still spaces nodes**
+  Given an automation with Get Content followed by steps on both exits
+  When the canvas auto-positions a newly added step
+  Then the new step doesn't overlap the Get Content node
 - **AC7: Run view hides add buttons**
   Given a completed run of the automation
   When the run canvas renders
@@ -272,6 +296,18 @@ so that I don't publish an automation with a path that can never run.
   Given an unnamed line from a step that declares outcomes
   When the author publishes
   Then no stale-outcome error is raised for it
+- **AC9: Empty dynamic list flags named lines**
+  Given a dynamic step whose outcomes resolve to an empty list, with a named line from `a`
+  When the author publishes
+  Then publish fails with the stale-outcome error for `a`
+- **AC10: Empty dynamic list draws Missing outcome**
+  Given the same step
+  When the canvas renders
+  Then the node shows a "Missing outcome: a" exit on the right edge
+- **AC11: Resolution failure at publish**
+  Given a dynamic step whose `GetOutcomesAsync` throws
+  When the author publishes
+  Then publish fails with `Step '<name>' could not list its outcomes: <message>`
 
 ### S6: Old automations keep working ("Any result")
 
@@ -309,6 +345,14 @@ so that upgrading doesn't change what my automations do.
   Given the "Any result" line
   When the author reconnects it from the default exit and saves
   Then the saved connection has `outcome` equal to the default key
+- **AC8: Both kinds of line warn**
+  Given an "Any result" line, and the author draws a new line from "Found"
+  When the canvas renders
+  Then the node shows a warning that both paths run on that result
+- **AC9: Warning clears**
+  Given that warning is showing
+  When the author removes the "Any result" line
+  Then the warning is gone
 
 ### S7: Outcome labels are translatable
 
@@ -384,6 +428,11 @@ Applies to all 11: `GetContent`, `GetContentProperty`, `FindContent`, `CreateCon
   Given the same automation
   When the content doesn't exist
   Then step B runs and A doesn't
+
+- **AC7: Property actions explain "Found"**
+  Given Get Content Property or Get Media Property on the canvas
+  When the author hovers its "Found" exit
+  Then the tooltip says "The item and the property were both found."
 
 **Sad path**
 

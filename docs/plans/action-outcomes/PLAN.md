@@ -24,33 +24,33 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S4 AC9 and AC13 specs pass.
 - [ ] **T3** Return a 400 `ProblemDetails` "Invalid settings" from `ResolveStepTypeOutputSchemaController` when `ResolveSettings` throws `InvalidOperationException` · story: S8 · depends-on: none · parallel-group: A
   - Done when: S8 AC1–AC2 specs pass (extend `ResolveStepTypeOutputSchemaControllerTests`).
-- [ ] **T4** Add the internal `StepOutcomeValidator` (unique non-empty keys, no `__` prefix, exactly one default when non-empty) · story: S1 · depends-on: T1 · parallel-group: B
-  - Done when: S1 AC5–AC9 specs pass.
-- [ ] **T5** Add `AddDanglingOutcomeErrors` to `AutomationService.ValidateForPublishAsync`, resolving each declaring step's outcomes from its saved settings · story: S5 · depends-on: T1 · parallel-group: B
-  - Done when: S5 AC5–AC8 specs pass (extend `PublishValidationTests`), and S5 AC3 (draft save allowed) passes.
+- [ ] **T4** Add the internal `StepOutcomeValidator` (unique non-empty keys, no `__` prefix, at most one default) · story: S1 · depends-on: T1 · parallel-group: B
+  - Done when: S1 AC5–AC9 and AC8 (no default allowed) specs pass.
+- [ ] **T5** Add `AddDanglingOutcomeErrors` to `AutomationService.ValidateForPublishAsync`, resolving each declaring step's outcomes (`HasDynamicOutcomes || GetOutcomes().Count > 0`) from its saved settings, and reporting a resolution failure as its own error · story: S5 · depends-on: T1 · parallel-group: B
+  - Done when: S5 AC5–AC9 and AC11 specs pass, and S5 AC3 (draft save allowed) passes.
 - [ ] **T6** Add `outcomes` and `hasDynamicOutcomes` to `StepTypeItemResponseModel`, mapped in `CatalogueMapDefinition` (all three map methods) · story: S3, S7 · depends-on: T1 · parallel-group: B
   - Done when: S3 AC1–AC2 and S7 AC3 (catalogue part) specs pass (extend `CatalogueMapDefinitionTests`).
 - [ ] **T7** Add `ResolveStepTypeOutcomesController`, `POST step-types/{alias}/outcomes`, with `ResolveOutcomesRequestModel` / `StepOutcomeResponseModel`, using the same 404 and 400 handling as output schema · story: S4, S7 · depends-on: T1, T3 · parallel-group: B
   - Done when: S4 AC2, AC3, AC10, AC11 and S7 AC3 (endpoint part) specs pass.
 - [ ] **T8** Make Get Content declare `success` (default, `#uaOutcomes_found`) and `notFound` (`#uaOutcomes_notFound`), and add English terms to `lang/en.ts` · story: S9, S7 · depends-on: T1 · parallel-group: B
   - Done when: S9 AC1–AC3 specs pass for Get Content.
-- [ ] **T9** In `ActionStepBody`: resolve outcomes lazily from `_stepConfig.Settings` when the action declares any; validate them with `StepOutcomeValidator` (a failure becomes a step failure with category `Validation`); map "no outcome" to the default; set `StepRun.BranchOutcome` for every returned outcome; log a warning for an undeclared outcome · story: S2, S4 · depends-on: T1, T4 · parallel-group: C
+- [ ] **T9** In `ActionStepBody`: resolve outcomes lazily from `_stepConfig.Settings` when the action declares any; validate them with `StepOutcomeValidator` (a failure, or `GetOutcomesAsync` throwing, becomes a step failure with category `Validation`); map "no outcome" to the default, or fail the step when there's no default; set `StepRun.BranchOutcome` for every returned outcome; log a warning for an undeclared outcome · story: S2, S4 · depends-on: T1, T4 · parallel-group: C
   - Confirm while building: `IStepErrorClassifier` treats `Validation` as terminal (SPEC assumption).
-  - Done when: S2 AC1–AC11 and S4 AC1, AC7, AC8 specs pass, as integration tests modelled on `ApprovalOutcomeTests`.
+  - Done when: S2 AC1–AC13 and S4 AC1, AC7, AC8 specs pass, as integration tests modelled on `ApprovalOutcomeTests`.
 - [ ] **T10** Extend `ActionTestHarness<TAction>` with the resolved outcomes for given settings and the effective branch outcome of an execution · story: S1 · depends-on: T1, T9 · parallel-group: D
   - Done when: S1 AC4 spec passes, plus one harness spec for the default mapping.
 - [ ] **T11** **wire: outcomes into the Management API.** Regenerate the OpenAPI client (`api/types.gen.ts`, `sdk.gen.ts`) · story: S3, S4 · depends-on: T3, T6, T7, T8 · parallel-group: D
   - Done when: against the running demo site, a real `GET` of the actions catalogue returns Get Content with its two outcomes; a real `POST .../step-types/<getContent alias>/outcomes` returns them; a real `POST .../step-types/nope/outcomes` returns 404; and the regenerated client builds.
 - [ ] **T12** Map `outcomes`/`hasDynamicOutcomes` in `catalogue/type-mapper.ts` and add `resolveOutcomes(alias, settings)` to `catalogue.repository.ts` · story: S3, S4 · depends-on: T11 · parallel-group: E
   - Done when: the client builds and the repository call works against the demo site (checked in T16).
-- [ ] **T13** Canvas data: add `outcomes` to `CatalogueLookupEntry`/`ActionNodeData`; fill it in `#buildCatalogueLookup`/`modelToNodes` (resolving dynamic steps on load); return the default key from `getContinuationSourceHandle`; map unnamed lines on declaring steps to `__any__` and back in `flow-to-model.ts` · story: S3, S4, S6 · depends-on: T12 · parallel-group: F
-  - Done when: S3 AC6, S4 AC4 and S6 AC4 pass in T16.
-- [ ] **T14** `ActionNode.tsx`: stacked outcome exits (Switch layout) with "+" buttons, "(default)" mark, "Any result" exit only when an unnamed line exists (no "+"), red "Missing outcome" exits for stale lines, labels through `localize.string()` as text, add buttons hidden in run view · story: S3, S5, S6, S7 · depends-on: T13 · parallel-group: G
-  - Done when: S3 AC3, AC4, AC7, S5 AC1, S6 AC1–AC3 and S7 AC1, AC2, AC4 pass in T16.
+- [ ] **T13** Canvas data: add `outcomes` to `CatalogueLookupEntry`/`ActionNodeData`; fill it in `#buildCatalogueLookup`/`modelToNodes` (resolving dynamic steps on load); return the default key (else the first key) from `getContinuationSourceHandle`; map unnamed lines on declaring steps to `__any__` and back in `flow-to-model.ts` · story: S3, S4, S6 · depends-on: T12 · parallel-group: F
+  - Done when: S3 AC6, AC8, S4 AC4 and S6 AC4 pass in T16.
+- [ ] **T14** `ActionNode.tsx`: exits on the right edge whenever the action declares outcomes (Switch layout, regardless of count) with "+" buttons, a warning while "Any result" and a named line both leave the node, "(default)" mark, "Any result" exit only when an unnamed line exists (no "+"), red "Missing outcome" exits for stale lines (including an empty dynamic list), the Found tooltip on the two property actions, labels through `localize.string()` as text, add buttons hidden in run view · story: S3, S5, S6, S7 · depends-on: T13 · parallel-group: G
+  - Done when: S3 AC3, AC4, AC7, AC9, AC10, S5 AC1, AC10, S6 AC1–AC3, AC8, AC9 and S7 AC1, AC2, AC4 pass in T16.
 - [ ] **T15** Workspace view: after the settings modal submits for a dynamic-outcome step, call `resolveOutcomes` and update that node; on failure keep the old exits and show the standard error notification; never drop lines · story: S4, S5 · depends-on: T13 · parallel-group: G
   - Done when: S4 AC5, AC6, AC12 and S5 AC2 pass in T16.
 - [ ] **T16** **wire: outcome exits into the canvas.** Playwright acceptance specs in `Umbraco.Automate.Tests.AcceptanceTests/tests/DefaultConfig/`, against the running demo site · story: S3, S4, S5, S6, S7, S9 · depends-on: T5, T9, T14, T15 · parallel-group: H
-  - Get Content (real): its exits render; draw `notFound` → step, save, and the saved connection has `outcome: "notFound"` (S3 AC5); publish, then run with missing content and the `notFound` path runs (S9 AC4–AC5 for Get Content); an old unnamed line shows as "Any result" and still fires (S6 AC5–AC7).
+  - Get Content (real): its exits render; draw `notFound` → step, save, and the saved connection has `outcome: "notFound"` (S3 AC5); publish, then run with missing content and the `notFound` path runs (S9 AC4–AC5 for Get Content); an old unnamed line shows as "Any result" and still fires (S6 AC5–AC7); drawing "Found" next to it shows the warning (S6 AC8–AC9); auto-layout doesn't overlap the right-edge exits (S3 AC11).
   - Dynamic behaviour (no built-in has dynamic outcomes): stub the catalogue and `/outcomes` responses with Playwright `page.route`, then check the exits on load, after a settings save, after a resolve failure, and for a stale line (S4 AC4–AC6, AC12; S5 AC1–AC2).
   - Stale publish: publish an automation whose line uses an outcome Get Content doesn't declare, and the UI shows the publish error from S5 AC5.
 - [ ] **T17** Document outcomes for action developers: add **Outcome** to `docs/vocabulary.md`, and an outcomes section (static, dynamic, default, keys vs labels, the unbound-settings rule, `ContainsBinding()`) next to the output-schema guidance in `docs/engineering-spec.md` · story: S1, S4 · depends-on: T1, T2, T9 · parallel-group: H
@@ -59,10 +59,10 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 ## Slice 2: built-in actions
 
 - [ ] **T18** Content actions declare outcomes: `GetContentProperty`, `FindContent`, `CreateContent`, `UpdateContentProperty`, `NotifyEditor`, with English terms in `lang/en.ts` · story: S9 · depends-on: T8, T16 · parallel-group: I
-  - Done when: S9 AC1–AC3 and AC6 specs pass for each.
+  - Done when: S9 AC1–AC3 and AC6 specs pass for each, plus S9 AC7 for Get Content Property.
 - [ ] **T19** Media actions declare outcomes: `GetMedia`, `GetMediaProperty`, `FindMedia`, `CreateMedia`, `UpdateMediaProperty`, with English terms in `lang/en.ts` · story: S9 · depends-on: T18 · parallel-group: J
   - Runs after T18, not alongside it, because both edit `lang/en.ts`.
-  - Done when: S9 AC1–AC3 and AC6 specs pass for each.
+  - Done when: S9 AC1–AC3 and AC6 specs pass for each, plus S9 AC7 for Get Media Property.
 - [ ] **T20** **wire: built-in exits in the demo site.** One Playwright spec per group (Get Media and Find Content) proving the not-found exit routes through the real site · story: S9 · depends-on: T19 · parallel-group: K
 
 ## Port to v17
@@ -70,3 +70,8 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 - [ ] **T21** Port slice 1 to `v17/dev` via the Backport Workflow (`CONTRIBUTING.md`): a `v17/feature/*` branch from `v17/dev`, then build, unit, integration and acceptance tests on v17 · story: all of Epic A · depends-on: T16, T17 · parallel-group: L
   - Done when: the v17 PR is green and the same acceptance specs pass against a v17 demo site.
 - [ ] **T22** Port slice 2 to `v17/dev` · story: S9 · depends-on: T20, T21 · parallel-group: M
+
+## Consumers
+
+- [ ] **T23** Tell Umbraco.AI the minimum Automate version once slice 1 is released on each line: open an issue (or PR) on Umbraco.AI to raise `Umbraco.Automate.Core` in `Directory.Packages.props` from `[18.0.0, …)` to the release that ships outcomes, and the matching v17 floor. Include the consumer contract from ARCHITECTURE (Yes/No and Pick-One with no default, Score keyed by level name plus a duplicate-level check in Core, Ask Questions declaring none) · story: none (external dependency) · depends-on: T21 · parallel-group: N
+  - Done when: the Umbraco.AI issue/PR exists and links this plan. The version bump itself happens in Umbraco.AI.

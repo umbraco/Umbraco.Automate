@@ -17,7 +17,13 @@ public class StepOutcomeValidatorTests
     [Fact(Skip = "Pending: T4")]
     public void Validate_EmptyDeclaration_Passes()
     {
-        // Given no outcomes — Then validation passes (no default required).
+        // Given no outcomes — Then validation passes.
+    }
+
+    [Fact(Skip = "Pending: T4")]
+    public void Validate_NoDefault_Passes()
+    {
+        // Given [true, false] with no default — Then validation passes (a default is optional).
     }
 
     #endregion
@@ -43,15 +49,9 @@ public class StepOutcomeValidatorTests
     }
 
     [Fact(Skip = "Pending: T4")]
-    public void Validate_NoDefault_FailsSayingExactlyOneDefaultIsRequired()
+    public void Validate_TwoDefaults_FailsSayingAtMostOneDefaultIsAllowed()
     {
-        // Given [yes, no] with no default — Then the error says exactly one default is required.
-    }
-
-    [Fact(Skip = "Pending: T4")]
-    public void Validate_TwoDefaults_FailsSayingExactlyOneDefaultIsRequired()
-    {
-        // Given [yes(default), no(default)] — Then the error says exactly one default is required.
+        // Given [yes(default), no(default)] — Then the error says at most one default is allowed.
     }
 
     #endregion

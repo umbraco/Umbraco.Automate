@@ -70,8 +70,12 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
 **Rules a declaration must follow** (checked by one shared validator, see Key decisions):
 
 - `Key` is non-empty and unique within the step. It is what's stored on
-  `StepConnection.Outcome` and `SourceHandle`, so it must be **stable**. Never derive it from a
-  label the author can rename.
+  `StepConnection.Outcome` and `SourceHandle`, so it should be **stable**. Built-in and
+  developer-defined keys must never come from a label. An action *may* use author-typed text as
+  the key (Pick-One option keys, Ask Score level names). Renaming that text then breaks its
+  line, and that's accepted: the line shows as **Missing outcome** on the canvas and publish is
+  blocked (decisions 6 and 13), so it's never silent. A hidden stable id is the action's own
+  choice to add.
 - `Label` is display text only. It follows the settings-field convention
   (`EditableModelSchemaBuilder`): a label starting with `#` is a localization key, and anything
   else is shown as-is. Built-in actions use keys (`#uaOutcomes_<key>`). Labels taken from
@@ -85,9 +89,16 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
   shows up as raw `${ … }` text in a string property. `BindingTokenizer` is internal, so a
   small public helper, `string.ContainsBinding()` in `Umbraco.Automate.Extensions`, lets
   action authors skip those values.
-- If any outcomes are declared, **exactly one** is `IsDefault`.
+- **At most one** outcome is `IsDefault`. A default is only needed when the action can
+  succeed *without* naming an outcome (the built-ins' "Found"). An action that always names one,
+  like the AI decision actions, declares no default, so it gets no exit that can never fire.
 - `GetOutcomesAsync` must be cheap and side-effect free. It reads settings only: no network,
   no database. It runs on canvas load, on settings save, at publish, and at run time.
+
+**"Declares outcomes"** means `HasDynamicOutcomes || GetOutcomes().Count > 0`, everywhere this
+document and SPEC use the phrase. A dynamic action that resolves to an *empty* list for some
+settings still declares outcomes: its named lines are checked at publish and drawn as Missing
+outcome, and it keeps the outcome layout (decision 14).
 
 ## Data model & persistence
 
@@ -127,15 +138,20 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
 2. **A declared default outcome replaces "no outcome".** When an action that declares outcomes
    returns success with no outcome, `ActionStepBody` emits the default outcome's key. This is
    what gives the media/content actions a real "Found" exit that does *not* also fire on
-   "Not found". *Rejected:* a reserved magic key like `"default"`. Switch already uses that
-   string for its own fallback, and actions should name their own default ("found", "other").
+   "Not found". If the action declares outcomes but **no default**, returning no outcome is an
+   action bug: the step fails with a terminal `Validation` error saying the action must name
+   one of its outcomes. *Rejected:* a reserved magic key like `"default"`. Switch already uses
+   that string for its own fallback, and actions should name their own default. *Rejected:* a
+   required default (the first draft). Actions that always name an outcome would get an exit
+   that can never fire.
 
 3. **Outcomes are resolved in `ActionStepBody`, lazily, not in `WorkflowCompiler`.**
    `Compile` is synchronous and also runs during recovery (`WorkflowDefinitionRecovery`).
    Resolving dynamic outcomes there would mean sync-over-async on every compile. The body is
    already async and only needs the list when the action declares outcomes. It resolves once
    per step execution and only when needed: to map "no outcome" to the default, and to warn on
-   an undeclared one.
+   an undeclared one. If `GetOutcomesAsync` throws at run time, the step fails with a terminal
+   `Validation` error, the same as a broken declaration. There's no sensible exit to guess.
 
 4. **Old unnamed lines keep working, shown as "Any result"** (decided with the user). An
    automation saved before an action declared outcomes has an unnamed line from it. Unnamed
@@ -143,7 +159,9 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
    result. Nothing saved changes what it does, on v17 or v18. On the canvas, an extra
    **Any result** exit appears on that node *only while such a line exists*. Users can move the
    line to a named exit when they choose to. New unnamed lines can't be drawn from a node that
-   declares outcomes. *Rejected:* moving old lines to the default exit on save. That quietly
+   declares outcomes. While an "Any result" line **and** at least one named line both leave the
+   same node, both fire on that outcome and the run splits into two paths. The node shows a
+   warning for as long as that's true (decision 15). *Rejected:* moving old lines to the default exit on save. That quietly
    changes behaviour, since "not found" would stop continuing, inside a major and on an LTS line.
 
 5. **An undeclared outcome is routed, not failed.** If an action returns a key it didn't
@@ -158,7 +176,7 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
    draft stays allowed, matching how dangling step references are handled today.
 
 7. **One shared declaration validator.** A small internal `StepOutcomeValidator` checks the
-   rules in "The contract" (unique non-empty keys, exactly one default). It's used by
+   rules in "The contract" (unique non-empty keys, no `__` prefix, at most one default). It's used by
    `ActionStepBody` before mapping (an invalid declaration fails the step with a clear,
    terminal error rather than guessing), by publish validation, and by the test harness.
    *Rejected:* validating at registration. Dynamic outcomes depend on settings, so they can
@@ -175,7 +193,7 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
 
 9. **The canvas extends `ActionNode` rather than adding a node type.** `getNodeType` still
    returns `"action"`. `ActionNode` renders a single unnamed exit when the action declares no
-   outcomes, and a stacked list of exits (Switch's layout) when it does. Follow-up path: If,
+   outcomes, and a stacked list of exits (Switch's layout) when it does (see decision 14). Follow-up path: If,
    Switch and Approval become actions or control flows that declare outcomes and render through
    the same component. Then their hard-coded node types and the duplicated
    "must stay in step with…" constants can go. *Rejected:* a new `OutcomeNode` type. That would
@@ -197,38 +215,72 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
 
 12. **No reserved handle id collides with action keys.** The "Any result" exit uses a
     client-only handle id (`__any__`) that maps to `sourceHandle: null, outcome: null` on save.
-    Action keys must not start with `__`, which the shared validator enforces.
+    Action keys must not start with `__`, which the shared validator enforces. The whole `__`
+   namespace is reserved for exits the system adds, not ones actions declare. That includes the
+   error exits planned in `docs/plans/internal/custom-error-paths.md` (see "Fit with error paths").
+
+13. **"Missing outcome" covers renames and empty lists alike.** Any named line whose key isn't in
+    the step's current resolved list is drawn on a red Missing outcome exit and blocks publish.
+    That's the same whether the option was renamed, deleted, or the dynamic list came back empty.
+
+14. **Layout follows "declares outcomes", not the exit count.** An action that declares no
+    outcomes keeps its single exit at the bottom, unchanged. An action that declares outcomes
+    always stacks its exits on the right edge, like Switch, even with only one. *Rejected:*
+    choosing the layout by exit count. A settings-driven node's count changes as you edit it,
+    and "Any result" / "Missing outcome" exits come and go, so the node would jump between
+    layouts and drag its lines around. The 11 built-ins all declare two or more outcomes, so
+    their exits move from the bottom to the right in existing automations. That's accepted, and
+    the Playwright story checks auto-layout spacing still works.
+
+15. **Warn when "Any result" and a named exit both have lines.** It's legal and sometimes
+    intended, so it isn't blocked. But on an upgraded automation it's easy to do by accident
+    (draw "Found" without moving the old line), so the node shows a warning while both exist.
+    *Rejected:* blocking publish. That would break automations that rely on both paths running.
+
+### Fit with error paths
+
+`docs/plans/internal/custom-error-paths.md` adds a *failure* path per step. This feature only
+adds *success* outcomes, and the two stay separate:
+
+- Outcomes route only on success. A failed step never takes an outcome exit (SPEC, run-time
+  behaviour), so the two can't both fire for one result.
+- Error exits, when built, should use a reserved `__`-prefixed handle id (for example `__error`)
+  on the same node, rendered after the outcome exits. Actions can never declare `__` keys, so
+  there's no collision.
+- Error exits are drawn regardless of whether the action declares outcomes, so they must not
+  change the layout rule in decision 14. That's for the error-paths design to confirm.
 
 ### Consumer contract (for Umbraco.AI.Automate, not built here)
 
-Declaring outcomes is the action's choice. The rule of thumb: **declare outcomes only when one
-run produces exactly one answer.** A run leaves through a single outcome
-(`ExecutionResult.Outcome` carries one value), so exits only make sense for answers that
-exclude each other.
+Checked against Umbraco.AI's `v18/feature/decision-capability` branch (`d80c0d14`). Declaring
+outcomes is the action's choice. The rule of thumb: **declare outcomes only when one run
+produces exactly one answer.** A run leaves through a single outcome (`ExecutionResult.Outcome`
+carries one value), so exits only make sense for answers that exclude each other.
 
-**Single-question decision actions declare outcomes.**
+| Action | Outcomes | Default | Notes |
+| --- | --- | --- | --- |
+| **Ask Yes/No** | `true`, `false` (static) | none | The threshold always resolves to true or false |
+| **Ask Pick-One** | one per option: `StepOutcome(option.Key, option.Key)` (dynamic) | none | Options are `AskChoiceDecisionOption { Key, Value }`. `Value` is an optional description for the AI and can be long, so it isn't the label. `DecisionAnswerChecker` already rejects a choice that isn't one of the keys |
+| **Ask Score** | one per level: `StepOutcome(levelName, levelName)` (dynamic) | none | The answer is a position in `Levels`. The action maps it to the level name. Keyed by name, not position: renaming shows as Missing outcome, while position keys would silently re-route lines when levels are added or reordered. Needs a duplicate-level-name check in Umbraco.AI Core, or Automate's duplicate-key rule will fail the step |
+| **Ask Questions** | none | none | Asks several questions and returns one answer per question, so there's no single answer to branch on. Keeps one normal exit and writes every answer to its output |
 
-> ASSUMPTION: A list-choice decision stores options as `{ id, label }` in settings. It sets
-> `HasDynamicOutcomes = true` and declares one `StepOutcome(id, label)` per typed option, plus
-> `StepOutcome("other", "#uaiOutcomes_other") { IsDefault = true }`. When the options setting is
-> a binding (for example a list produced by an earlier step), it declares only `other`: the
-> resolved options are still sent to the model and its choice is written to the step output,
-> but the run takes the `other` exit. Authors who need a path per bound option add a Switch
-> after the step. A yes/no decision declares `true`/`false` statically, with `false` as the
-> default. In every case the model's raw answer stays in the step output for later steps to
-> bind to. The outcome only picks the exit.
+**Branching on a multi-question action.** Use control flow after the step. The canvas allows
+one line per exit, so either chain Switch (or If) steps, one per question, each reading that
+question's answer from the output, or follow the step with a Parallel container whose paths
+each start with an If or Switch on their own question's answer.
 
-**Multi-question decision actions declare no outcomes.** An action that asks several questions,
-possibly with different answer types, has no single answer to branch on. Giving each
-question-and-answer pair its own exit would need several outcomes per run, and one exit per
-combination of answers grows too fast (three yes/no questions already need 8). So it keeps the
-one normal exit and writes every answer to its output. Authors branch with control flow:
+**Bindings.** The options list (and the levels list) as a whole can't be bound to a previous
+step. But `SettingsBindingResolver` does resolve string values inside list items, so a single
+option key or level name *can* hold a `${ … }` binding. Such an entry contributes no exit
+(`ContainsBinding()`). In every case the model's raw answer stays in the step output for later
+steps to bind to. The outcome only picks the exit.
 
-- The canvas allows one line per exit, so several paths can't leave the single exit directly.
-- Either chain Switch (or If) steps, one per question, each reading that question's answer
-  from the step output;
-- or follow the step with a Parallel container whose paths each start with an If or Switch on
-  their own question's answer.
+**Renames.** Pick-One keys and Score level names are typed by the author, so renaming one breaks
+its line. That's accepted (see "Rules a declaration must follow"). A hidden stable id in the
+Umbraco.AI property editor is optional.
 
-This keeps each action's meaning plain: if it has exits, they mean "the answer was X". If it
-doesn't, read the output.
+**Version floor.** Umbraco.AI.Automate currently allows Automate `[18.0.0, 18.999.999)`. Once it
+overrides the outcome members, its minimum must be the Automate release that ships outcomes, on
+both the v17 and v18 lines. Its overrides don't exist on an older Automate's `StepTypeBase`,
+so loading it there would fail with a type-load error rather than quietly degrade. Tracked as
+PLAN T23.

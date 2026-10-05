@@ -132,6 +132,22 @@ public class ActionOutcomeRoutingTests
     }
 
     [Fact(Skip = "Pending: T9")]
+    public async Task Run_NoOutcomeAndNoDefault_FailsTheStep()
+    {
+        // Given an action declaring [true, false] with no default — When it returns success with
+        // no outcome — Then the step fails with "Action '<alias>' must return one of its declared outcomes."
+        await Task.CompletedTask;
+    }
+
+    [Fact(Skip = "Pending: T9")]
+    public async Task Run_GetOutcomesAsyncThrows_FailsTheStepWithValidationCategory()
+    {
+        // Given a dynamic action whose GetOutcomesAsync throws — Then the step run fails with
+        // error category Validation.
+        await Task.CompletedTask;
+    }
+
+    [Fact(Skip = "Pending: T9")]
     public async Task Run_ActionFails_RunsNeitherExit()
     {
         // When the action fails — Then neither A nor B has a step run.
