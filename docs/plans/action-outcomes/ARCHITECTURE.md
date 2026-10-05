@@ -201,11 +201,34 @@ The explicit `IStepType.GetOutcomesAsync` resolves typed settings and delegates,
 
 ### Consumer contract (for Umbraco.AI.Automate, not built here)
 
-> ASSUMPTION: The AI decision action stores options as `{ id, label }` in settings. It sets
-> `HasDynamicOutcomes = true` and returns one `StepOutcome(id, label)` per typed option plus
-> `StepOutcome("other", "#uaiOutcomes_other") { IsDefault = true }`. When the options setting
-> is a binding (for example a list produced by an earlier step), it declares only `other`. The
-> model's choice is still sent to the model and written to the step output, and the run takes
-> the `other` exit. Authors who need a path per bound option add a Switch after the step. A yes/no decision declares `true`/`false`
-> statically, with `false` as the default. The model's raw answer stays in the step output for
-> later steps to bind to. The outcome only picks the exit.
+Declaring outcomes is the action's choice. The rule of thumb: **declare outcomes only when one
+run produces exactly one answer.** A run leaves through a single outcome
+(`ExecutionResult.Outcome` carries one value), so exits only make sense for answers that
+exclude each other.
+
+**Single-question decision actions declare outcomes.**
+
+> ASSUMPTION: A list-choice decision stores options as `{ id, label }` in settings. It sets
+> `HasDynamicOutcomes = true` and declares one `StepOutcome(id, label)` per typed option, plus
+> `StepOutcome("other", "#uaiOutcomes_other") { IsDefault = true }`. When the options setting is
+> a binding (for example a list produced by an earlier step), it declares only `other`: the
+> resolved options are still sent to the model and its choice is written to the step output,
+> but the run takes the `other` exit. Authors who need a path per bound option add a Switch
+> after the step. A yes/no decision declares `true`/`false` statically, with `false` as the
+> default. In every case the model's raw answer stays in the step output for later steps to
+> bind to. The outcome only picks the exit.
+
+**Multi-question decision actions declare no outcomes.** An action that asks several questions,
+possibly with different answer types, has no single answer to branch on. Giving each
+question-and-answer pair its own exit would need several outcomes per run, and one exit per
+combination of answers grows too fast (three yes/no questions already need 8). So it keeps the
+one normal exit and writes every answer to its output. Authors branch with control flow:
+
+- The canvas allows one line per exit, so several paths can't leave the single exit directly.
+- Either chain Switch (or If) steps, one per question, each reading that question's answer
+  from the step output;
+- or follow the step with a Parallel container whose paths each start with an If or Switch on
+  their own question's answer.
+
+This keeps each action's meaning plain: if it has exits, they mean "the answer was X". If it
+doesn't, read the output.

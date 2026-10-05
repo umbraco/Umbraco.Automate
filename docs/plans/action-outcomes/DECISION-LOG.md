@@ -21,3 +21,4 @@
 - **02-10-2026 (umb-plan):** Dynamic canvas behaviour is proven with Playwright route stubbing. No built-in action has dynamic outcomes, and adding one only for tests would ship test code.
 - **02-10-2026 (umb-plan):** T19 runs after T18 because both edit `lang/en.ts`.
 - **02-10-2026 (umb-plan):** Added a public `string.ContainsBinding()` helper (ARCHITECTURE updated). `BindingTokenizer` is internal, and action authors need it to follow the unbound-settings rule.
+- **05-10-2026 (umb-design, with user):** Single-question decision actions declare outcomes. Multi-question ones declare none and are branched with Switch/If or a Parallel container. A run leaves through one outcome, so exits only fit answers that exclude each other.
