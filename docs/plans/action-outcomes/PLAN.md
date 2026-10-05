@@ -62,7 +62,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Dynamic behaviour (no built-in has dynamic outcomes): stub the catalogue and `/outcomes` responses with Playwright `page.route`, then check the exits on load, after a settings save, after a resolve failure, and for a stale line (S4 AC4–AC6, AC12; S5 AC1–AC2).
   - Stale publish: publish an automation whose line uses an outcome Get Content doesn't declare, and the UI shows the publish error from S5 AC5.
   - Run view: run the Get Content automation, open the run, and the `notFound` line is styled as taken and the `success` line as not taken; the step detail shows "Exit taken: Not found" (S10 AC4–AC6).
-- [ ] **T17** Document outcomes for action developers: add **Outcome** to `docs/vocabulary.md`, and an outcomes section (static, dynamic, default, keys vs labels, the unbound-settings rule, `ContainsBinding()`) next to the output-schema guidance in `docs/engineering-spec.md` · story: S1, S4 · depends-on: T1, T2, T9 · parallel-group: H
+- [x] **T17** Document outcomes for action developers: add **Outcome** to `docs/vocabulary.md`, and an outcomes section (static, dynamic, default, keys vs labels, the unbound-settings rule, `ContainsBinding()`) next to the output-schema guidance in `docs/engineering-spec.md` · story: S1, S4 · depends-on: T1, T2, T9 · parallel-group: H
   - Done when: both docs describe the shipped contract, and an AI decision example matches ARCHITECTURE's consumer contract.
 
 ## Slice 2: built-in actions
