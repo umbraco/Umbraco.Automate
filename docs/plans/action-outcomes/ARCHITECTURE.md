@@ -117,9 +117,7 @@ outcome, and it keeps the outcome layout (decision 14).
   column add, no backfill). Existing runs show no exit taken, which is honest: it was never
   recorded.
 
-  > ASSUMPTION: Length-limited like the other short identifier strings on the entity (match how
-  > `ActionAlias` is configured). Outcome keys are short identifiers, and a key longer than the
-  > limit is truncated rather than failing the step run save.
+  Stored **unbounded** (`nvarchar(max)` / `TEXT`), like `LogEntries` and `Error` on the same table. Keys are author-typed (Switch case names, decision options) with no length limit upstream, so a cap would make the run view silently miss the taken line.
 
 - The v17 port needs its own migrations generated on `v17/dev` (migrations aren't portable
   between lines), with the same name.
