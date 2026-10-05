@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
@@ -94,7 +95,7 @@ public class AllActionsControllerTests
 
     private static IUmbracoMapper BuildMapper()
     {
-        var mapDefinition = new CatalogueMapDefinition();
+        var mapDefinition = new CatalogueMapDefinition(NullLogger<CatalogueMapDefinition>.Instance);
         var definitions = new MapDefinitionCollection(() => [mapDefinition]);
         return new UmbracoMapper(
             definitions,
