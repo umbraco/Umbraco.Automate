@@ -45,6 +45,8 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S10 AC3 passes, plus a spec that a step run with no exit returns `null`.
 - [x] **T11** **wire: outcomes into the Management API.** Regenerate the OpenAPI client (`api/types.gen.ts`, `sdk.gen.ts`) · story: S3, S4, S10 · depends-on: T3, T6, T7, T8, T25 · parallel-group: F
   - Done when: against the running demo site, a real run of an automation with a Get Content step, reloaded through the run API, returns `branchOutcome` for that step; a real `GET` of the actions catalogue returns Get Content with its two outcomes; a real `POST .../step-types/<getContent alias>/outcomes` returns them; a real `POST .../step-types/nope/outcomes` returns 404; and the regenerated client builds.
+- [ ] **T27** Route missing items to the not-found outcome for Get Content: let the action authorizer's result say the CMS reported the item as `NotFound` (distinct from a permission failure), and have `GetContentAction` return `SuccessWithOutcome(OutcomeNotFound)` for it. Permission failures still fail · story: S9 · depends-on: T8 · parallel-group: E
+  - Done when: S9 AC8–AC9 specs pass, and a real run on the demo site with a deleted content key takes the `notFound` line.
 - [ ] **T12** Map `outcomes`/`hasDynamicOutcomes` in `catalogue/type-mapper.ts` and add `resolveOutcomes(alias, settings)` to `catalogue.repository.ts` · story: S3, S4 · depends-on: T11 · parallel-group: E
   - Done when: the client builds and the repository call works against the demo site (checked in T16).
 - [ ] **T13** Canvas data: add `outcomes` to `CatalogueLookupEntry`/`ActionNodeData`; fill it in `#buildCatalogueLookup`/`modelToNodes` (resolving dynamic steps on load); return the default key (else the first key) from `getContinuationSourceHandle`; map unnamed lines on declaring steps to `__any__` and back in `flow-to-model.ts` · story: S3, S4, S6 · depends-on: T12 · parallel-group: F
@@ -55,8 +57,8 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S4 AC5, AC6, AC12 and S5 AC2 pass in T16.
 - [ ] **T26** Run view: style the taken / not-taken lines on the run canvas and show "Exit taken: <label>" in the step run detail, for actions, If and Switch · story: S10 · depends-on: T11, T13 · parallel-group: G
   - Done when: S10 AC4–AC6 and AC8 pass in T16.
-- [ ] **T16** **wire: outcome exits into the canvas.** Playwright acceptance specs in `Umbraco.Automate.Tests.AcceptanceTests/tests/DefaultConfig/`, against the running demo site · story: S3, S4, S5, S6, S7, S9, S10 · depends-on: T5, T9, T14, T15, T26 · parallel-group: H
-  - Get Content (real): its exits render; draw `notFound` → step, save, and the saved connection has `outcome: "notFound"` (S3 AC5); publish, then run with missing content and the `notFound` path runs (S9 AC4–AC5 for Get Content); an old unnamed line shows as "Any result" and still fires (S6 AC5–AC7); drawing "Found" next to it shows the warning (S6 AC8–AC9); auto-layout doesn't overlap the right-edge exits (S3 AC11).
+- [ ] **T16** **wire: outcome exits into the canvas.** Playwright acceptance specs in `Umbraco.Automate.Tests.AcceptanceTests/tests/DefaultConfig/`, against the running demo site · story: S3, S4, S5, S6, S7, S9, S10 · depends-on: T5, T9, T14, T15, T26, T27 · parallel-group: H
+  - Get Content (real): its exits render; draw `notFound` → step, save, and the saved connection has `outcome: "notFound"` (S3 AC5); publish, then run with a deleted content key and the `notFound` path runs (S9 AC4–AC5, AC8 for Get Content); an old unnamed line shows as "Any result" and still fires (S6 AC5–AC7); drawing "Found" next to it shows the warning (S6 AC8–AC9); auto-layout doesn't overlap the right-edge exits (S3 AC11).
   - Dynamic behaviour (no built-in has dynamic outcomes): stub the catalogue and `/outcomes` responses with Playwright `page.route`, then check the exits on load, after a settings save, after a resolve failure, and for a stale line (S4 AC4–AC6, AC12; S5 AC1–AC2).
   - Stale publish: publish an automation whose line uses an outcome Get Content doesn't declare, and the UI shows the publish error from S5 AC5.
   - Run view: run the Get Content automation, open the run, and the `notFound` line is styled as taken and the `success` line as not taken; the step detail shows "Exit taken: Not found" (S10 AC4–AC6).
@@ -65,9 +67,9 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 
 ## Slice 2: built-in actions
 
-- [ ] **T18** Content actions declare outcomes: `GetContentProperty`, `FindContent`, `CreateContent`, `UpdateContentProperty`, `NotifyEditor`, with English terms in `lang/en.ts` · story: S9 · depends-on: T8, T16 · parallel-group: I
+- [ ] **T18** Content actions declare outcomes: `GetContentProperty`, `FindContent`, `CreateContent`, `UpdateContentProperty`, `NotifyEditor`, with English terms in `lang/en.ts`. Each one that authorizes an item by key also routes a missing item to its not-found outcome, using T27's authorizer support · story: S9 · depends-on: T8, T16 · parallel-group: I
   - Done when: S9 AC1–AC3 and AC6 specs pass for each, plus S9 AC7 for Get Content Property.
-- [ ] **T19** Media actions declare outcomes: `GetMedia`, `GetMediaProperty`, `FindMedia`, `CreateMedia`, `UpdateMediaProperty`, with English terms in `lang/en.ts` · story: S9 · depends-on: T18 · parallel-group: J
+- [ ] **T19** Media actions declare outcomes: `GetMedia`, `GetMediaProperty`, `FindMedia`, `CreateMedia`, `UpdateMediaProperty`, with English terms in `lang/en.ts`. Each one that authorizes an item by key also routes a missing item to its not-found outcome, using T27's authorizer support (media side) · story: S9 · depends-on: T18 · parallel-group: J
   - Runs after T18, not alongside it, because both edit `lang/en.ts`.
   - Done when: S9 AC1–AC3 and AC6 specs pass for each, plus S9 AC7 for Get Media Property.
 - [ ] **T20** **wire: built-in exits in the demo site.** One Playwright spec per group (Get Media and Find Content) proving the not-found exit routes through the real site · story: S9 · depends-on: T19 · parallel-group: K

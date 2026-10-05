@@ -200,6 +200,17 @@ outcome, and it keeps the outcome layout (decision 14).
    `UpdateMediaProperty`, `NotifyEditor`. Each adds a default success outcome plus its existing
    `Outcome*` constants. The constants keep their current values, so returned keys don't change.
 
+   **Missing items route too** (decided with the user during the build). Today the action
+   authorizer (`AutomationActionAuthorizer`) turns a content or media key that doesn't exist into
+   a step *failure* ("Content node '…' not found.") before the action's own not-found branch, so
+   `notFound` only fires for items that exist but aren't published. These actions will route a
+   key the CMS reports as `NotFound` to their not-found outcome (`notFound`, or `parentNotFound`
+   for Create) instead of failing. The authorizer's result gains a way to tell "doesn't exist"
+   apart from "not allowed"; permission failures still fail the step. This is a **behaviour
+   change** on both lines: a saved automation whose step currently fails on a deleted item will
+   continue down its not-found or "Any result" line instead. It goes in the changelog. It
+   reveals nothing new: the failure message already said the item wasn't found.
+
    > ASSUMPTION: The default success outcome is keyed `success`, labelled after the action, for
    > example "Found" (Get/Find), "Created" (Create), "Updated" (Update), "Sent" (Notify Editor).
 

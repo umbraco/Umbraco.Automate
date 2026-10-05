@@ -6,7 +6,7 @@ Read these in order:
 2. [x] [ARCHITECTURE.md](./ARCHITECTURE.md) — Outcomes are declared on the step type (static or from settings), the same way output schema is. WorkflowCore routing is reused untouched, and old unnamed lines keep working as "Any result".
 3. [x] [SPEC.md](./SPEC.md) — Catalogue gains outcomes plus a resolve endpoint, publish blocks stale lines, run records the exit taken, and ActionNode draws one exit per outcome.
 4. [x] [STORIES.md](./STORIES.md) — 10 stories in two epics, revised after Rick's review and during the build: actions branch on their own outcomes (slice 1), and the built-in actions get real exits (slice 2).
-5. [x] [PLAN.md](./PLAN.md) — 26 tasks, T1 to T26 (T23 is a hand-off to Umbraco.AI; T24 to T26 were added during the build to save and show the exit each run took). The first parallel group (T1 to T3) is the contract, the binding helper and the output-schema 400 fix.
+5. [x] [PLAN.md](./PLAN.md) — 27 tasks, T1 to T27 (T23 is a hand-off to Umbraco.AI; T24 to T27 were added during the build). The first parallel group (T1 to T3) is the contract, the binding helper and the output-schema 400 fix.
 6. [ ] [BUILD-LOG.md](./BUILD-LOG.md) — <pending>
 
 See [DECISION-LOG.md](./DECISION-LOG.md) for why things changed along the way.
