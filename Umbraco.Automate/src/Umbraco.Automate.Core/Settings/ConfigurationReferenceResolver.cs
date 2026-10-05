@@ -49,10 +49,10 @@ internal sealed class ConfigurationReferenceResolver : IConfigurationReferenceRe
         {
             if (!ConfigurationReferenceScanner.MatchesPrefix(wholeKey, _allowedConfigKeyPrefixes))
             {
-                throw new InvalidOperationException(BuildNotPermittedMessage(wholeKey));
+                throw new SettingsResolutionException(BuildNotPermittedMessage(wholeKey));
             }
 
-            return ConvertToTargetType(LookupConfigValue(wholeKey, isSensitiveField), targetType);
+            return ConvertToTargetType(wholeKey, LookupConfigValue(wholeKey, isSensitiveField), targetType);
         }
 
         // Otherwise scan for references embedded in a larger string and splice in their string
@@ -86,7 +86,7 @@ internal sealed class ConfigurationReferenceResolver : IConfigurationReferenceRe
         // surfaced in clear. See SecretConfigurationKeyPrefixes.
         if (!isSensitiveField && ConfigurationReferenceScanner.MatchesPrefix(configKey, _secretConfigKeyPrefixes))
         {
-            throw new InvalidOperationException(
+            throw new SettingsResolutionException(
                 $"Configuration key '{configKey}' is a secret and may only be referenced from " +
                 $"a sensitive field (one marked [Field(IsSensitive = true)]). Move the value " +
                 $"to a non-secret section (e.g. Umbraco:Automate:Variables) if it is safe to " +
@@ -97,7 +97,7 @@ internal sealed class ConfigurationReferenceResolver : IConfigurationReferenceRe
 
         if (configValue is null)
         {
-            throw new InvalidOperationException(
+            throw new SettingsResolutionException(
                 $"Configuration key '{configKey}' not found. " +
                 $"Ensure the key is set in appsettings.json, environment variables, or other configuration sources before using ${configKey} in settings.");
         }
@@ -112,7 +112,12 @@ internal sealed class ConfigurationReferenceResolver : IConfigurationReferenceRe
         $"An administrator can place the value under an allowed section or extend " +
         $"Umbraco:Automate:AllowedConfigurationKeyPrefixes in app settings.";
 
-    private static object ConvertToTargetType(string value, Type targetType)
+    /// <summary>
+    /// Converts a resolved configuration value to the target type. Failure messages name the
+    /// configuration <paramref name="key"/> only and never the value, because the value may be a
+    /// secret and these messages can reach API clients.
+    /// </summary>
+    private static object ConvertToTargetType(string key, string value, Type targetType)
     {
         var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
 
@@ -123,41 +128,38 @@ internal sealed class ConfigurationReferenceResolver : IConfigurationReferenceRe
 
         if (underlyingType == typeof(bool))
         {
-            if (bool.TryParse(value, out var boolValue))
-            {
-                return boolValue;
-            }
-
-            throw new InvalidOperationException(
-                $"Cannot convert configuration value '{value}' to boolean.");
+            return bool.TryParse(value, out var boolValue) ? boolValue : throw CannotConvert(key, "boolean");
         }
 
         if (underlyingType == typeof(int))
         {
-            if (int.TryParse(value, out var intValue))
-            {
-                return intValue;
-            }
-
-            throw new InvalidOperationException(
-                $"Cannot convert configuration value '{value}' to integer.");
+            return int.TryParse(value, out var intValue) ? intValue : throw CannotConvert(key, "integer");
         }
 
         if (underlyingType == typeof(long))
         {
-            return long.Parse(value);
+            return long.TryParse(value, out var longValue)
+                ? longValue
+                : throw CannotConvert(key, "long integer");
         }
 
         if (underlyingType == typeof(double))
         {
-            return double.Parse(value);
+            return double.TryParse(value, out var doubleValue)
+                ? doubleValue
+                : throw CannotConvert(key, "double");
         }
 
         if (underlyingType == typeof(decimal))
         {
-            return decimal.Parse(value);
+            return decimal.TryParse(value, out var decimalValue)
+                ? decimalValue
+                : throw CannotConvert(key, "decimal");
         }
 
         return value;
     }
+
+    private static SettingsResolutionException CannotConvert(string key, string typeName) =>
+        new($"Cannot convert configuration value for '{key}' to {typeName}.");
 }

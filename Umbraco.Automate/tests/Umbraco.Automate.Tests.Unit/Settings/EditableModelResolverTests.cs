@@ -176,6 +176,17 @@ public class EditableModelResolverTests
         exception.Message.ShouldContain("not found");
     }
 
+    [Fact]
+    public void ResolveModel_WithResolveFailure_ThrowsSettingsResolutionException()
+    {
+        var settings = new FakeSettings { ApiToken = "$Slack:NonExistentKey" };
+        var resolver = CreateResolver();
+
+        var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
+
+        Should.Throw<SettingsResolutionException>(act);
+    }
+
     #endregion
 
     #region ResolveModel<TModel> — Configuration key allow-list
