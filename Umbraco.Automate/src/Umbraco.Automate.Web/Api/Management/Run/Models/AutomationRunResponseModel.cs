@@ -86,6 +86,13 @@ public sealed class StepRunResponseModel
     /// <summary>Duration in milliseconds.</summary>
     public double? DurationMs { get; set; }
 
+    /// <summary>
+    /// The outcome key the step left through: an action's returned or default outcome, an If's
+    /// <c>true</c>/<c>false</c>, or a Switch case or default. <c>null</c> for steps that do not
+    /// branch, failed steps, and runs recorded before this was saved.
+    /// </summary>
+    public string? BranchOutcome { get; set; }
+
     /// <summary>The log entries recorded by the action during execution.</summary>
     public IList<StepRunLogEntryResponseModel> LogEntries { get; set; } = [];
 }
