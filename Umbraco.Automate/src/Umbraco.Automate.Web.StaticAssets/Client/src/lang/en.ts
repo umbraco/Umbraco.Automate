@@ -73,6 +73,10 @@ export default {
         scheduledTriggerSettingsTimingLabel: "Timing",
         scheduledTriggerSettingsTimingDescription: "Choose Flexible to spread the load and run around the scheduled time, or Precise to run right on the tick.",
     },
+    uaOutcomes: {
+        found: "Found",
+        notFound: "Not found",
+    },
     uaPlaceholders: {
         enterName: "Enter a name...",
         enterAlias: "Enter an alias...",

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
@@ -33,6 +34,12 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     /// requested culture" cases, which the published cache reports uniformly.
     /// </summary>
     public const string OutcomeNotFound = "notFound";
+
+    /// <summary>
+    /// Outcome key for a successful read. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a found item leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
 
     private readonly IPublishedContentCache _publishedContentCache;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
@@ -67,6 +74,14 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         _variationContextAccessor = variationContextAccessor;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
