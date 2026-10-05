@@ -39,7 +39,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S2 AC1–AC13 and S4 AC1, AC7, AC8 specs pass, as integration tests modelled on `ApprovalOutcomeTests`.
 - [x] **T10** Extend `ActionTestHarness<TAction>` with the resolved outcomes for given settings and the effective branch outcome of an execution · story: S1 · depends-on: T1, T9 · parallel-group: D
   - Done when: S1 AC4 spec passes, plus one harness spec for the default mapping.
-- [ ] **T24** Persist `StepRun.BranchOutcome`: add `BranchOutcome` to `StepRunEntity`, map it both ways in `StepRunFactory`, configure it in the DbContext like the other short strings, and add the `UmbracoAutomate_AddStepRunBranchOutcome` migration for SQL Server and SQLite (same shape as `UmbracoAutomate_AddStepRunLogEntries`) · story: S10 · depends-on: T9 · parallel-group: D
+- [x] **T24** Persist `StepRun.BranchOutcome`: add `BranchOutcome` to `StepRunEntity`, map it both ways in `StepRunFactory`, configure it in the DbContext like the other short strings, and add the `UmbracoAutomate_AddStepRunBranchOutcome` migration for SQL Server and SQLite (same shape as `UmbracoAutomate_AddStepRunLogEntries`) · story: S10 · depends-on: T9 · parallel-group: D
   - Done when: S10 AC1–AC2 and AC7 pass as integration tests against a real database, and both migrations apply cleanly to an existing database.
 - [ ] **T25** Return `branchOutcome` on step runs from the run API (the step run response model and its mapping) · story: S10 · depends-on: T24 · parallel-group: E
   - Done when: S10 AC3 passes, plus a spec that a step run with no exit returns `null`.
