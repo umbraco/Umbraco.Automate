@@ -1,7 +1,6 @@
 // S9 — Content and media actions offer named exits (docs/plans/action-outcomes/STORIES.md)
 //
-// Get Content is live (T8) and the other content actions are live (T18). The media actions stay pending
-// until T19; move each InlineData row out of the skipped theories as its task lands.
+// Get Content is live (T8), the other content actions are live (T18) and the media actions are live (T19).
 
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
@@ -25,46 +24,6 @@ namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
 public class BuiltInActionOutcomeTests
 {
-    #region Given each built-in action that returns outcomes today
-
-    [Theory(Skip = "Pending: T19")]
-    [InlineData("GetMediaAction")]
-    [InlineData("GetMediaPropertyAction")]
-    [InlineData("FindMediaAction")]
-    [InlineData("CreateMediaAction")]
-    [InlineData("UpdateMediaPropertyAction")]
-    public void GetOutcomes_BuiltInAction_DefaultIsSuccess(string actionType)
-    {
-        // Then the single default outcome's key is "success".
-        _ = actionType;
-    }
-
-    [Theory(Skip = "Pending: T19")]
-    [InlineData("GetMediaAction")]
-    [InlineData("GetMediaPropertyAction")]
-    [InlineData("FindMediaAction")]
-    [InlineData("CreateMediaAction")]
-    [InlineData("UpdateMediaPropertyAction")]
-    public void GetOutcomes_BuiltInAction_KeysAreSuccessThenExistingConstants(string actionType)
-    {
-        // Then the keys equal ["success", ...the action's public Outcome* constant values].
-        _ = actionType;
-    }
-
-    [Theory(Skip = "Pending: T19")]
-    [InlineData("GetMediaAction")]
-    [InlineData("GetMediaPropertyAction")]
-    [InlineData("FindMediaAction")]
-    [InlineData("CreateMediaAction")]
-    [InlineData("UpdateMediaPropertyAction")]
-    public void GetOutcomes_BuiltInAction_AllLabelsAreLocalizationKeys(string actionType)
-    {
-        // Then every label starts with "#uaOutcomes_".
-        _ = actionType;
-    }
-
-    #endregion
-
     #region Given each content action that returns outcomes
 
     // Expected keys are literal on purpose: they are what saved automations store, so a renamed
@@ -76,6 +35,15 @@ public class BuiltInActionOutcomeTests
         { "CreateContentAction", ["success", "parentNotFound", "contentTypeNotFound"] },
         { "UpdateContentPropertyAction", ["success", "notFound", "propertyNotFound"] },
         { "NotifyEditorAction", ["success", "notFound"] },
+    };
+
+    public static TheoryData<string, string[]> MediaActionOutcomeKeys => new()
+    {
+        { "GetMediaAction", ["success", "notFound"] },
+        { "GetMediaPropertyAction", ["success", "notFound", "propertyNotFound"] },
+        { "FindMediaAction", ["success", "notFound"] },
+        { "CreateMediaAction", ["success", "parentNotFound", "mediaTypeNotFound", "fileDownloadFailed"] },
+        { "UpdateMediaPropertyAction", ["success", "notFound", "propertyNotFound"] },
     };
 
     [Theory]
@@ -99,6 +67,33 @@ public class BuiltInActionOutcomeTests
         _ = expectedKeys;
 
         CreateContentAction(actionType).GetOutcomes().ShouldAllBe(o => o.Label.StartsWith("#uaOutcomes_"));
+    }
+
+    #endregion
+
+    #region Given each media action that returns outcomes
+
+    [Theory]
+    [MemberData(nameof(MediaActionOutcomeKeys))]
+    public void GetOutcomes_MediaAction_DefaultIsSuccess(string actionType, string[] expectedKeys)
+    {
+        _ = expectedKeys;
+
+        CreateMediaAction(actionType).GetOutcomes().Single(o => o.IsDefault).Key.ShouldBe("success");
+    }
+
+    [Theory]
+    [MemberData(nameof(MediaActionOutcomeKeys))]
+    public void GetOutcomes_MediaAction_KeysAreSuccessThenExistingConstants(string actionType, string[] expectedKeys)
+        => CreateMediaAction(actionType).GetOutcomes().Select(o => o.Key).ShouldBe(expectedKeys);
+
+    [Theory]
+    [MemberData(nameof(MediaActionOutcomeKeys))]
+    public void GetOutcomes_MediaAction_AllLabelsAreLocalizationKeys(string actionType, string[] expectedKeys)
+    {
+        _ = expectedKeys;
+
+        CreateMediaAction(actionType).GetOutcomes().ShouldAllBe(o => o.Label.StartsWith("#uaOutcomes_"));
     }
 
     #endregion
@@ -198,6 +193,62 @@ public class BuiltInActionOutcomeTests
                 Mock.Of<IAutomationService>(),
                 Mock.Of<IEditorNotifier>(),
                 Mock.Of<ILogger<NotifyEditorAction>>()),
+            _ => throw new ArgumentOutOfRangeException(nameof(actionType), actionType, null),
+        };
+    }
+
+    private static IAction CreateMediaAction(string actionType)
+    {
+        var infrastructure = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
+
+        return actionType switch
+        {
+            "GetMediaAction" => new GetMediaAction(
+                infrastructure,
+                Mock.Of<IPublishedMediaCache>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IPublishedUrlProvider>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IContentValueNormaliser>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<IMediaNavigationQueryService>(),
+                Mock.Of<IVariationContextAccessor>(),
+                Mock.Of<ILogger<GetMediaAction>>()),
+            "GetMediaPropertyAction" => new GetMediaPropertyAction(
+                infrastructure,
+                Mock.Of<IPublishedMediaCache>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IContentValueNormaliser>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<IVariationContextAccessor>(),
+                Mock.Of<ILogger<GetMediaPropertyAction>>()),
+            "FindMediaAction" => new FindMediaAction(
+                infrastructure,
+                Mock.Of<IExamineManager>(),
+                Mock.Of<IMediaTypeService>(),
+                Mock.Of<IPublishedMediaCache>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IPublishedUrlProvider>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<FindMediaAction>>()),
+            "CreateMediaAction" => new CreateMediaAction(
+                infrastructure,
+                Mock.Of<IMediaService>(),
+                Mock.Of<IMediaTypeService>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<IMediaFileDownloader>(),
+                Mock.Of<ILogger<CreateMediaAction>>()),
+            "UpdateMediaPropertyAction" => new UpdateMediaPropertyAction(
+                infrastructure,
+                Mock.Of<IMediaService>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<UpdateMediaPropertyAction>>()),
             _ => throw new ArgumentOutOfRangeException(nameof(actionType), actionType, null),
         };
     }
