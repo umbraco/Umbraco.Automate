@@ -83,6 +83,7 @@ npx playwright test -g "loads the Automate section"
 | `Automations/automation.run.spec.ts` | Publish, Run now, Runs view, Run Script reading upstream `data` (#345), Run now hidden on a draft (#366), step output in the run view (#376) |
 | `Outcomes/outcomes.get-content.spec.ts` | Action outcomes on Get Content: right-edge Found/Not found exits, drawing and saving `notFound`, runs taking the notFound or success path, old unnamed lines as "Any result" and the both-paths warning, the stale-outcome publish error, auto-layout, the run view's taken and not-taken lines and "Exit taken" |
 | `Outcomes/outcomes.dynamic.spec.ts` | Dynamic outcomes with a stubbed catalogue and outcomes endpoint: exits on load, after a settings save, a failed resolve, "Missing outcome" exits, labels rendered as text. |
+| `Outcomes/outcomes.built-in.spec.ts` | The other built-in content and media actions: Get Media and Update Content Property take the notFound path for a missing key, Find Content for an empty search (and success for a match), and Get Media Property and Update Content Property draw their translated exits |
 | `Connections/connection.crud.spec.ts` | Connection create, rename, collection listing, collection Create button (#297) |
 | `Connections/connection.test.spec.ts` | Test connection saves unsaved edits (#347), popup-blocked same-tab OAuth fallback (#348, stubbed) |
 
