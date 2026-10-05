@@ -17,7 +17,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 
 ## Slice 1: contract, runtime, API, canvas
 
-- [ ] **T1** Add `StepOutcome` and the outcome members on `IStepType` (default interface members) and `StepTypeBase` (virtuals, plus the typed `GetOutcomesAsync(TSettings?)` and the explicit-interface bridge that mirrors `GetOutputSchemaAsync`) · story: S1 · depends-on: none · parallel-group: A
+- [x] **T1** Add `StepOutcome` and the outcome members on `IStepType` (default interface members) and `StepTypeBase` (virtuals, plus the typed `GetOutcomesAsync(TSettings?)` and the explicit-interface bridge that mirrors `GetOutputSchemaAsync`) · story: S1 · depends-on: none · parallel-group: A
   - Files: `Core/StepTypes/StepOutcome.cs` (new), `Core/StepTypes/IStepType.cs`, `Core/StepTypes/StepTypeBase.cs`
   - Done when: S1 AC1–AC3 specs pass; an existing action compiles unchanged.
 - [ ] **T2** Add a `ContainsBinding()` string extension in `Umbraco.Automate.Extensions`, backed by `BindingTokenizer.FindBindings` · story: S4 · depends-on: none · parallel-group: A

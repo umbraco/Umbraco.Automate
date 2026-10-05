@@ -32,3 +32,5 @@
 - **05-10-2026 (umb-design, review):** The `__` handle prefix is reserved for system exits, including future error exits from `custom-error-paths.md`. Outcomes route on success only, so the two never fire for the same result.
 - **05-10-2026 (umb-design, with user):** Layout follows "declares outcomes": none means a bottom exit, any means right-edge exits, whatever the count. Choosing by count would make settings-driven nodes jump between layouts. The 11 built-ins move to the right, which is accepted.
 - **05-10-2026 (umb-plan, review):** Added T23, a hand-off to Umbraco.AI to raise its Automate minimum version once outcomes ship on both lines.
+- **05-10-2026 (umb-build-loop, T1):** S4 AC7 (bound options give only `other`) moved from T1 to T2, since it needs `ContainsBinding()`. T2 must also make the test action skip bound values.
+- **05-10-2026 (umb-build-loop):** Smoke for tasks with no entry point yet (T1, T2, T4) is the full test suite. Demo-site smoke starts at T11, the first task that exposes an endpoint.
