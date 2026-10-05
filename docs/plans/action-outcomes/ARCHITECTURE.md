@@ -102,13 +102,27 @@ outcome, and it keeps the outcome layout (decision 14).
 
 ## Data model & persistence
 
-**None.** No entity, no migration, no new column.
+**One new nullable column** on the step run table, for the exit each step took.
 
 - Connections already persist `Outcome` and `SourceHandle` inside the automation definition
-  JSON (`AutomationDefinitionDto.Connections`).
-- `StepRun.BranchOutcome` already exists and is already persisted. It's set today only by
-  If/Switch. This feature also sets it on action step runs.
-- SQL Server and SQLite: unaffected.
+  JSON (`AutomationDefinitionDto.Connections`). No change there.
+- `StepRun.BranchOutcome` exists on the domain model and is set by If/Switch today, but it was
+  **never persisted**: `StepRunEntity` and `StepRunFactory` don't map it, so it's lost on save
+  (found during T9; the original "already persisted" claim was wrong). This feature persists
+  it, which also fixes If/Switch, and sets it on action step runs too.
+- `StepRunEntity` gains `string? BranchOutcome`, mapped both ways in `StepRunFactory`. Nullable,
+  because most steps don't branch and every existing row has none.
+- Migrations: `UmbracoAutomate_AddStepRunBranchOutcome` for **both** SQL Server and SQLite, in
+  the same shape as the existing `UmbracoAutomate_AddStepRunLogEntries` (a single nullable
+  column add, no backfill). Existing runs show no exit taken, which is honest: it was never
+  recorded.
+
+  > ASSUMPTION: Length-limited like the other short identifier strings on the entity (match how
+  > `ActionAlias` is configured). Outcome keys are short identifiers, and a key longer than the
+  > limit is truncated rather than failing the step run save.
+
+- The v17 port needs its own migrations generated on `v17/dev` (migrations aren't portable
+  between lines), with the same name.
 
 ## Connected systems
 
@@ -117,7 +131,7 @@ outcome, and it keeps the outcome layout (decision 14).
 | Version history (`AutomationVersionableEntityAdapter.CompareConnections`) | No change | Connections are already versioned whole. Moving a line to another exit already shows up as a connection change |
 | Import / export (`AutomationExportModel.Connections`) | No change | `StepConnection` is exported as-is. An imported automation with a stale outcome is caught by the publish check below, same as any other step |
 | Publish validation (`AutomationService.ValidateForPublishAsync`) | **Yes** | New `AddDanglingOutcomeErrors`, next to `AddDanglingStepReferenceErrors` |
-| Run tracking (`StepRun.BranchOutcome`) | **Yes** | Recorded for actions too, so run history shows which exit was taken |
+| Run tracking (`StepRun.BranchOutcome`) | **Yes** | Now persisted (new column and migrations), set for actions as well as If/Switch, returned by the run API and shown in the run view |
 | Run log (`ActionContext.LogEntries`) | **Yes** | A warning when an action returns an outcome it didn't declare |
 | WorkflowCore compile (`WorkflowCompiler.WireTransitions`) | **No change** | Already turns `Outcome` into `ValueOutcome`. Unnamed edges keep matching everything (that is how "Any result" keeps working) |
 | OpenAPI client (`api/types.gen.ts`, `sdk.gen.ts`) | **Yes** | Regenerate after the catalogue model and new endpoint |
