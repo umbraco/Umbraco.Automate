@@ -47,7 +47,13 @@ Mirrors `POST /step-types/{alias}/output-schema`.
 
 `POST` publish on an automation fails with the existing `AutomationValidationException` /
 problem-details shape when any connection has a non-null `outcome` that isn't a key in its
-source step's resolved outcomes, **and** that step's action declares outcomes.
+source step's resolved outcomes, **and** that step's action declares outcomes
+(`HasDynamicOutcomes || GetOutcomes().Count > 0`, as defined in ARCHITECTURE).
+
+- A dynamic action that resolves to an **empty** list still declares outcomes, so every named
+  line from it is flagged.
+- If resolving the step's outcomes throws, publish fails with
+  `Step '<step name>' could not list its outcomes: <message>` rather than skipping the check.
 
 - Message: `Step '<step name>' has a connection from outcome '<key>', which the step no longer
   has. Reconnect or remove it.`
@@ -62,17 +68,22 @@ source step's resolved outcomes, **and** that step's action declares outcomes.
 For a step whose action declares outcomes (always resolved from the step's saved, unbound
 settings, so the list matches what the editor showed):
 
-- Success with no outcome → the run follows the default outcome's exit, plus any "Any result"
-  line. `StepRun.branchOutcome` is the default key.
+- Success with no outcome, and a default is declared → the run follows the default outcome's
+  exit, plus any "Any result" line. `StepRun.branchOutcome` is the default key.
+- Success with no outcome, and **no** default is declared → the step fails with a terminal
+  `Validation` error: `Action '<alias>' must return one of its declared outcomes.`
 - Success with a declared outcome `k` → follows the `k` exit plus any "Any result" line.
   `branchOutcome = k`.
 - Success with an undeclared outcome `k` → routes on `k` as today (normally only "Any result"
   lines fire). `branchOutcome = k`. The step's run log has a warning:
   `Action returned outcome '<k>', which it does not declare.`
-- A declaration that breaks the rules (duplicate/empty key, a key starting with `__`, zero or
-  several defaults) → the step fails with an error naming the action and the broken rule,
+- A declaration that breaks the rules (duplicate/empty key, a key starting with `__`, more
+  than one default) → the step fails with an error naming the action and the broken rule,
   categorised `StepRunErrorCategory.Validation` so the classifier treats it as terminal and
   doesn't retry.
+
+- `GetOutcomesAsync` throws → the step fails with a terminal `Validation` error naming the
+  action and the exception message.
 
   > ASSUMPTION: `Validation` is already classed as terminal by `IStepErrorClassifier`. Confirm
   > during build, since this assumes the current classifier rules.
@@ -87,6 +98,9 @@ The 11 built-in actions listed in ARCHITECTURE decision 8 return the same outcom
 return today, plus they now declare them, with `success` as the default. Their labels are
 `#uaOutcomes_<key>` keys, with English terms added to `lang/en.ts`. A saved automation
 using any of them runs exactly as before. See "Any result" below.
+
+Get Content Property's and Get Media Property's `success` exit means both the item **and** the
+property were found. Its tooltip says so: "The item and the property were both found."
 
 ### Test harness
 
@@ -116,9 +130,10 @@ extension type, no new modal.
   > ASSUMPTION: One request per dynamic step, as output schema does today. Batch later only if
   > large automations show it's slow.
 
-- `getContinuationSourceHandle` returns the **default** outcome's key for an action that
-  declares outcomes (so "insert step between" continues down the default exit), and `null`
-  otherwise, as today.
+- `getContinuationSourceHandle`, for an action that declares outcomes, returns the
+  **default** outcome's key, or the **first** outcome's key when there's no default (so
+  "insert step between" continues down that exit). It returns `null` for an action that
+  declares outcomes but currently resolves to none, and `null` otherwise, as today.
 - A saved connection with `sourceHandle: null, outcome: null` from a step that declares
   outcomes is shown on the `__any__` handle. On save it goes back to
   `sourceHandle: null, outcome: null`. Round-tripping a loaded automation without edits
@@ -129,16 +144,21 @@ extension type, no new modal.
 When the node's action declares **no** outcomes, it renders exactly as today: one unnamed
 bottom exit.
 
-When it declares outcomes, it renders:
+When it declares outcomes (even if the current list is empty or has only one entry), it
+renders its exits stacked on the **right** edge, like Switch, never at the bottom. The layout
+depends only on whether the action declares outcomes, never on how many exits it has right now:
 
-- One labelled exit per outcome, in declaration order, stacked like Switch's cases, each with
-  its own "+" add-step button. The default outcome is visibly marked (for example "(default)"
+- One labelled exit per outcome, in declaration order, each with its own "+" add-step button. The default outcome is visibly marked (for example "(default)"
   after its label).
 - An **Any result** exit, after the declared ones, **only if** an unnamed line currently leaves
   this node. It has no "+" button, so new "Any result" lines can't be drawn. Its tooltip says
   this line runs whatever the step returns, and suggests moving it to a named exit.
+- A **warning** on the node while an "Any result" line and at least one named line both leave
+  it. The text says both paths run on that result, and suggests moving the "Any result" line.
+  It disappears as soon as either kind of line is gone.
 - A **Missing outcome** exit, in error styling, for each connected line whose outcome isn't in
-  the current list. It's labelled with the stale key and has a tooltip saying the outcome no
+  the current list, including when a dynamic action resolves to an empty list. It's labelled
+  with the stale key and has a tooltip saying the outcome no
   longer exists and the automation won't publish until the line is moved or removed.
 - Labels render as text, never as HTML, through `localize.string()`. A `#key` label shows the
   translated term (or the key itself if no term exists, as settings fields do), and any other
