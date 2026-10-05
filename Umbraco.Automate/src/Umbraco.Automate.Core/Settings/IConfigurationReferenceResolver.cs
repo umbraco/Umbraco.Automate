@@ -40,7 +40,7 @@ public interface IConfigurationReferenceResolver
     /// The original value when there is nothing to resolve; otherwise the value with references
     /// substituted (and, for a whole-value reference, converted to <paramref name="targetType"/>).
     /// </returns>
-    /// <exception cref="System.InvalidOperationException">
+    /// <exception cref="SettingsResolutionException">
     /// Thrown when a whole-value reference targets a disallowed prefix, when a referenced key is
     /// absent from configuration, or when a secret key is referenced from a non-sensitive field.
     /// </exception>

@@ -79,7 +79,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
+            throw new SettingsResolutionException(
                 BuildResolveFailureMessage(modelId, modelType, ex),
                 ex);
         }
@@ -243,7 +243,7 @@ internal sealed class EditableModelResolver : IEditableModelResolver
         {
             var errorMessage = $"Validation failed for model '{modelId}':\n" +
                                string.Join("\n", validationErrors);
-            throw new InvalidOperationException(errorMessage);
+            throw new SettingsResolutionException(errorMessage);
         }
     }
 }
