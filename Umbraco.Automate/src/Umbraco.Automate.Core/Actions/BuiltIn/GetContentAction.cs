@@ -99,9 +99,19 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         // Node-level authorisation: section access is checked upstream by the middleware,
         // but the service account's start node / granular permissions may scope it to a
         // subset of the Content section. Reject reads outside the account's accessible path.
-        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        // A key the CMS reports as not existing (e.g. deleted) is not a permission problem, so
+        // it routes to the notFound outcome like an unpublished item does.
+        var authorization = await _authorizer.AuthorizeContentAsync(contentKey, RequiredPermissions, cancellationToken);
+        if (authorization.IsNotFound)
         {
-            return failure;
+            context.LogWarning($"Content {contentKey} was not found");
+
+            return SuccessWithOutcome(OutcomeNotFound, new GetContentOutput { ContentKey = contentKey });
+        }
+
+        if (!authorization.Authorized)
+        {
+            return authorization.ToFailedActionResult();
         }
 
         // Required when running from the outbox dispatcher, which has no HTTP request
