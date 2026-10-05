@@ -36,3 +36,6 @@
 - **05-10-2026 (umb-build-loop):** Smoke for tasks with no entry point yet (T1, T2, T4) is the full test suite. Demo-site smoke starts at T11, the first task that exposes an endpoint.
 - **05-10-2026 (umb-build-loop, T2):** `ContainsBinding()` lives in a new public `BindingStringExtensions` class. Making the existing internal `StringExtensions` public would also have exposed `ToCamelCase`.
 - **05-10-2026 (umb-build-loop, T2):** The S4 AC7 spec binds a single list entry, not the whole list. A whole list setting can't be bound (see the consumer contract), so this is the shape that really happens. Recheck in T9 how a bound setting reaches `GetOutcomesAsync`.
+- **05-10-2026 (umb-build-loop, T3):** Resolver error messages could echo a resolved configuration value (possibly a secret), and T3 started sending them to the browser. Messages now name the key only. This also closes the same leak in step run errors and publish validation.
+- **05-10-2026 (umb-build-loop, T3, after review):** Added public `SettingsResolutionException : InvalidOperationException`, so the endpoints catch only settings problems and not bugs in an action's own code. T7 must catch the same type.
+- **05-10-2026 (umb-build-loop, T3, after review):** Kept current-culture number parsing. A switch to invariant culture would silently change values on non-English servers inside a released minor.

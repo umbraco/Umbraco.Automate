@@ -22,7 +22,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S1 AC1–AC3 specs pass; an existing action compiles unchanged.
 - [x] **T2** Add a `ContainsBinding()` string extension in `Umbraco.Automate.Extensions`, backed by `BindingTokenizer.FindBindings` · story: S4 · depends-on: none · parallel-group: A
   - Done when: S4 AC9 and AC13 specs pass.
-- [ ] **T3** Return a 400 `ProblemDetails` "Invalid settings" from `ResolveStepTypeOutputSchemaController` when `ResolveSettings` throws `InvalidOperationException` · story: S8 · depends-on: none · parallel-group: A
+- [x] **T3** Return a 400 `ProblemDetails` "Invalid settings" from `ResolveStepTypeOutputSchemaController` when `ResolveSettings` throws `InvalidOperationException` · story: S8 · depends-on: none · parallel-group: A
   - Done when: S8 AC1–AC2 specs pass (extend `ResolveStepTypeOutputSchemaControllerTests`).
 - [ ] **T4** Add the internal `StepOutcomeValidator` (unique non-empty keys, no `__` prefix, at most one default) · story: S1 · depends-on: T1 · parallel-group: B
   - Done when: S1 AC5–AC9 and AC8 (no default allowed) specs pass.
