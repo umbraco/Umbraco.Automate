@@ -100,6 +100,10 @@ export class UaCatalogueServerDataSource {
             CatalogueService.postCatalogueStepTypesByAliasOutcomes({
                 path: { alias },
                 body: { settings },
+                // throwOnError: the generated client resolves a 4xx/5xx by default, which tryExecute
+                // neither reports nor flags, so a failed resolve would be silent. Throwing makes
+                // tryExecute raise the standard error notification and return `{ error }`.
+                throwOnError: true,
             }),
         );
 
