@@ -5,7 +5,7 @@ import type {
     StepConnectionModel,
 } from "../../../../../api/types.gen.js";
 import type { CanvasState, TriggerNodeData, ActionNodeData } from "../types.js";
-import { TRIGGER_NODE_ID } from "./model-to-flow.js";
+import { ANY_RESULT_HANDLE, TRIGGER_NODE_ID } from "./model-to-flow.js";
 
 export function flowToTrigger(
     nodes: Node[],
@@ -53,10 +53,11 @@ export function flowToConnections(edges: Edge[]): StepConnectionModel[] {
     return edges.map((edge) => {
         const conn: StepConnectionModel & Record<string, unknown> = {
             sourceStepId: edge.source === TRIGGER_NODE_ID ? EMPTY_GUID : edge.source,
-            sourceHandle: edge.sourceHandle ?? null,
+            // "Any result" is display-only: an unnamed line is saved with no handle and no outcome.
+            sourceHandle: edge.sourceHandle === ANY_RESULT_HANDLE ? null : (edge.sourceHandle ?? null),
             targetStepId: edge.target,
             targetHandle: edge.targetHandle ?? null,
-            outcome: (edge.label as string) ?? null,
+            outcome: edge.sourceHandle === ANY_RESULT_HANDLE ? null : ((edge.label as string) ?? null),
         };
         const filter = (edge.data as Record<string, unknown> | undefined)?.filter as StepConnectionModel["filter"];
         if (filter) {
