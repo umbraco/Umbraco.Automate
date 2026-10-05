@@ -1,40 +1,75 @@
 // S1 — Declare fixed outcomes on an action (docs/plans/action-outcomes/STORIES.md)
-//
-// Pending: the types under test (StepOutcome, IStepType outcome members) don't exist yet.
-// The builder for each named task fills in the body and removes Skip.
+
+using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Tests.Unit.StepTypes;
 
 public class StepOutcomeDeclarationTests
 {
+    private static readonly ActionInfrastructure ActionDeps = new(new Mock<IEditableModelResolver>().Object);
+
     #region Given an action declaring yes and no (default)
 
-    [Fact(Skip = "Pending: T1")]
+    [Fact]
     public void GetOutcomes_YesNoAction_ReturnsKeysInDeclarationOrder()
     {
-        // Then the keys are [yes, no], in that order.
+        IStepType action = new YesNoAction(ActionDeps);
+
+        action.GetOutcomes().Select(o => o.Key).ShouldBe(["yes", "no"]);
     }
 
-    [Fact(Skip = "Pending: T1")]
+    [Fact]
     public void GetOutcomes_YesNoAction_FlagsOnlyNoAsDefault()
     {
-        // Then the single IsDefault outcome is "no".
+        IStepType action = new YesNoAction(ActionDeps);
+
+        action.GetOutcomes().Where(o => o.IsDefault).Select(o => o.Key).ShouldBe(["no"]);
     }
 
     #endregion
 
     #region Given an action that declares nothing
 
-    [Fact(Skip = "Pending: T1")]
+    [Fact]
     public void GetOutcomes_ActionDeclaringNothing_ReturnsEmpty()
     {
-        // Then the outcome list is empty.
+        IStepType action = new PlainAction(ActionDeps);
+
+        action.GetOutcomes().ShouldBeEmpty();
     }
 
-    [Fact(Skip = "Pending: T1")]
+    [Fact]
     public void HasDynamicOutcomes_ActionDeclaringNothing_IsFalse()
     {
-        // Then HasDynamicOutcomes is false.
+        IStepType action = new PlainAction(ActionDeps);
+
+        action.HasDynamicOutcomes.ShouldBeFalse();
+    }
+
+    #endregion
+
+    #region Test Doubles
+
+    [Action("test.yesno", "Yes/No Action")]
+    private class YesNoAction(ActionInfrastructure infrastructure) : ActionBase<object>(infrastructure)
+    {
+        public override IReadOnlyList<StepOutcome> GetOutcomes() =>
+        [
+            new StepOutcome("yes", "Yes"),
+            new StepOutcome("no", "No") { IsDefault = true },
+        ];
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+    }
+
+    [Action("test.plain", "Plain Action")]
+    private class PlainAction(ActionInfrastructure infrastructure) : ActionBase<object>(infrastructure)
+    {
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
     }
 
     #endregion
