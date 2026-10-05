@@ -56,3 +56,4 @@
 - **05-10-2026 (umb-build-loop, T10):** The routing rules moved to an internal `StepOutcomeRouter` shared by `ActionStepBody` and the harness. The reviewer confirmed the refactor is behaviour-identical.
 - **05-10-2026 (umb-build-loop, T24, after review):** `BranchOutcome` is stored unbounded, not capped at 100 with truncation. Outcome keys have no length limit upstream, and a truncated key wouldn't match its line in the run view. ARCHITECTURE updated.
 - **05-10-2026 (umb-build-loop, T24):** The SQL Server migration hasn't been run against a real SQL Server, since none is available here. It has the same single nullable column add as the SQLite one, which was applied to the demo database. It must be run once before release.
+- **05-10-2026 (umb-build-loop, T24):** The SQL Server migration has now been checked: every migration applied cleanly to a throwaway SQL Server 2022 container, and `BranchOutcome` is `nvarchar(max) NULL`. This closes the open item above.
