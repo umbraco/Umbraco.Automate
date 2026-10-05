@@ -208,8 +208,16 @@ outcome, and it keeps the outcome layout (decision 14).
    for Create) instead of failing. The authorizer's result gains a way to tell "doesn't exist"
    apart from "not allowed"; permission failures still fail the step. This is a **behaviour
    change** on both lines: a saved automation whose step currently fails on a deleted item will
-   continue down its not-found or "Any result" line instead. It goes in the changelog. It
-   reveals nothing new: the failure message already said the item wasn't found.
+   continue down its not-found or "Any result" line instead. It goes in the changelog.
+
+   "Doesn't exist" covers two CMS cases: the key has no path at all (`NotFound`, permanently
+   deleted or never existed), and the node is in the recycle bin (Umbraco reports
+   `UnauthorizedMissingPathAccess` for a trashed node to any account without root start nodes,
+   because the bin sits outside every start node). Both route to not-found. No permission is
+   skipped and nothing is read from the bin. The only new information is that an out-of-scope
+   account can tell "in the bin" from "live outside my start node", which is small next to what
+   the existing messages already reveal ("not found" vs "outside its start-node path"), and only
+   the automation author sees it.
 
    > ASSUMPTION: The default success outcome is keyed `success`, labelled after the action, for
    > example "Found" (Get/Find), "Created" (Create), "Updated" (Update), "Sent" (Notify Editor).
