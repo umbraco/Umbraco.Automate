@@ -17,7 +17,6 @@ using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
-using Umbraco.Cms.Core.Services.Navigation;
 using Umbraco.Cms.Core.Web;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
@@ -211,7 +210,6 @@ public class BuiltInActionOutcomeTests
                 Mock.Of<IUserIdKeyResolver>(),
                 Mock.Of<IContentValueNormaliser>(),
                 Mock.Of<IAutomationActionAuthorizer>(),
-                Mock.Of<IMediaNavigationQueryService>(),
                 Mock.Of<IVariationContextAccessor>(),
                 Mock.Of<ILogger<GetMediaAction>>()),
             "GetMediaPropertyAction" => new GetMediaPropertyAction(
@@ -267,7 +265,6 @@ public class BuiltInActionOutcomeTests
             Mock.Of<IUserIdKeyResolver>(),
             Mock.Of<IContentValueNormaliser>(),
             authorizer ?? Mock.Of<IAutomationActionAuthorizer>(),
-            Mock.Of<IDocumentNavigationQueryService>(),
             Mock.Of<IVariationContextAccessor>(),
             Mock.Of<ILogger<GetContentAction>>());
 }
