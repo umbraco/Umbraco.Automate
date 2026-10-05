@@ -392,6 +392,50 @@ so that a bad setting doesn't surface as an unhandled server error.
   When the output schema endpoint is called
   Then the response is the same 200 schema as today
 
+### S10: See which exit a run took
+
+As an **automation author** looking at a run,
+I want to see which exit each branching step took,
+so that I can understand why the run went the way it did.
+
+**Happy path**
+
+- **AC1: Exit taken is saved**
+  Given a run where the yes/no step returned `yes`
+  When the run is reloaded from the database
+  Then that step run's `branchOutcome` is `yes`
+- **AC2: If and Switch are saved too**
+  Given a run where a Switch step took case `news`
+  When the run is reloaded from the database
+  Then that step run's `branchOutcome` is `news`
+- **AC3: API returns it**
+  Given that run
+  When the run endpoint is requested
+  Then the step run includes `branchOutcome: "yes"`
+- **AC4: Taken line is highlighted**
+  Given that run on the run canvas
+  When it renders
+  Then the line from the `yes` exit is styled as taken
+- **AC5: Other lines are dimmed**
+  Given the same run
+  When it renders
+  Then the line from the `no` exit is styled as not taken
+- **AC6: Detail shows the exit**
+  Given the step run detail for the yes/no step
+  When it opens
+  Then it shows "Exit taken: Yes"
+
+**Sad path**
+
+- **AC7: Old runs show nothing**
+  Given a run recorded before this feature
+  When it is loaded
+  Then its step runs have `branchOutcome: null` and no line is styled as taken or not taken
+- **AC8: Non-branching steps unchanged**
+  Given a step that declares no outcomes and returned none
+  When the run renders
+  Then its lines are styled as today and no "Exit taken" is shown
+
 ---
 
 ## Epic B: Built-in actions offer real exits (slice 2)

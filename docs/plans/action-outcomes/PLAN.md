@@ -34,13 +34,17 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S4 AC2, AC3, AC10, AC11 and S7 AC3 (endpoint part) specs pass.
 - [x] **T8** Make Get Content declare `success` (default, `#uaOutcomes_found`) and `notFound` (`#uaOutcomes_notFound`), and add English terms to `lang/en.ts` · story: S9, S7 · depends-on: T1 · parallel-group: B
   - Done when: S9 AC1–AC3 specs pass for Get Content.
-- [ ] **T9** In `ActionStepBody`: resolve outcomes lazily from `_stepConfig.Settings` when the action declares any; validate them with `StepOutcomeValidator` (a failure, or `GetOutcomesAsync` throwing, becomes a step failure with category `Validation`); map "no outcome" to the default, or fail the step when there's no default; set `StepRun.BranchOutcome` for every returned outcome; log a warning for an undeclared outcome · story: S2, S4 · depends-on: T1, T4 · parallel-group: C
+- [x] **T9** In `ActionStepBody`: resolve outcomes lazily from `_stepConfig.Settings` when the action declares any; validate them with `StepOutcomeValidator` (a failure, or `GetOutcomesAsync` throwing, becomes a step failure with category `Validation`); map "no outcome" to the default, or fail the step when there's no default; set `StepRun.BranchOutcome` for every returned outcome; log a warning for an undeclared outcome · story: S2, S4 · depends-on: T1, T4 · parallel-group: C
   - Confirm while building: `IStepErrorClassifier` treats `Validation` as terminal (SPEC assumption).
   - Done when: S2 AC1–AC13 and S4 AC1, AC7, AC8 specs pass, as integration tests modelled on `ApprovalOutcomeTests`.
 - [ ] **T10** Extend `ActionTestHarness<TAction>` with the resolved outcomes for given settings and the effective branch outcome of an execution · story: S1 · depends-on: T1, T9 · parallel-group: D
   - Done when: S1 AC4 spec passes, plus one harness spec for the default mapping.
-- [ ] **T11** **wire: outcomes into the Management API.** Regenerate the OpenAPI client (`api/types.gen.ts`, `sdk.gen.ts`) · story: S3, S4 · depends-on: T3, T6, T7, T8 · parallel-group: D
-  - Done when: against the running demo site, a real `GET` of the actions catalogue returns Get Content with its two outcomes; a real `POST .../step-types/<getContent alias>/outcomes` returns them; a real `POST .../step-types/nope/outcomes` returns 404; and the regenerated client builds.
+- [ ] **T24** Persist `StepRun.BranchOutcome`: add `BranchOutcome` to `StepRunEntity`, map it both ways in `StepRunFactory`, configure it in the DbContext like the other short strings, and add the `UmbracoAutomate_AddStepRunBranchOutcome` migration for SQL Server and SQLite (same shape as `UmbracoAutomate_AddStepRunLogEntries`) · story: S10 · depends-on: T9 · parallel-group: D
+  - Done when: S10 AC1–AC2 and AC7 pass as integration tests against a real database, and both migrations apply cleanly to an existing database.
+- [ ] **T25** Return `branchOutcome` on step runs from the run API (the step run response model and its mapping) · story: S10 · depends-on: T24 · parallel-group: E
+  - Done when: S10 AC3 passes, plus a spec that a step run with no exit returns `null`.
+- [ ] **T11** **wire: outcomes into the Management API.** Regenerate the OpenAPI client (`api/types.gen.ts`, `sdk.gen.ts`) · story: S3, S4, S10 · depends-on: T3, T6, T7, T8, T25 · parallel-group: F
+  - Done when: against the running demo site, a real run of an automation with a Get Content step, reloaded through the run API, returns `branchOutcome` for that step; a real `GET` of the actions catalogue returns Get Content with its two outcomes; a real `POST .../step-types/<getContent alias>/outcomes` returns them; a real `POST .../step-types/nope/outcomes` returns 404; and the regenerated client builds.
 - [ ] **T12** Map `outcomes`/`hasDynamicOutcomes` in `catalogue/type-mapper.ts` and add `resolveOutcomes(alias, settings)` to `catalogue.repository.ts` · story: S3, S4 · depends-on: T11 · parallel-group: E
   - Done when: the client builds and the repository call works against the demo site (checked in T16).
 - [ ] **T13** Canvas data: add `outcomes` to `CatalogueLookupEntry`/`ActionNodeData`; fill it in `#buildCatalogueLookup`/`modelToNodes` (resolving dynamic steps on load); return the default key (else the first key) from `getContinuationSourceHandle`; map unnamed lines on declaring steps to `__any__` and back in `flow-to-model.ts` · story: S3, S4, S6 · depends-on: T12 · parallel-group: F
@@ -49,10 +53,13 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S3 AC3, AC4, AC7, AC9, AC10, S5 AC1, AC10, S6 AC1–AC3, AC8, AC9 and S7 AC1, AC2, AC4 pass in T16.
 - [ ] **T15** Workspace view: after the settings modal submits for a dynamic-outcome step, call `resolveOutcomes` and update that node; on failure keep the old exits and show the standard error notification; never drop lines · story: S4, S5 · depends-on: T13 · parallel-group: G
   - Done when: S4 AC5, AC6, AC12 and S5 AC2 pass in T16.
-- [ ] **T16** **wire: outcome exits into the canvas.** Playwright acceptance specs in `Umbraco.Automate.Tests.AcceptanceTests/tests/DefaultConfig/`, against the running demo site · story: S3, S4, S5, S6, S7, S9 · depends-on: T5, T9, T14, T15 · parallel-group: H
+- [ ] **T26** Run view: style the taken / not-taken lines on the run canvas and show "Exit taken: <label>" in the step run detail, for actions, If and Switch · story: S10 · depends-on: T11, T13 · parallel-group: G
+  - Done when: S10 AC4–AC6 and AC8 pass in T16.
+- [ ] **T16** **wire: outcome exits into the canvas.** Playwright acceptance specs in `Umbraco.Automate.Tests.AcceptanceTests/tests/DefaultConfig/`, against the running demo site · story: S3, S4, S5, S6, S7, S9, S10 · depends-on: T5, T9, T14, T15, T26 · parallel-group: H
   - Get Content (real): its exits render; draw `notFound` → step, save, and the saved connection has `outcome: "notFound"` (S3 AC5); publish, then run with missing content and the `notFound` path runs (S9 AC4–AC5 for Get Content); an old unnamed line shows as "Any result" and still fires (S6 AC5–AC7); drawing "Found" next to it shows the warning (S6 AC8–AC9); auto-layout doesn't overlap the right-edge exits (S3 AC11).
   - Dynamic behaviour (no built-in has dynamic outcomes): stub the catalogue and `/outcomes` responses with Playwright `page.route`, then check the exits on load, after a settings save, after a resolve failure, and for a stale line (S4 AC4–AC6, AC12; S5 AC1–AC2).
   - Stale publish: publish an automation whose line uses an outcome Get Content doesn't declare, and the UI shows the publish error from S5 AC5.
+  - Run view: run the Get Content automation, open the run, and the `notFound` line is styled as taken and the `success` line as not taken; the step detail shows "Exit taken: Not found" (S10 AC4–AC6).
 - [ ] **T17** Document outcomes for action developers: add **Outcome** to `docs/vocabulary.md`, and an outcomes section (static, dynamic, default, keys vs labels, the unbound-settings rule, `ContainsBinding()`) next to the output-schema guidance in `docs/engineering-spec.md` · story: S1, S4 · depends-on: T1, T2, T9 · parallel-group: H
   - Done when: both docs describe the shipped contract, and an AI decision example matches ARCHITECTURE's consumer contract.
 
@@ -67,7 +74,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 
 ## Port to v17
 
-- [ ] **T21** Port slice 1 to `v17/dev` via the Backport Workflow (`CONTRIBUTING.md`): a `v17/feature/*` branch from `v17/dev`, then build, unit, integration and acceptance tests on v17 · story: all of Epic A · depends-on: T16, T17 · parallel-group: L
+- [ ] **T21** Port slice 1 to `v17/dev` (including T24's migrations, regenerated on the v17 line) via the Backport Workflow (`CONTRIBUTING.md`): a `v17/feature/*` branch from `v17/dev`, then build, unit, integration and acceptance tests on v17 · story: all of Epic A · depends-on: T16, T17 · parallel-group: L
   - Done when: the v17 PR is green and the same acceptance specs pass against a v17 demo site.
 - [ ] **T22** Port slice 2 to `v17/dev` · story: S9 · depends-on: T20, T21 · parallel-group: M
 

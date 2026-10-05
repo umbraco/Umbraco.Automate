@@ -102,6 +102,18 @@ using any of them runs exactly as before. See "Any result" below.
 Get Content Property's and Get Media Property's `success` exit means both the item **and** the
 property were found. Its tooltip says so: "The item and the property were both found."
 
+### Run API: exit taken
+
+The step run model returned by the run endpoints (`AutomationRunResponseModel.StepRuns`) gains
+`branchOutcome: string | null`.
+
+- It's the outcome key the step left through: an action's returned or default outcome, an If's
+  `true`/`false`, a Switch's case name or `default`.
+- `null` for steps that don't branch, steps that failed, and every run recorded before this
+  feature (it was never saved).
+- Read back exactly as saved. A run started, then reloaded from the database, returns the same
+  value.
+
 ### Test harness
 
 `ActionTestHarness<TAction>` exposes:
@@ -175,6 +187,19 @@ After a step's settings modal is submitted, if its action `hasDynamicOutcomes`, 
 calls `resolveOutcomes` with the new settings and re-renders that node's exits. Lines on keys
 that still exist stay attached. Lines on keys that vanished move to **Missing outcome** exits
 and are never deleted silently.
+
+### Run view: exit taken (`run/workspace/run/views/run-canvas-view.element.ts`, run details)
+
+- On the run canvas, the line leaving a completed step through the exit it took (the edge whose
+  saved `outcome` equals the step run's `branchOutcome`) is styled as **taken**. Other named
+  lines from that step are styled as **not taken** (dimmed). "Any result" lines from a step
+  that branched are styled as taken, since they always fire.
+- Steps with no `branchOutcome` (non-branching, failed, or old runs) leave their lines styled as
+  today.
+- This applies to If and Switch steps too.
+- The step run detail shows "Exit taken: <label>", using the outcome's label from the catalogue
+  or resolved outcomes when available, and the raw key otherwise. It's hidden when there's no
+  `branchOutcome`.
 
 ### UX spots
 
