@@ -23,6 +23,7 @@ internal static class StepRunFactory
             InputData = entity.InputData,
             OutputData = entity.OutputData,
             LogEntries = DeserializeLogEntries(entity.LogEntries),
+            BranchOutcome = entity.BranchOutcome,
             Error = entity.Error,
             ErrorCategory = entity.ErrorCategory.HasValue ? (StepRunErrorCategory)entity.ErrorCategory.Value : null,
             RetryCount = entity.RetryCount,
@@ -44,6 +45,7 @@ internal static class StepRunFactory
             InputData = stepRun.InputData,
             OutputData = stepRun.OutputData,
             LogEntries = SerializeLogEntries(stepRun.LogEntries),
+            BranchOutcome = stepRun.BranchOutcome,
             Error = stepRun.Error,
             ErrorCategory = stepRun.ErrorCategory.HasValue ? (int)stepRun.ErrorCategory.Value : null,
             RetryCount = stepRun.RetryCount,
@@ -59,6 +61,7 @@ internal static class StepRunFactory
         entity.InputData = stepRun.InputData;
         entity.OutputData = stepRun.OutputData;
         entity.LogEntries = SerializeLogEntries(stepRun.LogEntries);
+        entity.BranchOutcome = stepRun.BranchOutcome;
         entity.Error = stepRun.Error;
         entity.ErrorCategory = stepRun.ErrorCategory.HasValue ? (int)stepRun.ErrorCategory.Value : null;
         entity.RetryCount = stepRun.RetryCount;
