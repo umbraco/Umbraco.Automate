@@ -1,6 +1,11 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Realtime;
+using Umbraco.Automate.Core.Security;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
@@ -12,7 +17,9 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.notifyEditor", "Notify Editor",
     Description = "Sends a realtime toast to any backoffice user currently editing the specified content item.",
     Group = "Content",
-    Icon = "icon-megaphone")]
+    Icon = "icon-megaphone",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, NotifyEditorOutput>
 {
     /// <summary>
@@ -23,22 +30,46 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
     private readonly IContentService _contentService;
     private readonly IAutomationService _automationService;
     private readonly IEditorNotifier _editorNotifier;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<NotifyEditorAction> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NotifyEditorAction"/> class.
     /// </summary>
+    [Obsolete("Use the constructor that takes an IAutomationActionAuthorizer. Scheduled for removal in Umbraco Automate 19.")]
     public NotifyEditorAction(
         ActionInfrastructure infrastructure,
         IContentService contentService,
         IAutomationService automationService,
         IEditorNotifier editorNotifier,
         ILogger<NotifyEditorAction> logger)
+        : this(
+            infrastructure,
+            contentService,
+            automationService,
+            editorNotifier,
+            StaticServiceProvider.Instance.GetRequiredService<IAutomationActionAuthorizer>(),
+            logger)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NotifyEditorAction"/> class.
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
+    public NotifyEditorAction(
+        ActionInfrastructure infrastructure,
+        IContentService contentService,
+        IAutomationService automationService,
+        IEditorNotifier editorNotifier,
+        IAutomationActionAuthorizer authorizer,
+        ILogger<NotifyEditorAction> logger)
         : base(infrastructure)
     {
         _contentService = contentService;
         _automationService = automationService;
         _editorNotifier = editorNotifier;
+        _authorizer = authorizer;
         _logger = logger;
     }
 
@@ -65,6 +96,16 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
             context.LogWarning($"Content {contentKey} was not found, so no editors were notified");
 
             return SuccessWithOutcome(OutcomeNotFound, new NotifyEditorOutput { ContentKey = contentKey });
+        }
+
+        // Node-level authorisation: the service account's start node / granular permissions may
+        // scope it to a subset of the Content section. This runs after the existence check on
+        // purpose: the real authorizer reports a missing node as a failure, which would turn the
+        // documented notFound outcome into an Authentication error. Nothing about the item (its
+        // name) is read or logged before this point.
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        {
+            return failure;
         }
 
         // Resolve the automation name up-front — it's used in both default title and
