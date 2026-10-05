@@ -430,6 +430,17 @@
     border-style: dashed;
 }
 
+/* Run view: lines the run took, and named lines from a branching step it did not take. */
+.react-flow__edge.ua-edge--taken .react-flow__edge-path {
+    stroke: var(--uui-color-positive-standalone, #22c55e);
+    stroke-width: 2.5;
+}
+
+.react-flow__edge.ua-edge--not-taken,
+.ua-edge__label--not-taken {
+    opacity: 0.35;
+}
+
 /* Outcome exits (action nodes that declare outcomes) — reuse the Switch row layout above. */
 .ua-node__switch-case--missing {
     background: color-mix(in srgb, var(--uui-color-danger, #d42054) 8%, transparent);

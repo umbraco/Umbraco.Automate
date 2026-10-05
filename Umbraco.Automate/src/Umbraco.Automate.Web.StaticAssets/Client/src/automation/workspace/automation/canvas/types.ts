@@ -102,6 +102,8 @@ import type { ConditionSetModel } from "../../../../api/types.gen.js";
 
 export interface EdgeFilterData {
     filter?: ConditionSetModel | null;
+    /** Run view only: the run did not leave through this line's exit, so its label is dimmed. */
+    notTaken?: boolean;
 }
 
 export interface EdgeFilterOpenDetail {
