@@ -99,6 +99,11 @@ return today, plus they now declare them, with `success` as the default. Their l
 `#uaOutcomes_<key>` keys, with English terms added to `lang/en.ts`. A saved automation
 using any of them runs exactly as before. See "Any result" below.
 
+A content or media key that doesn't exist (deleted, or never existed) routes to the action's
+not-found outcome (`notFound`, or `parentNotFound` for Create) instead of failing the step, as
+an unpublished item already does. A key the service account isn't allowed to access still fails
+the step with the existing permission message.
+
 Get Content Property's and Get Media Property's `success` exit means both the item **and** the
 property were found. Its tooltip says so: "The item and the property were both found."
 

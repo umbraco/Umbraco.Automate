@@ -473,6 +473,14 @@ Applies to all 11: `GetContent`, `GetContentProperty`, `FindContent`, `CreateCon
   When the content doesn't exist
   Then step B runs and A doesn't
 
+- **AC8: Deleted content routes to Not found**
+  Given Get Content with `notFound` → step B, and a content key that doesn't exist
+  When the automation runs
+  Then step B runs and the step doesn't fail
+- **AC9: No permission still fails**
+  Given Get Content and a content key the service account can't access
+  When the automation runs
+  Then the step fails with the existing permission message
 - **AC7: Property actions explain "Found"**
   Given Get Content Property or Get Media Property on the canvas
   When the author hovers its "Found" exit
