@@ -76,6 +76,12 @@ export default {
     uaOutcomes: {
         found: "Found",
         notFound: "Not found",
+        propertyNotFound: "Property not found",
+        parentNotFound: "Parent not found",
+        contentTypeNotFound: "Content type not found",
+        created: "Created",
+        updated: "Updated",
+        sent: "Sent",
     },
     uaOutcomeExits: {
         default: "(default)",

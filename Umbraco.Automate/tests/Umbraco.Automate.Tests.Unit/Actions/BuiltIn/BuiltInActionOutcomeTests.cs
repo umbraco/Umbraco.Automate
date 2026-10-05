@@ -1,18 +1,22 @@
 // S9 — Content and media actions offer named exits (docs/plans/action-outcomes/STORIES.md)
 //
-// Get Content is live (T8). The other actions stay pending until content actions land in T18 and
-// media actions in T19; move each InlineData row out of the skipped theories as its task lands.
+// Get Content is live (T8) and the other content actions are live (T18). The media actions stay pending
+// until T19; move each InlineData row out of the skipped theories as its task lands.
 
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
+using Examine;
+using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Cms;
+using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.Navigation;
 using Umbraco.Cms.Core.Web;
@@ -23,12 +27,7 @@ public class BuiltInActionOutcomeTests
 {
     #region Given each built-in action that returns outcomes today
 
-    [Theory(Skip = "Pending: T18 / T19")]
-    [InlineData("GetContentPropertyAction")]
-    [InlineData("FindContentAction")]
-    [InlineData("CreateContentAction")]
-    [InlineData("UpdateContentPropertyAction")]
-    [InlineData("NotifyEditorAction")]
+    [Theory(Skip = "Pending: T19")]
     [InlineData("GetMediaAction")]
     [InlineData("GetMediaPropertyAction")]
     [InlineData("FindMediaAction")]
@@ -40,12 +39,7 @@ public class BuiltInActionOutcomeTests
         _ = actionType;
     }
 
-    [Theory(Skip = "Pending: T18 / T19")]
-    [InlineData("GetContentPropertyAction")]
-    [InlineData("FindContentAction")]
-    [InlineData("CreateContentAction")]
-    [InlineData("UpdateContentPropertyAction")]
-    [InlineData("NotifyEditorAction")]
+    [Theory(Skip = "Pending: T19")]
     [InlineData("GetMediaAction")]
     [InlineData("GetMediaPropertyAction")]
     [InlineData("FindMediaAction")]
@@ -57,12 +51,7 @@ public class BuiltInActionOutcomeTests
         _ = actionType;
     }
 
-    [Theory(Skip = "Pending: T18 / T19")]
-    [InlineData("GetContentPropertyAction")]
-    [InlineData("FindContentAction")]
-    [InlineData("CreateContentAction")]
-    [InlineData("UpdateContentPropertyAction")]
-    [InlineData("NotifyEditorAction")]
+    [Theory(Skip = "Pending: T19")]
     [InlineData("GetMediaAction")]
     [InlineData("GetMediaPropertyAction")]
     [InlineData("FindMediaAction")]
@@ -72,6 +61,44 @@ public class BuiltInActionOutcomeTests
     {
         // Then every label starts with "#uaOutcomes_".
         _ = actionType;
+    }
+
+    #endregion
+
+    #region Given each content action that returns outcomes
+
+    // Expected keys are literal on purpose: they are what saved automations store, so a renamed
+    // constant must fail here rather than quietly follow the rename.
+    public static TheoryData<string, string[]> ContentActionOutcomeKeys => new()
+    {
+        { "GetContentPropertyAction", ["success", "notFound", "propertyNotFound"] },
+        { "FindContentAction", ["success", "notFound"] },
+        { "CreateContentAction", ["success", "parentNotFound", "contentTypeNotFound"] },
+        { "UpdateContentPropertyAction", ["success", "notFound", "propertyNotFound"] },
+        { "NotifyEditorAction", ["success", "notFound"] },
+    };
+
+    [Theory]
+    [MemberData(nameof(ContentActionOutcomeKeys))]
+    public void GetOutcomes_ContentAction_DefaultIsSuccess(string actionType, string[] expectedKeys)
+    {
+        _ = expectedKeys;
+
+        CreateContentAction(actionType).GetOutcomes().Single(o => o.IsDefault).Key.ShouldBe("success");
+    }
+
+    [Theory]
+    [MemberData(nameof(ContentActionOutcomeKeys))]
+    public void GetOutcomes_ContentAction_KeysAreSuccessThenExistingConstants(string actionType, string[] expectedKeys)
+        => CreateContentAction(actionType).GetOutcomes().Select(o => o.Key).ShouldBe(expectedKeys);
+
+    [Theory]
+    [MemberData(nameof(ContentActionOutcomeKeys))]
+    public void GetOutcomes_ContentAction_AllLabelsAreLocalizationKeys(string actionType, string[] expectedKeys)
+    {
+        _ = expectedKeys;
+
+        CreateContentAction(actionType).GetOutcomes().ShouldAllBe(o => o.Label.StartsWith("#uaOutcomes_"));
     }
 
     #endregion
@@ -124,6 +151,56 @@ public class BuiltInActionOutcomeTests
     }
 
     #endregion
+
+    private static IAction CreateContentAction(string actionType)
+    {
+        var infrastructure = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
+
+        return actionType switch
+        {
+            "GetContentPropertyAction" => new GetContentPropertyAction(
+                infrastructure,
+                Mock.Of<IPublishedContentCache>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IContentValueNormaliser>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<IVariationContextAccessor>(),
+                Mock.Of<ILogger<GetContentPropertyAction>>()),
+            "FindContentAction" => new FindContentAction(
+                infrastructure,
+                Mock.Of<IExamineManager>(),
+                Mock.Of<IContentTypeService>(),
+                Mock.Of<IPublishedContentCache>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IPublishedUrlProvider>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<FindContentAction>>()),
+            "CreateContentAction" => new CreateContentAction(
+                infrastructure,
+                Mock.Of<IContentService>(),
+                Mock.Of<IContentTypeService>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<CreateContentAction>>()),
+            "UpdateContentPropertyAction" => new UpdateContentPropertyAction(
+                infrastructure,
+                Mock.Of<IContentService>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<UpdateContentPropertyAction>>()),
+            "NotifyEditorAction" => new NotifyEditorAction(
+                infrastructure,
+                Mock.Of<IContentService>(),
+                Mock.Of<IAutomationService>(),
+                Mock.Of<IEditorNotifier>(),
+                Mock.Of<ILogger<NotifyEditorAction>>()),
+            _ => throw new ArgumentOutOfRangeException(nameof(actionType), actionType, null),
+        };
+    }
 
     private static GetContentAction CreateGetContentAction(
         IPublishedContentCache? cache = null,
