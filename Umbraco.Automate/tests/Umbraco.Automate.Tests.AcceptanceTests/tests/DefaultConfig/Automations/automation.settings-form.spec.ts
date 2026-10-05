@@ -23,7 +23,9 @@ test.describe('Settings form', () => {
     // Arrange
     const description = await umbracoAutomateApi.catalogue.getFieldDescription(actions.startAutomation, 'triggerData');
     expect(description).toContain('${');
-    const start = automationStep(actions.startAutomation, 'start', {}, { x: 250, y: 200 });
+    // Start Automation's target is required even to save a draft.
+    const targetId = await umbracoAutomateApi.automations.create(uniqueName('Settings Target'), automateServiceAccountWorkspace.id);
+    const start = automationStep(actions.startAutomation, 'start', { automationKey: targetId }, { x: 250, y: 200 });
     const id = await umbracoAutomateApi.automations.create(uniqueName('Settings Description'), automateServiceAccountWorkspace.id, {
       trigger: manualTrigger(),
       steps: [start],
