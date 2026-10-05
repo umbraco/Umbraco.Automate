@@ -44,7 +44,11 @@ export class ConstantHelper {
 
   public static readonly actions = {
     delay: 'umbracoAutomate.delay',
+    findContent: 'umbracoAutomate.findContent',
     getContent: 'umbracoAutomate.getContent',
+    getMedia: 'umbracoAutomate.getMedia',
+    getMediaProperty: 'umbracoAutomate.getMediaProperty',
+    updateContentProperty: 'umbracoAutomate.updateContentProperty',
     httpRequest: 'umbracoAutomate.httpRequest',
     logMessage: 'umbracoAutomate.logMessage',
     requestApproval: 'umbracoAutomate.requestApproval',
@@ -71,6 +75,8 @@ export class ConstantHelper {
   public static readonly outcomeLabels = {
     found: 'Found',
     notFound: 'Not found',
+    propertyNotFound: 'Property not found',
+    updated: 'Updated',
     anyResult: 'Any result',
     missing: 'Missing outcome',
     exitTaken: 'Exit taken',

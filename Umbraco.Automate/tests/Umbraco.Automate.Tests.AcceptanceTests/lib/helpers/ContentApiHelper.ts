@@ -15,8 +15,8 @@ export class ContentApiHelper {
     this.api = api;
   }
 
-  /** The key of a published, non-trashed document at the root of the content tree. */
-  async getPublishedRootDocumentKey(): Promise<string> {
+  /** A published, non-trashed document at the root of the content tree. */
+  async getPublishedRootDocument(): Promise<{ key: string; name: string }> {
     const requestUrl = this.api.baseUrl + '/umbraco/management/api/v1/tree/document/root?skip=0&take=50';
     const response = await this.api.get(requestUrl);
     const body = await response.json();
@@ -24,8 +24,13 @@ export class ContentApiHelper {
       (item: any) => !item.isTrashed && item.variants?.some((v: any) => v.state === 'Published')
     );
     if (!published) {
-      throw new Error('The demo site has no published content at the root to run Get Content against.');
+      throw new Error('The demo site has no published content at the root to run against.');
     }
-    return published.id;
+    return { key: published.id, name: published.variants.find((v: any) => v.state === 'Published').name };
+  }
+
+  /** The key of a published, non-trashed document at the root of the content tree. */
+  async getPublishedRootDocumentKey(): Promise<string> {
+    return (await this.getPublishedRootDocument()).key;
   }
 }
