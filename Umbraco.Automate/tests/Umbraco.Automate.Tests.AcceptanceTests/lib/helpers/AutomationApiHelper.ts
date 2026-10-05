@@ -86,6 +86,9 @@ export class AutomationApiHelper {
       connections: options.connections ?? [],
       notificationSettings: options.notificationSettings
     });
+    if (!response.ok()) {
+      throw new Error(`Creating automation "${name}" failed (${response.status()}): ${await response.text()}`);
+    }
 
     const location = response.headers()['location'];
     if (location) {
