@@ -72,8 +72,8 @@ public class EditableModelFieldAttribute : Attribute
     /// <c>Umb.PropertyEditorUi.CodeEditor</c>) gain an "Insert binding" action. Any other
     /// <see cref="EditorUiAlias"/>, such as a content or form picker, keeps its editor and gains
     /// a switch to a binding text box instead, so the field takes either a picked value or a
-    /// binding. Only <c>string</c> properties and lists of <c>string</c> are resolved; a binding
-    /// on a list is stored as a one-item list and resolves to one string.
+    /// binding. Only <c>string</c> properties get the pick-or-bind switch; lists and other types
+    /// keep their own editor.
     /// </remarks>
     public bool SupportsBindings { get; set; }
 

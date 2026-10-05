@@ -12,7 +12,7 @@ import { CONDITION_BUILDER_UI_ALIAS } from "../condition-builder/manifests.js";
 import { SWITCH_CASE_BUILDER_UI_ALIAS } from "../switch-case-builder/manifests.js";
 import { KEY_VALUE_EDITOR_UI_ALIAS } from "../key-value-editor/manifests.js";
 import { BINDABLE_EDITOR_CONFIG_ALIASES, BINDABLE_EDITOR_UI_ALIAS } from "../bindable-editor/manifests.js";
-import { isBindingValue } from "../bindable-editor/bindable-value.utils.js";
+import { isBindingExpression } from "../bindable-editor/bindable-value.utils.js";
 
 const TEXT_BOX_UI_ALIAS = "Umb.PropertyEditorUi.TextBox";
 
@@ -83,6 +83,18 @@ export class UaSettingsFormElement extends UmbLitElement {
      */
     #lastEmittedSettings: Record<string, unknown> | null = null;
 
+    /** The values as they were when the form last loaded them; never updated by user edits. */
+    #loadedValues: Record<string, unknown> = {};
+
+    /**
+     * Keys of the fields routed to the bindable editor. Routing is decided once per load, not
+     * per render: once a field is in here it stays wrapped however its value changes (switching
+     * the binding off, emptying the expression box, deleting a `}` mid-edit), and `visibleWhen`
+     * hiding and showing it keeps the decision. Cleared only by `#populatePropertyValues`, i.e.
+     * when the form is given new fields or externally changed values (the panel reopened).
+     */
+    #bindableEditorFields = new Set<string>();
+
     override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
         if (this.#isInitialized && changedProperties.size === 1 && changedProperties.has("values")) {
             if (this.#isEchoUpdate(this.values)) {
@@ -129,6 +141,11 @@ export class UaSettingsFormElement extends UmbLitElement {
             value: this.values?.[field.key] ?? field.defaultValue,
         }));
         this._currentValues = Object.fromEntries(this._propertyValues.map((v) => [v.alias, v.value]));
+
+        // A new set of fields/values is a fresh load: forget which fields were routed to the
+        // bindable editor and what they held, so routing is decided again against this load.
+        this.#loadedValues = this._currentValues;
+        this.#bindableEditorFields.clear();
     }
 
     /**
@@ -234,21 +251,33 @@ export class UaSettingsFormElement extends UmbLitElement {
     }
 
     /**
-     * Any other editor on a bindable field (a Forms form picker, a document picker, a dropdown)
-     * is wrapped by the bindable editor, which switches between that editor and a binding text
-     * box. Also taken with no binding sources in scope when the value is already a binding, so
-     * a saved `${ }` is shown as the expression it is rather than handed to a picker that can't
-     * display it.
+     * Any other editor on a bindable `string` field (a Forms form picker, a document picker, a
+     * dropdown) is wrapped by the bindable editor, which switches between that editor and a
+     * binding text box. Taken when binding sources are in scope, or, with none in scope, when the
+     * value the form loaded is already a binding, so a saved `${ }` is shown as the expression it
+     * is rather than handed to a picker that can't display it. Binding sources may arrive after
+     * the values, so a field not yet wrapped is re-evaluated until it is; once wrapped it stays
+     * wrapped (see `#bindableEditorFields`). Scalar and collection fields keep their own editor.
      */
     #usesBindableEditor(field: EditableModelFieldDescriptorModel): boolean {
-        if (!field.supportsBindings || !field.editorUiAlias) return false;
+        if (this.#bindableEditorFields.has(field.key)) return true;
+        if (!this.#isBindableEditorCandidate(field)) return false;
+
+        if (this.bindingSources.length === 0 && !isBindingExpression(this.#loadedValues[field.key])) return false;
+
+        this.#bindableEditorFields.add(field.key);
+        return true;
+    }
+
+    #isBindableEditorCandidate(field: EditableModelFieldDescriptorModel): boolean {
+        if (!field.supportsBindings || field.valueKind !== "String" || !field.editorUiAlias) return false;
 
         const alias = field.editorUiAlias;
         if (alias === TEXT_BOX_UI_ALIAS || alias === SENSITIVE_FIELD_UI_ALIAS) return false;
         if (BINDING_AWARE_EDITOR_UI_ALIASES.has(alias)) return false;
         if (alias === "Umb.PropertyEditorUi.TextArea" || alias === "Umb.PropertyEditorUi.CodeEditor") return false;
 
-        return this.bindingSources.length > 0 || isBindingValue(this._currentValues[field.key]);
+        return true;
     }
 
     #buildFieldConfig(field: EditableModelFieldDescriptorModel): Array<{ alias: string; value: unknown }> {
@@ -262,10 +291,6 @@ export class UaSettingsFormElement extends UmbLitElement {
 
         if (this.#usesBindableEditor(field)) {
             config.push({ alias: BINDABLE_EDITOR_CONFIG_ALIASES.editorUiAlias, value: field.editorUiAlias });
-            config.push({
-                alias: BINDABLE_EDITOR_CONFIG_ALIASES.valueShape,
-                value: Array.isArray(field.defaultValue) ? "array" : "string",
-            });
         }
 
         if (this.workspaceId) {

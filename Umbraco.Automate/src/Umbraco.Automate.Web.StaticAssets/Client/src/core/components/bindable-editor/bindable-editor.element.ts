@@ -14,12 +14,7 @@ import type { BindingSource } from "../../utils/binding-context.utils.js";
 import type { UaBindingInsertable } from "../binding-text-box/binding-editor.types.js";
 import type { UaBindingTextBoxElement } from "../binding-text-box/binding-text-box.element.js";
 import "../binding-text-box/binding-text-box.element.js";
-import {
-    getBindingExpression,
-    isEmptySettingsValue,
-    toBindingValue,
-    type UaBindingValueShape,
-} from "./bindable-value.utils.js";
+import { getBindingExpression, isEmptySettingsValue } from "./bindable-value.utils.js";
 import { BINDABLE_EDITOR_CONFIG_ALIASES, BINDABLE_EDITOR_UI_ALIAS } from "./constants.js";
 
 type UaBindableEditorMode = "editor" | "binding";
@@ -40,8 +35,8 @@ const LEGACY_PROPERTY_VALUE_CHANGE = "property-value-change";
  * produces or a `${ }` binding. `ua-settings-form` routes such fields here and names the
  * editor being wrapped in the config.
  *
- * Mode is derived from the value, not stored: a `${ }` value (or a one-item array holding one)
- * opens in binding mode, anything else in the wrapped editor. The stored settings shape is
+ * Mode is derived from the value, not stored: a `${ }` string opens in binding mode, anything
+ * else in the wrapped editor. A binding is always stored as a plain string. The stored settings shape is
  * unchanged, so automations saved before this editor existed open in the right mode with no
  * migration, and the server's binding resolver sees the same values it always has.
  *
@@ -88,18 +83,20 @@ export class UaBindableEditorElement
     @state()
     private _editorMissing = false;
 
+    /**
+     * Latched once bindings are in scope or the value given was a binding. It never flips back:
+     * switching off or emptying the expression must not remove the switch, or the author could
+     * not return to binding mode (the switch is decided once, never by edits).
+     */
+    #switchAvailable = false;
+
     #config?: UmbPropertyEditorConfigCollection;
     #editorUiAlias?: string;
-    #valueShape: UaBindingValueShape = "string";
 
     public set config(config: UmbPropertyEditorConfigCollection | undefined) {
         if (!config) return;
         this.#config = config;
         this._bindingSources = config.getValueByAlias<BindingSource[]>("bindingSources") ?? [];
-
-        if (config.getValueByAlias<UaBindingValueShape>(BINDABLE_EDITOR_CONFIG_ALIASES.valueShape) === "array") {
-            this.#valueShape = "array";
-        }
 
         // The wrapped editor reads the same collection, so it sees its own `editorConfig` entries.
         if (this._editorElement) {
@@ -216,9 +213,8 @@ export class UaBindableEditorElement
     protected override willUpdate(changed: PropertyValues) {
         super.willUpdate(changed);
 
-        if (Array.isArray(this.value)) {
-            // Seen an array: the field stores arrays, so a binding must be stored as one too.
-            this.#valueShape = "array";
+        if (!this.#switchAvailable) {
+            this.#switchAvailable = this._bindingSources.length > 0 || getBindingExpression(this.value) !== undefined;
         }
 
         if (
@@ -269,7 +265,7 @@ export class UaBindableEditorElement
         // Pin the mode: clearing the box would otherwise derive "editor" from the empty value
         // and swap the box out from under the author mid-edit.
         this._chosenMode = "binding";
-        this.#setValue(expression === "" ? undefined : toBindingValue(expression, this.#valueShape));
+        this.#setValue(expression === "" ? undefined : expression);
     }
 
     #switchMode(mode: UaBindableEditorMode) {
@@ -307,17 +303,17 @@ export class UaBindableEditorElement
         }
 
         this._chosenMode = "binding";
-        this.#setValue(toBindingValue(expression, this.#valueShape));
+        this.#setValue(expression);
     }
 
     /**
      * The switch is pointless with nothing to bind to, so it only shows where bindings are in
-     * scope. A field already holding an expression keeps it regardless, so the author is never
-     * stranded in a mode they can't leave.
+     * scope. A field that started out holding an expression keeps it regardless, and once shown it
+     * stays (see `#switchAvailable`), so the author is never stranded in a mode they can't leave.
      */
     #canSwitch(): boolean {
         if (this.readonly || this._editorMissing) return false;
-        return this._bindingSources.length > 0 || getBindingExpression(this.value) !== undefined;
+        return this.#switchAvailable;
     }
 
     override render() {
