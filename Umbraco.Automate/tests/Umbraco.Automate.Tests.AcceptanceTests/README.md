@@ -65,6 +65,7 @@ npx playwright test -g "loads the Automate section"
 | `lib/helpers/CatalogueApiHelper.ts` | The installed step types — names and output descriptions specs read instead of hard-coding |
 | `lib/helpers/WorkspaceApiHelper.ts` | Automate management API — workspaces |
 | `lib/helpers/ConnectionApiHelper.ts` | Automate management API — connections |
+| `lib/helpers/ContentApiHelper.ts` | Read-only lookup of content already on the demo site (a published key for Get Content runs) |
 | `lib/helpers/ServiceAccountApiHelper.ts` | Service accounts (CMS users of kind Api) |
 | `lib/helpers/testExtension.ts` | The Playwright fixtures |
 
@@ -80,6 +81,8 @@ npx playwright test -g "loads the Automate section"
 | `Automations/automation.binding-picker.spec.ts` | Predecessors in flow order (#299), expression descriptions (#307), readable value types, inserting an expression |
 | `Automations/automation.run-view.spec.ts` | Keyboard access to runs, steps and the trigger row, the Logs tab, the failing step's error as the run's error, whole-millisecond step durations, Replay disabled once unpublished |
 | `Automations/automation.run.spec.ts` | Publish, Run now, Runs view, Run Script reading upstream `data` (#345), Run now hidden on a draft (#366), step output in the run view (#376) |
+| `Outcomes/outcomes.get-content.spec.ts` | Action outcomes on Get Content: right-edge Found/Not found exits, drawing and saving `notFound`, runs taking the notFound or success path, old unnamed lines as "Any result" and the both-paths warning, the stale-outcome publish error, auto-layout, the run view's taken and not-taken lines and "Exit taken" |
+| `Outcomes/outcomes.dynamic.spec.ts` | Dynamic outcomes with a stubbed catalogue and outcomes endpoint: exits on load, after a settings save, a failed resolve, "Missing outcome" exits, labels rendered as text. |
 | `Connections/connection.crud.spec.ts` | Connection create, rename, collection listing, collection Create button (#297) |
 | `Connections/connection.test.spec.ts` | Test connection saves unsaved edits (#347), popup-blocked same-tab OAuth fallback (#348, stubbed) |
 
