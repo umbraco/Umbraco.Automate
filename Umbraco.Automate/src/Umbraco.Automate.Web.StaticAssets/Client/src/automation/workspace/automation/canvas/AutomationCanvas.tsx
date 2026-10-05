@@ -15,10 +15,13 @@ import {
     type ColorMode,
     type Connection,
 } from "@xyflow/react";
+import { LocalizeContext, type LocalizeString } from "./localize-context.js";
 import { nodeTypes } from "./nodes/node-types.js";
 import AutomationEdge from "./edges/AutomationEdge.js";
 import type { CanvasChangeDetail, AddNodeRequestDetail, ActionNodeData } from "./types.js";
 import { ANY_RESULT_HANDLE, BODY_HANDLE, PARALLEL_ALIAS } from "./utils/model-to-flow.js";
+
+const defaultLocalize: LocalizeString = (value) => value;
 
 const edgeTypes = {
     automation: AutomationEdge,
@@ -35,6 +38,8 @@ interface AutomationCanvasProps {
     viewport?: Viewport;
     colorMode?: ColorMode;
     readOnly?: boolean;
+    /** Backoffice localization for node labels; defaults to showing text untranslated. */
+    localize?: LocalizeString;
     onCanvasChange?: (detail: CanvasChangeDetail) => void;
     onAddNodeRequest?: (detail: AddNodeRequestDetail) => void;
     onDeleteRequest?: (nodes: Node[]) => Promise<boolean>;
@@ -46,6 +51,7 @@ export default function AutomationCanvas({
     viewport,
     colorMode = "light",
     readOnly = false,
+    localize,
     onCanvasChange,
     onAddNodeRequest,
     onDeleteRequest,
@@ -312,6 +318,7 @@ export default function AutomationCanvas({
     );
 
     return (
+        <LocalizeContext.Provider value={localize ?? defaultLocalize}>
         <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -355,5 +362,6 @@ export default function AutomationCanvas({
                 pannable
             />
         </ReactFlow>
+        </LocalizeContext.Provider>
     );
 }

@@ -77,6 +77,15 @@ export default {
         found: "Found",
         notFound: "Not found",
     },
+    uaOutcomeExits: {
+        default: "(default)",
+        anyResult: "Any result",
+        anyResultTooltip: "Runs whatever the step returns. Move this line to a named exit to choose when it runs.",
+        missing: "Missing outcome",
+        missingTooltip: "This outcome no longer exists. The automation won't publish until the line is moved or removed.",
+        bothPathsWarning: "Both paths run on this result. Move the Any result line to a named exit.",
+        propertyFoundTooltip: "The item and the property were both found.",
+    },
     uaPlaceholders: {
         enterName: "Enter a name...",
         enterAlias: "Enter an alias...",

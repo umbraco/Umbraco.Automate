@@ -429,3 +429,34 @@
     border-color: var(--uui-color-warning-standalone, #f59e0b);
     border-style: dashed;
 }
+
+/* Outcome exits (action nodes that declare outcomes) — reuse the Switch row layout above. */
+.ua-node__switch-case--missing {
+    background: color-mix(in srgb, var(--uui-color-danger, #d42054) 8%, transparent);
+}
+
+.ua-node__switch-case--missing .ua-node__switch-case-label {
+    color: var(--uui-color-danger, #d42054);
+}
+
+.ua-node__switch-case--missing .react-flow__handle {
+    background: var(--uui-color-danger, #d42054);
+}
+
+.ua-node__warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--uui-size-space-2, 6px);
+    padding: var(--uui-size-space-2, 6px) var(--uui-size-space-4, 12px);
+    padding-left: calc(var(--uui-size-space-4, 12px) + 4px);
+    border-top: 1px solid var(--uui-color-divider-standalone, #e9e9eb);
+    background: color-mix(in srgb, var(--uui-color-warning, #fbd142) 20%, transparent);
+    color: var(--uui-color-text, #060606);
+    font-size: var(--uui-size-4, 12px);
+    line-height: 1.3;
+}
+
+.ua-node__warning uui-icon {
+    flex: none;
+    color: var(--uui-color-warning-standalone, #f59e0b);
+}
