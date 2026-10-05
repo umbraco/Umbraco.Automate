@@ -120,6 +120,81 @@ public class GetContentActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_NodeAuthorizationDenied_ReturnsTheAuthorizerReason()
+    {
+        var contentKey = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(contentKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var context = CreateContext(new GetContentSettings { ContentKey = contentKey.ToString() });
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Exception!.Message.ShouldBe("Out of start-node path.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var contentKey = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(contentKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{contentKey}' not found."));
+
+        var context = CreateContext(new GetContentSettings { ContentKey = contentKey.ToString() });
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_ReturnsNotFoundOutcomeWithTheKey()
+    {
+        var contentKey = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(contentKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{contentKey}' not found."));
+
+        var context = CreateContext(new GetContentSettings { ContentKey = contentKey.ToString() });
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        ((GetContentOutput)result.OutputData!).ContentKey.ShouldBe(contentKey);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_DoesNotReadThePublishedCache()
+    {
+        var contentKey = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(contentKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{contentKey}' not found."));
+
+        var context = CreateContext(new GetContentSettings { ContentKey = contentKey.ToString() });
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        _cache.Verify(c => c.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<bool?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_EmitsNotFoundOutcome()
+    {
+        var contentKey = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(contentKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{contentKey}' not found."));
+
+        var context = CreateContext(new GetContentSettings { ContentKey = contentKey.ToString() });
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Outcome.ShouldBe(GetContentAction.OutcomeNotFound);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ContentNotFound_ReturnsNotFoundOutcome()
     {
         var contentKey = Guid.NewGuid();
