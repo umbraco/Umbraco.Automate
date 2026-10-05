@@ -30,7 +30,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S5 AC5–AC9 and AC11 specs pass, and S5 AC3 (draft save allowed) passes.
 - [x] **T6** Add `outcomes` and `hasDynamicOutcomes` to `StepTypeItemResponseModel`, mapped in `CatalogueMapDefinition` (all three map methods) · story: S3, S7 · depends-on: T1 · parallel-group: B
   - Done when: S3 AC1–AC2 and S7 AC3 (catalogue part) specs pass (extend `CatalogueMapDefinitionTests`).
-- [ ] **T7** Add `ResolveStepTypeOutcomesController`, `POST step-types/{alias}/outcomes`, with `ResolveOutcomesRequestModel` / `StepOutcomeResponseModel`, using the same 404 and 400 handling as output schema · story: S4, S7 · depends-on: T1, T3 · parallel-group: B
+- [x] **T7** Add `ResolveStepTypeOutcomesController`, `POST step-types/{alias}/outcomes`, with `ResolveOutcomesRequestModel` / `StepOutcomeResponseModel`, using the same 404 and 400 handling as output schema · story: S4, S7 · depends-on: T1, T3 · parallel-group: B
   - Done when: S4 AC2, AC3, AC10, AC11 and S7 AC3 (endpoint part) specs pass.
 - [ ] **T8** Make Get Content declare `success` (default, `#uaOutcomes_found`) and `notFound` (`#uaOutcomes_notFound`), and add English terms to `lang/en.ts` · story: S9, S7 · depends-on: T1 · parallel-group: B
   - Done when: S9 AC1–AC3 specs pass for Get Content.
