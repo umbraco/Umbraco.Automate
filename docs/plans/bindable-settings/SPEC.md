@@ -84,10 +84,14 @@ steps' outputs.
 ![${ trigger.contentKey } in binding mode](./images/07-binding-expression.png)
 
 **Today: Move Media → Media can only pick folders.** Every image is greyed out
-(`MediaEntityPicker` is folders-only since CMS 17.3.0). `Umb.Automate.MediaKeyPicker` fixes
-this. There's no "after" shot because that picker doesn't exist yet.
+(`MediaEntityPicker` is folders-only since CMS 17.3.0).
 
 ![Move Media picker with all images greyed out](./images/08-move-media-today-folders-only.png)
+
+**After (T8): Move Media → Media uses `Umb.Automate.MediaKeyPicker` with `filesAndFolders`.**
+The images can be selected. Captured from the branch build on 05-10-2026.
+
+![Move Media picker with images selectable](./images/09-move-media-after-files-selectable.png)
 
 Not captured: the "nothing to bind to" state (no switch). No trigger's own settings have a
 picker field to show it on. The mockup below covers it.

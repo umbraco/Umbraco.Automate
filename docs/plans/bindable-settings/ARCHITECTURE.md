@@ -122,8 +122,11 @@ a parent and wrong for an item. CMS has no other editor that stores a plain medi
 `MediaPicker3` stores objects. `Umb.Automate.MediaKeyPicker` is #206's media picker without
 its switch: a thin `umb-input-media` honouring `validationLimit` and a `folderFilter` config
 (`filesOnly` by default, `filesAndFolders` or `foldersOnly` when a field sets it). Files only is the
-default because Get Media, Get Media Property and Update Media Property fail at run time on a
-folder. Move Media can move a folder, so its field allows both.
+default, and Get Media, Get Media Property and Update Media Property use it. That's a deliberate
+narrowing: these fields are for a media item, and keeping folders out of the picker keeps the
+choice clean. The actions themselves do work on folders, including folder types with their own
+properties, and a binding can still point at a folder. Move Media can move a folder, so its field
+allows both.
 
 > ASSUMPTION: Start Automation's `AutomationKey` (`Umb.Automate.AutomationPicker`) stays
 > picker-only. Binding which automation to start isn't asked for, and it would bypass the
