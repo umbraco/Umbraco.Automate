@@ -1,0 +1,29 @@
+# Decision log
+
+- **05-10-2026 (explore):** Started again from scratch. The earlier `collection-bindings` plan was deleted at the user's request and isn't used here.
+- **05-10-2026 (explore):** Scope is slice 1 only: pick or bind a single value with any editor (#83, #206, #443). Binding a whole list is left for a separate, later plan because it needs server work this slice doesn't.
+- **05-10-2026 (explore):** No kill criterion. Picking from the tree and binding from an earlier step (Find Content → Get Content Property) are both permanent needs. Only how it's built is open.
+- **05-10-2026 (design):** #443's generic wrapper owns the pick-or-bind switch. #206's built-in switches are dropped and #206 is closed in favour of #443's branch, which takes over its field changes.
+- **05-10-2026 (design):** Content keys use CMS `Umb.PropertyEditorUi.DocumentPicker`, matching Move/Create Content. #206's `ContentKeyPicker` is dropped (unreleased, so no shim needed).
+- **05-10-2026 (design):** Media items get `Umb.Automate.MediaKeyPicker` (files and folders). CMS `MediaEntityPicker` is folders-only since 17.3.0 (CMS #21895). This also fixes Move Media's `MediaKey`.
+- **05-10-2026 (design):** The server adds `ValueKind` (Scalar/Collection) to field descriptors. Only scalar fields are wrapped. This replaces #443's guess from `defaultValue` and its `["${ }"]` shape. It's the slice's one server change, additive, and against the brief's "no server change" assumption.
+- **05-10-2026 (design):** Start Automation's `AutomationKey` stays picker-only (assumed).
+- **05-10-2026 (design):** The wrapper remembers each mode's last value for the open step panel (expression and picked node), so toggling doesn't lose work. Nothing extra is stored. This replaces #443's clear-on-switch-off.
+- **05-10-2026 (plan):** Build on #443's branch. T1 rebases it and carries the plan folder and pending specs over from `v18/dev`, where they sit uncommitted.
+- **05-10-2026 (plan):** `valueKind` (T2, T4) comes before the routing change (T5). The routing rule depends on it, and T5 deletes #443's `defaultValue` guess.
+- **05-10-2026 (plan):** Remembered values (T6) follow T5 because both edit `bindable-editor.element.ts`. The content and media adoption tasks (T7, T8) can run alongside T6.
+- **05-10-2026 (plan):** Pending unit specs read `ValueKind` by reflection so they compile before it exists. T2 swaps that for the typed property.
+- **05-10-2026 (plan):** Acceptance specs follow the suite's convention (several `expect`s on one outcome, no label assertions). They're pending as `test.fixme`, which this suite otherwise uses for known product gaps. The header comment says so.
+- **05-10-2026 (plan):** Updating #443's description and closing #206 are outward-facing, so T10 needs the user's approval before anything is posted.
+- **05-10-2026 (sad-path review):** Ran the new sad-path-finder skill over this plan and PR #206. The user decided:
+  - **Empty parent bindings fail.** The four optional parent fields get `BindingMustResolve`, so a binding that resolves to empty fails the step instead of silently using the root. New task T12.
+  - **Only string fields get the switch.** `valueKind` becomes String / Scalar / Collection, and only `String` is wrapped, because a `${ }` string can't be deserialized into an int, Guid, enum or object.
+  - **The media key picker has a per-field folder filter.** Files only by default. Move Media's `MediaKey` allows folders, because Get and Update Media Property fail on a folder.
+- **05-10-2026 (sad-path review):** Recommended defaults taken, no user input needed:
+  - The form routes each field once, when it loads (decision 10).
+  - On switch-off, a GUID in the box wins over the remembered pick, and other text is dropped.
+  - Insert binding remembers the pick, as the switch does.
+  - The missing-editor fallback only applies once a field has been routed to the wrapper.
+- **05-10-2026 (sad-path review), OPEN:** Old non-canonical GUIDs (upper-case, braces) may show as "not found" in CMS's picker, although the run accepts them. Not fixed by treating them as binding mode: the wrapper is generic, and other pickers (Forms) store values that aren't GUIDs. T9 captures what's shown, then decides. Normalising on the content and media fields is the likely fix.
+- **05-10-2026 (sad-path review):** The review also confirmed #206 shouldn't merge as it is. It conflicts with `v18/dev` in `Constants.cs`, and it would release `Constants.EditorUiAliases` aliases that this plan drops. Closing it stays in T10, behind the human gate.
+- **05-10-2026 (build):** The plan folder is committed on #443's feature branch only, not on `v18/dev` as the build skill's default would do (the user's call). It reaches `v18/dev` through #443's review.
