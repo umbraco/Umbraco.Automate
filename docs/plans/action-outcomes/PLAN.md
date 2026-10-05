@@ -28,7 +28,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S1 AC5–AC9 and AC8 (no default allowed) specs pass.
 - [x] **T5** Add `AddDanglingOutcomeErrors` to `AutomationService.ValidateForPublishAsync`, resolving each declaring step's outcomes (`HasDynamicOutcomes || GetOutcomes().Count > 0`) from its saved settings, and reporting a resolution failure as its own error · story: S5 · depends-on: T1 · parallel-group: B
   - Done when: S5 AC5–AC9 and AC11 specs pass, and S5 AC3 (draft save allowed) passes.
-- [ ] **T6** Add `outcomes` and `hasDynamicOutcomes` to `StepTypeItemResponseModel`, mapped in `CatalogueMapDefinition` (all three map methods) · story: S3, S7 · depends-on: T1 · parallel-group: B
+- [x] **T6** Add `outcomes` and `hasDynamicOutcomes` to `StepTypeItemResponseModel`, mapped in `CatalogueMapDefinition` (all three map methods) · story: S3, S7 · depends-on: T1 · parallel-group: B
   - Done when: S3 AC1–AC2 and S7 AC3 (catalogue part) specs pass (extend `CatalogueMapDefinitionTests`).
 - [ ] **T7** Add `ResolveStepTypeOutcomesController`, `POST step-types/{alias}/outcomes`, with `ResolveOutcomesRequestModel` / `StepOutcomeResponseModel`, using the same 404 and 400 handling as output schema · story: S4, S7 · depends-on: T1, T3 · parallel-group: B
   - Done when: S4 AC2, AC3, AC10, AC11 and S7 AC3 (endpoint part) specs pass.
