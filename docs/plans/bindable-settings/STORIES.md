@@ -78,17 +78,24 @@ Specs: `automation.bindable-settings.spec.ts` ("Pick or bind").
   mode.
 - **AC8: Required in binding mode.** Given a required field in binding mode, when the
   expression box is emptied, then "This field is required" is shown.
-- **AC9: Read-only.** Given the step is read-only, when the settings open, then no switch is
-  shown.
+- **AC9: Read-only.** *Not reachable today: the step settings form has no read-only mode (decided
+  06-10-2026). The wrapper still hides the switch when `readonly` is set, for when one exists. No
+  acceptance spec.*
 - **AC10: Collection field unwrapped.** Given a bindable `Collection` field with a non-text
   editor, when the settings open, then its editor renders with no switch.
-- **AC10b: Non-string field unwrapped.** Given a bindable `Guid` or enum field with a non-text
-  editor, when the settings open, then its editor renders with no switch.
+- **AC10b: Non-string field unwrapped.** Given a bindable non-string single-value field (an object
+  such as If's `conditions`, or a `Guid` or enum) with a non-text editor, when the settings open,
+  then its editor renders with no switch.
 - **AC11: Self-binding editor unwrapped.** Given a bindable field using the key/value editor,
   when the settings open, then it renders with no switch.
 - **AC12: Missing editor.** Given bindings in scope and a field whose declared editor isn't
   registered, when the settings open, then the field is in binding mode, shows the stored value
   and has no switch.
+- **AC14: Binding an empty required field saves.** Given an empty required picker field (Publish
+  Content's Content Key, or Get Media's Media), when the author uses Insert binding and saves, then
+  the saved setting is the expression and no error is thrown.
+- **AC15: A GUID in another format still shows the node.** Given a stored upper-case or braced GUID of
+  an existing node or media item, when the settings open, then the picker shows that item.
 - **AC13: Routing holds while editing.** Given nothing in scope and a stored binding, when the
   author switches off and back on, then the switch is still shown and the expression is back.
 
@@ -126,9 +133,9 @@ Specs: `automation.bindable-settings.spec.ts` ("Switching modes").
 - **AC7: Other text is dropped.** Given binding mode holding text that is neither a binding nor
   a GUID, when the author switches off, then the picker is empty.
 
-> ASSUMPTION: Still to capture in T9 and then decide: what the picker shows for a deleted or
-> trashed node, and for an old upper-case or braced GUID. They become criteria here once
-> decided.
+Edge cases captured in T9 and decided 06-10-2026 (screenshots 10–19 in SPEC): a deleted node shows
+"Not found", and a deleted media item shows an empty picker (accepted). A trashed item shows a
+"Trashed" tag. Upper-case and braced GUIDs are converted (STORY-2 AC15).
 
 ---
 
@@ -199,8 +206,8 @@ Specs: `automation.bindable-settings.spec.ts` ("Media fields").
 
 - **AC5b: Folders not selectable for property actions.** Given Get Media Property's Media field,
   when the author opens the picker at the media root, then a folder can't be selected.
-- **AC5: Read-only picker.** Given a read-only step, when the media key picker renders, then it
-  can't be changed.
+- **AC5: Read-only picker.** *Not reachable today: no read-only settings form (decided
+  06-10-2026). No acceptance spec.*
 
 ---
 

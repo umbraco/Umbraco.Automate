@@ -93,6 +93,20 @@ The images can be selected. Captured from the branch build on 05-10-2026.
 
 ![Move Media picker with images selectable](./images/09-move-media-after-files-selectable.png)
 
+**Edge cases (T9, 06-10-2026).** What the pickers show for stored values that don't map cleanly to
+an item, and what was decided:
+
+| Stored value | Document picker | Media key picker | Decision |
+|---|---|---|---|
+| Deleted item's GUID | "Not found" with the GUID (10) | Empty "Choose" (14) | Accepted. The run fails with the action's not-found message |
+| Trashed item's GUID | Node with a "Trashed" tag (11) | Card with a "Trashed" tag (15) | Fine as it is |
+| Upper-case GUID | "Not found" (12) | Empty (16) | Converted to canonical for display, so the item shows |
+| Braced GUID | "Not found" (13) | Empty (17) | Converted to canonical by the wrapper |
+
+An author whose user group has only the Automate section sees a stored node's name (18), but
+"Choose" opens an empty tree (19), because the CMS's tree permissions apply. That's accepted. Such
+authors bind the node from the trigger or an earlier step instead.
+
 Not captured: the "nothing to bind to" state (no switch). No trigger's own settings have a
 picker field to show it on. The mockup below covers it.
 
@@ -193,6 +207,11 @@ It shows its editor with no switch, because whole-list binding is out of scope.
   wrapper (bindings in scope, or a stored binding), it opens in binding mode with no switch,
   showing the stored value as text. With nothing in scope and no binding, the form renders the
   declared alias as it does today.
+- **GUID format:** a stored GUID in another format (any case, braces in pairs, surrounding spaces)
+  is converted to canonical lower-case before it's handed to the wrapped picker, so the item
+  shows. The canonical form is saved once the author changes the field or switches back from a
+  binding. A field nobody touches keeps its stored form, so opening an old step doesn't mark it
+  changed, and the run accepts every format anyway.
 - **Value written:** in picker mode, exactly what the wrapped editor emits. In binding mode, the
   expression string. Nothing else is added to the stored settings.
 
