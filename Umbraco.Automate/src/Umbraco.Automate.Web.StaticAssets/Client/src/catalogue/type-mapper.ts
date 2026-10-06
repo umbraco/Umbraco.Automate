@@ -2,7 +2,7 @@ import type { StepOutcomeResponseModel, ActionItemResponseModel, ConnectionTypeI
 import type { UaActionCatalogueItemModel, UaStepOutcome, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "./types.js";
 
 function toOutcome(response: StepOutcomeResponseModel): UaStepOutcome {
-    return { key: response.key, label: response.label, isDefault: response.isDefault };
+    return { key: response.key, label: response.label, isDefault: response.isDefault, description: response.description ?? undefined };
 }
 
 export const UaCatalogueTypeMapper = {

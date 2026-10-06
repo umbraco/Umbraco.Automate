@@ -75,6 +75,30 @@ public class CatalogueOutcomesMappingTests
         result.Outcomes.Single().Label.ShouldBe("Breaking news");
     }
 
+    [Fact]
+    public void Map_OutcomeWithKeyDescription_IsMappedUntranslated()
+    {
+        var result = MapAction(new DescribedOutcomesAction(ActionDeps));
+
+        result.Outcomes[0].Description.ShouldBe("#uaOutcomes_propertyFoundDescription");
+    }
+
+    [Fact]
+    public void Map_OutcomeWithLiteralDescription_IsMappedAsIs()
+    {
+        var result = MapAction(new DescribedOutcomesAction(ActionDeps));
+
+        result.Outcomes[1].Description.ShouldBe("Runs when nothing matched.");
+    }
+
+    [Fact]
+    public void Map_OutcomeWithoutDescription_DescriptionIsNull()
+    {
+        var result = MapAction(new YesNoAction(ActionDeps));
+
+        result.Outcomes.ShouldAllBe(o => o.Description == null);
+    }
+
     #endregion
 
     #region Given an action whose GetOutcomes throws
@@ -188,6 +212,19 @@ public class CatalogueOutcomesMappingTests
     private class LiteralLabelAction(ActionInfrastructure infrastructure) : ActionBase<object>(infrastructure)
     {
         public override IReadOnlyList<StepOutcome> GetOutcomes() => [new StepOutcome("news", "Breaking news")];
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => throw new NotImplementedException();
+    }
+
+    [Action("test.describedoutcomes", "Described Outcomes Action")]
+    private class DescribedOutcomesAction(ActionInfrastructure infrastructure) : ActionBase<object>(infrastructure)
+    {
+        public override IReadOnlyList<StepOutcome> GetOutcomes() =>
+        [
+            new StepOutcome("found", "Found") { Description = "#uaOutcomes_propertyFoundDescription" },
+            new StepOutcome("none", "None") { Description = "Runs when nothing matched." },
+        ];
 
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => throw new NotImplementedException();

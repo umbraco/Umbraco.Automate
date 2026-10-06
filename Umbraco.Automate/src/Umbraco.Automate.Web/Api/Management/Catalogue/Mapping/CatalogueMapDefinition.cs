@@ -112,6 +112,7 @@ public class CatalogueMapDefinition : IMapDefinition
         target.Key = source.Key;
         target.Label = source.Label;
         target.IsDefault = source.IsDefault;
+        target.Description = source.Description;
     }
 
     // Static outcomes only: dynamic ones depend on a step's settings and are resolved per step.

@@ -26,11 +26,6 @@ export interface ConnectedExits {
     namedKeys: string[];
 }
 
-const KEY_TOOLTIPS: Record<string, Record<string, string>> = {
-    "umbracoAutomate.getContentProperty": { success: "#uaOutcomeExits_propertyFoundTooltip" },
-    "umbracoAutomate.getMediaProperty": { success: "#uaOutcomeExits_propertyFoundTooltip" },
-};
-
 export function parseConnectedExits(handleIds: readonly (string | null | undefined)[]): ConnectedExits {
     const namedKeys: string[] = [];
     let hasUnnamed = false;
@@ -42,7 +37,6 @@ export function parseConnectedExits(handleIds: readonly (string | null | undefin
 }
 
 export function buildOutcomeExits(
-    actionAlias: string,
     outcomes: readonly UaStepOutcome[],
     outcomesUnknown: boolean,
     connected: ConnectedExits,
@@ -52,7 +46,7 @@ export function buildOutcomeExits(
         kind: "declared",
         label: o.label,
         isDefault: o.isDefault,
-        tooltip: KEY_TOOLTIPS[actionAlias]?.[o.key],
+        tooltip: o.description,
     }));
 
     if (connected.hasUnnamed) {

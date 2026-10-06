@@ -98,6 +98,26 @@ public class BuiltInActionOutcomeTests
 
     #endregion
 
+    #region Given the property actions' success outcome
+
+    [Theory]
+    [InlineData("GetContentPropertyAction")]
+    public void GetOutcomes_GetContentProperty_SuccessDescriptionIsThePropertyFoundTerm(string actionType)
+        => CreateContentAction(actionType).GetOutcomes().Single(o => o.Key == "success")
+            .Description.ShouldBe("#uaOutcomes_propertyFoundDescription");
+
+    [Theory]
+    [InlineData("GetMediaPropertyAction")]
+    public void GetOutcomes_GetMediaProperty_SuccessDescriptionIsThePropertyFoundTerm(string actionType)
+        => CreateMediaAction(actionType).GetOutcomes().Single(o => o.Key == "success")
+            .Description.ShouldBe("#uaOutcomes_propertyFoundDescription");
+
+    [Fact]
+    public void GetOutcomes_GetContent_DescribesNoOutcome()
+        => CreateGetContentAction().GetOutcomes().ShouldAllBe(o => o.Description == null);
+
+    #endregion
+
     #region Given Get Content
 
     [Fact]

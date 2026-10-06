@@ -516,6 +516,9 @@ public sealed record StepOutcome(string Key, string Label)
 {
     // The outcome taken when the action succeeds without naming one.
     public bool IsDefault { get; init; }
+
+    // Optional tooltip for the exit: a #key localization key or literal text, shown as text.
+    public string? Description { get; init; }
 }
 
 // IStepType (default interface members, so direct implementers don't break):
@@ -595,6 +598,7 @@ One shared validator checks these at publish and at run time.
 - `Key` must not start with `__`. That prefix is reserved for exits the system adds, such as "Any result".
 - At most one outcome has `IsDefault = true`. You need a default only if the action can succeed without naming an outcome. If it always names one, declare no default, or the default exit would be drawn but could never fire.
 - `Label` is display text only. A label starting with `#` is a localization key (built-in actions use `#uaOutcomes_<term>`, where the term is named for the label, not the key: Get Content's `success` outcome uses `#uaOutcomes_found`. Terms live in the backoffice language file). Any other label is shown as written, which suits author-typed text.
+- `Description` is optional. It is the tooltip on the outcome's exit and follows the same rule as `Label`: a `#` key is localized, anything else is shown as written, and it is always rendered as text. Get Content Property and Get Media Property use it on `success` (`#uaOutcomes_propertyFoundDescription`). It is returned untranslated as `description` in the catalogue and outcomes endpoints.
 
 #### Outcomes come from saved, unbound settings
 

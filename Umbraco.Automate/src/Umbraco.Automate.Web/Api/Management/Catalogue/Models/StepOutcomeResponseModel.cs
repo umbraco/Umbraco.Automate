@@ -17,4 +17,7 @@ public class StepOutcomeResponseModel
 
     /// <summary>Whether this is the default outcome, used when the step succeeds without naming an outcome.</summary>
     public bool IsDefault { get; set; }
+
+    /// <summary>An optional explanation of when the step finishes with this outcome: a <c>#key</c> localization key or literal text, returned untranslated.</summary>
+    public string? Description { get; set; }
 }
