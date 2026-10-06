@@ -115,6 +115,30 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
         return GetOutputSchemaAsync(typed, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public virtual IReadOnlyList<StepOutcome> GetOutcomes() => [];
+
+    /// <inheritdoc />
+    public virtual bool HasDynamicOutcomes => false;
+
+    /// <summary>
+    /// Override to provide outcomes based on the step's typed settings. Must be cheap and
+    /// side-effect free (no network or database access), and must work from saved, unbound settings.
+    /// The default implementation returns the static outcomes from <see cref="GetOutcomes"/>.
+    /// </summary>
+    /// <param name="settings">The resolved typed settings, or null if unconfigured.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The outcomes for the given settings, or an empty list if none.</returns>
+    protected virtual Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(TSettings? settings, CancellationToken cancellationToken = default)
+        => Task.FromResult(GetOutcomes());
+
+    /// <inheritdoc />
+    Task<IReadOnlyList<StepOutcome>> IStepType.GetOutcomesAsync(Dictionary<string, object?>? settings, CancellationToken cancellationToken)
+    {
+        var typed = settings is { Count: > 0 } ? ResolveSettings(settings) : null;
+        return GetOutcomesAsync(typed, cancellationToken);
+    }
+
     /// <summary>
     /// Resolves settings from a raw dictionary to a typed <typeparamref name="TSettings"/> instance,
     /// applying configuration variable substitution and validation.

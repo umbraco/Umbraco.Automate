@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Security;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
@@ -24,6 +25,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredPermissions = [ActionNew.ActionLetter])]
 public sealed class CreateContentAction : ActionBase<CreateContentSettings, CreateContentOutput>, ICmsAction
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when the parent content item does not exist.
     /// </summary>
@@ -66,6 +73,15 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_created") { IsDefault = true },
+            new StepOutcome(OutcomeParentNotFound, "#uaOutcomes_parentNotFound"),
+            new StepOutcome(OutcomeContentTypeNotFound, "#uaOutcomes_contentTypeNotFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<CreateContentSettings>();
@@ -97,13 +113,34 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
 
         // The root is not a node, so it takes its own check: a service account confined to a
         // start node can reach content inside it but must not write to the root.
-        var failure = atRoot
-            ? await _authorizer.AuthorizeContentRootOrFailAsync(RequiredPermissions, cancellationToken)
-            : await _authorizer.AuthorizeContentOrFailAsync(parentKey, RequiredPermissions, cancellationToken);
-
-        if (failure is not null)
+        if (atRoot)
         {
-            return failure;
+            if (await _authorizer.AuthorizeContentRootOrFailAsync(RequiredPermissions, cancellationToken) is { } rootFailure)
+            {
+                return rootFailure;
+            }
+        }
+        else
+        {
+            // A parent the CMS reports as not existing (deleted, or in the recycle bin) is not a
+            // permission problem, so it routes to the parentNotFound outcome.
+            var authorization = await _authorizer.AuthorizeContentAsync(parentKey, RequiredPermissions, cancellationToken);
+            if (authorization.IsNotFound)
+            {
+                context.LogWarning($"Parent content {parentKey} was not found, so nothing was created");
+
+                return SuccessWithOutcome(OutcomeParentNotFound, new CreateContentOutput
+                {
+                    Name = settings.Name,
+                    ContentTypeKey = contentTypeKey,
+                    ParentKey = parentKey,
+                });
+            }
+
+            if (!authorization.Authorized)
+            {
+                return authorization.ToFailedActionResult();
+            }
         }
 
         var parent = atRoot ? null : _contentService.GetById(parentKey);

@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -15,17 +17,20 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
     private readonly IContentPermissionService _contentPermissionService;
     private readonly IMediaPermissionService _mediaPermissionService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
+    private readonly IEntityService _entityService;
     private readonly ILogger<AutomationActionAuthorizer> _logger;
 
     public AutomationActionAuthorizer(
         IContentPermissionService contentPermissionService,
         IMediaPermissionService mediaPermissionService,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IEntityService entityService,
         ILogger<AutomationActionAuthorizer> logger)
     {
         _contentPermissionService = contentPermissionService;
         _mediaPermissionService = mediaPermissionService;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
+        _entityService = entityService;
         _logger = logger;
     }
 
@@ -62,9 +67,12 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             "Content authorisation denied for service account {UserKey} on node {ContentKey} (permissions [{Permissions}]): {Status}",
             user.Key, contentKey, string.Join(", ", permissions), status);
 
-        return AutomationAuthorizationResult.Fail(MapContentReason(status, contentKey, permissions));
+        var reason = MapContentReason(ContentAuthorizationStatus.NotFound, contentKey, permissions);
+        return status == ContentAuthorizationStatus.NotFound
+            || IsHiddenInRecycleBin(status == ContentAuthorizationStatus.UnauthorizedMissingPathAccess, UmbracoObjectTypes.Document, contentKey, UmbracoConstants.System.RecycleBinContentPathPrefix)
+            ? AutomationAuthorizationResult.NotFound(reason)
+            : AutomationAuthorizationResult.Fail(MapContentReason(status, contentKey, permissions));
     }
-
     /// <inheritdoc />
     public Task<AutomationAuthorizationResult> AuthorizeMediaAsync(
         Guid mediaKey,
@@ -96,7 +104,10 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             "Media authorisation denied for service account {UserKey} on node {MediaKey}: {Status}",
             user.Key, mediaKey, status);
 
-        return AutomationAuthorizationResult.Fail(MapMediaReason(status, mediaKey));
+        return status == MediaAuthorizationStatus.NotFound
+            || IsHiddenInRecycleBin(status == MediaAuthorizationStatus.UnauthorizedMissingPathAccess, UmbracoObjectTypes.Media, mediaKey, UmbracoConstants.System.RecycleBinMediaPathPrefix)
+            ? AutomationAuthorizationResult.NotFound(MapMediaReason(MediaAuthorizationStatus.NotFound, mediaKey))
+            : AutomationAuthorizationResult.Fail(MapMediaReason(status, mediaKey));
     }
 
     /// <inheritdoc />
@@ -283,6 +294,14 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
 
         return authorized;
     }
+
+    // The CMS reports a trashed node as "missing path access" to any account without a root
+    // start node, because the recycle bin sits outside every start-node path. Such an account
+    // cannot see the bin, so for it a trashed node is the same as a deleted one.
+    private bool IsHiddenInRecycleBin(bool deniedOnPath, UmbracoObjectTypes objectType, Guid key, string recycleBinPathPrefix)
+        => deniedOnPath
+           && _entityService.GetAllPaths(objectType, key)
+               .Any(p => p.Path.StartsWith(recycleBinPathPrefix, StringComparison.Ordinal));
 
     private Task<ContentAuthorizationStatus> AuthorizeContentKeyAsync(
         IUser user,

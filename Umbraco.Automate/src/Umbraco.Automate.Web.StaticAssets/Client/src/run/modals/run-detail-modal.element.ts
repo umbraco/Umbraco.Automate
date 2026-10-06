@@ -9,6 +9,7 @@ import { UaAutomationRunsChangedEvent } from "../../automation/events/automation
 import { formatDateTime, getRunStatusColor } from "../../core/index.js";
 import { AutomationsService, RunsService } from "../../api/sdk.gen.js";
 import type { UaRunDetailModel } from "../types.js";
+import type { UaStepOutcome } from "../../catalogue/types.js";
 import type { UaRunDetailModalData } from "./run-detail-modal.token.js";
 import "../components/step-run-detail/step-run-detail.element.js";
 import { UA_RUN_TRIGGER_ROW_ID } from "../components/run-trigger-detail/run-trigger-detail.element.js";
@@ -40,6 +41,10 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
 
     @state()
     private _actionNames = new Map<string, string>();
+
+    /** Each action's static outcomes by alias; dynamic ones can't be resolved without step settings. */
+    @state()
+    private _actionOutcomes = new Map<string, UaStepOutcome[]>();
 
     @state()
     private _triggerNames = new Map<string, string>();
@@ -77,6 +82,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                 names.set(a.alias, a.name);
             }
             this._actionNames = names;
+            this._actionOutcomes = new Map(actions.map((a) => [a.alias, a.outcomes ?? []]));
         }
 
         if (triggers) {
@@ -322,6 +328,7 @@ export class UaRunDetailModalElement extends UmbModalBaseElement<UaRunDetailModa
                                           .actionName=${this._actionNames.get(sr.actionAlias) ?? sr.actionAlias}
                                           .expanded=${this._expandedStep === sr.id}
                                           .runId=${this._run!.unique}
+                                          .outcomes=${this._actionOutcomes.get(sr.actionAlias)}
                                       ></ua-step-run-detail>
                                   `,
                               )}

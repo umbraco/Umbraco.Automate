@@ -4,7 +4,7 @@ import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { CatalogueService } from "../../api/sdk.gen.js";
 import { UaCatalogueServerDataSource } from "./catalogue.server.data-source.js";
 import type { NotificationChannelItemResponseModel } from "../../api/types.gen.js";
-import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaTriggerCatalogueItemModel } from "../types.js";
+import type { UaActionCatalogueItemModel, UaConnectionTypeCatalogueItemModel, UaControlFlowCatalogueItemModel, UaStepOutcome, UaTriggerCatalogueItemModel } from "../types.js";
 
 const UNSCOPED_CACHE_KEY = "__all__";
 
@@ -19,6 +19,9 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
     // Resolved dynamic output schemas, keyed by alias + serialized settings. The binding picker
     // resolves the same predecessor schemas repeatedly as it rebuilds, so cache per settings snapshot.
     #outputSchemaCache = new Map<string, Record<string, unknown> | null>();
+
+    // Resolved dynamic outcomes, keyed by alias + serialized settings.
+    #outcomesCache = new Map<string, UaStepOutcome[]>();
 
     constructor(host: UmbControllerHost) {
         super(host);
@@ -98,6 +101,27 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
         return result;
     }
 
+    /**
+     * Resolves the settings-dependent outcomes for a step type that declares `hasDynamicOutcomes`.
+     * Cached per (alias, settings) so repeated canvas rebuilds don't re-hit the server.
+     */
+    async resolveOutcomes(
+        alias: string,
+        settings: Record<string, unknown>,
+    ): Promise<{ data?: UaStepOutcome[]; error?: unknown }> {
+        const key = `${alias}::${JSON.stringify(settings ?? {})}`;
+        const cached = this.#outcomesCache.get(key);
+        if (cached) {
+            return { data: cached };
+        }
+
+        const result = await this.#dataSource.resolveOutcomes(alias, settings ?? {});
+        if (result.data) {
+            this.#outcomesCache.set(key, result.data);
+        }
+        return result;
+    }
+
     async requestNotificationChannels(): Promise<{ data?: NotificationChannelItemResponseModel[]; error?: unknown }> {
         const { data, error } = await tryExecute(
             this,
@@ -112,6 +136,7 @@ export class UaCatalogueRepository extends UmbRepositoryBase {
         this.#connectionTypesCache = undefined;
         this.#controlFlowsCache = undefined;
         this.#outputSchemaCache.clear();
+        this.#outcomesCache.clear();
     }
 }
 

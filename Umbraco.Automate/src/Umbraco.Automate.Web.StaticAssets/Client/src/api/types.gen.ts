@@ -16,6 +16,8 @@ export type ActionItemResponseModel = {
         [key: string]: unknown;
     };
     hasDynamicOutputSchema: boolean;
+    outcomes: Array<StepOutcomeResponseModel>;
+    hasDynamicOutcomes: boolean;
     type: string;
 };
 
@@ -232,6 +234,8 @@ export type ControlFlowItemResponseModel = {
         [key: string]: unknown;
     };
     hasDynamicOutputSchema: boolean;
+    outcomes: Array<StepOutcomeResponseModel>;
+    hasDynamicOutcomes: boolean;
     type: string;
 };
 
@@ -397,6 +401,12 @@ export type ProblemDetails = {
     instance?: null | string;
 };
 
+export type ResolveOutcomesRequestModel = {
+    settings: {
+        [key: string]: unknown;
+    };
+};
+
 export type ResolveOutputSchemaRequestModel = {
     settings: {
         [key: string]: unknown;
@@ -445,6 +455,13 @@ export type StepConnectionModel = {
 
 export type StepErrorBehaviorModel = 'Retry' | 'Suspend' | 'Terminate' | 'Compensate';
 
+export type StepOutcomeResponseModel = {
+    key: string;
+    label: string;
+    isDefault: boolean;
+    description?: null | string;
+};
+
 export type StepPositionModel = {
     x: number;
     y: number;
@@ -473,6 +490,7 @@ export type StepRunResponseModel = {
     error?: null | string;
     retryCount: number;
     durationMs?: null | number;
+    branchOutcome?: null | string;
     logEntries: Array<StepRunLogEntryResponseModel>;
 };
 
@@ -490,6 +508,8 @@ export type StepTypeItemResponseModel = {
         [key: string]: unknown;
     };
     hasDynamicOutputSchema: boolean;
+    outcomes: Array<StepOutcomeResponseModel>;
+    hasDynamicOutcomes: boolean;
     type: string;
 };
 
@@ -513,6 +533,8 @@ export type TriggerItemResponseModel = {
         [key: string]: unknown;
     };
     hasDynamicOutputSchema: boolean;
+    outcomes: Array<StepOutcomeResponseModel>;
+    hasDynamicOutcomes: boolean;
     type: string;
 };
 
@@ -1386,6 +1408,41 @@ export type GetCatalogueStepTypesResponses = {
 
 export type GetCatalogueStepTypesResponse = GetCatalogueStepTypesResponses[keyof GetCatalogueStepTypesResponses];
 
+export type PostCatalogueStepTypesByAliasOutcomesData = {
+    body: ResolveOutcomesRequestModel;
+    path: {
+        alias: string;
+    };
+    query?: never;
+    url: '/umbraco/automate/management/api/v1/catalogue/step-types/{alias}/outcomes';
+};
+
+export type PostCatalogueStepTypesByAliasOutcomesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostCatalogueStepTypesByAliasOutcomesError = PostCatalogueStepTypesByAliasOutcomesErrors[keyof PostCatalogueStepTypesByAliasOutcomesErrors];
+
+export type PostCatalogueStepTypesByAliasOutcomesResponses = {
+    /**
+     * OK
+     */
+    200: Array<StepOutcomeResponseModel>;
+};
+
+export type PostCatalogueStepTypesByAliasOutcomesResponse = PostCatalogueStepTypesByAliasOutcomesResponses[keyof PostCatalogueStepTypesByAliasOutcomesResponses];
+
 export type PostCatalogueStepTypesByAliasOutputSchemaData = {
     body: ResolveOutputSchemaRequestModel;
     path: {
@@ -1396,6 +1453,10 @@ export type PostCatalogueStepTypesByAliasOutputSchemaData = {
 };
 
 export type PostCatalogueStepTypesByAliasOutputSchemaErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
     /**
      * The resource is protected and requires an authentication token
      */
@@ -2312,6 +2373,10 @@ export type PutWorkspacesByIdData = {
 };
 
 export type PutWorkspacesByIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
     /**
      * The resource is protected and requires an authentication token
      */

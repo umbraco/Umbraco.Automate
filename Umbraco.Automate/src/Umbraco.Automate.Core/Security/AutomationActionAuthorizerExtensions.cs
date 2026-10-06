@@ -9,6 +9,28 @@ namespace Umbraco.Automate.Core.Security;
 public static class AutomationActionAuthorizerExtensions
 {
     /// <summary>
+    /// Converts a denied authorisation result into the failed <see cref="ActionResult"/> that
+    /// the <c>*OrFailAsync</c> helpers return: an <see cref="UnauthorizedAccessException"/>
+    /// carrying the failure reason, categorised as <see cref="StepRunErrorCategory.Authentication"/>.
+    /// </summary>
+    public static ActionResult ToFailedActionResult(this AutomationAuthorizationResult result)
+        => ActionResult.Failed(
+            new UnauthorizedAccessException(result.FailureReason),
+            StepRunErrorCategory.Authentication);
+
+    /// <summary>
+    /// Authorises the service account against <paramref name="contentKey"/> for the given
+    /// permission letters, without converting the outcome to an <see cref="ActionResult"/>, so
+    /// the caller can inspect <see cref="AutomationAuthorizationResult.IsNotFound"/>.
+    /// </summary>
+    public static Task<AutomationAuthorizationResult> AuthorizeContentAsync(
+        this IAutomationActionAuthorizer authorizer,
+        Guid contentKey,
+        IReadOnlyList<string> permissions,
+        CancellationToken cancellationToken)
+        => authorizer.AuthorizeContentAsync(contentKey, ToSet(permissions), cancellationToken);
+
+    /// <summary>
     /// Authorises the service account against <paramref name="contentKey"/> for the given
     /// permission letters and returns a failed <see cref="ActionResult"/> when access is
     /// denied. Returns <c>null</c> on success so the caller can short-circuit with
@@ -23,9 +45,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeContentAsync(contentKey, ToSet(permissions), cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -41,9 +61,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeMediaAsync(mediaKey, cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -59,9 +77,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeContentRootAsync(ToSet(permissions), cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -75,9 +91,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeMediaRootAsync(cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -96,9 +110,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeContentParentAsync(parentKey, ToSet(permissions), cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -115,9 +127,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeMediaParentAsync(parentKey, cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     private static IReadOnlySet<string> ToSet(IReadOnlyList<string> permissions)
