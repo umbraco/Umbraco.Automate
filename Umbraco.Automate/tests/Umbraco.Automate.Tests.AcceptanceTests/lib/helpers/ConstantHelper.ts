@@ -44,7 +44,12 @@ export class ConstantHelper {
 
   public static readonly actions = {
     delay: 'umbracoAutomate.delay',
+    findContent: 'umbracoAutomate.findContent',
     getContent: 'umbracoAutomate.getContent',
+    getContentProperty: 'umbracoAutomate.getContentProperty',
+    getMedia: 'umbracoAutomate.getMedia',
+    getMediaProperty: 'umbracoAutomate.getMediaProperty',
+    updateContentProperty: 'umbracoAutomate.updateContentProperty',
     httpRequest: 'umbracoAutomate.httpRequest',
     logMessage: 'umbracoAutomate.logMessage',
     requestApproval: 'umbracoAutomate.requestApproval',
@@ -55,6 +60,39 @@ export class ConstantHelper {
     switch: 'umbracoAutomate.switch',
     while: 'umbracoAutomate.while'
   };
+
+  /* The outcome keys Get Content declares, and the handle id the canvas gives an unnamed
+   * ("Any result") line. Mirror ANY_RESULT_HANDLE in model-to-flow.ts in the client. */
+  public static readonly outcomes = {
+    success: 'success',
+    notFound: 'notFound',
+    anyResult: '__any__'
+  };
+
+  /* English exit labels, from lang/en.ts (uaOutcomes, uaOutcomeExits). The outcome-exit specs are
+   * about these labels, so they are the one place besides the section tab where the suite asserts
+   * on translated text. `withDefault` adds the "(default)" mark the canvas appends to the default
+   * exit, so specs never spell that suffix out. */
+  public static readonly outcomeLabels = {
+    found: 'Found',
+    notFound: 'Not found',
+    propertyNotFound: 'Property not found',
+    updated: 'Updated',
+    anyResult: 'Any result',
+    missing: 'Missing outcome',
+    exitTaken: 'Exit taken',
+    withDefault: (label: string): string => `${label} (default)`
+  };
+
+  /* English exit tooltips, from an outcome's description (lang/en.ts, uaOutcomes). */
+  public static readonly outcomeDescriptions = {
+    propertyFound: 'The item and the property were both found.'
+  };
+
+  /* The publish error for a line from an outcome its step no longer declares (S5 AC5). */
+  public static staleOutcomeError(stepName: string, outcome: string): string {
+    return `Step '${stepName}' has a connection from outcome '${outcome}', which the step no longer has. Reconnect or remove it.`;
+  }
 
   /* Source handle ids on branching and container nodes. Mirror model-to-flow.ts in the client. */
   public static readonly handles = {

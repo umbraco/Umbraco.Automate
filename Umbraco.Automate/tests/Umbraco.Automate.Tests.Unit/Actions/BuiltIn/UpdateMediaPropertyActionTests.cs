@@ -52,6 +52,58 @@ public class UpdateMediaPropertyActionTests
         => _action.Alias.ShouldBe("umbracoAutomate.updateMediaProperty");
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe("notFound");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_DoesNotWrite()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        _mediaService.Verify(x => x.Save(It.IsAny<IMedia>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NodeAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_InvalidMediaKey_ReturnsValidationError()
     {
         var context = CreateContext(new UpdateMediaPropertySettings

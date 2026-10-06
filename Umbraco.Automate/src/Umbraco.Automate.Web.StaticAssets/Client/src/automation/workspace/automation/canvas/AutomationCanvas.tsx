@@ -15,10 +15,13 @@ import {
     type ColorMode,
     type Connection,
 } from "@xyflow/react";
+import { LocalizeContext, type LocalizeString } from "./localize-context.js";
 import { nodeTypes } from "./nodes/node-types.js";
 import AutomationEdge from "./edges/AutomationEdge.js";
 import type { CanvasChangeDetail, AddNodeRequestDetail, ActionNodeData } from "./types.js";
-import { BODY_HANDLE, PARALLEL_ALIAS } from "./utils/model-to-flow.js";
+import { ANY_RESULT_HANDLE, BODY_HANDLE, PARALLEL_ALIAS } from "./utils/model-to-flow.js";
+
+const defaultLocalize: LocalizeString = (value) => value;
 
 const edgeTypes = {
     automation: AutomationEdge,
@@ -35,6 +38,8 @@ interface AutomationCanvasProps {
     viewport?: Viewport;
     colorMode?: ColorMode;
     readOnly?: boolean;
+    /** Backoffice localization for node labels; defaults to showing text untranslated. */
+    localize?: LocalizeString;
     onCanvasChange?: (detail: CanvasChangeDetail) => void;
     onAddNodeRequest?: (detail: AddNodeRequestDetail) => void;
     onDeleteRequest?: (nodes: Node[]) => Promise<boolean>;
@@ -46,6 +51,7 @@ export default function AutomationCanvas({
     viewport,
     colorMode = "light",
     readOnly = false,
+    localize,
     onCanvasChange,
     onAddNodeRequest,
     onDeleteRequest,
@@ -158,6 +164,10 @@ export default function AutomationCanvas({
         (connection: Edge | Connection) => {
             if (connection.source === connection.target) return false;
 
+            // "Any result" only displays a legacy unnamed line; no new unnamed line may be drawn
+            // from a step that declares outcomes. (Drawing from a named exit is how it's done.)
+            if (connection.sourceHandle === ANY_RESULT_HANDLE) return false;
+
             const isDuplicate = edgesRef.current.some(
                 (e) =>
                     e.source === connection.source &&
@@ -224,6 +234,11 @@ export default function AutomationCanvas({
     const onConnectEnd = useCallback(
         (event: MouseEvent | TouchEvent) => {
             if (!onAddNodeRequest || !rfInstance.current || !connectStartRef.current) return;
+            // Dropping a drag from "Any result" on the pane would add a step on a new unnamed line.
+            if (connectStartRef.current.handleId === ANY_RESULT_HANDLE) {
+                connectStartRef.current = null;
+                return;
+            }
 
             // If the drop landed on a handle, onConnect already handled it.
             const target = (event as MouseEvent).target as HTMLElement | null;
@@ -303,6 +318,7 @@ export default function AutomationCanvas({
     );
 
     return (
+        <LocalizeContext.Provider value={localize ?? defaultLocalize}>
         <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -346,5 +362,6 @@ export default function AutomationCanvas({
                 pannable
             />
         </ReactFlow>
+        </LocalizeContext.Provider>
     );
 }

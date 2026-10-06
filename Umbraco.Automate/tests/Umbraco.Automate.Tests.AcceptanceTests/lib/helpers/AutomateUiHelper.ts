@@ -13,6 +13,9 @@ import { ConstantHelper } from './ConstantHelper';
  * normal click silently no-ops and a later wait hangs. The route patterns below mirror
  * `paths.ts` in the client and are stable.
  */
+/** An outcome as the catalogue and outcomes endpoints return it (`label` may be a `#term`). */
+export type StubbedOutcome = { key: string; label: string; isDefault: boolean };
+
 export class AutomateUiHelper {
   page: Page;
 
@@ -40,6 +43,12 @@ export class AutomateUiHelper {
 
   automationNotificationsUrl(id: string): string {
     return `${this.automationEditUrl(id)}/view/notifications`;
+  }
+
+  /* A run's own workspace, from src/run/workspace/run/paths.ts. `view` is the workspace view's
+   * pathname: `details` or `canvas`. */
+  runWorkspaceUrl(runId: string, view: 'details' | 'canvas' = 'canvas'): string {
+    return `${this.sectionPath()}/workspace/ua:run/edit/${runId}/view/${view}`;
   }
 
   /* The Approvals dashboard, from src/approval/dashboard/manifests.ts (pathname `approvals`). */
@@ -297,6 +306,26 @@ export class AutomateUiHelper {
     await this.nodeSettingsModal.waitFor({ state: 'visible' });
   }
 
+  /**
+   * Types into text fields of the open step settings modal, found by label, and saves the modal.
+   * A saved step's inputs are named "Field for <label>" and a freshly added step's just "<label>",
+   * so both are matched. Lit inputs commit on input events, so a field is cleared before the new value is filled, or the value is appended to what is there.
+   */
+  async changeStepSettingsAndSave(fields: Record<string, string>) {
+    for (const [label, value] of Object.entries(fields)) {
+      const field = this.nodeSettingsModal.getByRole('textbox', { name: new RegExp(`^(Field for )?${label}$`) });
+      await field.waitFor({ state: 'visible' });
+      await field.fill('');
+      await field.fill(value);
+    }
+    await this.clickInModal(this.nodeSettingsModal.getByRole('button', { name: 'Save', exact: true }));
+    await this.nodeSettingsModal.waitFor({ state: 'detached' });
+  }
+
+  async changeStepSettingAndSave(fieldLabel: string, value: string) {
+    await this.changeStepSettingsAndSave({ [fieldLabel]: value });
+  }
+
   get bindingPicker(): Locator {
     return this.page.locator(ConstantHelper.elements.bindingPickerModal).locator('ua-binding-picker');
   }
@@ -411,6 +440,11 @@ export class AutomateUiHelper {
   /* The duration shown in a step run's header. */
   runDetailStepDuration(index: number): Locator {
     return this.runDetailStep(index).locator('.step-duration');
+  }
+
+  /* The "Exit taken" row of a step run's Details tab. Open the Details tab first. */
+  stepRunExitTaken(index: number): Locator {
+    return this.runDetailStep(index).locator(`umb-property-layout[label="${ConstantHelper.outcomeLabels.exitTaken}"] [slot="editor"]`);
   }
 
   /* The open tab's content in a step run. */
@@ -530,6 +564,49 @@ export class AutomateUiHelper {
       });
     await this.page.route(pattern, handler);
     return async () => await this.page.unroute(pattern, handler);
+  }
+
+  /**
+   * Makes `actionAlias` an action with dynamic outcomes, and answers its outcomes endpoint from
+   * `resolve`. No built-in action has dynamic outcomes yet, so the editor is exercised by rewriting
+   * a real catalogue item and standing in for the endpoint.
+   *
+   * `resolve` receives the settings the editor posted and returns the outcomes to answer with, or
+   * `null` to answer with a 500. It is called per request, so a spec can change its answer part
+   * way through. Call before navigating to the automation.
+   */
+  async stubDynamicOutcomes(
+    actionAlias: string,
+    resolve: (settings: Record<string, unknown>) => StubbedOutcome[] | null
+  ) {
+    await this.page.route('**/umbraco/automate/management/api/v1/catalogue/actions**', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const items: any[] = Array.isArray(body) ? body : body.items;
+      const target = items.find((item) => item.alias === actionAlias);
+      if (!target) {
+        throw new Error(`Action "${actionAlias}" is not in the catalogue to make dynamic.`);
+      }
+      target.hasDynamicOutcomes = true;
+      target.outcomes = [];
+      await route.fulfill({ response, json: body });
+    });
+
+    await this.page.route(
+      `**/umbraco/automate/management/api/v1/catalogue/step-types/${actionAlias}/outcomes`,
+      async (route) => {
+        const outcomes = resolve(route.request().postDataJSON()?.settings ?? {});
+        if (outcomes === null) {
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/problem+json',
+            body: JSON.stringify({ type: 'Error', title: 'Stubbed failure', status: 500 })
+          });
+          return;
+        }
+        await route.fulfill({ status: 200, json: outcomes });
+      }
+    );
   }
 
   /* --- Connections: OAuth ------------------------------------------------------------- */
@@ -671,6 +748,100 @@ export class AutomateUiHelper {
   /* An edge, by the accessible name xyflow gives it ("Edge from <source> to <target>"). */
   canvasEdge(sourceStepId: string, targetStepId: string): Locator {
     return this.page.getByRole('group', { name: `Edge from ${sourceStepId} to ${targetStepId}`, exact: true });
+  }
+
+  /* --- Canvas: outcome exits ------------------------------------------------------------ */
+
+  /* The right-edge exit rows of an action that declares outcomes, in render order. */
+  outcomeExits(stepId: string): Locator {
+    return this.canvasNode(stepId).locator('.ua-node__switch-case');
+  }
+
+  /* One exit row, found by the handle it carries (the outcome key, or `ConstantHelper.outcomes.anyResult`). */
+  outcomeExit(stepId: string, handleId: string): Locator {
+    return this.outcomeExits(stepId).filter({ has: this.page.locator(`[data-handleid="${handleId}"]`) });
+  }
+
+  /* The toast the backoffice raises for a failed request (`color="danger"`). */
+  get errorNotification(): Locator {
+    return this.page.locator('uui-toast-notification[color="danger"]');
+  }
+
+  /* The both-paths warning on a node, shown while an Any result line and a named line both leave it. */
+  outcomeWarning(stepId: string): Locator {
+    return this.canvasNode(stepId).locator('.ua-node__warning');
+  }
+
+  /**
+   * Removes a line by selecting it and pressing Delete, as the canvas's `deleteKeyCode` allows.
+   * Edges carry their own toolbar too, but it renders outside the edge, so with several lines on
+   * the canvas there is no way to tell whose Delete button is whose.
+   *
+   * The click lands on a point along the line, not on the edge's bounding box: its centre is
+   * usually empty space, the line's midpoint is covered by its own toolbar, and another line or a
+   * node can cover any one point. So it tries a few points until xyflow reports the edge selected.
+   */
+  async deleteEdge(sourceStepId: string, targetStepId: string) {
+    const edge = this.canvasEdge(sourceStepId, targetStepId);
+    await this.selectEdge(sourceStepId, targetStepId);
+    await this.page.keyboard.press('Delete');
+    await expect(edge).toHaveCount(0);
+  }
+
+  /* Clicks along a line until xyflow marks it selected (see deleteEdge for why several points). */
+  private async selectEdge(sourceStepId: string, targetStepId: string) {
+    const edge = this.canvasEdge(sourceStepId, targetStepId);
+    for (const fraction of [0.25, 0.75, 0.4, 0.6]) {
+      const point = await this.pointOnEdge(sourceStepId, targetStepId, fraction);
+      await this.page.mouse.click(point.x, point.y);
+      try {
+        await expect(edge).toHaveClass(/selected/, { timeout: 500 });
+        return;
+      } catch {
+        // Something else was under that point; try the next one.
+      }
+    }
+    throw new Error(`Could not select the line from ${sourceStepId} to ${targetStepId}.`);
+  }
+
+  /* A point on a line, in page coordinates, `fraction` of the way along it. */
+  private async pointOnEdge(sourceStepId: string, targetStepId: string, fraction: number) {
+    return await this.canvasEdge(sourceStepId, targetStepId)
+      .locator('path.react-flow__edge-interaction')
+      .evaluate((path: SVGPathElement, at: number) => {
+        const onPath = path.getPointAtLength(path.getTotalLength() * at);
+        const matrix = path.getScreenCTM()!;
+        return {
+          x: matrix.a * onPath.x + matrix.c * onPath.y + matrix.e,
+          y: matrix.b * onPath.x + matrix.d * onPath.y + matrix.f
+        };
+      }, fraction);
+  }
+
+  /**
+   * Presses "Insert action" on one line's toolbar, which opens the action picker to insert a step
+   * onto that line. Follow with `chooseActionInPicker()` and the step's settings.
+   *
+   * A line's toolbar renders outside the line, with nothing tying the two together, so the toolbar
+   * is the one centred nearest the line's midpoint.
+   */
+  async clickEdgeInsert(sourceStepId: string, targetStepId: string) {
+    const middle = await this.pointOnEdge(sourceStepId, targetStepId, 0.5);
+    const toolbars = this.page.locator('.ua-edge__actions');
+    const centres = await toolbars.evaluateAll((els) =>
+      els.map((el) => {
+        const box = el.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      })
+    );
+    const distances = centres.map((c) => Math.hypot(c.x - middle.x, c.y - middle.y));
+    const nearest = distances.indexOf(Math.min(...distances));
+    await toolbars.nth(nearest).getByRole('button', { name: 'Insert action', exact: true }).click({ force: true });
+  }
+
+  /* The source handles of a node: its exits, whichever side they are on. */
+  canvasSourceHandles(stepId: string): Locator {
+    return this.canvasNode(stepId).locator('.react-flow__handle.source');
   }
 
   get edgeFilterModal(): Locator {

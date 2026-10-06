@@ -211,6 +211,7 @@ internal sealed class AutomationService : IAutomationService
 
         AddDisallowedConnectionErrors(automation, workspace, errors);
         AddDanglingStepReferenceErrors(automation, errors);
+        await AddDanglingOutcomeErrorsAsync(automation, errors, cancellationToken);
         await AddStepPublishSettingsErrorsAsync(automation, errors, cancellationToken);
 
         if (workspace.ServiceAccountKey != Guid.Empty)
@@ -276,6 +277,70 @@ internal sealed class AutomationService : IAutomationService
             foreach (var reference in FindDanglingStepReferences(haystack, validReferences))
             {
                 errors.Add($"A connection filter has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Flags connections drawn from an outcome the step no longer has — typically left behind after
+    /// a dynamic step's options were edited. Publish-only: a draft may keep a stale line so the
+    /// author can reconnect it. Unnamed connections (<see cref="StepConnection.Outcome"/> null) are
+    /// never flagged, and steps whose type is not an action (control flows route by their own
+    /// handles) are skipped. Static declarations are read without resolving settings; only dynamic
+    /// ones resolve the saved settings. The resolved list is checked with
+    /// <see cref="StepOutcomeValidator"/>, and a step with an invalid declaration is reported
+    /// without comparing its connections.
+    /// </summary>
+    private async Task AddDanglingOutcomeErrorsAsync(
+        Automation automation,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        foreach (var step in automation.Steps)
+        {
+            if (_actions.GetByAlias(step.ActionAlias) is not IStepType stepType)
+            {
+                continue;
+            }
+
+            IReadOnlyList<StepOutcome>? outcomes;
+            try
+            {
+                outcomes = stepType.HasDynamicOutcomes
+                    ? await stepType.GetOutcomesAsync(step.Settings, cancellationToken)
+                    : stepType.GetOutcomes();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                errors.Add($"Step '{step.Name}' could not list its outcomes: {ex.Message}");
+                continue;
+            }
+
+            if (outcomes is null)
+            {
+                errors.Add($"Step '{step.Name}' could not list its outcomes: the action returned no list.");
+                continue;
+            }
+
+            // Nothing declared: the step has no outcome lines to check.
+            if (!stepType.HasDynamicOutcomes && outcomes.Count == 0)
+            {
+                continue;
+            }
+
+            var declarationErrors = StepOutcomeValidator.Validate(outcomes);
+            if (declarationErrors.Count > 0)
+            {
+                errors.AddRange(declarationErrors.Select(e => $"Step '{step.Name}': {e}"));
+                continue;
+            }
+
+            var keys = outcomes.Select(o => o.Key).ToHashSet(StringComparer.Ordinal);
+            var staleConnections = automation.Connections
+                .Where(c => c.SourceStepId == step.Id && c.Outcome is not null && !keys.Contains(c.Outcome));
+            foreach (var connection in staleConnections)
+            {
+                errors.Add($"Step '{step.Name}' has a connection from outcome '{connection.Outcome}', which the step no longer has. Reconnect or remove it.");
             }
         }
     }

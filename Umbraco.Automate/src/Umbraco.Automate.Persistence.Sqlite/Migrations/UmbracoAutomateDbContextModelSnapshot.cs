@@ -15,7 +15,7 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Automations.AutomationEntity", b =>
                 {
@@ -280,6 +280,9 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.Property<string>("ActionAlias")
                         .IsRequired()
                         .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BranchOutcome")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CompletedUtc")

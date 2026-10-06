@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
@@ -21,6 +22,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySettings, UpdateMediaPropertyOutput>, ICmsAction
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when the media item does not exist.
     /// </summary>
@@ -60,6 +67,15 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_updated") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+            new StepOutcome(OutcomePropertyNotFound, "#uaOutcomes_propertyNotFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<UpdateMediaPropertySettings>();
@@ -78,9 +94,25 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
                 StepRunErrorCategory.Validation);
         }
 
-        if (await _authorizer.AuthorizeMediaOrFailAsync(mediaKey, cancellationToken) is { } failure)
+        // A key the CMS reports as not existing (e.g. deleted) is not a permission problem, so it
+        // routes to the notFound outcome.
+        var authorization = await _authorizer.AuthorizeMediaAsync(mediaKey, cancellationToken);
+        if (authorization.IsNotFound)
         {
-            return failure;
+            context.LogWarning($"Media {mediaKey} was not found, so nothing was updated");
+
+            return SuccessWithOutcome(OutcomeNotFound, new UpdateMediaPropertyOutput
+            {
+                MediaKey = mediaKey,
+                PropertyAlias = settings.PropertyAlias,
+                Culture = settings.Culture,
+                Segment = settings.Segment,
+            });
+        }
+
+        if (!authorization.Authorized)
+        {
+            return authorization.ToFailedActionResult();
         }
 
         var media = _mediaService.GetById(mediaKey);

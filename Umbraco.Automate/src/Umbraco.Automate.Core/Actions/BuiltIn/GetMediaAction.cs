@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -23,6 +24,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class GetMediaAction : ActionBase<GetMediaSettings, GetMediaOutput>
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     // Not ICmsAction — this is a read, so no audit trail entry is written.
 
     /// <summary>
@@ -67,6 +74,14 @@ public sealed class GetMediaAction : ActionBase<GetMediaSettings, GetMediaOutput
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<GetMediaSettings>();
@@ -82,10 +97,20 @@ public sealed class GetMediaAction : ActionBase<GetMediaSettings, GetMediaOutput
         // Node-level authorisation: section access is checked upstream by the middleware,
         // but the service account's start node may scope it to a subset of the Media
         // section. Reject reads outside the account's accessible path. Media access has
-        // no per-permission verbs, so this is a binary allow/deny.
-        if (await _authorizer.AuthorizeMediaOrFailAsync(mediaKey, cancellationToken) is { } failure)
+        // no per-permission verbs, so this is a binary allow/deny. A key the CMS reports as
+        // not existing (e.g. deleted or in the recycle bin) is not a permission problem, so it
+        // routes to the notFound outcome.
+        var authorization = await _authorizer.AuthorizeMediaAsync(mediaKey, cancellationToken);
+        if (authorization.IsNotFound)
         {
-            return failure;
+            context.LogWarning($"Media {mediaKey} was not found");
+
+            return SuccessWithOutcome(OutcomeNotFound, new GetMediaOutput { MediaKey = mediaKey });
+        }
+
+        if (!authorization.Authorized)
+        {
+            return authorization.ToFailedActionResult();
         }
 
         // Required when running from the outbox dispatcher, which has no HTTP request

@@ -1,11 +1,13 @@
 export { ApiHelpers } from './ApiHelpers';
 export { AutomateUiHelper } from './AutomateUiHelper';
+export type { StubbedOutcome } from './AutomateUiHelper';
 export { AutomationApiHelper } from './AutomationApiHelper';
 export type { ApprovalOutcome, CreateAutomationOptions, RunLifecycleAction } from './AutomationApiHelper';
 export { automationConnection, automationStep, manualTrigger } from './AutomationBuilder';
 export type { AutomationConnection, AutomationStep } from './AutomationBuilder';
 export { CatalogueApiHelper } from './CatalogueApiHelper';
 export { ConnectionApiHelper } from './ConnectionApiHelper';
+export { ContentApiHelper } from './ContentApiHelper';
 export { ConstantHelper } from './ConstantHelper';
 export { ServiceAccountApiHelper } from './ServiceAccountApiHelper';
 export { test } from './testExtension';

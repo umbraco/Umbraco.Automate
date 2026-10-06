@@ -2,10 +2,17 @@ import { css, html, customElement, property, state, nothing, repeat } from "@umb
 import type { PropertyValues } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import type { UaStepOutcome } from "../../../catalogue/types.js";
 import type { UaStepRunDataModel, UaStepRunLogEntryModel, UaStepRunModel } from "../../types.js";
 import { formatDateTime, formatLogTimestamp, getRunStatusColor, onActivateKey } from "../../../core/index.js";
 import { UaRunDetailServerDataSource } from "../../repository/detail/run-detail.server.data-source.js";
 import "../run-data-block/run-data-block.element.js";
+
+/** Built-in steps whose exits are fixed handles rather than catalogue outcomes, so need their own labels. */
+const BUILT_IN_EXIT_TERMS: Record<string, Record<string, string>> = {
+    "umbracoAutomate.if": { true: "uaRun_exitTrue", false: "uaRun_exitFalse" },
+    "umbracoAutomate.requestApproval": { approved: "uaRun_exitApproved", rejected: "uaRun_exitRejected" },
+};
 
 type UaStepRunTab = "details" | "input" | "output" | "logs";
 
@@ -37,6 +44,13 @@ export class UaStepRunDetailElement extends UmbLitElement {
     /** The run this step run belongs to; needed to load the step's input and output. */
     @property({ attribute: "run-id" })
     runId = "";
+
+    /**
+     * The step's exits (static, or resolved for a dynamic action), used to show a label for the
+     * exit it took. Without them the raw key is shown.
+     */
+    @property({ attribute: false })
+    outcomes?: readonly UaStepOutcome[];
 
     @state()
     private _data?: UaStepRunDataModel;
@@ -131,8 +145,23 @@ export class UaStepRunDetailElement extends UmbLitElement {
         this._data = data;
     }
 
+    /** The label of the exit taken: the outcome's (possibly `#term`) label, else the raw key. */
+    #exitTakenLabel(branchOutcome: string): string {
+        const term = BUILT_IN_EXIT_TERMS[this.stepRun.actionAlias]?.[branchOutcome];
+        if (term) return this.localize.term(term);
+        const label = this.outcomes?.find((o) => o.key === branchOutcome)?.label;
+        return label ? this.localize.string(label) : branchOutcome;
+    }
+
     #renderDetails() {
         return html`
+            ${this.stepRun.branchOutcome
+                ? html`
+                      <umb-property-layout label=${this.localize.term("uaRun_exitTaken")} orientation="vertical">
+                          <div slot="editor">${this.#exitTakenLabel(this.stepRun.branchOutcome)}</div>
+                      </umb-property-layout>
+                  `
+                : nothing}
             <umb-property-layout label=${this.localize.term("uaLabels_started")} orientation="vertical">
                 <div slot="editor">${this.stepRun.startedUtc ? formatDateTime(this.stepRun.startedUtc) : "-"}</div>
             </umb-property-layout>

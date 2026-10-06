@@ -503,6 +503,200 @@ public class SendSlackMessageAction : ActionBase<SlackMessageSettings>
 }
 ```
 
+### Outcomes (Named Exits)
+
+By default a step has one exit. An action can instead declare **outcomes**, named exits that the author connects to different next steps (for example "Found" and "Not found"). Outcomes are declared on `IStepType`, using the same shape as `IStepType.GetOutputSchemaAsync` and its static/dynamic split: a static `GetOutcomes()`, or a dynamic `HasDynamicOutcomes` + `GetOutcomesAsync(settings)`. `StepTypeBase` provides virtual implementations, so an action overrides only what it needs. Actions that declare nothing behave exactly as before.
+
+> **Version requirement.** The outcome members exist only in the Automate release that ships outcomes. A package that overrides them cannot load against an older Automate (the base class has nothing to override), so raise your minimum `Umbraco.Automate.Core` version to that release.
+
+```csharp
+namespace Umbraco.Automate.Core.StepTypes;
+
+public sealed record StepOutcome(string Key, string Label)
+{
+    // The outcome taken when the action succeeds without naming one.
+    public bool IsDefault { get; init; }
+
+    // Optional tooltip for the exit: a #key localization key or literal text, shown as text.
+    public string? Description { get; init; }
+}
+
+// IStepType (default interface members, so direct implementers don't break):
+IReadOnlyList<StepOutcome> GetOutcomes() => [];
+bool HasDynamicOutcomes => false;
+Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
+    Dictionary<string, object?>? settings, CancellationToken cancellationToken = default);
+
+// StepTypeBase<TSettings, …> (what authors override):
+public virtual IReadOnlyList<StepOutcome> GetOutcomes();
+public virtual bool HasDynamicOutcomes { get; }
+protected virtual Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
+    TSettings? settings, CancellationToken cancellationToken = default);
+```
+
+The base class resolves the saved settings dictionary into `TSettings` and calls the typed override.
+
+A step type "declares outcomes" when `HasDynamicOutcomes || GetOutcomes().Count > 0`. A dynamic action whose settings currently give an empty list still declares outcomes.
+
+#### Static outcomes
+
+Override `GetOutcomes()` and return the same list for every step. Return an outcome by name with `SuccessWithOutcome(...)`. Returning a plain success takes the default outcome.
+
+```csharp
+[Action("lookupProduct", "Look Up Product")]
+public class LookupProductAction : ActionBase<LookupProductSettings, LookupProductOutput>
+{
+    public const string OutcomeSuccess = "success";
+    public const string OutcomeNotFound = "notFound";
+
+    // …constructor, Description, Group, Icon…
+
+    public override IReadOnlyList<StepOutcome> GetOutcomes() =>
+    [
+        new StepOutcome(OutcomeSuccess, "Found") { IsDefault = true },
+        new StepOutcome(OutcomeNotFound, "Not found"),
+    ];
+
+    public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+    {
+        var settings = context.GetSettings<LookupProductSettings>();
+        var product = await _products.FindAsync(settings.Sku, cancellationToken);
+
+        return product is null
+            ? SuccessWithOutcome(OutcomeNotFound, new LookupProductOutput())
+            : Success(new LookupProductOutput { Name = product.Name });   // takes the default: "success"
+    }
+}
+```
+
+#### Dynamic outcomes
+
+When the exits depend on settings (one per option the author typed, say), set `HasDynamicOutcomes` and override the typed `GetOutcomesAsync`. `settings` is `null` when the step has no saved settings yet.
+
+```csharp
+public override bool HasDynamicOutcomes => true;
+
+protected override Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
+    RouteSettings? settings, CancellationToken cancellationToken = default)
+{
+    IReadOnlyList<StepOutcome> outcomes = (settings?.Options ?? [])
+        .Where(o => !string.IsNullOrWhiteSpace(o.Key) && !o.Key.ContainsBinding())
+        .Select(o => new StepOutcome(o.Key, o.Key))   // author-typed text: a literal label, no "#"
+        .ToList();
+
+    return Task.FromResult(outcomes);
+}
+```
+
+`ContainsBinding()` is in the `Umbraco.Automate.Extensions` namespace. Keep `GetOutcomes()` empty (the default) on a dynamic action unless it also has outcomes that never depend on settings.
+
+#### Rules a declaration must follow
+
+One shared validator checks these at publish and at run time.
+
+- `Key` is non-blank and unique within the step (compared ordinally). It is saved on the connection, so keep it stable. Never derive a key from a label you might reword. If a key comes from author-typed text, renaming that text breaks its connection (see "What authors see").
+- `Key` must not start with `__`. That prefix is reserved for exits the system adds, such as "Any result".
+- At most one outcome has `IsDefault = true`. You need a default only if the action can succeed without naming an outcome. If it always names one, declare no default, or the default exit would be drawn but could never fire.
+- `Label` is display text only. A label starting with `#` is a localization key (built-in actions use `#uaOutcomes_<term>`, where the term is named for the label, not the key: Get Content's `success` outcome uses `#uaOutcomes_found`. Terms live in the backoffice language file). Any other label is shown as written, which suits author-typed text.
+- `Description` is optional. It is the tooltip on the outcome's exit and follows the same rule as `Label`: a `#` key is localized, anything else is shown as written, and it is always rendered as text. Get Content Property and Get Media Property use it on `success` (`#uaOutcomes_propertyFoundDescription`). It is returned untranslated as `description` in the catalogue and outcomes endpoints.
+
+#### Outcomes come from saved, unbound settings
+
+The editor, the publish check and a run all resolve outcomes from the step's **saved** settings, before any `${ … }` binding is resolved. So the list can never differ between design time and run time. In `GetOutcomesAsync`, a value that holds a binding appears as raw `${ … }` text. Skip it with `string.ContainsBinding()`: its real value doesn't exist until the run, so it contributes no exit. If you need per-value paths for values only known at run time, put a Switch after the step.
+
+`GetOutcomes()` and `GetOutcomesAsync` must be cheap and side-effect free. Read the settings only, with no network or database access. They run on canvas load, on every settings save, at publish and at run time.
+
+#### What happens at run time
+
+- A plain success from an action that declares a default takes the default outcome's key.
+- An outcome the action returns that it didn't declare is still routed (only "Any result" lines match it), and a warning is written to the step's run log.
+- The step fails with a terminal `Validation` error (never retried) when the declaration is invalid, when the action succeeds without an outcome and declares no default, or when listing the outcomes throws or returns `null`.
+- Outcomes route on success only. A failed step takes no outcome exit.
+- The exit taken is stored on the step run as `BranchOutcome` (If, Switch and Request Approval record theirs too), returned by the run API as `branchOutcome` and shown as "Exit taken" in the run view. Runs from before this was recorded show none.
+
+#### Publish validation
+
+Publishing checks every named connection against the step's resolved outcomes. A connection whose outcome is no longer declared (a deleted option, say) blocks publish with an error naming the step and the missing outcome. So does an invalid declaration, or a failure to list the outcomes. Saving a draft is still allowed.
+
+#### What authors see
+
+- An action that declares outcomes draws one exit per outcome on the right edge of its node, even with only one. The default is marked as such. An action that declares none keeps its single exit at the bottom.
+- **Any result** appears on a node only while an unnamed connection leaves it. That is how automations saved before the action declared outcomes keep working: an unnamed connection matches every result. New unnamed connections can't be drawn from a node that declares outcomes. The one exception: inserting a dynamic step into a line before it has any exits keeps the downstream line as Any result, for the author to move once exits exist. If an Any result connection and a named one both leave the same node, both fire and the node shows a warning.
+- **Missing outcome** is a red exit for a named connection whose key isn't in the current list (a renamed or deleted option, or a dynamic list that came back empty). It blocks publish until the author reconnects it.
+- When the settings change, the canvas asks `POST catalogue/step-types/{alias}/outcomes` for the new list, only for actions with `HasDynamicOutcomes`, and keeps the last good exits if that request fails. Invalid settings return 400 and an unknown alias 404. Until a dynamic step has a resolved list, its existing connections show as neutral rows rather than Missing outcome.
+
+#### Missing items: route to a not-found outcome
+
+For a key that doesn't exist, the authorizer returned a failed result, and the `*OrFailAsync` helpers turned that into a failed step. The result now says why, so an action that looks up an item by key can route it. `AutomationAuthorizationResult.IsNotFound` is `true` when the CMS says the node doesn't exist, and also when it is in the recycle bin and the account has no root start node (the account can't see the bin). `AuthorizeMediaAsync` sets it the same way. Permission failures leave it `false`.
+
+```csharp
+var authorization = await _authorizer.AuthorizeContentAsync(contentKey, RequiredPermissions, cancellationToken);
+
+if (authorization.IsNotFound)
+{
+    return SuccessWithOutcome(OutcomeNotFound, new GetContentOutput { ContentKey = contentKey });
+}
+
+if (!authorization.Authorized)
+{
+    return authorization.ToFailedActionResult();   // still a failed step
+}
+```
+
+`AuthorizeContentAsync(Guid, IReadOnlyList<string>, CancellationToken)` and `ToFailedActionResult()` are extension methods on `IAutomationActionAuthorizer` / `AutomationAuthorizationResult` in `Umbraco.Automate.Core.Security`. The `*OrFailAsync` helpers still fail the step for a missing item, since they don't expose `IsNotFound`.
+
+#### Example: an AI decision action
+
+Declare outcomes only when one run produces exactly one answer, because a run leaves through a single outcome. The decision actions in Umbraco.AI.Automate are designed around this rule (the table is the agreed contract, implemented in that package, not here):
+
+| Action | Outcomes | Default |
+| --- | --- | --- |
+| Yes/No | `true`, `false` (static) | none |
+| Pick-One | one per option key (dynamic) | none |
+| Score | one per level name (dynamic, needs a duplicate-level-name check in Umbraco.AI Core, or the duplicate-key rule fails the step) | none |
+| Ask Questions (several questions) | none | none |
+
+A decision action always names its outcome, so it declares no default:
+
+```csharp
+public override bool HasDynamicOutcomes => true;
+
+protected override Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
+    AskChoiceDecisionSettings? settings, CancellationToken cancellationToken = default)
+{
+    // Options is List<AskChoiceDecisionOption> { Key, Value }
+    IReadOnlyList<StepOutcome> outcomes = (settings?.Options ?? [])
+        .Where(o => !string.IsNullOrWhiteSpace(o.Key) && !o.Key.ContainsBinding())
+        .Select(o => new StepOutcome(o.Key, o.Key))   // Value is a long AI description, not the label
+        .ToList();
+
+    return Task.FromResult(outcomes);
+}
+
+// In ExecuteAsync, once the model has answered:
+return SuccessWithOutcome(chosenOption.Key, new AskChoiceDecisionOutput { Choice = chosenOption.Key });
+```
+
+An action that asks several questions returns one answer per question, so there is no single answer to branch on. It declares no outcomes, writes every answer to its output, and the author branches afterwards with If or Switch steps (one per question), or with a Parallel container whose paths each start with an If or Switch on their own question.
+
+#### Testing
+
+`ActionTestHarness<TAction>` (`Umbraco.Automate.Testing`) can assert outcomes without a host:
+
+- `GetOutcomesAsync()` returns the declared outcomes, resolving a dynamic list from the settings given to `WithSettings(...)`.
+- `ExecuteWithOutcomeAsync()` runs the action and returns a `RoutedActionResult` with `Result`, `BranchOutcome` (the returned outcome, or the default when none was returned), `OutcomeProblem` (set when a run would fail the step) and `UndeclaredOutcomeWarning`. Problems are reported on the result, not thrown, and `Result.Status` stays as the action returned it, so assert on `OutcomeProblem` and `BranchOutcome`.
+
+```csharp
+// Register whatever the action's constructor needs, e.g. its product lookup service.
+var routed = await ActionTestHarness.For<LookupProductAction>()
+    .WithService(productServiceWithNoProducts)
+    .WithSettings(new LookupProductSettings { Sku = "missing" })
+    .ExecuteWithOutcomeAsync();
+
+routed.BranchOutcome.ShouldBe("notFound");
+routed.OutcomeProblem.ShouldBeNull();
+```
+
 ### Registration
 
 Uses `LazyCollectionBuilderBase` with auto-discovery via `TypeLoader` — same pattern as `AIProviderCollectionBuilder`:
