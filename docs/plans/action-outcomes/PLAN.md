@@ -76,7 +76,7 @@ test-only actions (a static yes/no action, and a dynamic options action) in
 
 ## Follow-up from PR review
 
-- [ ] **T28** Optional `Description` on `StepOutcome` (init property, `#term` or literal), mapped onto `StepOutcomeResponseModel.description`, regenerated client, `UaStepOutcome.description`; the canvas exit tooltip uses the outcome's description (localized, as text) and the hard-coded `KEY_TOOLTIPS` table in `outcome-exits.ts` is removed; Get Content Property and Get Media Property set the description on `success` to the existing "item and property both found" term; docs updated · story: S9 AC7 · depends-on: T20 · parallel-group: K
+- [x] **T28** Optional `Description` on `StepOutcome` (init property, `#term` or literal), mapped onto `StepOutcomeResponseModel.description`, regenerated client, `UaStepOutcome.description`; the canvas exit tooltip uses the outcome's description (localized, as text) and the hard-coded `KEY_TOOLTIPS` table in `outcome-exits.ts` is removed; Get Content Property and Get Media Property set the description on `success` to the existing "item and property both found" term; docs updated · story: S9 AC7 · depends-on: T20 · parallel-group: K
   - Done when: unit specs for the mapping and the two built-ins' descriptions pass; an acceptance spec shows a description as the exit's tooltip; the full suites pass; ported to the v17 branch (#449).
 
 ## Port to v17
