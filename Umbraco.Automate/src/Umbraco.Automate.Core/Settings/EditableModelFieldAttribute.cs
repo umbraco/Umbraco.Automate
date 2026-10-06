@@ -67,7 +67,27 @@ public class EditableModelFieldAttribute : Attribute
     /// Gets or sets a value indicating whether <c>${ binding }</c> syntax is evaluated
     /// at runtime against automation run data (trigger output, step outputs).
     /// </summary>
+    /// <remarks>
+    /// Text editors (the default text box, <c>Umb.PropertyEditorUi.TextArea</c>,
+    /// <c>Umb.PropertyEditorUi.CodeEditor</c>) gain an "Insert binding" action. Any other
+    /// <see cref="EditorUiAlias"/>, such as a content or form picker, keeps its editor and gains
+    /// a switch to a binding text box instead, so the field takes either a picked value or a
+    /// binding. Only <c>string</c> properties get the pick-or-bind switch; lists and other types
+    /// keep their own editor.
+    /// </remarks>
     public bool SupportsBindings { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a <c>${ }</c> binding on this field that resolves to
+    /// an empty or whitespace value fails the step, instead of handing the action an empty string.
+    /// Use it on optional fields where empty has a meaning of its own, such as "the root" for a
+    /// parent key.
+    /// </summary>
+    /// <remarks>
+    /// Only applies together with <see cref="SupportsBindings"/>, and only to <c>string</c>
+    /// properties. A field left empty with no binding in it is unaffected.
+    /// </remarks>
+    public bool BindingMustResolve { get; set; }
 
     /// <summary>
     /// Gets or sets the name of another property on the same settings model that controls

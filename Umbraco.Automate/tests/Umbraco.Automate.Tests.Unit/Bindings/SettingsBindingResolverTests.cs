@@ -1,6 +1,7 @@
 using Shouldly;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Bindings.Filters;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Tests.Unit.Bindings;
@@ -211,7 +212,114 @@ public class SettingsBindingResolverTests
         settings.Unmarked[0].Value.ShouldBe("${ trigger.name }");
     }
 
+    [Fact]
+    public void ResolveBindings_BoundAndEmpty_Throws()
+    {
+        var settings = new MustResolveSettings { ParentKey = "${ trigger.missing }" };
+
+        var act = () => _resolver.ResolveBindings(settings, _data);
+
+        act.ShouldThrow<SettingsBindingException>();
+    }
+
+    [Fact]
+    public void ResolveBindings_BoundAndEmpty_NamesTheFieldAndExpression()
+    {
+        var settings = new MustResolveSettings { ParentKey = "${ trigger.missing }" };
+
+        var act = () => _resolver.ResolveBindings(settings, _data);
+
+        act.ShouldThrow<SettingsBindingException>().Message
+            .ShouldBe("Setting 'ParentKey' is bound to '${ trigger.missing }', which resolved to no value.");
+    }
+
+    [Fact]
+    public void ResolveBindings_BoundAndWhitespaceOnly_Throws()
+    {
+        var settings = new MustResolveSettings { ParentKey = "${ trigger.blank }" };
+        var data = new Dictionary<string, object?>
+        {
+            ["trigger"] = new Dictionary<string, object?> { ["blank"] = "   " },
+        };
+
+        var act = () => _resolver.ResolveBindings(settings, data);
+
+        act.ShouldThrow<SettingsBindingException>();
+    }
+
+    [Fact]
+    public void ResolveBindings_BoundAndNonEmpty_Resolves()
+    {
+        var settings = new MustResolveSettings { ParentKey = "${ trigger.key }" };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.ParentKey.ShouldBe("abc-123");
+    }
+
+    [Fact]
+    public void ResolveBindings_LiterallyEmptyWithoutBinding_Passes()
+    {
+        var settings = new MustResolveSettings { ParentKey = string.Empty };
+
+        var act = () => _resolver.ResolveBindings(settings, _data);
+
+        act.ShouldNotThrow();
+    }
+
+    [Fact]
+    public void ResolveBindings_LiteralTextWithoutBinding_Passes()
+    {
+        var settings = new MustResolveSettings { ParentKey = "   " };
+
+        var act = () => _resolver.ResolveBindings(settings, _data);
+
+        act.ShouldNotThrow();
+    }
+
+    [Fact]
+    public void ResolveBindings_UnflaggedBoundAndEmpty_ResolvesToEmpty()
+    {
+        var settings = new MarkedSettings { Message = "${ trigger.missing }" };
+
+        _resolver.ResolveBindings(settings, _data);
+
+        settings.Message.ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void ResolveBindings_SensitiveFieldBoundAndEmpty_DoesNotLeakTheLiteralText()
+    {
+        var settings = new SensitiveMustResolveSettings { ApiKey = " ${ trigger.sk_live_abc } " };
+
+        var act = () => _resolver.ResolveBindings(settings, _data);
+
+        act.ShouldThrow<SettingsBindingException>().Message.ShouldNotContain("sk_live_abc");
+    }
+
+    [Fact]
+    public void ResolveBindings_SensitiveFieldBoundAndEmpty_ShowsTheMaskedPlaceholder()
+    {
+        var settings = new SensitiveMustResolveSettings { ApiKey = " ${ trigger.sk_live_abc } " };
+
+        var act = () => _resolver.ResolveBindings(settings, _data);
+
+        act.ShouldThrow<SettingsBindingException>().Message.ShouldContain(SensitiveDataMasker.MaskedValue);
+    }
+
     // --- Test settings POCOs ---
+
+    private sealed class MustResolveSettings
+    {
+        [Field(SupportsBindings = true, BindingMustResolve = true)]
+        public string ParentKey { get; set; } = string.Empty;
+    }
+
+    private sealed class SensitiveMustResolveSettings
+    {
+        [Field(SupportsBindings = true, BindingMustResolve = true, IsSensitive = true)]
+        public string ApiKey { get; set; } = string.Empty;
+    }
 
     private sealed class MarkedSettings
     {

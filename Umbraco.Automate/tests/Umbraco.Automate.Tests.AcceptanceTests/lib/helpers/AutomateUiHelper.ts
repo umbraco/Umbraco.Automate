@@ -511,6 +511,121 @@ export class AutomateUiHelper {
     await dialog.waitFor({ state: 'detached' });
   }
 
+  /* --- Step settings: bindable fields -------------------------------------------------- */
+
+  /* One field of the open step settings form, by its settings key (`contentKey`). */
+  settingsField(key: string): Locator {
+    return this.nodeSettingsModal.locator(`umb-property[alias="${key}"]`);
+  }
+
+  /* The wrapper (`ua-bindable-editor`) around a field's picker, present when the field can hold
+   * a picked value or a binding. */
+  bindableEditor(key: string): Locator {
+    return this.settingsField(key).locator('ua-bindable-editor');
+  }
+
+  /* The "Use a binding expression" switch's checkbox, for asserting its state. Matches nothing
+   * where the form shows no switch, so `toHaveCount(0)` proves its absence. */
+  bindingSwitch(key: string): Locator {
+    return this.bindableEditor(key).locator('umb-input-toggle input[role="switch"]');
+  }
+
+  /* The switch as a whole, which is what to click: the checkbox itself is visually hidden. */
+  bindingSwitchHost(key: string): Locator {
+    return this.bindableEditor(key).locator('umb-input-toggle');
+  }
+
+  async toggleBindingSwitch(key: string) {
+    await this.clickInModal(this.bindingSwitchHost(key));
+  }
+
+  /* The expression box a field shows in binding mode. */
+  bindingExpressionInput(key: string): Locator {
+    return this.bindableEditor(key).locator('ua-binding-text-box input');
+  }
+
+  async enterBindingExpression(key: string, text: string) {
+    await this.bindingExpressionInput(key).fill(text);
+  }
+
+  /* The picker's empty state. Used as the "Choose" button, and as the way to tell the picker is empty. */
+  pickerChooseButton(key: string): Locator {
+    return this.settingsField(key).locator('uui-button#btn-add');
+  }
+
+  /* The card a document picker shows for the picked node. Its `name` is the node's name. */
+  pickedDocumentCard(key: string): Locator {
+    return this.settingsField(key).locator('umb-document-item-ref uui-ref-node');
+  }
+
+  /* The cards a media picker shows for the picked items. */
+  pickedMediaCards(key: string): Locator {
+    return this.settingsField(key).locator('umb-input-media uui-card-media');
+  }
+
+  /* Whether the field's own validation reports it as missing. Reads the control's validity
+   * state, which is what drives the "required" message, rather than the message's wording. */
+  async isFieldMissing(key: string): Promise<boolean> {
+    return await this.bindableEditor(key).evaluate((el) => (el as HTMLElement & { validity: ValidityState }).validity.valueMissing);
+  }
+
+  get documentPickerModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.treePickerModal);
+  }
+
+  /**
+   * Picks a content node in a field's document picker: opens it, selects the node by name and
+   * confirms. Names are the unique ones the spec created, so this cannot hit a look-alike.
+   */
+  async pickDocument(key: string, nodeName: string) {
+    await this.clickInModal(this.pickerChooseButton(key));
+    await this.documentPickerModal.waitFor({ state: 'visible' });
+    await this.clickInModal(this.documentPickerModal.locator(`uui-menu-item[label="${nodeName}"]`));
+    await this.clickInModal(this.documentPickerModal.locator('uui-button[look="primary"]'));
+    await this.documentPickerModal.waitFor({ state: 'detached' });
+  }
+
+  get mediaPickerModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.mediaPickerModal);
+  }
+
+  /* A card in the open media picker, by the media item's key. Each carries `data-mark="media:<key>"`. */
+  mediaPickerCard(mediaKey: string): Locator {
+    return this.mediaPickerModal.getByTestId(`media:${mediaKey}`);
+  }
+
+  /* Opens a field's media picker and waits for its first level to render. */
+  async openMediaPicker(key: string) {
+    await this.clickInModal(this.pickerChooseButton(key));
+    await this.mediaPickerModal.waitFor({ state: 'visible' });
+    await this.mediaPickerModal.locator('uui-card-media').first().waitFor({ state: 'visible' });
+  }
+
+  /* Opens a folder card in the media picker, which lists its children in place. */
+  async enterMediaPickerFolder(folderKey: string) {
+    await this.clickInModal(this.mediaPickerCard(folderKey));
+  }
+
+  /* Selects an item in the media picker and confirms. */
+  async pickMedia(mediaKey: string) {
+    await this.clickInModal(this.mediaPickerCard(mediaKey));
+    await this.clickInModal(this.mediaPickerModal.locator('uui-button[look="primary"]'));
+    await this.mediaPickerModal.waitFor({ state: 'detached' });
+  }
+
+  /* Clicks Save in the step settings and returns straight away, so a spec can assert the modal
+   * stayed open because a field failed validation. `submitNodeSettings` is the one that waits
+   * for it to close. */
+  async attemptSaveNodeSettings() {
+    await this.clickInModal(this.nodeSettingsModal.locator('[slot="actions"] uui-button[look="primary"]'));
+  }
+
+  /* Closes the step settings without saving, as the modal's Close button does. */
+  async closeNodeSettings() {
+    await this.clickInModal(this.nodeSettingsModal.locator('[slot="actions"] uui-button:not([look="primary"])'));
+    await this.nodeSettingsModal.waitFor({ state: 'detached' });
+  }
+
   /* --- Request stubs ------------------------------------------------------------------- */
 
   /**
@@ -530,6 +645,27 @@ export class AutomateUiHelper {
       });
     await this.page.route(pattern, handler);
     return async () => await this.page.unroute(pattern, handler);
+  }
+
+  /**
+   * Makes one action field declare a different editor, by rewriting the catalogue answer the step
+   * settings read. No installed action names an editor that is not registered, so this is the way
+   * to reach the "editor package missing" case without breaking real data. Call before navigating.
+   */
+  async stubActionFieldEditor(actionAlias: string, fieldKey: string, editorUiAlias: string) {
+    await this.page.route('**/umbraco/automate/management/api/v1/catalogue/actions**', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const actions: any[] = Array.isArray(body) ? body : body.items ?? [];
+      const field = actions
+        .find((action) => action.alias === actionAlias)
+        ?.settingsSchema?.fields?.find((f: any) => f.key === fieldKey);
+      if (!field) {
+        throw new Error(`Field "${fieldKey}" of "${actionAlias}" is not in the catalogue answer.`);
+      }
+      field.editorUiAlias = editorUiAlias;
+      await route.fulfill({ response, json: body });
+    });
   }
 
   /* --- Connections: OAuth ------------------------------------------------------------- */
