@@ -81,6 +81,44 @@ public class RunCancellationStepMiddlewareTests : IDisposable
         result.PersistenceData.ShouldBe(context.PersistenceData);
     }
 
+    // An earlier step in the same execution pass ended the workflow (a terminal failure, or a
+    // Terminate/Suspend error handler). Sibling pointers WorkflowCore already collected for the
+    // pass must not run their steps.
+    [Theory]
+    [InlineData(WorkflowStatus.Terminated)]
+    [InlineData(WorkflowStatus.Suspended)]
+    public async Task HandleAsync_WorkflowNoLongerRunnable_DoesNotCallNext(WorkflowStatus status)
+    {
+        var context = CreateContext(workflowData: new AutomationWorkflowData { RunId = Guid.NewGuid() });
+        context.Workflow.Status = status;
+
+        var (_, nextCalled) = await InvokeAsync(context);
+
+        nextCalled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task HandleAsync_WorkflowNoLongerRunnable_DoesNotProceed()
+    {
+        var context = CreateContext(workflowData: new AutomationWorkflowData { RunId = Guid.NewGuid() });
+        context.Workflow.Status = WorkflowStatus.Terminated;
+
+        var (result, _) = await InvokeAsync(context);
+
+        result.Proceed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task HandleAsync_WorkflowSuspendedEarlierInThePass_StaysSuspended()
+    {
+        var context = CreateContext(workflowData: new AutomationWorkflowData { RunId = Guid.NewGuid() });
+        context.Workflow.Status = WorkflowStatus.Suspended;
+
+        await InvokeAsync(context);
+
+        context.Workflow.Status.ShouldBe(WorkflowStatus.Suspended);
+    }
+
     private async Task<(ExecutionResult Result, bool NextCalled)> InvokeAsync(IStepExecutionContext context)
     {
         var nextCalled = false;

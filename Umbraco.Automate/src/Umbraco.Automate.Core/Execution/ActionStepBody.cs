@@ -268,12 +268,12 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
-        // Pipeline-caught failures: decide retry/terminate/skip based on the configured
+        // Pipeline-caught failures: decide retry/terminate/suspend based on the configured
         // ErrorBehavior (applied via WorkflowCore on the WorkflowStep) and the classifier.
         if (result.Status == ActionResultStatus.Failed)
         {
             var exception = result.Exception ?? new InvalidOperationException($"Step '{_stepConfig.Name}' failed.");
-            return DecideFailureOutcome(exception, result.ErrorCategory ?? StepRunErrorCategory.Unknown, context);
+            throw SelectFailureToThrow(exception, result.ErrorCategory ?? StepRunErrorCategory.Unknown, context);
         }
 
         // If the action returned a named outcome, route via WorkflowCore's outcome matching.
@@ -286,48 +286,56 @@ internal sealed class ActionStepBody : StepBodyAsync
     }
 
     /// <summary>
-    /// Decides how to surface a step failure to WorkflowCore. The step's
-    /// <see cref="StepErrorBehavior"/> is wired onto the <c>WorkflowStep</c> at compile
-    /// time, so WorkflowCore honors retry/suspend/terminate/compensate when we throw.
-    /// Terminate and Suspend always throw — the whole point of those modes is to halt
-    /// the run regardless of retry budget or error category. Only the Retry path applies
-    /// the terminal-category and retry-budget guards, short-circuiting with
-    /// <see cref="ExecutionResult.Next"/> when retrying cannot help.
+    /// Decides which exception surfaces a step failure to WorkflowCore; every caller throws it. The step's
+    /// <see cref="StepErrorBehavior"/> is wired onto the <c>WorkflowStep</c> at compile time, so
+    /// WorkflowCore's error handler for that behaviour applies. Terminate, Suspend and Compensate
+    /// always surface the step's own error — those modes halt the run (Compensate after running its
+    /// compensation) and never retry, so the retry-budget and terminal-category guards have nothing
+    /// to decide. Only Retry applies the guards: when retrying cannot help, the step's error is
+    /// wrapped in a <see cref="NonRetryableStepFailureException"/>, which
+    /// <see cref="AutomateRetryHandler"/> hands to WorkflowCore's Terminate handler, so the run
+    /// ends Failed and no outcome edge out of the step is followed.
     /// </summary>
-    private ExecutionResult DecideFailureOutcome(
+    private Exception SelectFailureToThrow(
         Exception exception,
         StepRunErrorCategory category,
         IStepExecutionContext context)
     {
-        // Terminate always aborts the workflow — WorkflowCore's Terminate handler stops
-        // execution and does not retry, because we set the step's ErrorBehavior.
-        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
+        switch (_stepConfig.ErrorBehavior)
         {
-            _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
-            throw exception;
-        }
+            // Terminate always aborts the workflow — WorkflowCore's Terminate handler stops
+            // execution and does not retry, because we set the step's ErrorBehavior.
+            case StepErrorBehavior.Terminate:
+                _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
+                return exception;
 
-        // Suspend pauses the workflow for manual intervention — throw unconditionally so
-        // WorkflowCore applies the Suspend handler. The retry-budget and terminal-category
-        // guards below intentionally do not apply: the whole point of Suspend is that a
-        // human fixes the underlying issue (e.g. bad config, missing credentials) before
-        // resuming, which is exactly the case where retry cannot help.
-        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Suspend)
-        {
-            _logger.LogError(
-                "Step {StepId} failed with Suspend behavior ({Category}) — suspending workflow",
-                _stepConfig.Id, category);
-            throw exception;
+            // Suspend pauses the workflow for manual intervention. The guards below intentionally
+            // do not apply: the whole point of Suspend is that a human fixes the underlying issue
+            // (e.g. bad config, missing credentials) before resuming, which is exactly the case
+            // where retry cannot help.
+            case StepErrorBehavior.Suspend:
+                _logger.LogError(
+                    "Step {StepId} failed with Suspend behavior ({Category}) — suspending workflow",
+                    _stepConfig.Id, category);
+                return exception;
+
+            // Compensate hands the failure to WorkflowCore's Compensate handler, which does not
+            // retry either — there is no retry budget to guard.
+            case StepErrorBehavior.Compensate:
+                _logger.LogError(
+                    "Step {StepId} failed with Compensate behavior ({Category}) — compensating",
+                    _stepConfig.Id, category);
+                return exception;
         }
 
         // Terminal category + Retry behavior: retrying cannot change the outcome
-        // (bad settings, missing auth, etc.). Skip past the failed step without retry.
+        // (bad settings, missing auth, etc.), so stop the run without retrying.
         if (_errorClassifier.IsTerminal(category))
         {
             _logger.LogError(
-                "Step {StepId} failed with terminal category {Category} — skipping without retry",
+                "Step {StepId} failed with terminal category {Category} — stopping the run without retry",
                 _stepConfig.Id, category);
-            return ExecutionResult.Next();
+            return new NonRetryableStepFailureException(exception);
         }
 
         // Transient failure. Cap retries at the step's configured MaxRetries, falling back
@@ -336,14 +344,14 @@ internal sealed class ActionStepBody : StepBodyAsync
         if (context.ExecutionPointer.RetryCount >= maxRetries)
         {
             _logger.LogError(
-                "Step {StepId} exhausted retry budget ({MaxRetries}) — skipping past failure",
+                "Step {StepId} exhausted retry budget ({MaxRetries}) — stopping the run",
                 _stepConfig.Id, maxRetries);
-            return ExecutionResult.Next();
+            return new NonRetryableStepFailureException(exception);
         }
 
-        // Throw so WorkflowCore applies the configured Retry behavior (with interval) via
+        // Rethrown so WorkflowCore applies the configured Retry behavior (with interval) via
         // the step-level settings set at compile time.
-        throw exception;
+        return exception;
     }
 
     /// <summary>
@@ -383,7 +391,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
         _metrics.StepFailed(_action.Alias);
 
-        return DecideFailureOutcome(exception, category, context);
+        throw SelectFailureToThrow(exception, category, context);
     }
 
     /// <summary>
@@ -421,21 +429,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         // Deserialize the decision from the execution pointer's event data.
         // WorkflowCore's SeedSubscription sets EventData on the pointer, not ContextItem.
-        var eventData = context.ExecutionPointer.EventData;
-        ApprovalDecision? decision = null;
-        if (eventData is JsonElement jsonElement)
-        {
-            decision = JsonSerializer.Deserialize<ApprovalDecision>(
-                jsonElement.GetRawText(), Dispatch.JsonOptions.Default);
-        }
-        else if (eventData is ApprovalDecision directDecision)
-        {
-            decision = directDecision;
-        }
-        else if (eventData is Newtonsoft.Json.Linq.JObject jObject)
-        {
-            decision = jObject.ToObject<ApprovalDecision>();
-        }
+        var decision = ApprovalDecisionReader.Read(context.ExecutionPointer.EventData);
 
         // Find the existing step run for this step.
         var run = await _runRepository.GetAsync(data.RunId, cancellationToken);
@@ -511,21 +505,23 @@ internal sealed class ActionStepBody : StepBodyAsync
         // submission. That is a genuine error rather than an outcome.
         //
         // Categorised as a configuration error, not as Cancelled: nothing was cancelled, and this is
-        // the category DefaultStepErrorClassifier already gives the InvalidOperationException thrown
-        // just below. Both are terminal, so retry behaviour is unchanged — a resume payload that was
-        // not a decision will not become one on a second attempt.
+        // the category DefaultStepErrorClassifier gives the InvalidOperationException raised below.
+        // It is terminal, so under Retry the run stops rather than retrying — a resume payload that
+        // was not a decision will not become one on a second attempt. Routed through the same
+        // decision as every other failure so Terminate, Suspend and Retry behave consistently.
+        // Under Suspend, ActionWorkflowStep.PrimeForRetry drops the bad payload from the pointer,
+        // so when an operator resumes the run this step asks for a decision again rather than
+        // re-reading the payload (or, finding this step run already Failed, moving on).
         stepRun.Status = StepRunStatus.Failed;
         _metrics.StepFailed(_action.Alias);
         stepRun.Error = "Approval step resumed without a valid decision";
         stepRun.ErrorCategory = StepRunErrorCategory.ConfigurationError;
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
-        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
-        {
-            throw new InvalidOperationException(stepRun.Error);
-        }
-
-        return ExecutionResult.Next();
+        throw SelectFailureToThrow(
+            new InvalidOperationException(stepRun.Error),
+            StepRunErrorCategory.ConfigurationError,
+            context);
     }
 
     private async Task<ExecutionResult> HandleSleepResumeAsync(
