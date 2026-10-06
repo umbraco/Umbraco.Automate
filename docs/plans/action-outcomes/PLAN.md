@@ -74,6 +74,11 @@ test-only actions (a static yes/no action, and a dynamic options action) in
   - Done when: S9 AC1–AC3 and AC6 specs pass for each, plus S9 AC7 for Get Media Property.
 - [x] **T20** **wire: built-in exits in the demo site.** One Playwright spec per group (Get Media and Find Content) proving the not-found exit routes through the real site · story: S9 · depends-on: T19 · parallel-group: K
 
+## Follow-up from PR review
+
+- [ ] **T28** Optional `Description` on `StepOutcome` (init property, `#term` or literal), mapped onto `StepOutcomeResponseModel.description`, regenerated client, `UaStepOutcome.description`; the canvas exit tooltip uses the outcome's description (localized, as text) and the hard-coded `KEY_TOOLTIPS` table in `outcome-exits.ts` is removed; Get Content Property and Get Media Property set the description on `success` to the existing "item and property both found" term; docs updated · story: S9 AC7 · depends-on: T20 · parallel-group: K
+  - Done when: unit specs for the mapping and the two built-ins' descriptions pass; an acceptance spec shows a description as the exit's tooltip; the full suites pass; ported to the v17 branch (#449).
+
 ## Port to v17
 
 - [x] **T21** Port slice 1 to `v17/dev` (including T24's migrations, regenerated on the v17 line) via the Backport Workflow (`CONTRIBUTING.md`): a `v17/feature/*` branch from `v17/dev`, then build, unit, integration and acceptance tests on v17 · story: all of Epic A · depends-on: T16, T17 · parallel-group: L

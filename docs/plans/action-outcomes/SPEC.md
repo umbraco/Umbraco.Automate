@@ -15,7 +15,7 @@ catalogue endpoints) gains:
 | `outcomes` | `StepOutcomeResponseModel[]` | The static outcomes (`GetOutcomes()`). Empty array when none are declared. Never null |
 | `hasDynamicOutcomes` | `bool` | `true` when outcomes depend on settings and must be resolved per step |
 
-`StepOutcomeResponseModel`: `{ key: string, label: string, isDefault: bool }`.
+`StepOutcomeResponseModel`: `{ key: string, label: string, isDefault: bool, description: string | null }`. `description` is returned raw, like `label`.
 
 - An action that declares nothing returns `outcomes: []`, `hasDynamicOutcomes: false`. Its
   catalogue response is otherwise byte-for-byte what it is today.

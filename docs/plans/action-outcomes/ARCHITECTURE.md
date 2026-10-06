@@ -41,6 +41,9 @@ public sealed record StepOutcome(string Key, string Label)
 {
     /// The outcome taken when the action succeeds without naming one.
     public bool IsDefault { get; init; }
+
+    /// Optional tooltip text for the exit (a "#term" key or literal text).
+    public string? Description { get; init; }
 }
 
 public interface IStepType
