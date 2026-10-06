@@ -23,7 +23,7 @@ public class CatalogueMapDefinition : IMapDefinition
     /// <summary>
     /// Initializes a new instance of the <see cref="CatalogueMapDefinition"/> class without logging.
     /// </summary>
-    [Obsolete("Use the constructor taking a logger. This constructor will be removed in a future major version.")]
+    [Obsolete("Use the constructor taking a logger. Scheduled for removal in Umbraco Automate 19.")]
     public CatalogueMapDefinition()
         : this(NullLogger<CatalogueMapDefinition>.Instance)
     {
