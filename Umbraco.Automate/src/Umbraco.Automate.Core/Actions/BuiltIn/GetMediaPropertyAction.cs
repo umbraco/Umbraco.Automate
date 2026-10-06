@@ -72,7 +72,7 @@ public sealed class GetMediaPropertyAction : ActionBase<GetMediaPropertySettings
     public override IReadOnlyList<StepOutcome> GetOutcomes()
         =>
         [
-            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true, Description = "#uaOutcomes_propertyFoundDescription" },
             new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
             new StepOutcome(OutcomePropertyNotFound, "#uaOutcomes_propertyNotFound"),
         ];

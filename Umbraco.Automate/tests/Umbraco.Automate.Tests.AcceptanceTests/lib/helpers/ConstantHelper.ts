@@ -46,6 +46,7 @@ export class ConstantHelper {
     delay: 'umbracoAutomate.delay',
     findContent: 'umbracoAutomate.findContent',
     getContent: 'umbracoAutomate.getContent',
+    getContentProperty: 'umbracoAutomate.getContentProperty',
     getMedia: 'umbracoAutomate.getMedia',
     getMediaProperty: 'umbracoAutomate.getMediaProperty',
     updateContentProperty: 'umbracoAutomate.updateContentProperty',
@@ -81,6 +82,11 @@ export class ConstantHelper {
     missing: 'Missing outcome',
     exitTaken: 'Exit taken',
     withDefault: (label: string): string => `${label} (default)`
+  };
+
+  /* English exit tooltips, from an outcome's description (lang/en.ts, uaOutcomes). */
+  public static readonly outcomeDescriptions = {
+    propertyFound: 'The item and the property were both found.'
   };
 
   /* The publish error for a line from an outcome its step no longer declares (S5 AC5). */

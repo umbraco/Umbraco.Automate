@@ -117,7 +117,7 @@ same convention — see `Umbraco.Automate.Core/Actions/BuiltIn/*Output.cs` and
 
 A named exit that an action declares for a successful result, such as "Found" or "Not found". Each outcome is an exit on the step, and the author connects each exit to its own next step. A run leaves a step through one outcome. An action that declares no outcomes keeps a single exit.
 
-An outcome has a stable **key** (saved on the connection) and a **label** (display text, either a `#key` localization key or literal text). An action can mark at most one outcome as the **default outcome**, which is the one taken when the action succeeds without naming an outcome.
+An outcome has a stable **key** (saved on the connection) and a **label** (display text, either a `#key` localization key or literal text), and an optional **description** (the exit's tooltip, in the same `#key`-or-literal form). An action can mark at most one outcome as the **default outcome**, which is the one taken when the action succeeds without naming an outcome.
 
 An automation saved before its action declared outcomes may have an unnamed connection from that step. It still runs on every result, and the canvas shows it as an **Any result** exit. A named connection whose outcome the step no longer declares shows as a **Missing outcome** exit and blocks publish.
 

@@ -5,6 +5,8 @@ export interface UaStepOutcome {
     key: string;
     label: string;
     isDefault: boolean;
+    /** Optional explanation (a `#term` or literal text), shown as the exit's tooltip. */
+    description?: string;
 }
 
 export interface UaCatalogueItemModel {

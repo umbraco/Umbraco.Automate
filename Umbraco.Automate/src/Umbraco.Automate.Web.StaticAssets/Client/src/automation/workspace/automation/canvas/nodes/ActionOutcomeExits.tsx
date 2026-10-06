@@ -33,12 +33,11 @@ function ActionOutcomeExits({ nodeId, nodeData }: ActionOutcomeExitsProps) {
     const { exits, hasBothPathsConflict } = useMemo(
         () =>
             buildOutcomeExits(
-                nodeData.actionAlias,
                 nodeData.outcomes ?? NO_OUTCOMES,
                 nodeData.outcomesUnknown ?? false,
                 parseConnectedExits(JSON.parse(connectedKey) as string[]),
             ),
-        [nodeData.actionAlias, nodeData.outcomes, nodeData.outcomesUnknown, connectedKey],
+        [nodeData.outcomes, nodeData.outcomesUnknown, connectedKey],
     );
 
     // Handles are added and removed as lines and outcomes change; tell React Flow to re-measure

@@ -466,6 +466,7 @@ export type StepOutcomeResponseModel = {
     key: string;
     label: string;
     isDefault: boolean;
+    description?: null | string;
 };
 
 export type StepPositionModel = {

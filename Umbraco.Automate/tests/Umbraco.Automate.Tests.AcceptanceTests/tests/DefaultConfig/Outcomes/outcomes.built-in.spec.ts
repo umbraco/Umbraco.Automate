@@ -20,7 +20,7 @@ import {
  * site, and every not-found case uses a key or a name that cannot exist. Runs need an execution
  * identity, so every spec uses the tier-2 `automateServiceAccountWorkspace`.
  */
-const { actions, outcomes, outcomeLabels } = ConstantHelper;
+const { actions, outcomes, outcomeLabels, outcomeDescriptions } = ConstantHelper;
 
 type Seeded = { id: string; branchingId: string };
 
@@ -160,6 +160,27 @@ test.describe('Built-in content and media outcomes', () => {
   });
 
   test.describe('exits on the canvas', () => {
+    test('Get Content Property shows its description as the Found exit tooltip', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateUi,
+      umbracoAutomateApi
+    }) => {
+      // Arrange
+      const { id, branchingId } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.getContentProperty, {
+        contentKey: randomUUID(),
+        propertyAlias: 'title'
+      });
+
+      // Act
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+      await umbracoAutomateUi.automate.waitForCanvas();
+
+      // Assert
+      await expect(
+        umbracoAutomateUi.automate.outcomeExit(branchingId, outcomes.success).locator('.ua-node__switch-case-label')
+      ).toHaveAttribute('title', outcomeDescriptions.propertyFound);
+    });
+
     test('Get Media Property draws Found (default), Not found and Property not found', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateUi,
