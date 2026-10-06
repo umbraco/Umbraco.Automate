@@ -156,6 +156,24 @@ public class ActionStepBodyApprovalRecoveryTests
         context.ExecutionPointer.EventPublished.ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task NoWaitingRunAndNoDecision_RecordsAFailedStepRunWithTheReason()
+    {
+        var context = ResumedContext();
+        RecordStepRuns(context);
+
+        await Should.ThrowAsync<NonRetryableStepFailureException>(() => CreateBody().RunAsync(context));
+
+        _runRepository.Verify(
+            r => r.AddStepRunAsync(
+                It.Is<StepRun>(sr => sr.StepId == _stepConfig.Id
+                    && sr.Status == StepRunStatus.Failed
+                    && sr.ErrorCategory == StepRunErrorCategory.ConfigurationError
+                    && sr.Error != null && sr.Error.Contains("none has been recorded")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private StepRun StepRunFor(IStepExecutionContext context, StepRunStatus status) => new()
     {
         Id = Guid.NewGuid(),

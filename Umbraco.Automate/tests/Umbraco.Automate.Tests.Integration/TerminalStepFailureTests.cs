@@ -442,6 +442,18 @@ public class TerminalStepFailureTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ApprovalResumedWithNothingWaitingOrRecordedUnderRetry_ShowsTheReasonInTheRunHistory()
+    {
+        var (run, approval, _) = await ResumeApprovalWithNothingWaitingOrRecordedAsync(StepErrorBehavior.Retry);
+        await WaitForRunStatusAsync(run.Id, AutomationRunStatus.Failed, TestTimeouts.WorkflowWait);
+
+        (await _runRepository.GetAsync(run.Id))!.StepRuns
+            .ShouldContain(s => s.StepId == approval.Id
+                && s.Status == StepRunStatus.Failed
+                && s.Error != null && s.Error.Contains("none has been recorded"));
+    }
+
+    [Fact]
     public async Task ApprovalResumedWithNothingWaitingOrRecordedUnderSuspend_SuspendsTheWorkflow()
     {
         var (run, _, _) = await ResumeApprovalWithNothingWaitingOrRecordedAsync(StepErrorBehavior.Suspend);

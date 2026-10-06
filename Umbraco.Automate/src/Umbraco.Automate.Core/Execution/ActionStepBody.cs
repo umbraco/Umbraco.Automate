@@ -437,7 +437,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         if (stepRun is null)
         {
-            return RouteByRecordedDecision(run, data, context);
+            return await RouteByRecordedDecisionAsync(run, data, context, cancellationToken);
         }
 
         // The run was marked Suspended when this step started waiting (SuspendRunForInputAsync);
@@ -547,15 +547,17 @@ internal sealed class ActionStepBody : StepBodyAsync
     /// <para>
     /// When the latest run does not record a decision, the step cannot tell what
     /// happened, and following its unnamed lines would let the run carry on as if it had been
-    /// approved. It fails instead, through the same decision as every other failure. The event is
+    /// approved. It fails instead, through the same decision as every other failure, and records a
+    /// failed step run so the reason shows in the run history, not only in the log. The event is
     /// dropped from the pointer first so that, under Suspend, an operator resuming the run gets a
     /// fresh request for a decision rather than this same failure again.
     /// </para>
     /// </remarks>
-    private ExecutionResult RouteByRecordedDecision(
+    private async Task<ExecutionResult> RouteByRecordedDecisionAsync(
         AutomationRun? run,
         AutomationWorkflowData data,
-        IStepExecutionContext context)
+        IStepExecutionContext context,
+        CancellationToken cancellationToken)
     {
         var latest = run?.StepRuns
             .Where(sr => sr.StepId == _stepConfig.Id)
@@ -586,14 +588,31 @@ internal sealed class ActionStepBody : StepBodyAsync
             "Step {StepId} in run {RunId} was resumed but has neither a step run waiting for input nor a recorded decision (latest step run status: {Status})",
             _stepConfig.Id, data.RunId, latest?.Status);
 
+        var exception = new InvalidOperationException(
+            $"Approval step '{_stepConfig.Name}' was resumed, but no step run is waiting for a decision and none has been recorded.");
+
+        var now = DateTime.UtcNow;
+        await _runRepository.AddStepRunAsync(
+            new StepRun
+            {
+                Id = Guid.NewGuid(),
+                RunId = data.RunId,
+                StepId = _stepConfig.Id,
+                ActionAlias = _action.Alias,
+                Status = StepRunStatus.Failed,
+                StartedUtc = now,
+                CompletedUtc = now,
+                Duration = TimeSpan.Zero,
+                Error = exception.Message,
+                ErrorCategory = StepRunErrorCategory.ConfigurationError,
+            },
+            cancellationToken);
+        _metrics.StepFailed(_action.Alias);
+
         context.ExecutionPointer.EventPublished = false;
         context.ExecutionPointer.EventData = null;
 
-        throw SelectFailureToThrow(
-            new InvalidOperationException(
-                $"Approval step '{_stepConfig.Name}' was resumed, but no step run is waiting for a decision and none has been recorded."),
-            StepRunErrorCategory.ConfigurationError,
-            context);
+        throw SelectFailureToThrow(exception, StepRunErrorCategory.ConfigurationError, context);
     }
 
     private async Task<ExecutionResult> HandleSleepResumeAsync(
