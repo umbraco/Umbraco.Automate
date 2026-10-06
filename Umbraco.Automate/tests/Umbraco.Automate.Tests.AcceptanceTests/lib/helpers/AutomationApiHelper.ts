@@ -167,6 +167,25 @@ export class AutomationApiHelper {
     return await response.json();
   }
 
+  /* The step runs of one run that belong to the step with this id. */
+  stepRunOf(run: any, stepId: string) {
+    const stepRun = run.stepRuns.find((s: any) => s.stepId === stepId);
+    if (!stepRun) {
+      throw new Error(`Run ${run.id} has no step run for step ${stepId}.`);
+    }
+    return stepRun;
+  }
+
+  /* What one step wrote as its output, parsed. Loaded from `runs/{id}/step-runs/{id}/data`, the
+   * way the run view's Output tab does, because the run detail itself leaves it out. */
+  async getStepOutput(runId: string, stepId: string): Promise<any> {
+    const stepRun = this.stepRunOf(await this.getRun(runId), stepId);
+    const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId + '/step-runs/' + stepRun.id + '/data';
+    const response = await this.api.get(requestUrl);
+    const body = await response.json();
+    return body.output ? JSON.parse(body.output) : null;
+  }
+
   /**
    * Waits until one run reaches `status`, and returns its detail.
    *

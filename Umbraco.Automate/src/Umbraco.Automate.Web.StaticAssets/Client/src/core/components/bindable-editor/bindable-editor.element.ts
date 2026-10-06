@@ -13,7 +13,7 @@ import type {
 import type { UaBindingInsertable } from "../binding-text-box/binding-editor.types.js";
 import type { UaBindingTextBoxElement } from "../binding-text-box/binding-text-box.element.js";
 import "../binding-text-box/binding-text-box.element.js";
-import { getBindingExpression, isEmptySettingsValue, isGuidText } from "./bindable-value.utils.js";
+import { getBindingExpression, isEmptySettingsValue, isGuidText, normalizeGuid } from "./bindable-value.utils.js";
 import { BINDABLE_EDITOR_CONFIG_ALIASES, BINDABLE_EDITOR_UI_ALIAS } from "./constants.js";
 
 type UaBindableEditorMode = "editor" | "binding";
@@ -86,6 +86,9 @@ export class UaBindableEditorElement
      */
     #rememberedExpression?: string;
     #rememberedPick?: unknown;
+
+    /** The wrapped editor currently counted in this control's validity, if any. */
+    #wiredEditor?: UmbPropertyEditorUiElement;
 
     #config?: UmbPropertyEditorConfigCollection;
     #editorUiAlias?: string;
@@ -168,6 +171,7 @@ export class UaBindableEditorElement
         if (this.#isFormControl(element)) {
             this.removeFormControlElement(element);
         }
+        this.#wiredEditor = undefined;
         element.destroy?.();
         this._editorElement = undefined;
     }
@@ -187,17 +191,20 @@ export class UaBindableEditorElement
         element.toggleAttribute("readonly", this.readonly);
         element.dataSourceAlias = this.dataSourceAlias;
         if (this.#config) element.config = this.#config;
-        element.value = getBindingExpression(this.value) === undefined ? this.value : undefined;
+        element.value = this.#pickerValue();
+    }
 
-        // The wrapped editor's own rules (e.g. a picker's min/max items) count only while it is
-        // the editor in use; a binding is checked when the run resolves it, not here.
-        if (this.#isFormControl(element)) {
-            if (this.#mode === "editor") {
-                this.addFormControlElement(element);
-            } else {
-                this.removeFormControlElement(element);
-            }
-        }
+    /**
+     * What the wrapped editor is given. A binding is not something it can show, and a GUID in an
+     * accepted non-canonical form (upper case, braces, padding) is converted so the picker can
+     * resolve the item. The stored value is deliberately left as it is until the author acts:
+     * emitting a change on load would make every automation saved before this look unsaved. The
+     * picker raises its own canonical value on the first interaction, and a switch back from a
+     * binding stores the converted GUID (see `#switchToEditor`).
+     */
+    #pickerValue(): unknown {
+        if (getBindingExpression(this.value) !== undefined) return undefined;
+        return isGuidText(this.value) ? normalizeGuid(this.value) : this.value;
     }
 
     #isFormControl(
@@ -206,8 +213,49 @@ export class UaBindableEditorElement
         return "checkValidity" in element && "validity" in element;
     }
 
+    /**
+     * The wrapped editor's own rules (e.g. a picker's min/max items) count only while it is the
+     * editor in use; a binding is checked when the run resolves it, not here.
+     *
+     * Registration order matters, because the mixin reports validity against an invalid control
+     * and the browser rejects an anchor that is not in this element's tree:
+     * - REMOVE in `willUpdate`, before render. The wrapped editor is detached when the binding
+     *   box takes over, and `UmbFormControlMixin.updated` runs the validators right after that
+     *   render, so a still-registered detached editor would make `setValidity` throw.
+     * - ADD in `updated`, after render. The editor must be back in the tree first, or adding it
+     *   (which also runs the validators) would anchor on a detached element. The editor also
+     *   settles asynchronously after it is given its value, which the mixin is not told about,
+     *   so once it has settled validity is recomputed, but only when the form is already
+     *   validating: a field the author has not touched must not start out flagged.
+     * Neither direction ever validates with a registered-but-detached editor.
+     */
+    #unwireEditorWhenBinding() {
+        const element = this.#wiredEditor;
+        if (!element || this.#mode === "editor") return;
+
+        this.removeFormControlElement(element as UmbPropertyEditorUiElement & UaNativeFormControlElement);
+        this.#wiredEditor = undefined;
+    }
+
+    async #wireEditorWhenEditing() {
+        const element = this._editorElement;
+        if (!element || !this.#isFormControl(element) || this.#mode !== "editor") return;
+        if (this.#wiredEditor === element) return;
+
+        this.#wiredEditor = element;
+        this.addFormControlElement(element);
+
+        await (element as { updateComplete?: Promise<unknown> }).updateComplete;
+        if (this._editorElement !== element || this.#mode !== "editor" || this.pristine) return;
+
+        element.checkValidity();
+        this._runValidators();
+    }
+
     protected override willUpdate(changed: PropertyValues) {
         super.willUpdate(changed);
+
+        this.#unwireEditorWhenBinding();
 
         if (
             changed.has("value") ||
@@ -220,6 +268,11 @@ export class UaBindableEditorElement
         ) {
             this.#syncEditor();
         }
+    }
+
+    protected override updated(changed: PropertyValues) {
+        super.updated(changed);
+        void this.#wireEditorWhenEditing();
     }
 
     override destroy() {
@@ -279,7 +332,11 @@ export class UaBindableEditorElement
         const expression = getBindingExpression(this.value);
         if (expression !== undefined) this.#rememberedExpression = expression;
 
-        if (isGuidText(this.value)) return;
+        if (isGuidText(this.value)) {
+            // Store the canonical GUID so the saved value is clean and the picker resolves it.
+            this.#setValue(normalizeGuid(this.value));
+            return;
+        }
         this.#setValue(this.#rememberedPick);
     }
 
@@ -318,7 +375,7 @@ export class UaBindableEditorElement
             }
         }
 
-        this.#rememberedPick = this.value;
+        if (this.#mode === "editor") this.#rememberedPick = this.value;
         this._chosenMode = "binding";
         this.#setValue(expression);
     }
