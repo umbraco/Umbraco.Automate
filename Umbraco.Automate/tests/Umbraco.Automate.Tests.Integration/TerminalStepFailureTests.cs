@@ -421,6 +421,50 @@ public class TerminalStepFailureTests : IAsyncLifetime
         (await _runRepository.GetAsync(run.Id))!.StepRuns.Count(s => s.StepId == after.Id).ShouldBe(1);
     }
 
+    // --- Approval resumed with a decision, but no step run waiting and none recorded ---
+
+    [Fact]
+    public async Task ApprovalResumedWithNothingWaitingOrRecordedUnderRetry_EndsTheRunFailed()
+    {
+        var (run, _, _) = await ResumeApprovalWithNothingWaitingOrRecordedAsync(StepErrorBehavior.Retry);
+
+        (await WaitForRunStatusAsync(run.Id, AutomationRunStatus.Failed, TestTimeouts.WorkflowWait)).ShouldBe(AutomationRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task ApprovalResumedWithNothingWaitingOrRecordedUnderRetry_DoesNotRunTheStepBehindAnUnnamedLine()
+    {
+        var (run, _, after) = await ResumeApprovalWithNothingWaitingOrRecordedAsync(StepErrorBehavior.Retry);
+        await WaitForRunStatusAsync(run.Id, AutomationRunStatus.Failed, TestTimeouts.WorkflowWait);
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        (await _runRepository.GetAsync(run.Id))!.StepRuns.ShouldNotContain(s => s.StepId == after.Id);
+    }
+
+    [Fact]
+    public async Task ApprovalResumedWithNothingWaitingOrRecordedUnderSuspend_SuspendsTheWorkflow()
+    {
+        var (run, _, _) = await ResumeApprovalWithNothingWaitingOrRecordedAsync(StepErrorBehavior.Suspend);
+
+        var instance = await WaitForWorkflowStatusAsync(run, WorkflowStatus.Suspended, TestTimeouts.WorkflowWait);
+        instance.Status.ShouldBe(WorkflowStatus.Suspended);
+    }
+
+    [Fact]
+    public async Task ApprovalResumedWithNothingWaitingOrRecordedUnderSuspend_OnResume_AsksForADecisionAgain()
+    {
+        var (run, approval, _) = await ResumeApprovalWithNothingWaitingOrRecordedAsync(StepErrorBehavior.Suspend);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Suspended, TestTimeouts.WorkflowWait);
+        await WaitForRunStatusAsync(run.Id, AutomationRunStatus.Suspended, TestTimeouts.WorkflowWait);
+
+        (await _runService.ResumeRunAsync(run.Id)).ShouldBe(RunLifecycleResult.Success);
+
+        await WaitForStepRunCountAsync(run.Id, approval.Id, StepRunStatus.WaitingForInput, 1, TestTimeouts.WorkflowWait);
+        (await _runRepository.GetAsync(run.Id))!.StepRuns
+            .Count(s => s.StepId == approval.Id && s.Status == StepRunStatus.WaitingForInput)
+            .ShouldBe(1);
+    }
+
     /// <summary>ManualTrigger → failing step → (unnamed line) → log step.</summary>
     private async Task<(AutomationRun Run, StepConfiguration Failing, StepConfiguration After)> RunLinearAsync(
         string failingAlias,
@@ -546,6 +590,53 @@ public class TerminalStepFailureTests : IAsyncLifetime
 
         await PublishApprovalEventAsync(runId, approval.Id, "not a decision");
         await WaitForStepRunCountAsync(runId, approval.Id, StepRunStatus.Failed, 1, TestTimeouts.WorkflowWait);
+
+        return ((await _runRepository.GetAsync(runId))!, approval, after);
+    }
+
+    /// <summary>
+    /// ManualTrigger → approval step → (unnamed line) → log step. Waits for the approval, then takes
+    /// the step run out of WaitingForInput without recording a decision on it — state the step cannot
+    /// explain — and publishes a valid decision, so the step resumes with nothing to route by.
+    /// </summary>
+    private async Task<(AutomationRun Run, StepConfiguration Approval, StepConfiguration After)> ResumeApprovalWithNothingWaitingOrRecordedAsync(
+        StepErrorBehavior behavior)
+    {
+        var approval = new StepConfiguration
+        {
+            Id = Guid.NewGuid(),
+            ActionAlias = RequestApprovalAction.ApprovalActionAlias,
+            Name = "Approval",
+            Alias = "approval",
+            Settings = new Dictionary<string, object?> { ["prompt"] = "Please approve" },
+            ErrorBehavior = behavior,
+        };
+        var after = LogStep("afterApproval", "after-approval");
+
+        var automation = new AutomationBuilder()
+            .WithAlias($"test-terminal-approval-unrecorded-{Guid.NewGuid():N}")
+            .WithName("test-terminal-approval-unrecorded")
+            .WithManualTrigger()
+            .AddStep(approval)
+            .AddStep(after)
+            .WithTriggerConnection(approval.Id)
+            .WithConnection(approval.Id, after.Id)
+            .Build();
+
+        var runId = await TriggerAsync(automation);
+        await WaitForStepRunCountAsync(runId, approval.Id, StepRunStatus.WaitingForInput, 1, TestTimeouts.WorkflowWait);
+
+        var waiting = (await _runRepository.GetAsync(runId))!.StepRuns
+            .Single(s => s.StepId == approval.Id && s.Status == StepRunStatus.WaitingForInput);
+        waiting.Status = StepRunStatus.Running;
+        await _runRepository.UpdateStepRunAsync(waiting);
+
+        await PublishApprovalEventAsync(runId, approval.Id, new ApprovalDecision
+        {
+            Outcome = ApprovalOutcome.Approved,
+            ApprovedByUserKey = Guid.NewGuid(),
+            DecisionUtc = DateTime.UtcNow,
+        });
 
         return ((await _runRepository.GetAsync(runId))!, approval, after);
     }

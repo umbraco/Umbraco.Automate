@@ -322,6 +322,120 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         resumed!.Status.ShouldBe(AutomationRunStatus.Running);
     }
 
+    // --- Resumed after a crash: the decision was saved on the step run, the workflow was not ---
+
+    [Fact]
+    public async Task RecordedApproval_AfterACrash_RunsTheApprovedLine()
+    {
+        var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
+
+        await WaitForStepRunStatusAsync(run, steps.Approved.Id, StepRunStatus.Completed, TestTimeouts.WorkflowWait);
+    }
+
+    [Fact]
+    public async Task RecordedApproval_AfterACrash_DoesNotRunTheRejectedLine()
+    {
+        var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        var completed = await _runRepository.GetAsync(run.Id);
+        completed!.StepRuns.ShouldNotContain(s => s.StepId == steps.Rejected.Id);
+    }
+
+    [Fact]
+    public async Task RecordedRejection_AfterACrash_RunsTheRejectedLine()
+    {
+        var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Rejected);
+
+        await WaitForStepRunStatusAsync(run, steps.Rejected.Id, StepRunStatus.Completed, TestTimeouts.WorkflowWait);
+    }
+
+    [Fact]
+    public async Task RecordedRejection_AfterACrash_DoesNotRunTheApprovedLine()
+    {
+        var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Rejected);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        var completed = await _runRepository.GetAsync(run.Id);
+        completed!.StepRuns.ShouldNotContain(s => s.StepId == steps.Approved.Id);
+    }
+
+    [Fact]
+    public async Task RecordedDecision_AfterACrash_DoesNotAddASecondStepRun()
+    {
+        var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
+        await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
+
+        var completed = await _runRepository.GetAsync(run.Id);
+        completed!.StepRuns.Count(s => s.StepId == steps.Approval.Id).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RecordedDecision_AfterACrash_IsStillReadableByLaterSteps()
+    {
+        // The workflow data that carried the approval's output was lost with the crash; the step
+        // puts the recorded output back so a binding to it still resolves.
+        var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
+
+        var reader = await WaitForStepRunStatusAsync(run, steps.Reader.Id, StepRunStatus.Completed, TestTimeouts.WorkflowWait);
+        ReadMessage(reader.OutputData!).ShouldBe("saw:Approved");
+    }
+
+    /// <summary>
+    /// ManualTrigger → approval, with an approved line, a rejected line, and an unnamed line to a
+    /// step that reads the decision. Waits for the approval, then reproduces the crash window: the
+    /// decision is saved on the step run exactly as the resume path saves it, but the workflow never
+    /// learnt of it, so WorkflowCore re-runs the step with the published decision.
+    /// </summary>
+    private async Task<(AutomationRun Run, RecoverySteps Steps)> ResumeAfterRecordedDecisionAsync(ApprovalOutcome outcome)
+    {
+        var approvalStep = ApprovalStep();
+        var steps = new RecoverySteps(
+            approvalStep,
+            LogStep("approvedLog", "took-approved-path"),
+            LogStep("rejectedLog", "took-rejected-path"),
+            LogStep("readerLog", "saw:${ steps.approval.outcome }"));
+
+        var automation = new AutomationBuilder()
+            .WithAlias($"test-approval-recovery-{Guid.NewGuid():N}")
+            .WithName("test-approval-recovery")
+            .WithManualTrigger()
+            .AddStep(approvalStep)
+            .AddStep(steps.Approved)
+            .AddStep(steps.Rejected)
+            .AddStep(steps.Reader)
+            .WithTriggerConnection(approvalStep.Id)
+            .WithConnection(approvalStep.Id, steps.Approved.Id, RequestApprovalAction.ApprovedOutcome)
+            .WithConnection(approvalStep.Id, steps.Rejected.Id, RequestApprovalAction.RejectedOutcome)
+            .WithConnection(approvalStep.Id, steps.Reader.Id)
+            .Build();
+
+        var run = await RunToApprovalAsync(automation, approvalStep);
+
+        var waiting = (await _runRepository.GetAsync(run.Id))!.StepRuns
+            .Single(s => s.StepId == approvalStep.Id && s.Status == StepRunStatus.WaitingForInput);
+        waiting.Status = outcome == ApprovalOutcome.Approved ? StepRunStatus.Completed : StepRunStatus.Rejected;
+        waiting.CompletedUtc = DateTime.UtcNow;
+        waiting.OutputData = JsonSerializer.Serialize(
+            new ApprovalDecisionOutput
+            {
+                Approved = outcome == ApprovalOutcome.Approved,
+                Outcome = outcome.ToString(),
+                DecisionUtc = DateTime.UtcNow,
+            },
+            JsonOptions.Default);
+        await _runRepository.UpdateStepRunAsync(waiting);
+
+        await SubmitDecisionAsync(run.Id, approvalStep.Id, outcome);
+        return (run, steps);
+    }
+
+    private sealed record RecoverySteps(
+        StepConfiguration Approval,
+        StepConfiguration Approved,
+        StepConfiguration Rejected,
+        StepConfiguration Reader);
+
     private static StepConfiguration ApprovalStep() => new()
     {
         Id = Guid.NewGuid(),
