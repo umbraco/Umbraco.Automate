@@ -24,10 +24,19 @@ public class WorkflowLockProviderTests
     }
 
     private static WorkflowLockProvider CreateProvider(
-        Mock<IWorkflowLockStore> store, FakeTimeProvider timeProvider, WorkflowLockOptions? options = null)
+        Mock<IWorkflowLockStore> store,
+        FakeTimeProvider timeProvider,
+        WorkflowLockOptions? options = null,
+        Mock<IWorkflowNodeHeartbeatStore>? heartbeatStore = null,
+        bool eligible = true)
     {
+        var eligibility = new Mock<IExecutionNodeEligibility>();
+        eligibility.Setup(e => e.CanExecuteWorkflows()).Returns(() => eligible);
+
         return new WorkflowLockProvider(
             store.Object,
+            (heartbeatStore ?? new Mock<IWorkflowNodeHeartbeatStore>()).Object,
+            eligibility.Object,
             Options.Create(options ?? new WorkflowLockOptions()),
             timeProvider,
             NullLogger<WorkflowLockProvider>.Instance);
@@ -262,5 +271,101 @@ public class WorkflowLockProviderTests
 
         released.ShouldNotContain("never-owned");
         store.Verify(s => s.ReleaseAsync(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Start_WritesHeartbeat_WithTheLeaseOwnerToken_AndStopRemovesIt()
+    {
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var options = new WorkflowLockOptions { RenewalInterval = TimeSpan.FromMilliseconds(30) };
+
+        Guid? leaseToken = null;
+        var store = new Mock<IWorkflowLockStore>();
+        store.Setup(s => s.TryAcquireAsync(
+                It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Callback<string, Guid, DateTime, DateTime, CancellationToken>((_, token, _, _, _) => leaseToken = token)
+            .ReturnsAsync(true);
+
+        var beats = 0;
+        Guid? heartbeatNode = null;
+        var heartbeatStore = new Mock<IWorkflowNodeHeartbeatStore>();
+        heartbeatStore.Setup(s => s.BeatAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, DateTime, CancellationToken>((node, _, _) =>
+            {
+                heartbeatNode = node;
+                Interlocked.Increment(ref beats);
+            })
+            .Returns(Task.CompletedTask);
+
+        var provider = CreateProvider(store, timeProvider, options, heartbeatStore);
+        await provider.AcquireLock("lock-1", CancellationToken.None);
+        await provider.Start();
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (Volatile.Read(ref beats) < 2 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        await provider.Stop();
+
+        Volatile.Read(ref beats).ShouldBeGreaterThanOrEqualTo(2);
+        heartbeatNode.ShouldBe(leaseToken);
+        heartbeatStore.Verify(s => s.RemoveAsync(leaseToken!.Value, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Start_PrunesHeartbeatsOlderThanTheStaleLeaseMultiple_AfterEachBeat()
+    {
+        var now = new DateTimeOffset(2026, 10, 7, 12, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(now);
+        var options = new WorkflowLockOptions
+        {
+            LeaseDuration = TimeSpan.FromSeconds(30),
+            RenewalInterval = TimeSpan.FromMilliseconds(30),
+        };
+
+        var prunes = 0;
+        DateTime? staleBefore = null;
+        var heartbeatStore = new Mock<IWorkflowNodeHeartbeatStore>();
+        heartbeatStore.Setup(s => s.RemoveStaleAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Callback<DateTime, CancellationToken>((cutoff, _) =>
+            {
+                staleBefore = cutoff;
+                Interlocked.Increment(ref prunes);
+            })
+            .Returns(Task.CompletedTask);
+
+        var provider = CreateProvider(new Mock<IWorkflowLockStore>(), timeProvider, options, heartbeatStore);
+        await provider.Start();
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (Volatile.Read(ref prunes) < 2 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        await provider.Stop();
+
+        Volatile.Read(ref prunes).ShouldBeGreaterThanOrEqualTo(2);
+        staleBefore.ShouldBe(now.UtcDateTime - options.LeaseDuration * WorkflowNodeHeartbeat.StaleLeaseMultiple);
+    }
+
+    [Fact]
+    public async Task Start_DoesNotWriteHeartbeat_WhenNodeIsNotEligibleToExecuteWorkflows()
+    {
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var options = new WorkflowLockOptions { RenewalInterval = TimeSpan.FromMilliseconds(20) };
+        var store = new Mock<IWorkflowLockStore>();
+        var heartbeatStore = new Mock<IWorkflowNodeHeartbeatStore>();
+
+        var provider = CreateProvider(store, timeProvider, options, heartbeatStore, eligible: false);
+        await provider.Start();
+        await Task.Delay(150);
+        await provider.Stop();
+
+        heartbeatStore.Verify(
+            s => s.BeatAsync(It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        heartbeatStore.Verify(s => s.RemoveAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
