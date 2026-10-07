@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Web.Api.Management.Automation.Controllers;
 using Umbraco.Automate.Web.Api.Management.Automation.Models;
+using Umbraco.Automate.Web.Api.Management.Versioning.Controllers;
 using Umbraco.Cms.Core.Mapping;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security;
@@ -13,7 +16,8 @@ using Umbraco.Cms.Core.Security;
 namespace Umbraco.Automate.Tests.Unit.Automations;
 
 /// <summary>
-/// An <see cref="AutomationValidationException"/> from create, update or publish is a client error
+/// An <see cref="AutomationValidationException"/> from create, update, publish, import or
+/// rollback is a client error
 /// with the reasons listed, not an unhandled 500.
 /// </summary>
 public class AutomationValidationResponseTests
@@ -94,6 +98,67 @@ public class AutomationValidationResponseTests
 
         ShouldBeValidationProblem(result);
     }
+
+    [Fact]
+    public async Task ImportNew_WithReservedStepAlias_ReturnsValidationProblem()
+    {
+        GivenImportThrows();
+        var controller = WithContext(new ImportNewAutomationController(
+            _automationService.Object, _authorizationService.Object));
+
+        var result = await controller.ImportNewAutomation(new ImportAutomationRequestModel
+        {
+            WorkspaceId = Guid.NewGuid(),
+            ExportModel = null!,
+        });
+
+        ShouldBeValidationProblem(result);
+    }
+
+    [Fact]
+    public async Task ImportExisting_WithReservedStepAlias_ReturnsValidationProblem()
+    {
+        var existing = GivenExisting();
+        GivenImportThrows();
+        var controller = WithContext(new ImportExistingAutomationController(
+            _automationService.Object, _authorizationService.Object));
+
+        var result = await controller.ImportExistingAutomation(existing.Id, null!);
+
+        ShouldBeValidationProblem(result);
+    }
+
+    [Fact]
+    public async Task Rollback_ToVersionThatFailsValidation_ReturnsValidationProblem()
+    {
+        var existing = new AutomationBuilder().AsDraft().Build();
+        var adapter = new Mock<IVersionableEntityAdapter>();
+        adapter.Setup(a => a.EntityTypeName).Returns("Automation");
+        adapter.Setup(a => a.GetEntityAsync(existing.Id, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+        adapter
+            .Setup(a => a.RollbackAsync(existing.Id, 2, It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(ValidationException);
+        var controller = WithContext(new EntityVersionHistoryController(
+            Mock.Of<IEntityVersionService>(),
+            new VersionableEntityAdapterCollection(() => [adapter.Object]),
+            _authorizationService.Object,
+            _securityAccessor.Object,
+            _mapper.Object));
+
+        var result = await controller.RollbackToVersion("Automation", existing.Id, 2);
+
+        ShouldBeValidationProblem(result);
+    }
+
+    private void GivenImportThrows()
+        => _automationService
+            .Setup(s => s.ImportAutomationAsync(
+                It.IsAny<AutomationExportModel>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(ValidationException);
 
     private Automation GivenExisting()
     {
