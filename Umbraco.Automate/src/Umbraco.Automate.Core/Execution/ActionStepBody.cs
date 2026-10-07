@@ -524,17 +524,23 @@ internal sealed class ActionStepBody : StepBodyAsync
     }
 
     /// <summary>
-    /// Handles a resumed approval step that has no step run left waiting for input. The usual cause is
-    /// a crash between saving the decision on the step run and persisting the workflow: on recovery the
-    /// engine re-runs this step with the same event, but the decision has already been applied. The
-    /// step run's status is the record of that decision — <see cref="StepRunStatus.Completed"/> for an
-    /// approval, <see cref="StepRunStatus.Rejected"/> for a refusal — so the step routes by it, to the
-    /// line that decision chose. Nothing is saved or published again: the step run, the run's return
-    /// to Running and the metrics were all written before the crash. Only the step's output is put
-    /// back on the workflow data, which was lost with the unpersisted workflow, so later steps can
-    /// still bind to the decision.
+    /// Handles a resumed approval step that has no step run left waiting for input. This happens when
+    /// the decision was saved on the step run but the workflow was not persisted afterwards (persisting
+    /// it failed, or the node executing it stopped), and the instance is then re-run without a restart:
+    /// in the same process, or on another node. The engine re-runs this step with the same event, but
+    /// the decision has already been applied. The step run's status is the record of that decision —
+    /// <see cref="StepRunStatus.Completed"/> for an approval, <see cref="StepRunStatus.Rejected"/> for a
+    /// refusal — so the step routes by it, to the line that decision chose. Nothing is saved or
+    /// published again: the step run, the run's return to Running and the metrics were all written
+    /// before. Only the step's output is put back on the workflow data, which was lost with the
+    /// unpersisted workflow, so later steps can still bind to the decision.
     /// </summary>
     /// <remarks>
+    /// This does not cover a restart. On startup, stuck-run recovery sees a Running run with no step
+    /// waiting, and fails the run and terminates its instance before the event is processed, so this
+    /// method is never reached. That is the safe outcome; recovering such runs is tracked in
+    /// https://github.com/umbraco/Umbraco.Automate/issues/467.
+    /// <para>
     /// The latest step run for this step is taken as the one the event belongs to: a step only waits
     /// for an event after saving its step run as waiting, so in a sequential loop no other run of this
     /// step (a previous iteration, say) can be newer. That does not hold under a parallel ForEach
@@ -544,6 +550,7 @@ internal sealed class ActionStepBody : StepBodyAsync
     /// is undecided) or follows the sibling's decision. This is the same blind spot as the
     /// waiting-run lookup in <c>HandleResumeAsync</c>; matching runs to iterations properly needs
     /// iteration identity on <see cref="StepRun"/>, which is out of scope here.
+    /// </para>
     /// <para>
     /// When the latest run does not record a decision, the step cannot tell what
     /// happened, and following its unnamed lines would let the run carry on as if it had been
