@@ -437,8 +437,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         if (stepRun is null)
         {
-            _logger.LogWarning("No WaitingForInput step run found for step {StepId} in run {RunId}", _stepConfig.Id, data.RunId);
-            return ExecutionResult.Next();
+            return await RouteByRecordedDecisionAsync(run, data, context, cancellationToken);
         }
 
         // The run was marked Suspended when this step started waiting (SuspendRunForInputAsync);
@@ -524,6 +523,105 @@ internal sealed class ActionStepBody : StepBodyAsync
             context);
     }
 
+    /// <summary>
+    /// Handles a resumed approval step that has no step run left waiting for input. This happens when
+    /// the decision was saved on the step run but the workflow was not persisted afterwards (persisting
+    /// it failed, or the node executing it stopped), and the instance is then re-run without a restart:
+    /// in the same process, or on another node. The engine re-runs this step with the same event, but
+    /// the decision has already been applied. The step run's status is the record of that decision —
+    /// <see cref="StepRunStatus.Completed"/> for an approval, <see cref="StepRunStatus.Rejected"/> for a
+    /// refusal — so the step routes by it, to the line that decision chose. Nothing is saved or
+    /// published again: the step run, the run's return to Running and the metrics were all written
+    /// before. Only the step's output is put back on the workflow data, which was lost with the
+    /// unpersisted workflow, so later steps can still bind to the decision.
+    /// </summary>
+    /// <remarks>
+    /// This does not cover a restart. On startup, stuck-run recovery sees a Running run with no step
+    /// waiting, and fails the run and terminates its instance before the event is processed, so this
+    /// method is never reached. That is the safe outcome; recovering such runs is tracked in
+    /// https://github.com/umbraco/Umbraco.Automate/issues/467.
+    /// <para>
+    /// The latest step run for this step is taken as the one the event belongs to: a step only waits
+    /// for an event after saving its step run as waiting, so in a sequential loop no other run of this
+    /// step (a previous iteration, say) can be newer. That does not hold under a parallel ForEach
+    /// (<c>RunParallel</c>): iterations of the same step run side by side, step runs carry no iteration
+    /// identity, and the approval event key (<c>{RunId}:{StepId}</c>) is shared by every iteration. The
+    /// newest run may then belong to a sibling iteration, so recovery fails closed (the sibling's run
+    /// is undecided) or follows the sibling's decision. This is the same blind spot as the
+    /// waiting-run lookup in <c>HandleResumeAsync</c>; matching runs to iterations properly needs
+    /// iteration identity on <see cref="StepRun"/>, which is out of scope here.
+    /// </para>
+    /// <para>
+    /// When the latest run does not record a decision, the step cannot tell what
+    /// happened, and following its unnamed lines would let the run carry on as if it had been
+    /// approved. It fails instead, through the same decision as every other failure, and records a
+    /// failed step run so the reason shows in the run history, not only in the log. The event is
+    /// dropped from the pointer first so that, under Suspend, an operator resuming the run gets a
+    /// fresh request for a decision rather than this same failure again.
+    /// </para>
+    /// </remarks>
+    private async Task<ExecutionResult> RouteByRecordedDecisionAsync(
+        AutomationRun? run,
+        AutomationWorkflowData data,
+        IStepExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var latest = run?.StepRuns
+            .Where(sr => sr.StepId == _stepConfig.Id)
+            .MaxBy(sr => sr.StartedUtc);
+
+        var recordedOutcome = latest?.Status switch
+        {
+            StepRunStatus.Completed => RequestApprovalAction.ApprovedOutcome,
+            StepRunStatus.Rejected => RequestApprovalAction.RejectedOutcome,
+            _ => null,
+        };
+
+        if (latest is not null && recordedOutcome is not null)
+        {
+            _logger.LogWarning(
+                "Step {StepId} in run {RunId} was resumed after its decision was already recorded; following the recorded '{Outcome}' outcome",
+                _stepConfig.Id, data.RunId, recordedOutcome);
+
+            if (latest.OutputData is { } outputJson)
+            {
+                PublishOutput(outputJson, latest.Id, data, context.Item as ForEachIterationContext);
+            }
+
+            return ExecutionResult.Outcome(recordedOutcome);
+        }
+
+        _logger.LogError(
+            "Step {StepId} in run {RunId} was resumed but has neither a step run waiting for input nor a recorded decision (latest step run status: {Status})",
+            _stepConfig.Id, data.RunId, latest?.Status);
+
+        var exception = new InvalidOperationException(
+            $"Approval step '{_stepConfig.Name}' was resumed, but no step run is waiting for a decision and none has been recorded.");
+
+        var now = DateTime.UtcNow;
+        await _runRepository.AddStepRunAsync(
+            new StepRun
+            {
+                Id = Guid.NewGuid(),
+                RunId = data.RunId,
+                StepId = _stepConfig.Id,
+                ActionAlias = _action.Alias,
+                Status = StepRunStatus.Failed,
+                StartedUtc = now,
+                CompletedUtc = now,
+                Duration = TimeSpan.Zero,
+                Error = exception.Message,
+                ErrorCategory = StepRunErrorCategory.ConfigurationError,
+            },
+            cancellationToken);
+        _metrics.StepFailed(_action.Alias);
+
+        context.ExecutionPointer.EventPublished = false;
+        context.ExecutionPointer.EventData = null;
+
+        throw SelectFailureToThrow(exception, StepRunErrorCategory.ConfigurationError, context);
+    }
+
     private async Task<ExecutionResult> HandleSleepResumeAsync(
         SleepPersistenceData sleepData,
         AutomationWorkflowData data,
@@ -569,6 +667,19 @@ internal sealed class ActionStepBody : StepBodyAsync
         var outputJson = JsonSerializer.Serialize(outputData, Dispatch.JsonOptions.Default);
         stepRun.OutputData = outputJson;
 
+        PublishOutput(outputJson, stepRun.Id, data, iterationContext);
+    }
+
+    /// <summary>
+    /// Makes a step run's recorded output readable by later steps' bindings, by putting it on the
+    /// workflow data.
+    /// </summary>
+    private void PublishOutput(
+        string outputJson,
+        Guid stepRunId,
+        AutomationWorkflowData data,
+        ForEachIterationContext? iterationContext)
+    {
         // Small outputs are deserialized to a case-insensitive dictionary with plain .NET
         // types (not JsonElement) so values survive the WorkflowCore Newtonsoft.Json
         // persistence round-trip and are accessible to BindingEvaluator.ResolvePath.
@@ -577,7 +688,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         // is written once) goes into the workflow data — binding evaluation hydrates it on
         // demand via StepOutputHydrationCache.
         var unwrapped = StepOutputReference.CreateInlineOrMarker(
-            outputJson, stepRun.Id, _executionOptions.Value.MaxInlineOutputBytes);
+            outputJson, stepRunId, _executionOptions.Value.MaxInlineOutputBytes);
 
         // Write to the run-global table so steps after the loop (and external observers)
         // can still read the most recent value. Inside an iteration the global entry is

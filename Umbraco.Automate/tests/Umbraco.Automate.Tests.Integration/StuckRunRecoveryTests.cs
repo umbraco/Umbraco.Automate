@@ -100,6 +100,21 @@ public class StuckRunRecoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task RecoverStuckRunsAsync_ApprovalDecidedButNotYetRouted_FailsTheRun()
+    {
+        // Pins a known gap (#467): the decision was saved on the approval step run (Completed) and the
+        // run moved back to Running, but the process stopped before the workflow was persisted. No step
+        // is waiting, so recovery fails the run instead of letting the step route by the decision.
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Completed, WorkflowStatus.Runnable);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+    }
+
+    [Fact]
     public async Task RecoverStuckRunsAsync_FinishedRun_DoesNotTouchItsInstance()
     {
         var (_, instanceId) = await SeedRunAsync(
