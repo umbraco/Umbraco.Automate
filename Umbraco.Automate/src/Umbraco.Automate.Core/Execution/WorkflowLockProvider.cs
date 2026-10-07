@@ -171,14 +171,30 @@ internal sealed class WorkflowLockProvider : IDistributedLockProvider
             return;
         }
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
         try
         {
-            await _heartbeatStore.BeatAsync(_ownerToken, _timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
+            await _heartbeatStore.BeatAsync(_ownerToken, now, cancellationToken);
             _heartbeatWritten = true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to write workflow node heartbeat");
+            return;
+        }
+
+        // Rows left by nodes that crashed are otherwise only removed by a recovery that waits them out,
+        // so while nodes stay up they pile up and make the next lone restart wait on them. A live node
+        // drops them once they are as old as recovery treats as long gone.
+        try
+        {
+            var staleBefore = now - _options.Value.LeaseDuration * WorkflowNodeHeartbeat.StaleLeaseMultiple;
+            await _heartbeatStore.RemoveStaleAsync(staleBefore, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to remove stale workflow node heartbeats");
         }
     }
 

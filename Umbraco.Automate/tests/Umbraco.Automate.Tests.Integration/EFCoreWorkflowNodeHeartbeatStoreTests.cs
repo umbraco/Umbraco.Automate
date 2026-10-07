@@ -47,6 +47,21 @@ public class EFCoreWorkflowNodeHeartbeatStoreTests : IDisposable
         (await db.WorkflowNodeHeartbeats.Select(h => h.NodeId).ToListAsync()).ShouldBe([staying]);
     }
 
+    [Fact]
+    public async Task RemoveStaleAsync_DeletesOnlyRowsLastWrittenBeforeTheCutoff()
+    {
+        var cutoff = new DateTime(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc);
+        var crashed = Guid.NewGuid();
+        var live = Guid.NewGuid();
+        await _store.BeatAsync(crashed, cutoff.AddMinutes(-1), CancellationToken.None);
+        await _store.BeatAsync(live, cutoff, CancellationToken.None);
+
+        await _store.RemoveStaleAsync(cutoff, CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.WorkflowNodeHeartbeats.Select(h => h.NodeId).ToListAsync()).ShouldBe([live]);
+    }
+
     public void Dispose()
     {
         _fixture.Dispose();

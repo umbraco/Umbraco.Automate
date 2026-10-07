@@ -25,4 +25,23 @@ internal interface IWorkflowNodeHeartbeatStore
     /// workflow work) is not waited on by the next node to start.
     /// </summary>
     Task RemoveAsync(Guid nodeId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes every heartbeat last written before <paramref name="staleBeforeUtc"/>: rows left by nodes
+    /// that stopped without removing their own (a crash or a killed process).
+    /// </summary>
+    Task RemoveStaleAsync(DateTime staleBeforeUtc, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Shared values for reading <see cref="IWorkflowNodeHeartbeatStore"/> rows.
+/// </summary>
+internal static class WorkflowNodeHeartbeat
+{
+    /// <summary>
+    /// A heartbeat this many <see cref="WorkflowLockOptions.LeaseDuration"/>s behind the reading node's
+    /// clock is from a node long gone, not one with a skewed clock, so it can be discarded without
+    /// waiting for it to change.
+    /// </summary>
+    public const int StaleLeaseMultiple = 10;
 }

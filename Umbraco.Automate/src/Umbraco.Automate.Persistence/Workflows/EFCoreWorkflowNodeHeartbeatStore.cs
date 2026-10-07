@@ -55,4 +55,13 @@ internal sealed class EFCoreWorkflowNodeHeartbeatStore : IWorkflowNodeHeartbeatS
             .Where(h => h.NodeId == nodeId)
             .ExecuteDeleteAsync(cancellationToken);
     }
+
+    public async Task RemoveStaleAsync(DateTime staleBeforeUtc, CancellationToken cancellationToken)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        await db.WorkflowNodeHeartbeats
+            .Where(h => h.HeartbeatUtc < staleBeforeUtc)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 }

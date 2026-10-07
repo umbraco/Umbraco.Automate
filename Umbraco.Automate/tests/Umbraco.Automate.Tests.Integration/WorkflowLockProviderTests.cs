@@ -315,6 +315,43 @@ public class WorkflowLockProviderTests
     }
 
     [Fact]
+    public async Task Start_PrunesHeartbeatsOlderThanTheStaleLeaseMultiple_AfterEachBeat()
+    {
+        var now = new DateTimeOffset(2026, 10, 7, 12, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(now);
+        var options = new WorkflowLockOptions
+        {
+            LeaseDuration = TimeSpan.FromSeconds(30),
+            RenewalInterval = TimeSpan.FromMilliseconds(30),
+        };
+
+        var prunes = 0;
+        DateTime? staleBefore = null;
+        var heartbeatStore = new Mock<IWorkflowNodeHeartbeatStore>();
+        heartbeatStore.Setup(s => s.RemoveStaleAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Callback<DateTime, CancellationToken>((cutoff, _) =>
+            {
+                staleBefore = cutoff;
+                Interlocked.Increment(ref prunes);
+            })
+            .Returns(Task.CompletedTask);
+
+        var provider = CreateProvider(new Mock<IWorkflowLockStore>(), timeProvider, options, heartbeatStore);
+        await provider.Start();
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (Volatile.Read(ref prunes) < 2 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+        }
+
+        await provider.Stop();
+
+        Volatile.Read(ref prunes).ShouldBeGreaterThanOrEqualTo(2);
+        staleBefore.ShouldBe(now.UtcDateTime - options.LeaseDuration * WorkflowNodeHeartbeat.StaleLeaseMultiple);
+    }
+
+    [Fact]
     public async Task Start_DoesNotWriteHeartbeat_WhenNodeIsNotEligibleToExecuteWorkflows()
     {
         var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);

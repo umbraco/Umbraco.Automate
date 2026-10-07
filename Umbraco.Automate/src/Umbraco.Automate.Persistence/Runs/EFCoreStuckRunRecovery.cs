@@ -30,8 +30,9 @@ namespace Umbraco.Automate.Persistence.Runs;
 /// What can is the node heartbeat (see <see cref="IWorkflowNodeHeartbeatStore"/>). A workflow lock is
 /// only held while a node is inside an execution pass, so a run that is queued, between steps or
 /// waiting to retry holds none — but any node consuming workflow work will run its next pass, and such
-/// a node keeps heartbeating. So if any other node is live, no in-flight run is stuck and recovery
-/// leaves them all to it; only when no other node is live does it fail them. A node counts as live
+/// a node keeps heartbeating. So if any other node is live, recovery leaves every in-flight run to it
+/// except those whose instance has already ended, which no node will move on; only when no other node
+/// is live does it fail them all. A node counts as live
 /// when its beat counter changes within <see cref="WorkflowLockOptions.LeaseDuration"/>, which needs no
 /// comparison between clocks; recovery stops waiting as soon as it sees a beat, or once every other
 /// node's row has gone.
@@ -44,10 +45,6 @@ namespace Umbraco.Automate.Persistence.Runs;
 internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 {
     private const string InterruptedError = "Recovered after application restart — workflow was interrupted";
-
-    // A heartbeat this far behind the recovering node's clock is from a node long gone, not one with a
-    // skewed clock, so it is discarded without waiting for it to change.
-    private const int StaleHeartbeatLeaseMultiple = 10;
 
     private static readonly int[] NonTerminalStatuses =
     [
@@ -107,10 +104,20 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 
             if (liveness.AnyLive)
             {
+                // A live node only carries on a run whose instance it can still execute. One whose
+                // instance has already ended (its run update was lost in a crash) is moved on by no
+                // one, so it is still recovered. A run with no instance yet is left alone: it may be
+                // queued in the outbox for the live node to start. The grace period (the same one used
+                // for long-gone heartbeats, which also absorbs clock skew between nodes) leaves a run
+                // its live node is still finalising.
+                var endedBefore = _timeProvider.GetUtcNow().UtcDateTime
+                    - _lockOptions.Value.LeaseDuration * WorkflowNodeHeartbeat.StaleLeaseMultiple;
+                var endedRuns = await ReadRunsWithEndedInstancesAsync(db, stuckRuns, endedBefore, cancellationToken);
+
                 _logger.LogInformation(
                     "Leaving {Count} in-flight run(s) alone — another node is live and will continue them",
-                    stuckRuns.Count);
-                stuckRuns = [];
+                    stuckRuns.Count - endedRuns.Count);
+                stuckRuns = endedRuns;
             }
             else if (liveness.Waited)
             {
@@ -258,6 +265,38 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
     }
 
     /// <summary>
+    /// Reads the runs whose instance ended at least <paramref name="endedBeforeUtc"/>. A live node saves
+    /// a finished instance before <c>RunFinalizer</c> updates its run, so an instance that has only just
+    /// ended may belong to a run about to be finalised normally; failing it here would stick, because
+    /// the finalizer leaves a run that is already terminal alone.
+    /// </summary>
+    private static async Task<List<StuckRun>> ReadRunsWithEndedInstancesAsync(
+        UmbracoAutomateDbContext db, List<StuckRun> runs, DateTime endedBeforeUtc, CancellationToken cancellationToken)
+    {
+        var instanceIds = runs
+            .Where(r => !string.IsNullOrEmpty(r.WorkflowInstanceId))
+            .Select(r => r.WorkflowInstanceId!)
+            .ToList();
+
+        if (instanceIds.Count == 0)
+        {
+            return [];
+        }
+
+        var endedInstanceIds = await db.WorkflowInstances
+            .Where(wi => instanceIds.Contains(wi.Id)
+                && !LiveInstanceStatuses.Contains(wi.Status)
+                && wi.CompleteTime != null
+                && wi.CompleteTime < endedBeforeUtc)
+            .Select(wi => wi.Id)
+            .ToListAsync(cancellationToken);
+
+        return runs
+            .Where(r => r.WorkflowInstanceId is not null && endedInstanceIds.Contains(r.WorkflowInstanceId))
+            .ToList();
+    }
+
+    /// <summary>
     /// Decides whether any other node is live by watching the heartbeat rows' beat counters for up to
     /// <see cref="WorkflowLockOptions.LeaseDuration"/>. Returns as soon as one changes (or a new node
     /// appears), or as soon as no other node is left to watch.
@@ -267,7 +306,7 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
     {
         var options = _lockOptions.Value;
         var started = _timeProvider.GetUtcNow();
-        var staleBefore = started.UtcDateTime - options.LeaseDuration * StaleHeartbeatLeaseMultiple;
+        var staleBefore = started.UtcDateTime - options.LeaseDuration * WorkflowNodeHeartbeat.StaleLeaseMultiple;
 
         var stopped = new List<Guid>();
         var watched = new Dictionary<Guid, long>();

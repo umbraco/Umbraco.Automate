@@ -206,6 +206,53 @@ public class StuckRunRecoveryTests : IDisposable
         (await db.AutomationRuns.SingleAsync(r => r.Id == queuedRunId)).Status.ShouldBe((int)AutomationRunStatus.Pending);
     }
 
+    [Theory]
+    [InlineData(WorkflowStatus.Terminated)]
+    [InlineData(WorkflowStatus.Complete)]
+    public async Task RecoverStuckRunsAsync_LiveNodeHeartbeating_StillFailsRunsWhoseInstanceHasEnded(WorkflowStatus endedStatus)
+    {
+        var recovery = CreateRecovery(TimeSpan.FromSeconds(10), RenewalInterval);
+        // The instance ended long ago but the run's own update was lost in a crash: no node will move it on.
+        var (endedRunId, endedInstanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Running, endedStatus, DateTime.UtcNow.AddHours(-1));
+        // Between steps: the live node carries this one on.
+        var (liveRunId, liveInstanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Pending, WorkflowStatus.Runnable);
+
+        using var liveNode = StartHeartbeating(Guid.NewGuid());
+        await liveNode.FirstBeat;
+
+        await recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        var endedRun = await db.AutomationRuns.SingleAsync(r => r.Id == endedRunId);
+        endedRun.Status.ShouldBe((int)AutomationRunStatus.Failed);
+        endedRun.Error.ShouldNotBeNull();
+        (await db.StepRuns.SingleAsync(sr => sr.RunId == endedRunId)).Status.ShouldBe((int)StepRunStatus.Failed);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == endedInstanceId)).Status.ShouldBe((int)endedStatus);
+        (await db.AutomationRuns.SingleAsync(r => r.Id == liveRunId)).Status.ShouldBe((int)AutomationRunStatus.Running);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == liveInstanceId)).Status.ShouldBe((int)WorkflowStatus.Runnable);
+    }
+
+    [Theory]
+    [InlineData(WorkflowStatus.Terminated)]
+    [InlineData(WorkflowStatus.Complete)]
+    public async Task RecoverStuckRunsAsync_LiveNodeHeartbeating_LeavesARunWhoseInstanceHasJustEnded(WorkflowStatus endedStatus)
+    {
+        var recovery = CreateRecovery(TimeSpan.FromSeconds(10), RenewalInterval);
+        // The live node has saved the finished instance but not yet finalised the run.
+        var (runId, _) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Completed, endedStatus, DateTime.UtcNow);
+
+        using var liveNode = StartHeartbeating(Guid.NewGuid());
+        await liveNode.FirstBeat;
+
+        await recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Running);
+    }
+
     [Fact]
     public async Task RecoverStuckRunsAsync_LiveNodeHeartbeating_StopsWaitingAtItsFirstBeat()
     {
@@ -427,7 +474,8 @@ public class StuckRunRecoveryTests : IDisposable
     private async Task<(Guid RunId, string InstanceId)> SeedRunAsync(
         AutomationRunStatus runStatus,
         StepRunStatus stepStatus,
-        WorkflowStatus instanceStatus)
+        WorkflowStatus instanceStatus,
+        DateTime? instanceCompleteTime = null)
     {
         var runId = Guid.NewGuid();
         var instanceId = Guid.NewGuid().ToString();
@@ -441,6 +489,7 @@ public class StuckRunRecoveryTests : IDisposable
             Version = 1,
             Status = (int)instanceStatus,
             CreateTime = DateTime.UtcNow,
+            CompleteTime = instanceCompleteTime,
             NextExecution = 0,
             SchemaVersion = 1,
             Data = "{}",
