@@ -713,6 +713,10 @@ export type PostAutomationsErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsError = PostAutomationsErrors[keyof PostAutomationsErrors];
