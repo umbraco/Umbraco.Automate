@@ -118,6 +118,24 @@ public class ActionStepBodyTests
     }
 
     [Fact]
+    public async Task RunAsync_EmptySettings_MissingRequiredDefaultUnderRetry_StopsTheRunWithoutRetrying()
+    {
+        var action = new RequiredSettingAction(new ActionInfrastructure(_modelResolver));
+        StepConfiguration stepConfig = new StepConfigurationBuilder()
+            .WithActionAlias(action.Alias)
+            .WithName("Step")
+            .WithErrorBehavior(StepErrorBehavior.Retry)
+            .WithSettings([]);
+
+        // A configuration error is terminal, so under Retry it is handed to WorkflowCore's
+        // Terminate handler (via AutomateRetryHandler) rather than retried.
+        await Should.ThrowAsync<NonRetryableStepFailureException>(
+            () => CreateBody(action, stepConfig).RunAsync(CreateContext([])));
+
+        action.Executed.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task RunAsync_ActionWithoutSettingsType_LeavesSettingsNullAndRecordsInputs()
     {
         var action = new NoSettingsAction(new ActionInfrastructure(_modelResolver));
