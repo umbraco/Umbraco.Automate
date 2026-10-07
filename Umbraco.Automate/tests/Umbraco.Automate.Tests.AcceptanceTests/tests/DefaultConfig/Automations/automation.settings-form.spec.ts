@@ -55,19 +55,19 @@ test.describe('Settings form', () => {
     const description = await umbracoAutomateApi.catalogue.getFieldDescription(actions.forEach, 'collection');
     const example = /`(\$\{[^`]*\})`/.exec(description)?.[1];
     expect(example).toBeDefined();
-    const loop = automationStep(actions.forEach, 'loop', { collection: '${ trigger.items }' }, { x: 250, y: 200 });
+    const forEach = automationStep(actions.forEach, 'eachItem', { collection: '${ trigger.items }' }, { x: 250, y: 200 });
     const id = await umbracoAutomateApi.automations.create(uniqueName('Settings Code Span'), automateServiceAccountWorkspace.id, {
       trigger: manualTrigger(),
-      steps: [loop],
-      connections: [automationConnection('trigger', loop)]
+      steps: [forEach],
+      connections: [automationConnection('trigger', forEach)]
     });
     const seeded = await umbracoAutomateApi.automations.getById(id);
-    const loopId = umbracoAutomateApi.automations.stepByAlias(seeded, 'loop').id;
+    const forEachId = umbracoAutomateApi.automations.stepByAlias(seeded, 'eachItem').id;
 
     // Act
     await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
     await umbracoAutomateUi.automate.waitForCanvas();
-    await umbracoAutomateUi.automate.openStepSettings(loopId);
+    await umbracoAutomateUi.automate.openStepSettings(forEachId);
 
     // Assert — the example renders as code, with `${` intact rather than `&#36;{`.
     const field = umbracoAutomateUi.automate.nodeSettingsModal.locator('umb-property[alias="collection"]');
