@@ -372,6 +372,20 @@ a deletion the node is permanently gone, so `AuthorizeAccessAsync` returns
 `NotFound` for everyone — not a meaningful authorisation signal. This event
 stays section-only.
 
+The batch triggers (`ContentBatchPublished/Saved/Unpublished`,
+`MediaBatchSaved/Trashed/Deleted`) go through the same authoriser, item by
+item. Items the service account cannot Browse are removed from the batch
+(`Items` and `Count` are rebuilt together) and the run starts with what is
+left. If nothing is left, the run is skipped exactly like a denied
+single-item event. Each item follows its single-item rule, so
+`MediaBatchTrashed` items are denied for scoped accounts and
+`MediaBatchDeleted` items are not node-checked. Because batch settings
+filters match if any item matches, the filter is re-checked against the
+narrowed batch, so a run never fires only because of an item the account
+cannot see. Authorisers registered after the built-in one see the narrowed
+batch. CMS permission services check a set of keys all-or-nothing, so access
+is checked once per item.
+
 ### Node access at action runtime — `IAutomationActionAuthorizer`
 
 Section access is necessary but not sufficient. A workspace with the Content
