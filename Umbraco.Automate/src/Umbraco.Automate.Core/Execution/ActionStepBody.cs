@@ -531,8 +531,8 @@ internal sealed class ActionStepBody : StepBodyAsync
     /// <summary>
     /// Handles a resumed approval step that has no step run left waiting for input. This happens when
     /// the decision was saved on the step run but the workflow was not persisted afterwards (persisting
-    /// it failed, or the node executing it stopped), and the instance is then re-run without a restart:
-    /// in the same process, or on another node. The engine re-runs this step with the same event, but
+    /// it failed, or the node executing it stopped), and the instance is then re-run: in the same
+    /// process, on another node, or after a restart. The engine re-runs this step with the same event, but
     /// the decision has already been applied. The step run's status is the record of that decision —
     /// <see cref="StepRunStatus.Completed"/> for an approval, <see cref="StepRunStatus.Rejected"/> for a
     /// refusal — so the step routes by it, to the line that decision chose. Nothing is saved or
@@ -541,10 +541,10 @@ internal sealed class ActionStepBody : StepBodyAsync
     /// unpersisted workflow, so later steps can still bind to the decision.
     /// </summary>
     /// <remarks>
-    /// This does not cover a restart. On startup, stuck-run recovery sees a Running run with no step
-    /// waiting, and fails the run and terminates its instance before the event is processed, so this
-    /// method is never reached. That is the safe outcome; recovering such runs is tracked in
-    /// https://github.com/umbraco/Umbraco.Automate/issues/467.
+    /// After a restart this is only reached because stuck-run recovery leaves such a run alone: its
+    /// instance still holds the delivered event on this step's pointer (see
+    /// <c>EFCoreStuckRunRecovery.ReadRunsWithUnroutedEventsAsync</c>). A run that also has a step left
+    /// Pending or Running is still failed there, so this method never runs alongside a repeated step.
     /// <para>
     /// The latest step run for this step is taken as the one the event belongs to: a step only waits
     /// for an event after saving its step run as waiting, so in a sequential loop no other run of this
