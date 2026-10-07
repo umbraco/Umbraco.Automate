@@ -98,6 +98,12 @@ export class AutomateUiHelper {
     return this.page.getByRole('textbox', { name: 'Name', exact: true });
   }
 
+  /* The automation editor's name field itself (not its inner textbox). UUI reflects `pristine`
+   * on it and clears it once validation has checked the field, which is when it shows invalid. */
+  get automationNameField(): Locator {
+    return this.page.locator('ua-automation-workspace-editor uui-input#name');
+  }
+
   get aliasInput(): Locator {
     return this.page.getByRole('textbox', { name: 'Alias', exact: true });
   }
@@ -166,6 +172,18 @@ export class AutomateUiHelper {
 
   async clickSaveAndPublish() {
     await this.saveAndPublishButton.click({ force: true });
+  }
+
+  /* Records every create (POST) of an automation from here on, so a spec can check that
+   * client-side validation stopped a save before it reached the server. */
+  trackAutomationCreates(): string[] {
+    const urls: string[] = [];
+    this.page.on('request', (request) => {
+      if (request.method() === 'POST' && /\/management\/api\/v1\/automations$/.test(new URL(request.url()).pathname)) {
+        urls.push(request.url());
+      }
+    });
+    return urls;
   }
 
   /**
