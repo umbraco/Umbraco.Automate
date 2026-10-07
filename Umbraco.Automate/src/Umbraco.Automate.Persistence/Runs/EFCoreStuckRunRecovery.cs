@@ -258,9 +258,47 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
             .Distinct()
             .ToListAsync(cancellationToken);
 
+        var unroutedEventRunIds = await ReadRunsWithUnroutedEventsAsync(db, cancellationToken);
+
         return await db.AutomationRuns
-            .Where(r => NonTerminalStatuses.Contains(r.Status) && !durableRunIds.Contains(r.Id))
+            .Where(r => NonTerminalStatuses.Contains(r.Status)
+                && !durableRunIds.Contains(r.Id)
+                && !unroutedEventRunIds.Contains(r.Id))
             .Select(r => new StuckRun(r.Id, r.WorkflowInstanceId))
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads the runs whose instance holds an event the engine has delivered to a step but no step has
+    /// acted on yet, such as an approval decision whose step saved it and moved the run back to Running
+    /// before the process stopped (#467). Such a run has no step waiting, yet it is not stuck: the
+    /// engine re-runs the step with the event, and the step routes by the decision it recorded.
+    /// </summary>
+    /// <remarks>
+    /// The signal is WorkflowCore's own pointer state. <c>EventConsumer.SeedSubscription</c> sets
+    /// <c>EventPublished</c> and <c>Active</c> on the waiting pointer and persists the instance as
+    /// runnable before the step runs; only the persist after the step sets <c>EndTime</c>. So an active,
+    /// published, unended pointer on a Runnable instance is exactly that window. The event subscription
+    /// is no signal: SeedSubscription ends it before the step runs, so it is already gone in the window,
+    /// while one still open only means the decision has not arrived. An instance that is not Runnable is
+    /// never executed, so its run is still recovered. So is a run with a step left Pending or Running:
+    /// re-running its instance would repeat that interrupted step's side effects.
+    /// </remarks>
+    private static Task<List<Guid>> ReadRunsWithUnroutedEventsAsync(
+        UmbracoAutomateDbContext db, CancellationToken cancellationToken)
+    {
+        var interruptedStepStatuses = new[] { (int)StepRunStatus.Pending, (int)StepRunStatus.Running };
+
+        return db.AutomationRuns
+            .Where(r => NonTerminalStatuses.Contains(r.Status)
+                && db.WorkflowInstances.Any(wi => wi.Id == r.WorkflowInstanceId
+                    && wi.Status == (int)WorkflowStatus.Runnable)
+                && db.WorkflowExecutionPointers.Any(p => p.WorkflowInstanceId == r.WorkflowInstanceId
+                    && p.Active
+                    && p.EventPublished
+                    && p.EndTime == null)
+                && !db.StepRuns.Any(sr => sr.RunId == r.Id && interruptedStepStatuses.Contains(sr.Status)))
+            .Select(r => r.Id)
             .ToListAsync(cancellationToken);
     }
 
