@@ -71,6 +71,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:CircuitBreaker"));
         builder.Services.Configure<WorkflowLockOptions>(
             builder.Config.GetSection("Umbraco:Automate:WorkflowLock"));
+        builder.Services.AddSingleton<IValidateOptions<WorkflowLockOptions>, WorkflowLockOptionsValidator>();
+        builder.Services.AddOptions<WorkflowLockOptions>().ValidateOnStart();
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()

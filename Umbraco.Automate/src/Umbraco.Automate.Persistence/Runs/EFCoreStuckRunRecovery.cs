@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Runs;
+using Umbraco.Automate.Persistence.Workflows;
 using Umbraco.Cms.Core.Sync;
 using WorkflowCore.Models;
 
@@ -26,11 +27,19 @@ namespace Umbraco.Automate.Persistence.Runs;
 /// <see cref="ServerRole.Unknown"/> (role election may not have completed at startup), so the server
 /// role alone cannot tell a run this node abandoned from one another node is executing.
 /// <para>
-/// What can is the workflow lock lease: a node executing an instance holds a lease on its id and keeps
-/// renewing it, so a run whose instance has an unexpired lease is still live and is left alone. A
-/// lease left behind by a process that just died lapses within
-/// <see cref="WorkflowLockOptions.LeaseDuration"/>, so recovery waits at most that long for leases to
-/// lapse before failing the runs whose instances are still held.
+/// What can is the node heartbeat (see <see cref="IWorkflowNodeHeartbeatStore"/>). A workflow lock is
+/// only held while a node is inside an execution pass, so a run that is queued, between steps or
+/// waiting to retry holds none — but any node consuming workflow work will run its next pass, and such
+/// a node keeps heartbeating. So if any other node is live, recovery leaves every in-flight run to it
+/// except those whose instance has already ended, which no node will move on; only when no other node
+/// is live does it fail them all. A node counts as live
+/// when its beat counter changes within <see cref="WorkflowLockOptions.LeaseDuration"/>, which needs no
+/// comparison between clocks; recovery stops waiting as soon as it sees a beat, or once every other
+/// node's row has gone.
+/// </para>
+/// <para>
+/// A node that joins while recovery is failing runs is still protected: an instance is only terminated
+/// when no lease on it is held, other than a lease owned by a node recovery has just seen stop.
 /// </para>
 /// </summary>
 internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
@@ -52,17 +61,20 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IOptions<WorkflowLockOptions> _lockOptions;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<EFCoreStuckRunRecovery> _logger;
 
     public EFCoreStuckRunRecovery(
         IDbContextFactory<UmbracoAutomateDbContext> dbContextFactory,
         IServerRoleAccessor serverRoleAccessor,
         IOptions<WorkflowLockOptions> lockOptions,
+        TimeProvider timeProvider,
         ILogger<EFCoreStuckRunRecovery> logger)
     {
         _dbContextFactory = dbContextFactory;
         _serverRoleAccessor = serverRoleAccessor;
         _lockOptions = lockOptions;
+        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -78,16 +90,43 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var now = DateTime.UtcNow;
-
         var stuckStepStatuses = new[] { (int)StepRunStatus.Pending, (int)StepRunStatus.Running };
 
-        // 1. Recover stuck runs and their step runs.
-        var candidateRuns = await ReadCandidateRunsAsync(db, cancellationToken);
+        // 1. Recover stuck runs and their step runs — but only when no other node is live to carry
+        //    them on (see class remarks).
+        var stuckRuns = await ReadCandidateRunsAsync(db, cancellationToken);
+        var stoppedNodeIds = new List<Guid>();
 
-        // Leave alone runs another node is still executing (see class remarks).
-        var stuckRuns = await ExcludeRunsHeldByLiveLeasesAsync(db, candidateRuns, cancellationToken);
+        if (stuckRuns.Count > 0)
+        {
+            var liveness = await WatchOtherNodesAsync(db, cancellationToken);
+            stoppedNodeIds = liveness.StoppedNodeIds;
 
+            if (liveness.AnyLive)
+            {
+                // A live node only carries on a run whose instance it can still execute. One whose
+                // instance has already ended (its run update was lost in a crash) is moved on by no
+                // one, so it is still recovered. A run with no instance yet is left alone: it may be
+                // queued in the outbox for the live node to start. The grace period (the same one used
+                // for long-gone heartbeats, which also absorbs clock skew between nodes) leaves a run
+                // its live node is still finalising.
+                var endedBefore = _timeProvider.GetUtcNow().UtcDateTime
+                    - _lockOptions.Value.LeaseDuration * WorkflowNodeHeartbeat.StaleLeaseMultiple;
+                var endedRuns = await ReadRunsWithEndedInstancesAsync(db, stuckRuns, endedBefore, cancellationToken);
+
+                _logger.LogInformation(
+                    "Leaving {Count} in-flight run(s) alone — another node is live and will continue them",
+                    stuckRuns.Count - endedRuns.Count);
+                stuckRuns = endedRuns;
+            }
+            else if (liveness.Waited)
+            {
+                // Runs finish while we wait, so the candidates read before it are stale: read them again.
+                stuckRuns = await ReadCandidateRunsAsync(db, cancellationToken);
+            }
+        }
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var stuckRunIds = stuckRuns.Select(r => r.Id).ToList();
 
         var recoveredSteps = 0;
@@ -106,10 +145,11 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 
             if (instanceIds.Count > 0)
             {
-                // Checked in the statement itself rather than only up front: a node that takes the
-                // lease between the check and this update must not have its instance terminated
-                // mid-pass — it would persist its in-memory copy as Runnable behind a Failed run.
-                var leaseNow = DateTime.UtcNow;
+                // Checked in the statement itself: a node that joined after the liveness check and
+                // took the lease must not have its instance terminated mid-pass — it would persist its
+                // in-memory copy as Runnable behind a Failed run. Leases owned by a node just seen to
+                // stop are not held by anyone, so they don't count.
+                var leaseNow = _timeProvider.GetUtcNow().UtcDateTime;
 
                 // Status is a real column for both instance schema versions, and it is what the
                 // poller and WorkflowDefinitionRecovery filter on, so updating it is enough to stop
@@ -118,7 +158,9 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
                 terminatedInstances = await db.WorkflowInstances
                     .Where(wi => instanceIds.Contains(wi.Id)
                         && LiveInstanceStatuses.Contains(wi.Status)
-                        && !db.WorkflowLocks.Any(l => l.LockId == wi.Id && l.ExpiresUtc >= leaseNow))
+                        && !db.WorkflowLocks.Any(l => l.LockId == wi.Id
+                            && l.ExpiresUtc >= leaseNow
+                            && !stoppedNodeIds.Contains(l.OwnerToken)))
                     .ExecuteUpdateAsync(
                         s => s
                             .SetProperty(wi => wi.Status, (int)WorkflowStatus.Terminated)
@@ -182,6 +224,14 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
 
         recoveredSteps += orphanedSteps;
 
+        if (stoppedNodeIds.Count > 0)
+        {
+            // Those nodes are gone; drop their rows so the next startup does not wait on them.
+            await db.WorkflowNodeHeartbeats
+                .Where(h => stoppedNodeIds.Contains(h.NodeId))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
         if (recoveredRuns > 0 || recoveredSteps > 0)
         {
             _logger.LogWarning(
@@ -214,70 +264,123 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<List<StuckRun>> ExcludeRunsHeldByLiveLeasesAsync(
-        UmbracoAutomateDbContext db, List<StuckRun> candidates, CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads the runs whose instance ended at least <paramref name="endedBeforeUtc"/>. A live node saves
+    /// a finished instance before <c>RunFinalizer</c> updates its run, so an instance that has only just
+    /// ended may belong to a run about to be finalised normally; failing it here would stick, because
+    /// the finalizer leaves a run that is already terminal alone.
+    /// </summary>
+    private static async Task<List<StuckRun>> ReadRunsWithEndedInstancesAsync(
+        UmbracoAutomateDbContext db, List<StuckRun> runs, DateTime endedBeforeUtc, CancellationToken cancellationToken)
     {
-        var instanceIds = GetInstanceIds(candidates);
+        var instanceIds = runs
+            .Where(r => !string.IsNullOrEmpty(r.WorkflowInstanceId))
+            .Select(r => r.WorkflowInstanceId!)
+            .ToList();
 
         if (instanceIds.Count == 0)
         {
-            return candidates;
+            return [];
         }
 
-        var leaseDuration = _lockOptions.Value.LeaseDuration;
-        var heldInstanceIds = await GetLeasedInstanceIdsAsync(db, instanceIds, cancellationToken);
+        var endedInstanceIds = await db.WorkflowInstances
+            .Where(wi => instanceIds.Contains(wi.Id)
+                && !LiveInstanceStatuses.Contains(wi.Status)
+                && wi.CompleteTime != null
+                && wi.CompleteTime < endedBeforeUtc)
+            .Select(wi => wi.Id)
+            .ToListAsync(cancellationToken);
 
-        if (heldInstanceIds.Count > 0)
-        {
-            // A lease held by the process that just died lapses on its own; a live node keeps renewing
-            // its lease. Give the former time to lapse, bounded by the lease duration, then decide.
-            _logger.LogInformation(
-                "Waiting {LeaseDuration} for {Count} workflow lease(s) to lapse before recovering stuck runs",
-                leaseDuration, heldInstanceIds.Count);
-
-            await Task.Delay(leaseDuration, cancellationToken);
-
-            // Runs finish while we wait, so the candidates read before it are stale: read them again.
-            candidates = await ReadCandidateRunsAsync(db, cancellationToken);
-            instanceIds = GetInstanceIds(candidates);
-            heldInstanceIds = instanceIds.Count == 0
-                ? []
-                : await GetLeasedInstanceIdsAsync(db, instanceIds, cancellationToken);
-        }
-
-        if (heldInstanceIds.Count == 0)
-        {
-            return candidates;
-        }
-
-        _logger.LogInformation(
-            "Leaving {Count} run(s) alone — their workflow instances are still leased by another node",
-            heldInstanceIds.Count);
-
-        return candidates
-            .Where(r => string.IsNullOrEmpty(r.WorkflowInstanceId) || !heldInstanceIds.Contains(r.WorkflowInstanceId))
+        return runs
+            .Where(r => r.WorkflowInstanceId is not null && endedInstanceIds.Contains(r.WorkflowInstanceId))
             .ToList();
     }
 
-    private static List<string> GetInstanceIds(List<StuckRun> candidates) => candidates
-        .Where(r => !string.IsNullOrEmpty(r.WorkflowInstanceId))
-        .Select(r => r.WorkflowInstanceId!)
-        .ToList();
-
-    private static async Task<HashSet<string>> GetLeasedInstanceIdsAsync(
-        UmbracoAutomateDbContext db, List<string> instanceIds, CancellationToken cancellationToken)
+    /// <summary>
+    /// Decides whether any other node is live by watching the heartbeat rows' beat counters for up to
+    /// <see cref="WorkflowLockOptions.LeaseDuration"/>. Returns as soon as one changes (or a new node
+    /// appears), or as soon as no other node is left to watch.
+    /// </summary>
+    private async Task<NodeLiveness> WatchOtherNodesAsync(
+        UmbracoAutomateDbContext db, CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
+        var options = _lockOptions.Value;
+        var started = _timeProvider.GetUtcNow();
+        var staleBefore = started.UtcDateTime - options.LeaseDuration * WorkflowNodeHeartbeat.StaleLeaseMultiple;
 
-        // AsNoTracking + a fresh query each call: the second look must see renewals, not cached rows.
-        var held = await db.WorkflowLocks
-            .AsNoTracking()
-            .Where(l => instanceIds.Contains(l.LockId) && l.ExpiresUtc >= now)
-            .Select(l => l.LockId)
-            .ToListAsync(cancellationToken);
+        var stopped = new List<Guid>();
+        var watched = new Dictionary<Guid, long>();
 
-        return held.ToHashSet();
+        foreach (var heartbeat in await ReadHeartbeatsAsync(db, cancellationToken))
+        {
+            if (heartbeat.HeartbeatUtc < staleBefore)
+            {
+                stopped.Add(heartbeat.NodeId);
+            }
+            else
+            {
+                watched[heartbeat.NodeId] = heartbeat.Beat;
+            }
+        }
+
+        if (watched.Count == 0)
+        {
+            return new NodeLiveness(false, stopped, Waited: false);
+        }
+
+        _logger.LogInformation(
+            "Waiting up to {LeaseDuration} for a heartbeat from {Count} other node(s) before recovering stuck runs",
+            options.LeaseDuration, watched.Count);
+
+        var deadline = started + options.LeaseDuration;
+        var pollInterval = options.RenewalInterval < TimeSpan.FromSeconds(1)
+            ? options.RenewalInterval
+            : TimeSpan.FromSeconds(1);
+
+        while (true)
+        {
+            var remaining = deadline - _timeProvider.GetUtcNow();
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+
+            await Task.Delay(remaining < pollInterval ? remaining : pollInterval, _timeProvider, cancellationToken);
+
+            var current = await ReadHeartbeatsAsync(db, cancellationToken);
+
+            foreach (var heartbeat in current)
+            {
+                var isNew = !watched.TryGetValue(heartbeat.NodeId, out var beat) && !stopped.Contains(heartbeat.NodeId);
+                if (isNew || (watched.ContainsKey(heartbeat.NodeId) && beat != heartbeat.Beat))
+                {
+                    return new NodeLiveness(true, stopped, Waited: true);
+                }
+            }
+
+            // A node that shut down cleanly removed its row: nothing left to wait for from it.
+            var present = current.Select(h => h.NodeId).ToHashSet();
+            foreach (var nodeId in watched.Keys.Where(id => !present.Contains(id)).ToList())
+            {
+                watched.Remove(nodeId);
+            }
+
+            if (watched.Count == 0)
+            {
+                return new NodeLiveness(false, stopped, Waited: true);
+            }
+        }
+
+        stopped.AddRange(watched.Keys);
+        return new NodeLiveness(false, stopped, Waited: true);
     }
+
+    private static Task<List<WorkflowNodeHeartbeatEntity>> ReadHeartbeatsAsync(
+        UmbracoAutomateDbContext db, CancellationToken cancellationToken) =>
+        // AsNoTracking + a fresh query each call: every look must see new beats, not cached rows.
+        db.WorkflowNodeHeartbeats.AsNoTracking().ToListAsync(cancellationToken);
+
+    private sealed record NodeLiveness(bool AnyLive, List<Guid> StoppedNodeIds, bool Waited);
 
     private sealed record StuckRun(Guid Id, string? WorkflowInstanceId);
 }
