@@ -59,9 +59,11 @@ export class UaAutomationDetailServerDataSource implements UmbDetailDataSource<U
     async create(model: UaAutomationDetailModel, _parentUnique: string | null) {
         const requestBody = UaAutomationTypeMapper.toCreateRequest(model);
 
+        // throwOnError: tryExecute only notifies (toast) on a rejected promise, and the generated SDK
+        // client resolves 4xx/5xx by default, so a failed save would otherwise report nothing.
         const { response, error } = await tryExecute(
             this.#host,
-            AutomationsService.postAutomations({ body: requestBody }),
+            AutomationsService.postAutomations({ body: requestBody, throwOnError: true }),
         );
 
         if (error) {
@@ -77,11 +79,13 @@ export class UaAutomationDetailServerDataSource implements UmbDetailDataSource<U
     async update(model: UaAutomationDetailModel) {
         const requestBody = UaAutomationTypeMapper.toUpdateRequest(model);
 
+        // throwOnError: see create(). A 409 here means another tab or user saved first.
         const { error } = await tryExecute(
             this.#host,
             AutomationsService.putAutomationsById({
                 path: { id: model.unique },
                 body: requestBody,
+                throwOnError: true,
             }),
         );
 

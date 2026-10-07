@@ -13,9 +13,10 @@ namespace Umbraco.Automate.Core.Execution;
 /// Syncs an <see cref="AutomationRun"/>'s status with its WorkflowCore workflow instance.
 /// Handles terminal states (<see cref="WorkflowStatus.Complete"/> /
 /// <see cref="WorkflowStatus.Terminated"/>) as well as the non-terminal
-/// <see cref="WorkflowStatus.Suspended"/> transition used for error-mode Suspend and
-/// approval <c>WaitForEvent</c> waits. Called from the persistence provider's
-/// <c>PersistWorkflow</c> method.
+/// <see cref="WorkflowStatus.Suspended"/> transition used for error-mode Suspend. Approval
+/// <c>WaitForEvent</c> waits never reach it — WorkflowCore leaves the workflow Runnable and only
+/// parks the pointer — so <see cref="ActionStepBody"/> suspends the run for those itself.
+/// Called from the persistence provider's <c>PersistWorkflow</c> method.
 /// </summary>
 internal sealed class RunFinalizer
 {
@@ -134,7 +135,12 @@ internal sealed class RunFinalizer
 
         if (workflow.Status == WorkflowStatus.Terminated)
         {
-            run.Error = "Workflow terminated";
+            // A terminated workflow is almost always a step failing with the Terminate error
+            // behaviour. Report that step's error, which says what went wrong; "Workflow
+            // terminated" only says that it did.
+            run.Error = run.StepRuns
+                .FirstOrDefault(sr => sr.Status == StepRunStatus.Failed && !string.IsNullOrEmpty(sr.Error))?
+                .Error ?? "Workflow terminated";
         }
 
         // Propagate the first step error to the run if no run-level error is set yet.

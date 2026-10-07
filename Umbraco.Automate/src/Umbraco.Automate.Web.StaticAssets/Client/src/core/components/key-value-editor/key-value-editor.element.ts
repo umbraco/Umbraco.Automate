@@ -6,9 +6,9 @@ import type {
     UmbPropertyEditorConfigCollection,
 } from "@umbraco-cms/backoffice/property-editor";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
-import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
+import { UMB_MODAL_MANAGER_CONTEXT, umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
-import "../binding-picker/binding-picker-button.element.js";
+import { UA_BINDING_PICKER_MODAL } from "../binding-text-box/binding-picker-modal.token.js";
 
 /**
  * One row of a key/value list. Serialized as-is, and read back into a settings POCO
@@ -82,11 +82,22 @@ export class UaKeyValueEditorElement extends UmbLitElement implements UmbPropert
      * Appends the picked expression to the row's value rather than replacing it, so a header
      * like `Bearer ${ ... }` can be built up from a literal prefix and a binding.
      */
-    #onBindingSelect(rowIndex: number, e: CustomEvent<{ expression: string }>) {
-        e.stopPropagation();
-        const newValue = this.#cloneValue();
-        newValue[rowIndex].value = `${newValue[rowIndex].value ?? ""}${e.detail.expression}`;
-        this.#emitChange(newValue);
+    async #insertBinding(rowIndex: number) {
+        const modalManager = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+        if (!modalManager) return;
+
+        const modal = modalManager.open(this, UA_BINDING_PICKER_MODAL, {
+            data: { sources: this.bindingSources },
+        });
+
+        try {
+            const { expression } = await modal.onSubmit();
+            const newValue = this.#cloneValue();
+            newValue[rowIndex].value = `${newValue[rowIndex].value ?? ""}${expression}`;
+            this.#emitChange(newValue);
+        } catch {
+            // dismissed
+        }
     }
 
     #addRow() {
@@ -135,11 +146,17 @@ export class UaKeyValueEditorElement extends UmbLitElement implements UmbPropert
                         .value=${row.value ?? ""}
                         @change=${(e: Event) => this.#onValueChange(rowIndex, e)}
                     ></uui-input>
-                    <ua-binding-picker-button
-                        .sources=${this.bindingSources}
-                        @ua:binding-select=${(e: CustomEvent<{ expression: string }>) =>
-                            this.#onBindingSelect(rowIndex, e)}
-                    ></ua-binding-picker-button>
+                    ${this.bindingSources.length > 0
+                        ? html`<uui-button
+                              look="secondary"
+                              compact
+                              label=${this.localize.term("uaBindings_insertExpression")}
+                              title=${this.localize.term("uaBindings_insertExpression")}
+                              @click=${() => this.#insertBinding(rowIndex)}
+                          >
+                              <uui-icon name="icon-code"></uui-icon>
+                          </uui-button>`
+                        : nothing}
                 </div>
 
                 <uui-button

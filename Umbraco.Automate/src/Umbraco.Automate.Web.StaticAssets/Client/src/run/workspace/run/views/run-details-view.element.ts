@@ -4,7 +4,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UA_RUN_WORKSPACE_CONTEXT } from "../run-workspace.context-token.js";
 import type { UaRunDetailModel } from "../../../types.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
-import { formatDateTime } from "../../../../core/index.js";
+import { formatDateTime, getRunStatusColor } from "../../../../core/index.js";
 import "../../../components/step-run-detail/step-run-detail.element.js";
 import { UA_RUN_TRIGGER_ROW_ID } from "../../../components/run-trigger-detail/run-trigger-detail.element.js";
 
@@ -61,25 +61,6 @@ export class UaRunDetailsViewElement extends UmbLitElement {
         }
     }
 
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            case "WaitingForInput":
-                return "warning";
-            case "Failed":
-                return "danger";
-            case "Skipped":
-            case "Cancelled":
-            case "Suspended":
-                return "default";
-            default:
-                return "default";
-        }
-    }
-
     #onToggleStep(e: CustomEvent<{ stepId: string }>) {
         const stepId = e.detail.stepId;
         this._expandedStep = this._expandedStep === stepId ? undefined : stepId;
@@ -120,7 +101,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                     <uui-box headline=${this.localize.term("uaLabels_runInfo")}>
                         <umb-property-layout label=${this.localize.term("uaLabels_status")} orientation="vertical">
                             <div slot="editor">
-                                <uui-tag color=${this.#statusColor(this._run.status)} look="secondary">
+                                <uui-tag color=${getRunStatusColor(this._run.status)} look="secondary">
                                     ${this._run.status}
                                 </uui-tag>
                             </div>
@@ -198,7 +179,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
 
             .error-output {
                 background: var(--uui-color-danger-standalone);
-                color: white;
+                color: var(--uui-color-danger-contrast, white);
                 padding: var(--uui-size-space-3);
                 border-radius: var(--uui-border-radius);
                 font-size: var(--uui-size-4);

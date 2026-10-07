@@ -3,7 +3,7 @@ import type { PropertyValues } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UaRunDataValueModel } from "../../types.js";
-import { formatDateTime } from "../../../core/index.js";
+import { formatDateTime, onActivateKey } from "../../../core/index.js";
 import { UaRunDetailServerDataSource } from "../../repository/detail/run-detail.server.data-source.js";
 import "../run-data-block/run-data-block.element.js";
 
@@ -104,7 +104,14 @@ export class UaRunTriggerDetailElement extends UmbLitElement {
     override render() {
         return html`
             <uui-box>
-                <div class="header" @click=${this.#toggle}>
+                <div
+                    class="header"
+                    role="button"
+                    tabindex="0"
+                    aria-expanded=${this.expanded ? "true" : "false"}
+                    @click=${this.#toggle}
+                    @keydown=${onActivateKey(() => this.#toggle())}
+                >
                     <uui-icon name=${this.expanded ? "icon-navigation-down" : "icon-navigation-right"}></uui-icon>
                     <span class="name">${this.triggerName || this.localize.term("uaRun_trigger")}</span>
                     <span class="started">${this.startedUtc ? formatDateTime(this.startedUtc) : "-"}</span>
@@ -141,6 +148,11 @@ export class UaRunTriggerDetailElement extends UmbLitElement {
 
             .header:hover {
                 background: var(--uui-color-surface-alt);
+            }
+
+            .header:focus-visible {
+                outline: 2px solid var(--uui-color-focus);
+                outline-offset: -2px;
             }
 
             .name {

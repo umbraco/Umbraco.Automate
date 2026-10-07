@@ -23,6 +23,15 @@ parameters:
             changeVar: SlackChanged
             hasNpm: false
 
+    # Queue-time override: generate SBOMs and run the license policy check on any branch.
+    # SBOMs normally only run on vN/release/* and vN/hotfix/*, where they are also uploaded to
+    # Dependency-Track. Elsewhere this covers every product and never uploads, so in-progress
+    # versions don't land in Dependency-Track.
+    - name: generateSbom
+      displayName: Generate SBOMs and check licenses (no upload off release/hotfix)
+      type: boolean
+      default: false
+
 # Feature branches are not listed: their pull request builds them, and a branch
 # trigger as well would build every push twice.
 # batch: a burst of merges builds once, from the latest commit, rather than once per merge.
@@ -49,7 +58,7 @@ variables:
       value: "true"
     - name: DOTNET_CLI_TELEMETRY_OPTOUT
       value: "true"
-    # A push to vN/main, vN/dev, vN/release/* or vN/hotfix/*: the builds that publish SBOMs and packages.
+    # A push to vN/main, vN/dev, vN/release/* or vN/hotfix/*: the builds that publish packages.
     # Resolves to "True" or "False" at compile time; eq() compares case-insensitively.
     - name: isPublishBuild
       value: ${{ and(ne(variables['Build.Reason'], 'PullRequest'), or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/'), endsWith(variables['Build.SourceBranch'], '/main'), endsWith(variables['Build.SourceBranch'], '/dev'))) }}
@@ -241,8 +250,129 @@ stages:
       displayName: Acceptance Tests
       dependsOn: []
       jobs:
+          # Decides whether a pull request needs the acceptance suite at all, and how much of it.
+          # A job in this stage rather than a step in Build (as in Forms), because this stage
+          # deliberately runs alongside Build: waiting on Build would put the whole .NET build
+          # and test run back on the acceptance critical path. It needs only the PR merge commit
+          # and its two parents, so a depth-2 checkout on a Linux agent is enough.
+          - job: Changes
+            displayName: Detect acceptance changes
+            pool:
+                vmImage: "ubuntu-latest"
+            steps:
+                - checkout: self
+                  fetchDepth: 2
+
+                # A PR build sorts its changed files (the PR merge commit against its first
+                # parent, the target branch tip) into areas, first match wins:
+                #   none         *.md, docs/, .claude/, .github/, .githooks/, assets/, templates/
+                #                (the dotnet new templates, not scripts/templates/), LICENSE and
+                #                repo tooling (commitlint, prettier, .mcp.json, changelog and
+                #                release-manifest scripts and config, git-hook setup,
+                #                marketplace JSON)                -> no acceptance
+                #   tests        the .NET unit, integration and common test projects
+                #                                                 -> no acceptance (Build runs them)
+                #   specs        tests/...AcceptanceTests/ tests/, lib/ and umbraco.config.ts
+                #                                                 -> acceptance, CHANGED SPECS only
+                #   acceptance   the rest of tests/...AcceptanceTests/ (package*.json,
+                #                playwright.config.ts, tsconfig.json, postinstall.js, ...)
+                #                                                 -> acceptance, whole suite
+                #   shared       anything else: product code, the frontend, the demo-site
+                #                scripts and templates, pipeline YAML, Directory.*.props,
+                #                global.json, version.json, NuGet config, ...
+                #                                                 -> acceptance, whole suite
+                # A PR touching only none/tests files skips the suite. Pushes, and anything
+                # unexpected (not a PR merge commit, empty diff), run the whole suite. The
+                # acceptance job's condition skips only on an explicit 'false', so a missing
+                # variable runs the suite rather than silently skipping it.
+                #
+                # acceptanceChangedOnly is true only when acceptance runs because of `specs` files
+                # and nothing else. The matrix step then picks one leg running Playwright's
+                # --only-changed, which runs the changed spec files plus any spec that imports a
+                # changed file. That import graph is why `specs` is limited to TypeScript the specs
+                # import: package.json, the Playwright config or the npm install scripts are not
+                # imported by any spec (playwright.config.ts only by auth.setup.ts), so
+                # --only-changed would run next to nothing for them, and they run the whole suite.
+                - bash: |
+                      runAcceptance=true
+                      acceptanceChangedOnly=false
+                      acc=Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
+                      if [ "$(Build.Reason)" = "PullRequest" ] && git rev-parse -q --verify HEAD^2 >/dev/null; then
+                        # --no-renames lists a moved file's old path too, so moving code out of src/
+                        # into docs/ can't hide the src/ side and skip the suite.
+                        changed=$(git diff --name-only --no-renames HEAD^1 HEAD)
+                        if [ -n "$changed" ]; then
+                          runAcceptance=false
+                          # Set by any area that needs the whole suite, not just changed specs.
+                          fullAcceptance=false
+                          while IFS= read -r file; do
+                            case "$file" in
+                              *.md|docs/*|.claude/*|.github/*|.githooks/*|assets/*|templates/*|LICENSE|commitlint.config.js|.git-blame-ignore-revs|.prettierrc|.prettierignore|.mcp.json|.worktreeinclude|*/changelog.config.json|*/umbraco-marketplace*.json|scripts/generate-changelog*|scripts/generate-release-manifest*|scripts/list-commit-options.js|scripts/setup-git-hooks*|.azure-pipelines/scripts/validate-changelogs.ps1)
+                                area=none ;;
+                              Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/*|Umbraco.Automate/tests/Directory.*|Umbraco.Automate.OpenIddict/tests/*|Umbraco.Automate.Slack/tests/*)
+                                area=tests ;;
+                              "$acc"/tests/*|"$acc"/lib/*|"$acc"/umbraco.config.ts)
+                                area=specs ;;
+                              "$acc"/*)
+                                area=acceptance ;;
+                              *)
+                                area=shared ;;
+                            esac
+                            echo "$area: $file"
+                            case "$area" in
+                              specs) runAcceptance=true ;;
+                              acceptance|shared) runAcceptance=true; fullAcceptance=true ;;
+                            esac
+                          done <<< "$changed"
+                          if [ "$runAcceptance" = true ] && [ "$fullAcceptance" = false ]; then
+                            acceptanceChangedOnly=true
+                          fi
+                        fi
+                      else
+                        echo "Not a PR merge commit: running the whole acceptance suite."
+                      fi
+                      echo "Acceptance tests: $runAcceptance (changed specs only: $acceptanceChangedOnly)"
+                      echo "##vso[task.setvariable variable=runAcceptance;isOutput=true]$runAcceptance"
+                      echo "##vso[task.setvariable variable=acceptanceChangedOnly;isOutput=true]$acceptanceChangedOnly"
+                  name: changes
+                  displayName: Detect whether acceptance tests run
+
+                # STANDARD: four shards of the whole suite. CHANGED (a PR whose only
+                # acceptance-relevant changes are specs - see acceptanceChangedOnly above): ONE
+                # unsharded leg running --only-changed against the PR's target branch tip. A
+                # handful of specs don't need four agents each paying the build, scaffold and
+                # LocalDB first boot. HEAD~1 rather than HEAD^1, because npm runs the script through
+                # cmd.exe on Windows, where ^ is the escape character; on the PR merge commit both
+                # name the same first parent, which the acceptance job's full-history checkout has.
+                # --pass-with-no-tests keeps a PR that only deletes specs green.
+                #
+                # Each leg carries its own testCommand (incl. any --shard) and a `leg` name for
+                # step titles and artifact names; the run step just executes testCommand. There
+                # is no release-type matrix or force-full parameter here: every non-PR build
+                # leaves acceptanceChangedOnly false and gets STANDARD.
+                - bash: |
+                      STANDARD='{"Shard 1 of 4":{"leg":"Shard 1 of 4","testCommand":"npm run test -- --shard=1/4"},"Shard 2 of 4":{"leg":"Shard 2 of 4","testCommand":"npm run test -- --shard=2/4"},"Shard 3 of 4":{"leg":"Shard 3 of 4","testCommand":"npm run test -- --shard=3/4"},"Shard 4 of 4":{"leg":"Shard 4 of 4","testCommand":"npm run test -- --shard=4/4"}}'
+                      CHANGED='{"Changed specs":{"leg":"Changed specs","testCommand":"npm run test -- --only-changed=HEAD~1 --pass-with-no-tests"}}'
+                      matrix="$STANDARD"
+                      if [ "$(changes.acceptanceChangedOnly)" = "true" ]; then matrix="$CHANGED"; fi
+                      echo "Acceptance matrix: $matrix"
+                      echo "##vso[task.setvariable variable=acceptanceMatrix;isOutput=true]$matrix"
+                  name: acceptance
+                  displayName: Compute acceptance matrix
+
           - job: AcceptanceTests
             displayName: Run Playwright Acceptance Tests
+            dependsOn: Changes
+            condition: and(succeeded(), ne(dependencies.Changes.outputs['changes.runAcceptance'], 'false'))
+            # Computed by the Changes job: four shards of the whole suite, or one leg running
+            # just the changed specs. Each shard gets its own demo site and LocalDB. The
+            # specs share site data and the suite runs one worker, so shards cannot share a
+            # site; splitting across agents is what makes them run concurrently. Playwright
+            # splits by test (fullyParallel in playwright.config.ts, --shard in each leg's
+            # testCommand), and every leg runs auth.setup.ts itself. maxParallel is left at the
+            # default so all shards run concurrently.
+            strategy:
+                matrix: $[ dependencies.Changes.outputs['acceptance.acceptanceMatrix'] ]
             # Windows agents build more slowly, and the first boot against a cold LocalDB
             # creates the database and runs the full unattended install.
             timeoutInMinutes: 60
@@ -256,6 +386,10 @@ stages:
                 ASPNETCORE_ENVIRONMENT: Development
                 ASPNETCORE_URLS: https://localhost:44380
                 PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
+                # Cached below. Each shard otherwise restored NuGet cold three times (~1:20) and ran
+                # two cold `npm ci` (~1:50), a large share of its ~7:30 of setup (build 289743).
+                NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+                npm_config_cache: $(Pipeline.Workspace)/.npm
                 acceptanceDir: $(Build.SourcesDirectory)/Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
                 # Override the scaffold's SQLite connection string. Automate shares it
                 # (Umbraco:Automate:UseNamedConnectionString = umbracoDbDSN), so this moves
@@ -267,9 +401,26 @@ stages:
             steps:
                 # Full history, like the Build stage: the demo site builds the products from
                 # project references, and Nerdbank.GitVersioning cannot compute a version
-                # height from a shallow clone.
+                # height from a shallow clone. It also gives a changed-specs leg the merge
+                # commit's first parent that --only-changed=HEAD~1 diffs against.
                 - checkout: self
                   fetchDepth: 0
+
+                # Started now and left running, so its 10-30s boot overlaps the builds instead of
+                # sitting on the critical path. "Wait for SQL Server LocalDB" below checks it is up.
+                - pwsh: |
+                      Start-Process SqlLocalDB -ArgumentList 'start', 'MSSQLLocalDB' -WindowStyle Hidden
+                      Write-Host "SQL Server LocalDB starting in the background"
+                  displayName: Start SQL Server LocalDB (background)
+
+                # The SDK global.json pins is not on the hosted image, so UseDotNet downloaded and
+                # extracted it on every shard (24-59s). UseDotNet finds a cached copy in its tool
+                # directory and skips the download.
+                - task: Cache@2
+                  displayName: Cache .NET SDK
+                  inputs:
+                      key: 'dotnet-sdk | "$(Agent.OS)" | global.json'
+                      path: $(Agent.ToolsDirectory)/dotnet
 
                 - task: UseDotNet@2
                   displayName: Setup .NET
@@ -280,6 +431,27 @@ stages:
                   displayName: Setup Node.js
                   inputs:
                       version: $(NODE_VERSION)
+
+                # One npm cache for both installs: the frontend at the repo root and the acceptance
+                # test packages. The Build stage's npm and NuGet caches are keyed on its Linux agent,
+                # so these Windows jobs keep their own. PR builds read what their target branch saved.
+                - task: Cache@2
+                  displayName: Cache npm
+                  inputs:
+                      key: 'npm | "$(Agent.OS)" | package-lock.json | Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests/package-lock.json'
+                      restoreKeys: |
+                          npm | "$(Agent.OS)"
+                      path: $(npm_config_cache)
+
+                # Versions live in Directory.Packages.props; the demo site's own packages (the
+                # Umbraco template, Clean, WorktreeDevPort) come from install-demo-site.ps1.
+                - task: Cache@2
+                  displayName: Cache NuGet packages
+                  inputs:
+                      key: 'nuget | "$(Agent.OS)" | Directory.Packages.props | scripts/install-demo-site.ps1'
+                      restoreKeys: |
+                          nuget | "$(Agent.OS)"
+                      path: $(NUGET_PACKAGES)
 
                 # Builds the wwwroot bundles the demo site serves. Without this the
                 # Automate section silently fails to register and every UI spec fails
@@ -292,7 +464,8 @@ stages:
                       npm run build
                   displayName: Build frontend
 
-                - pwsh: ./scripts/install-demo-site.ps1
+                # -SkipSolution: CI builds the demo project directly and never opens the local .slnx.
+                - pwsh: ./scripts/install-demo-site.ps1 -SkipSolution
                   displayName: Scaffold demo site
 
                 # The demo lives under demos/vN where N comes from Umbraco.Cms.Core in
@@ -313,8 +486,20 @@ stages:
                 - script: dotnet build "$(demoProject)" --configuration Release
                   displayName: Build demo site
 
-                - pwsh: SqlLocalDB start MSSQLLocalDB
-                  displayName: Start SQL Server LocalDB
+                # Started in the background at the top of the job; by now it has usually been up for
+                # minutes, so this normally returns at once. Falls back to a blocking start if the
+                # background start did not take.
+                - pwsh: |
+                      for ($i = 0; $i -lt 60; $i++) {
+                        if ((SqlLocalDB info MSSQLLocalDB) -match 'State:\s+Running') {
+                          Write-Host "SQL Server LocalDB is running (check $i)"
+                          exit 0
+                        }
+                        Start-Sleep -Seconds 1
+                      }
+                      Write-Host "LocalDB not running after 60s; starting it in the foreground"
+                      SqlLocalDB start MSSQLLocalDB
+                  displayName: Wait for SQL Server LocalDB
 
                 # Keyed on the acceptance package-lock, which pins the Playwright
                 # version that determines the required browser build.
@@ -368,14 +553,16 @@ stages:
 
                 # First boot creates the LocalDB database and runs the unattended install and
                 # the Automate schema migrations, so allow generous time before calling it a failure.
+                # Polls every 3s (was 10s): the site is usually up in 20-35s, so a coarse poll
+                # added up to 10s of idle wait per shard.
                 - pwsh: |
-                      for ($i = 0; $i -lt 90; $i++) {
+                      for ($i = 0; $i -lt 300; $i++) {
                         try {
                           Invoke-WebRequest "$(ASPNETCORE_URLS)/umbraco" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 10 | Out-Null
                           Write-Host "Demo site is up (attempt $i)"
                           exit 0
                         } catch {
-                          Start-Sleep -Seconds 10
+                          Start-Sleep -Seconds 3
                         }
                       }
                       Write-Host "##vso[task.logissue type=error]Demo site did not respond within 15 minutes"
@@ -384,8 +571,8 @@ stages:
                       exit 1
                   displayName: Wait for demo site
 
-                - script: npx playwright test DefaultConfig
-                  displayName: Run acceptance tests
+                - script: $(testCommand)
+                  displayName: Run acceptance tests ($(leg))
                   workingDirectory: $(acceptanceDir)
 
                 # always(), so the site is also stopped after a failed or cancelled test step.
@@ -408,21 +595,21 @@ stages:
                   inputs:
                       testResultsFormat: JUnit
                       testResultsFiles: "$(acceptanceDir)/results/results.xml"
-                      testRunTitle: Acceptance Tests
+                      testRunTitle: Acceptance Tests ($(leg))
                       mergeTestResults: true
 
                 # Traces, screenshots and video for every failed test, plus the site
                 # logs, because a UI failure is rarely diagnosable from the error alone.
                 # always(), as in Forms: a job killed by its timeout is cancelled, and a
                 # cancelled job skips steps whose condition does not include always(), so
-                # the run that most needs diagnosing would upload nothing. The attempt number
-                # keeps a re-run from colliding with the first attempt's artifact.
+                # the run that most needs diagnosing would upload nothing. The leg name and attempt
+                # number keep shards and re-runs from colliding on the same artifact name.
                 - task: PublishPipelineArtifact@1
                   displayName: Upload failure diagnostics
                   condition: always()
                   inputs:
                       targetPath: $(acceptanceDir)/results
-                      artifact: acceptance-test-results - Attempt $(System.JobAttempt)
+                      artifact: acceptance-test-results - $(leg) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
                 - task: PublishPipelineArtifact@1
@@ -430,61 +617,55 @@ stages:
                   condition: always()
                   inputs:
                       targetPath: $(Build.ArtifactStagingDirectory)
-                      artifact: acceptance-demo-site-log - Attempt $(System.JobAttempt)
+                      artifact: acceptance-demo-site-log - $(leg) - Attempt $(System.JobAttempt)
                       publishLocation: pipeline
 
     # ============================================================
-    # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
-    # Generates per-product SBOMs and uploads to Dependency-Track
+    # Generate & Upload SBOMs - Only runs on push to vN/release/* and vN/hotfix/*, or on any
+    # branch when generateSbom is ticked at queue time (generate + license check, no upload)
+    # Covers only the products being released (same change detection as Pack), uploads them to
+    # Dependency-Track, and gates Pack: a license policy violation stops the release
     # ============================================================
     - stage: GenerateSBOM
       displayName: Generate & Upload SBOMs
       dependsOn: Build
-      condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
+      condition: |
+          and(
+            succeeded(),
+            ne(variables['Build.Reason'], 'PullRequest'),
+            or(
+              eq('${{ parameters.generateSbom }}', 'true'),
+              contains(variables['Build.SourceBranch'], '/release/'),
+              contains(variables['Build.SourceBranch'], '/hotfix/')
+            )
+          )
       jobs:
-          # One job for every product: each SBOM takes about a minute, far less than the
-          # agent wait a job per product cost, and cdxgen is installed once, not per product.
           - job: GenerateSBOMs
             displayName: Generate SBOMs
-            continueOnError: true
             pool:
                 vmImage: "ubuntu-latest"
+            ${{ if or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/')) }}:
+                variables:
+                    # The products in the release, from the Build job's change detection
+                    sbomProducts: $[ stageDependencies.Build.BuildAndTest.outputs['detect.AllChangedProducts'] ]
             steps:
+                # nbgv needs full history to work out each product's version
                 - checkout: self
-                  fetchDepth: 1
+                  fetchDepth: 0
 
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
+                # A queue-time SBOM check on any other branch covers every product, since
+                # change detection only narrows the list to a release on release/hotfix.
+                - ${{ if and(not(contains(variables['Build.SourceBranch'], '/release/')), not(contains(variables['Build.SourceBranch'], '/hotfix/'))) }}:
+                      - pwsh: |
+                            $products = (Get-ChildItem -Directory | Where-Object { Test-Path (Join-Path $_.FullName "version.json") }).Name -join ","
+                            Write-Host "Products: $products"
+                            Write-Host "##vso[task.setvariable variable=sbomProducts]$products"
+                        displayName: List all products
 
-                - task: Npm@1
-                  displayName: Install cdxgen
-                  inputs:
-                      command: custom
-                      customCommand: install --global @cyclonedx/cdxgen
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
+                - template: .azure-pipelines/templates/sbom.yml
                   parameters:
-                      product: Umbraco.Automate
-
-                - ${{ each product in parameters.level1Products }}:
-                      - template: .azure-pipelines/templates/generate-sbom.yml
-                        parameters:
-                            product: ${{ product.name }}
-
-                - ${{ each product in parameters.level2Products }}:
-                      - template: .azure-pipelines/templates/generate-sbom.yml
-                        parameters:
-                            product: ${{ product.name }}
-
-                - task: PublishPipelineArtifact@1
-                  displayName: Upload combined SBOM artifact
-                  condition: succeededOrFailed()
-                  inputs:
-                      targetPath: $(Build.ArtifactStagingDirectory)/sbom
-                      artifact: all-sboms
-                      publishLocation: pipeline
+                      products: $(sbomProducts)
+                      upload: ${{ or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/')) }}
 
     # ============================================================
     # Validate Changelogs - Only runs on release and hotfix branches
@@ -523,20 +704,23 @@ stages:
     # ============================================================
     # Pack Stage - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
     # Uses dynamic change detection to only pack products that changed
-    # Runs in parallel with GenerateSBOM after Build (through ValidateChangelogs dependency)
+    # Waits for GenerateSBOM so a license policy violation stops a release before it is packed
     # ============================================================
     - stage: Pack
       displayName: Pack NuGet & NPM Packages
       dependsOn:
           - Build
           - ValidateChangelogs
+          - GenerateSBOM
       # Only pack on push (not PR) to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches,
       # and only when change detection (in the Build job) found something to pack.
-      # ValidateChangelogs may be skipped (on vN/main, vN/dev branches), which is OK
+      # ValidateChangelogs and GenerateSBOM may be skipped (on vN/main, vN/dev branches), which is OK.
+      # GenerateSBOM succeeds with issues when only the Dependency-Track upload failed.
       condition: |
           and(
             in(dependencies.Build.result, 'Succeeded'),
             in(dependencies.ValidateChangelogs.result, 'Succeeded', 'Skipped'),
+            in(dependencies.GenerateSBOM.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
             eq(variables.isPublishBuild, 'True'),
             eq(dependencies.Build.outputs['BuildAndTest.detect.AnyChanged'], 'true')
           )

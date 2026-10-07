@@ -263,6 +263,23 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
   pushes on `vN/main`, `vN/dev`, `vN/hotfix/*` and `vN/release/*`, so the suite would never run
   on a pull request. The trade-off is that CI exercises **project references**, not a published
   package.
+- **Skips or narrows itself on pull requests.** A small `Changes` job in the same stage sorts the
+  PR's changed files into areas (the table is in the comment above it in `azure-pipelines.yml`;
+  update it when you add a project or move code). A PR touching only docs, repo tooling or the
+  .NET unit/integration test projects skips the suite. A PR whose only acceptance changes are
+  specs or helpers (`tests/`, `lib/`, `umbraco.config.ts`) runs **one** unsharded leg with
+  Playwright's `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec
+  importing a changed file, plus the setup project. `package*.json`, `playwright.config.ts`,
+  `tsconfig.json` or install-script changes, and any product change, run the whole suite, because
+  specs don't import those files and `--only-changed` would miss them. Pushes always run the whole
+  suite. Use `HEAD~1`, never `HEAD^1`: npm runs the script through cmd.exe on Windows, where `^`
+  is the escape character. The job condition skips only on an explicit `'false'`.
+- **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
+  its own `testCommand`, e.g. `npm run test -- --shard=1/4`), each against its **own** demo site
+  and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a
+  site. `fullyParallel: true` (with one worker) makes Playwright split by test rather than by file, so shards finish together; every shard runs `auth.setup.ts` itself. Each shard pays
+  the full setup (build, scaffold, first boot), so extra shards only help while the tests
+  themselves dominate; results and artifacts are named per leg.
 - **Scaffolds the site with `scripts/install-demo-site.ps1`**, the same script developers run, so
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to

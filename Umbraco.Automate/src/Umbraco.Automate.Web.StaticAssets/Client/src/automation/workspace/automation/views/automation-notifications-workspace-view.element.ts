@@ -1,7 +1,7 @@
 import { css, html, customElement, state, repeat, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import { UMB_MODAL_MANAGER_CONTEXT, UMB_ITEM_PICKER_MODAL } from "@umbraco-cms/backoffice/modal";
+import { UMB_MODAL_MANAGER_CONTEXT, UMB_ITEM_PICKER_MODAL, umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import type { ChannelConfigurationModel, NotificationChannelItemResponseModel } from "../../../../api/types.gen.js";
@@ -116,9 +116,26 @@ export class UaAutomationNotificationsWorkspaceViewElement extends UmbLitElement
         }
     }
 
-    #removeChannel(index: number, e: Event) {
+    async #removeChannel(index: number, e: Event) {
         e.stopPropagation();
-        this._channels = this._channels.filter((_, i) => i !== index);
+
+        const channel = this._channels[index];
+        if (!channel) return;
+        const name = this.#getCatalogueItem(channel.channelAlias)?.name ?? channel.channelAlias;
+
+        try {
+            await umbConfirmModal(this, {
+                headline: this.localize.term("uaNotifications_removeChannelHeadline"),
+                content: this.localize.term("uaNotifications_removeChannelConfirm", name),
+                color: "danger",
+                confirmLabel: "#actions_remove",
+            });
+        } catch {
+            return;
+        }
+
+        // Filter by identity, not index: the list may have changed while the dialog was open.
+        this._channels = this._channels.filter((c) => c !== channel);
         this.#persist();
     }
 

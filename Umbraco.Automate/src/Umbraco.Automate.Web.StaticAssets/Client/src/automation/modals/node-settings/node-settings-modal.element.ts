@@ -292,11 +292,24 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     }
 
     #renderDetailsBox() {
-        const errorBehaviorOptions = (["Retry", "Suspend", "Terminate", "Compensate"] as const).map((value) => ({
-            name: this.localize.term(`uaAutomation_stepErrorBehavior${value}`),
-            value,
-            selected: value === this._errorBehavior,
-        }));
+        // Compensate is hidden until compensation steps exist. A step that already has it saved
+        // still shows it (as legacy) so the value is displayed truthfully and never silently changed.
+        const errorBehaviorOptions = [
+            ...(["Retry", "Suspend", "Terminate"] as const).map((value) => ({
+                name: this.localize.term(`uaAutomation_stepErrorBehavior${value}`),
+                value,
+                selected: value === this._errorBehavior,
+            })),
+            ...(this._errorBehavior === "Compensate"
+                ? [
+                      {
+                          name: this.localize.term("uaAutomation_stepErrorBehaviorCompensateLegacy"),
+                          value: "Compensate",
+                          selected: true,
+                      },
+                  ]
+                : []),
+        ];
 
         return html`
             <uui-box>
@@ -319,6 +332,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                     orientation="vertical"
                 >
                     <uui-select
+                        label=${this.localize.term("uaLabels_errorBehavior")}
                         slot="editor"
                         .options=${errorBehaviorOptions}
                         @change=${this.#onErrorBehaviorChange}
@@ -337,6 +351,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                 orientation="vertical"
             >
                 <uui-input
+                    label=${this.localize.term("uaLabels_retryInterval")}
                     slot="editor"
                     .value=${this._retryInterval}
                     placeholder="00:00:30"
@@ -349,6 +364,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                 orientation="vertical"
             >
                 <uui-input
+                    label=${this.localize.term("uaLabels_maxRetries")}
                     slot="editor"
                     type="number"
                     min="0"
@@ -380,6 +396,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                     ${this.localize.term("uaAutomation_stepConnectionDescription")}
                 </p>
                 <uui-select
+                    label=${this.localize.term("uaLabels_connection")}
                     .options=${options}
                     @change=${this.#onConnectionChange}
                 ></uui-select>

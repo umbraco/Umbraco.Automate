@@ -4,6 +4,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UA_RUN_WORKSPACE_CONTEXT } from "./run-workspace.context-token.js";
 import { UA_RUN_WORKSPACE_ALIAS } from "../../constants.js";
 import type { UaRunDetailModel } from "../../types.js";
+import { getRunStatusColor } from "../../../core/index.js";
 
 @customElement("ua-run-workspace-editor")
 export class UaRunWorkspaceEditorElement extends UmbLitElement {
@@ -20,24 +21,6 @@ export class UaRunWorkspaceEditorElement extends UmbLitElement {
         });
     }
 
-    #statusColor(status: string): string {
-        switch (status) {
-            case "Completed":
-                return "positive";
-            case "Running":
-            case "Pending":
-            case "Rejected":
-                return "warning";
-            case "Failed":
-                return "danger";
-            case "Cancelled":
-            case "Suspended":
-                return "default";
-            default:
-                return "default";
-        }
-    }
-
     override render() {
         if (!this._run) return html`<uui-loader></uui-loader>`;
 
@@ -45,7 +28,7 @@ export class UaRunWorkspaceEditorElement extends UmbLitElement {
             <umb-workspace-editor alias="${UA_RUN_WORKSPACE_ALIAS}" .enforceNoFooter=${true}>
                 <div id="header" slot="header">
                     <span class="title">Run ${this._run.unique.substring(0, 8)}...</span>
-                    <uui-tag color=${this.#statusColor(this._run.status)} look="secondary">
+                    <uui-tag color=${getRunStatusColor(this._run.status)} look="secondary">
                         ${this._run.status}
                     </uui-tag>
                 </div>

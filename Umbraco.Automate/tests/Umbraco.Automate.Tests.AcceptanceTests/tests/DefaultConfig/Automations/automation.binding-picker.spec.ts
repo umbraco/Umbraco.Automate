@@ -79,6 +79,36 @@ test.describe('Binding picker', () => {
     await expect(leaf).toHaveAttribute('detail', new RegExp(escapeRegExp(description)));
   });
 
+  test('shows readable value types, not raw schema types', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange — Get Content's output has nullable properties, whose schema type is
+    // ["string", "null"], which used to print as "string,null".
+    const content = automationStep(actions.getContent, 'content', {}, { x: 250, y: 200 });
+    const target = automationStep(actions.logMessage, 'target', { message: 'logged', logLevel: 'Information' }, { x: 250, y: 380 });
+    const id = await umbracoAutomateApi.automations.create(uniqueName('Binding Types'), automateServiceAccountWorkspace.id, {
+      trigger: manualTrigger(),
+      steps: [content, target],
+      connections: [automationConnection('trigger', content), automationConnection(content, target)]
+    });
+    const seeded = await umbracoAutomateApi.automations.getById(id);
+    const targetId = umbracoAutomateApi.automations.stepByAlias(seeded, 'target').id;
+
+    // Act
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+    await umbracoAutomateUi.automate.waitForCanvas();
+    await umbracoAutomateUi.automate.openStepSettings(targetId);
+    await umbracoAutomateUi.automate.openBindingPicker();
+
+    // Assert
+    const details = await umbracoAutomateUi.automate.bindingLeafDetails();
+    expect(details.length).toBeGreaterThan(0);
+    expect(details.filter((detail) => /,null\b|^unknown\b/.test(detail))).toEqual([]);
+    expect(details.some((detail) => detail.includes('(optional)'))).toBe(true);
+  });
+
   test('inserts the chosen expression into the field', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,

@@ -74,10 +74,11 @@ npx playwright test -g "loads the Automate section"
 | --- | --- |
 | `Smoke/automate.section.spec.ts` | Section loads, dashboard renders, management API answers |
 | `Workspaces/workspace.fixtures.spec.ts` | Both workspace fixture tiers |
-| `Workspaces/workspace.management.spec.ts` | Workspace list, rename, delete, service account display, collection Create button (#297) |
+| `Workspaces/workspace.management.spec.ts` | Workspace list, rename, delete, service account display, collection Create button (#297), editor back arrow |
 | `Automations/automation.lifecycle.spec.ts` | Automation create, rename, delete |
 | `Automations/automation.canvas.spec.ts` | Branches rejoining and publishing (#323), Approval rejected branch, placement beside the clicked output (#322), insert between on a connected output (#346), inserting a container (#324), unavailable actions (#325) |
-| `Automations/automation.binding-picker.spec.ts` | Predecessors in flow order (#299), expression descriptions (#307), inserting an expression |
+| `Automations/automation.binding-picker.spec.ts` | Predecessors in flow order (#299), expression descriptions (#307), readable value types, inserting an expression |
+| `Automations/automation.run-view.spec.ts` | Keyboard access to runs, steps and the trigger row, the Logs tab, the failing step's error as the run's error, whole-millisecond step durations, Replay disabled once unpublished |
 | `Automations/automation.run.spec.ts` | Publish, Run now, Runs view, Run Script reading upstream `data` (#345), Run now hidden on a draft (#366), step output in the run view (#376) |
 | `Connections/connection.crud.spec.ts` | Connection create, rename, collection listing, collection Create button (#297) |
 | `Connections/connection.test.spec.ts` | Test connection saves unsaved edits (#347), popup-blocked same-tab OAuth fallback (#348, stubbed) |
