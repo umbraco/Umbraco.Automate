@@ -44,4 +44,34 @@ test.describe('Settings form', () => {
     await expect(field.locator('#description')).toContainText(description);
     await expect(field.locator('umb-ufm-js-expression')).toHaveCount(0);
   });
+
+  test('shows binding syntax inside a code span as written', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange — For Each's Collection description puts its example in backticks. UFM leaves code
+    // alone, so escaping there would show the entity as text.
+    const description = await umbracoAutomateApi.catalogue.getFieldDescription(actions.forEach, 'collection');
+    const example = /`(\$\{[^`]*\})`/.exec(description)?.[1];
+    expect(example).toBeDefined();
+    const loop = automationStep(actions.forEach, 'loop', { collection: '${ trigger.items }' }, { x: 250, y: 200 });
+    const id = await umbracoAutomateApi.automations.create(uniqueName('Settings Code Span'), automateServiceAccountWorkspace.id, {
+      trigger: manualTrigger(),
+      steps: [loop],
+      connections: [automationConnection('trigger', loop)]
+    });
+    const seeded = await umbracoAutomateApi.automations.getById(id);
+    const loopId = umbracoAutomateApi.automations.stepByAlias(seeded, 'loop').id;
+
+    // Act
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+    await umbracoAutomateUi.automate.waitForCanvas();
+    await umbracoAutomateUi.automate.openStepSettings(loopId);
+
+    // Assert — the example renders as code, with `${` intact rather than `&#36;{`.
+    const field = umbracoAutomateUi.automate.nodeSettingsModal.locator('umb-property[alias="collection"]');
+    await expect(field.locator('#description code')).toHaveText(example!);
+    await expect(field.locator('#description')).not.toContainText('&#36;');
+  });
 });

@@ -73,12 +73,16 @@ export class CatalogueApiHelper {
     return description;
   }
 
-  /* The description of one settings field of an action, as the settings form receives it. */
-  async getFieldDescription(actionAlias: string, fieldKey: string): Promise<string> {
-    const action = await this.getActionByAlias(actionAlias);
-    const description = action.settingsSchema?.fields?.find((f: any) => f.key === fieldKey)?.description;
+  /* The description of one settings field of an action or control flow, as the settings form receives it. */
+  async getFieldDescription(stepTypeAlias: string, fieldKey: string): Promise<string> {
+    const all = [...(await this.getActions()), ...(await this.getControlFlows())];
+    const stepType = all.find((i: any) => i.alias === stepTypeAlias);
+    if (!stepType) {
+      throw new Error(`Step type "${stepTypeAlias}" is not in the catalogue.`);
+    }
+    const description = stepType.settingsSchema?.fields?.find((f: any) => f.key === fieldKey)?.description;
     if (!description) {
-      throw new Error(`Setting "${fieldKey}" of "${actionAlias}" has no description.`);
+      throw new Error(`Setting "${fieldKey}" of "${stepTypeAlias}" has no description.`);
     }
     return description;
   }
