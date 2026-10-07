@@ -292,11 +292,24 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     }
 
     #renderDetailsBox() {
-        const errorBehaviorOptions = (["Retry", "Suspend", "Terminate", "Compensate"] as const).map((value) => ({
-            name: this.localize.term(`uaAutomation_stepErrorBehavior${value}`),
-            value,
-            selected: value === this._errorBehavior,
-        }));
+        // Compensate is hidden until compensation steps exist. A step that already has it saved
+        // still shows it (as legacy) so the value is displayed truthfully and never silently changed.
+        const errorBehaviorOptions = [
+            ...(["Retry", "Suspend", "Terminate"] as const).map((value) => ({
+                name: this.localize.term(`uaAutomation_stepErrorBehavior${value}`),
+                value,
+                selected: value === this._errorBehavior,
+            })),
+            ...(this._errorBehavior === "Compensate"
+                ? [
+                      {
+                          name: this.localize.term("uaAutomation_stepErrorBehaviorCompensateLegacy"),
+                          value: "Compensate",
+                          selected: true,
+                      },
+                  ]
+                : []),
+        ];
 
         return html`
             <uui-box>

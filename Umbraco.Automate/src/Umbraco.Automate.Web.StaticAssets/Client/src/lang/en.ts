@@ -100,6 +100,7 @@ export default {
         stepErrorBehaviorSuspend: "Suspend",
         stepErrorBehaviorTerminate: "Terminate",
         stepErrorBehaviorCompensate: "Compensate",
+        stepErrorBehaviorCompensateLegacy: "Compensate (legacy)",
         stepErrorBehaviorDescription: "What happens when this step fails.",
         stepAliasDuplicate: "Another step already uses this alias. Choose a different one.",
         stepRetryIntervalDescription:
