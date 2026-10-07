@@ -322,10 +322,11 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         resumed!.Status.ShouldBe(AutomationRunStatus.Running);
     }
 
-    // --- Resumed after a crash: the decision was saved on the step run, the workflow was not ---
+    // --- Re-run without a restart: the decision was saved on the step run, the workflow was not ---
+    // (After a restart, stuck-run recovery fails the run first; see StuckRunRecoveryTests and #467.)
 
     [Fact]
-    public async Task RecordedApproval_AfterACrash_RunsTheApprovedLine()
+    public async Task RecordedApproval_OnReRun_RunsTheApprovedLine()
     {
         var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
 
@@ -333,7 +334,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RecordedApproval_AfterACrash_DoesNotRunTheRejectedLine()
+    public async Task RecordedApproval_OnReRun_DoesNotRunTheRejectedLine()
     {
         var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
         await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
@@ -343,7 +344,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RecordedRejection_AfterACrash_RunsTheRejectedLine()
+    public async Task RecordedRejection_OnReRun_RunsTheRejectedLine()
     {
         var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Rejected);
 
@@ -351,7 +352,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RecordedRejection_AfterACrash_DoesNotRunTheApprovedLine()
+    public async Task RecordedRejection_OnReRun_DoesNotRunTheApprovedLine()
     {
         var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Rejected);
         await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
@@ -361,7 +362,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RecordedDecision_AfterACrash_DoesNotAddASecondStepRun()
+    public async Task RecordedDecision_OnReRun_DoesNotAddASecondStepRun()
     {
         var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
         await WaitForWorkflowStatusAsync(run, WorkflowStatus.Complete, TestTimeouts.WorkflowWait);
@@ -371,9 +372,9 @@ public class ApprovalOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RecordedDecision_AfterACrash_IsStillReadableByLaterSteps()
+    public async Task RecordedDecision_OnReRun_IsStillReadableByLaterSteps()
     {
-        // The workflow data that carried the approval's output was lost with the crash; the step
+        // The workflow data that carried the approval's output was never persisted; the step
         // puts the recorded output back so a binding to it still resolves.
         var (run, steps) = await ResumeAfterRecordedDecisionAsync(ApprovalOutcome.Approved);
 
@@ -383,7 +384,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
 
     /// <summary>
     /// ManualTrigger → approval, with an approved line, a rejected line, and an unnamed line to a
-    /// step that reads the decision. Waits for the approval, then reproduces the crash window: the
+    /// step that reads the decision. Waits for the approval, then reproduces the re-run: the
     /// decision is saved on the step run exactly as the resume path saves it, but the workflow never
     /// learnt of it, so WorkflowCore re-runs the step with the published decision.
     /// </summary>

@@ -19,8 +19,8 @@ using WorkflowCore.Models;
 namespace Umbraco.Automate.Tests.Unit.Execution;
 
 /// <summary>
-/// An approval step resumed when no step run is waiting for input — the crash window between saving
-/// the decision on the step run and persisting the workflow. The step routes by the decision the step
+/// An approval step resumed when no step run is waiting for input — re-run without a restart after the
+/// decision was saved on the step run but the workflow was not persisted. The step routes by the decision the step
 /// run records instead of following only its unnamed lines, and fails when there is nothing recorded.
 /// </summary>
 public class ActionStepBodyApprovalRecoveryTests
@@ -230,7 +230,7 @@ public class ActionStepBodyApprovalRecoveryTests
             Mock.Of<ILogger<ActionStepBody>>());
     }
 
-    /// <summary>A pointer woken by a valid approval decision, as WorkflowCore re-runs it after a crash.</summary>
+    /// <summary>A pointer woken by a valid approval decision, as WorkflowCore re-runs it when the workflow was not persisted.</summary>
     private static IStepExecutionContext ResumedContext() => new StepExecutionContext
     {
         Workflow = new WorkflowInstance
