@@ -710,6 +710,10 @@ export type PostAutomationsErrors = {
      * The authenticated user does not have access to this resource
      */
     403: unknown;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsError = PostAutomationsErrors[keyof PostAutomationsErrors];
