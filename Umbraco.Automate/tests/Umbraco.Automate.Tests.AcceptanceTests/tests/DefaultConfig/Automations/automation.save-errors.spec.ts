@@ -2,9 +2,9 @@ import { expect } from '@playwright/test';
 import { test, ConstantHelper, uniqueName } from '../../../lib/index';
 
 /**
- * A save the server rejects tells the editor why, instead of only marking the button failed.
+ * A save that cannot succeed tells the editor why, instead of only marking the button failed.
  *
- * The notification only appears because the detail data source opts into throwOnError: the SDK
+ * Server rejections are only shown because the detail data source opts into throwOnError: the SDK
  * client otherwise resolves a 4xx, and tryExecute stays silent.
  */
 test.describe('Save errors', () => {
@@ -12,8 +12,7 @@ test.describe('Save errors', () => {
     await umbracoUi.goToBackOffice();
   });
 
-  test('Save and publish without a name says the server rejected it', async ({
-    page,
+  test('Save and publish without a name marks the name field and sends nothing', async ({
     automateWorkspace,
     umbracoAutomateUi
   }) => {
@@ -23,14 +22,14 @@ test.describe('Save errors', () => {
       automate.automationCreateUrl(ConstantHelper.entityTypes.workspace, automateWorkspace.id)
     );
     await automate.waitForWorkspaceEditor();
+    const creates = automate.trackAutomationCreates();
 
-    // Act — Save and publish skips the client-side name check, so the server answers 400.
+    // Act — Save and publish runs the same client-side validation as Save (#460).
     await automate.clickSaveAndPublish();
 
-    // Assert
-    await expect(
-      page.locator('uui-toast-notification').filter({ hasText: 'One or more validation errors occurred' })
-    ).toBeVisible();
+    // Assert — the empty name is flagged inline, and the server is never asked.
+    await expect(automate.automationNameField).not.toHaveAttribute('pristine');
+    expect(creates).toHaveLength(0);
   });
 
   test('saving a copy someone else has changed says to reload', async ({
