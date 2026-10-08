@@ -286,7 +286,8 @@ public class AutomationServicePublishSectionValidationTests
                 actionCollection, triggerCollection, controlFlowCollection, connectionTypeCollection,
                 new WebhookAuthenticatorCollection(() => []),
                 new NotificationChannelCollection(() => [])),
-            new SectionAccessChecker());
+            new SectionAccessChecker(),
+            Mock.Of<IConfigurationReferenceResolver>());
 
         return (service, repo);
     }

@@ -4,6 +4,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
 import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.js";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
+import { escapeUfmExpressions } from "../../utils/ufm.utils.js";
 import { BINDING_TEXT_BOX_UI_ALIAS } from "../binding-text-box/manifests.js";
 import { BINDING_TEXT_AREA_UI_ALIAS } from "../binding-text-area/manifests.js";
 import { BINDING_CODE_EDITOR_UI_ALIAS } from "../binding-code-editor/manifests.js";
@@ -236,7 +237,7 @@ export class UaSettingsFormElement extends UmbLitElement {
         return html`
             <umb-property
                 label=${this.localize.string(field.label)}
-                description=${this.localize.string(field.description ?? "")}
+                description=${escapeUfmExpressions(this.localize.string(field.description ?? ""))}
                 alias=${field.key}
                 data-path=${`$.${field.key}`}
                 property-editor-ui-alias=${this.#resolveEditorAlias(field)}

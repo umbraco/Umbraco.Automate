@@ -163,14 +163,14 @@ public class AutomationExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_SkipsUnknownActions()
+    public async Task ExecuteAsync_CompilesUnknownActionsAsUnavailableSteps()
     {
         var automation = CreateAutomation("unknownAction");
 
         await _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None);
 
         _registeredDefinitions.Count.ShouldBe(1);
-        _registeredDefinitions[0].Steps.Count.ShouldBe(0);
+        _registeredDefinitions[0].Steps.Single().BodyType.ShouldBe(typeof(UnavailableStepBody));
     }
 
     [Fact]
