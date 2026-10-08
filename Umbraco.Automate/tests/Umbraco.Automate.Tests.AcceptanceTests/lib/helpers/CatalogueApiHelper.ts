@@ -1,4 +1,5 @@
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
+import { ensureOk } from './ApiResponse';
 import { ConstantHelper } from './ConstantHelper';
 
 /**
@@ -18,6 +19,7 @@ export class CatalogueApiHelper {
 
   private async getList(path: string): Promise<any[]> {
     const response = await this.api.get(this.api.baseUrl + this.basePath + path);
+    await ensureOk(response, `Reading catalogue ${path}`);
     const body = await response.json();
     return Array.isArray(body) ? body : body.items ?? [];
   }
