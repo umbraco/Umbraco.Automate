@@ -1,4 +1,5 @@
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
+import { ensureOk } from './ApiResponse';
 import { ConstantHelper } from './ConstantHelper';
 import { toAlias } from './TestData';
 
@@ -22,6 +23,7 @@ export class ConnectionApiHelper {
   async getAll() {
     const requestUrl = this.api.baseUrl + this.basePath + 'connections';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, 'Listing connections');
     const body = await response.json();
     return body.items ?? [];
   }
@@ -43,6 +45,7 @@ export class ConnectionApiHelper {
 
     const requestUrl = this.api.baseUrl + this.basePath + 'connections/' + item.id;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting connection "${name}"`);
     return await response.json();
   }
 
@@ -51,6 +54,7 @@ export class ConnectionApiHelper {
   async create(name: string, type: string, settings: Record<string, unknown> = {}): Promise<string> {
     const requestUrl = this.api.baseUrl + this.basePath + 'connections';
     const response = await this.api.post(requestUrl, { alias: toAlias(name), name, type, settings });
+    await ensureOk(response, `Creating connection "${name}"`);
 
     const location = response.headers()['location'];
     if (location) {
@@ -63,6 +67,7 @@ export class ConnectionApiHelper {
   async getById(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'connections/' + id;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting connection ${id}`);
     return await response.json();
   }
 
