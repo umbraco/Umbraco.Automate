@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -34,6 +35,7 @@ using Umbraco.Automate.Tests.Common.Fixtures;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Scoping;
+using Umbraco.Cms.Core.Sync;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -477,6 +479,27 @@ public class TerminalStepFailureTests : IAsyncLifetime
             .ShouldBe(1);
     }
 
+    // --- Approval decided, but the process stopped before the decision was routed (#467) ---
+
+    [Theory]
+    [InlineData(ApprovalOutcome.Approved)]
+    [InlineData(ApprovalOutcome.Rejected)]
+    public async Task ApprovalDecidedButNotRoutedBeforeARestart_RunsTheLineTheDecisionChose(ApprovalOutcome outcome)
+    {
+        var (run, steps) = await RestartBeforeRoutingRecordedDecisionAsync(outcome);
+        var chosen = outcome == ApprovalOutcome.Approved ? steps.Approved : steps.Rejected;
+
+        await WaitForStepRunCountAsync(run.Id, chosen.Id, StepRunStatus.Completed, 1, TestTimeouts.WorkflowWait);
+    }
+
+    [Fact]
+    public async Task ApprovalDecidedButNotRoutedBeforeARestart_CompletesTheRun()
+    {
+        var (run, _) = await RestartBeforeRoutingRecordedDecisionAsync(ApprovalOutcome.Approved);
+
+        (await WaitForRunStatusAsync(run.Id, AutomationRunStatus.Completed, TestTimeouts.WorkflowWait)).ShouldBe(AutomationRunStatus.Completed);
+    }
+
     /// <summary>ManualTrigger → failing step → (unnamed line) → log step.</summary>
     private async Task<(AutomationRun Run, StepConfiguration Failing, StepConfiguration After)> RunLinearAsync(
         string failingAlias,
@@ -668,6 +691,118 @@ public class TerminalStepFailureTests : IAsyncLifetime
 
         return (run, approval, after);
     }
+
+    /// <summary>
+    /// ManualTrigger → approval, with an approved line and a rejected line. Waits for the approval,
+    /// stops the host, then leaves the database exactly as a process that stopped mid-resume leaves
+    /// it: WorkflowCore's <c>EventConsumer.SeedSubscription</c> delivered the decision to the step's
+    /// pointer, and the step saved the decision on its step run and moved the run back to Running,
+    /// but the workflow was never persisted after the step. Then it runs stuck-run recovery and starts
+    /// the host again, as a restart does.
+    /// </summary>
+    private async Task<(AutomationRun Run, RecordedDecisionSteps Steps)> RestartBeforeRoutingRecordedDecisionAsync(
+        ApprovalOutcome outcome)
+    {
+        var approval = new StepConfiguration
+        {
+            Id = Guid.NewGuid(),
+            ActionAlias = RequestApprovalAction.ApprovalActionAlias,
+            Name = "Approval",
+            Alias = "approval",
+            Settings = new Dictionary<string, object?> { ["prompt"] = "Please approve" },
+        };
+        var steps = new RecordedDecisionSteps(
+            approval,
+            LogStep("approvedLog", "took-approved-path"),
+            LogStep("rejectedLog", "took-rejected-path"));
+
+        var automation = new AutomationBuilder()
+            .WithAlias($"test-terminal-approval-restart-{Guid.NewGuid():N}")
+            .WithName("test-terminal-approval-restart")
+            .WithManualTrigger()
+            .AddStep(approval)
+            .AddStep(steps.Approved)
+            .AddStep(steps.Rejected)
+            .WithTriggerConnection(approval.Id)
+            .WithConnection(approval.Id, steps.Approved.Id, RequestApprovalAction.ApprovedOutcome)
+            .WithConnection(approval.Id, steps.Rejected.Id, RequestApprovalAction.RejectedOutcome)
+            .Build();
+
+        var runId = await TriggerAsync(automation);
+        await WaitForStepRunCountAsync(runId, approval.Id, StepRunStatus.WaitingForInput, 1, TestTimeouts.WorkflowWait);
+        await WaitForRunStatusAsync(runId, AutomationRunStatus.Suspended, TestTimeouts.WorkflowWait);
+
+        await _workflowHost.StopAsync(CancellationToken.None);
+
+        var decision = new ApprovalDecision
+        {
+            Outcome = outcome,
+            ApprovedByUserKey = Guid.NewGuid(),
+            DecisionUtc = DateTime.UtcNow,
+        };
+        var eventKey = $"{runId}:{approval.Id}";
+        await PublishApprovalEventAsync(runId, approval.Id, decision);
+
+        // What SeedSubscription persists before the step runs: the event on the pointer, the
+        // subscription ended and the event processed.
+        var run = (await _runRepository.GetAsync(runId))!;
+        var instance = await _persistence.GetWorkflowInstance(run.WorkflowInstanceId!);
+        foreach (var pointer in instance.ExecutionPointers.Where(p => p.EventKey == eventKey && !p.EventPublished && p.EndTime == null))
+        {
+            pointer.EventData = decision;
+            pointer.EventPublished = true;
+            pointer.Active = true;
+        }
+
+        instance.NextExecution = 0;
+        await _persistence.PersistWorkflow(instance);
+
+        foreach (var subscription in await _persistence.GetSubscriptions(RequestApprovalAction.ApprovalEventName, eventKey, DateTime.UtcNow))
+        {
+            await _persistence.TerminateSubscription(subscription.Id);
+        }
+
+        foreach (var eventId in await _persistence.GetEvents(RequestApprovalAction.ApprovalEventName, eventKey, DateTime.MinValue))
+        {
+            await _persistence.MarkEventProcessed(eventId);
+        }
+
+        // What the step saved before the process stopped (see ActionStepBody.HandleResumeAsync).
+        run.Status = AutomationRunStatus.Running;
+        await _runRepository.SaveAsync(run);
+
+        var waiting = run.StepRuns.Single(s => s.StepId == approval.Id && s.Status == StepRunStatus.WaitingForInput);
+        waiting.Status = outcome == ApprovalOutcome.Approved ? StepRunStatus.Completed : StepRunStatus.Rejected;
+        waiting.CompletedUtc = DateTime.UtcNow;
+        waiting.OutputData = JsonSerializer.Serialize(
+            new ApprovalDecisionOutput
+            {
+                Approved = outcome == ApprovalOutcome.Approved,
+                Outcome = outcome.ToString(),
+                DecisionUtc = decision.DecisionUtc,
+            },
+            JsonOptions.Default);
+        await _runRepository.UpdateStepRunAsync(waiting);
+
+        var serverRoleAccessor = new Mock<IServerRoleAccessor>();
+        serverRoleAccessor.Setup(r => r.CurrentServerRole).Returns(ServerRole.Single);
+        var recovery = new EFCoreStuckRunRecovery(
+            new TestDbContextFactory(_fixture.CreateContext),
+            serverRoleAccessor.Object,
+            Options.Create(new WorkflowLockOptions()),
+            TimeProvider.System,
+            NullLogger<EFCoreStuckRunRecovery>.Instance);
+        await recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await _workflowHost.StartAsync(CancellationToken.None);
+
+        return (run, steps);
+    }
+
+    private sealed record RecordedDecisionSteps(
+        StepConfiguration Approval,
+        StepConfiguration Approved,
+        StepConfiguration Rejected);
 
     /// <summary>Publishes the approval event as <c>SubmitApprovalController</c> does, with any payload.</summary>
     private Task PublishApprovalEventAsync(Guid runId, Guid stepId, object payload)
