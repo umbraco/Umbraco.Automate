@@ -50,6 +50,8 @@ export class ConstantHelper {
     requestApproval: 'umbracoAutomate.requestApproval',
     runScript: 'umbracoAutomate.runScript',
     setVariable: 'umbracoAutomate.setVariable',
+    startAutomation: 'umbracoAutomate.startAutomation',
+    forEach: 'umbracoAutomate.forEach',
     slackSendMessage: 'slack.sendMessage',
     if: 'umbracoAutomate.if',
     switch: 'umbracoAutomate.switch',
