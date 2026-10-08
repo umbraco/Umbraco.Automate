@@ -242,6 +242,59 @@ public class TerminalStepFailureTests : IAsyncLifetime
         run.StepRuns.Count(s => s.StepId == failing.Id).ShouldBe(1);
     }
 
+    // --- Unavailable action (package removed or action excluded) ---
+
+    private const string UnavailableAlias = "removedPackage.action";
+
+    [Fact]
+    public async Task UnavailableActionUnderRetry_DoesNotRunTheStepBehindAnUnnamedLine()
+    {
+        var (run, _, after) = await RunLinearAsync(UnavailableAlias, StepErrorBehavior.Retry);
+
+        run.StepRuns.ShouldNotContain(s => s.StepId == after.Id);
+    }
+
+    [Fact]
+    public async Task UnavailableActionUnderRetry_EndsTheRunFailed()
+    {
+        var (run, _, _) = await RunLinearAsync(UnavailableAlias, StepErrorBehavior.Retry);
+
+        run.Status.ShouldBe(AutomationRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task UnavailableActionUnderRetry_RecordsAFailedStepRun()
+    {
+        var (run, failing, _) = await RunLinearAsync(UnavailableAlias, StepErrorBehavior.Retry);
+
+        run.StepRuns.Single(s => s.StepId == failing.Id).Status.ShouldBe(StepRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task UnavailableActionUnderRetry_NamesTheMissingActionInTheStepError()
+    {
+        var (run, failing, _) = await RunLinearAsync(UnavailableAlias, StepErrorBehavior.Retry);
+
+        run.StepRuns.Single(s => s.StepId == failing.Id).Error.ShouldContain(UnavailableAlias);
+    }
+
+    [Fact]
+    public async Task UnavailableActionUnderRetry_IsNotRetried()
+    {
+        var (run, failing, _) = await RunLinearAsync(UnavailableAlias, StepErrorBehavior.Retry, maxRetries: 2);
+
+        run.StepRuns.Count(s => s.StepId == failing.Id).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task UnavailableActionUnderSuspend_SuspendsTheRun()
+    {
+        var (run, _, _) = await RunLinearAsync(
+            UnavailableAlias, StepErrorBehavior.Suspend, waitFor: AutomationRunStatus.Suspended);
+
+        run.Status.ShouldBe(AutomationRunStatus.Suspended);
+    }
+
     // --- Exhausted retry budget under Retry ---
 
     [Fact]
