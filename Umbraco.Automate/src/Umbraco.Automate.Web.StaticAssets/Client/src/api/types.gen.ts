@@ -713,6 +713,10 @@ export type PostAutomationsErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsError = PostAutomationsErrors[keyof PostAutomationsErrors];
@@ -903,6 +907,10 @@ export type PutAutomationsByIdImportErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PutAutomationsByIdImportError = PutAutomationsByIdImportErrors[keyof PutAutomationsByIdImportErrors];
@@ -1160,6 +1168,10 @@ export type PostAutomationsImportErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsImportError = PostAutomationsImportErrors[keyof PostAutomationsImportErrors];
@@ -2007,6 +2019,10 @@ export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackError
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackError = PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors[keyof PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors];
