@@ -108,13 +108,67 @@ public class StuckRunRecoveryTests : IDisposable
     }
 
     [Fact]
-    public async Task RecoverStuckRunsAsync_ApprovalDecidedButNotYetRouted_FailsTheRun()
+    public async Task RecoverStuckRunsAsync_ApprovalDecidedButNotYetRouted_LeavesRunAndInstanceToRoute()
     {
-        // Pins a known gap (#467): the decision was saved on the approval step run (Completed) and the
-        // run moved back to Running, but the process stopped before the workflow was persisted. No step
-        // is waiting, so recovery fails the run instead of letting the step route by the decision.
-        var (runId, _) = await SeedRunAsync(
+        // #467: the decision was saved on the approval step run (Completed) and the run moved back to
+        // Running, but the process stopped before the workflow was persisted. The engine still holds
+        // the delivered event on the step's pointer, so it re-runs the step, which routes by the
+        // recorded decision.
+        var (runId, instanceId) = await SeedRunAsync(
             AutomationRunStatus.Running, StepRunStatus.Completed, WorkflowStatus.Runnable);
+        await AddExecutionPointerAsync(instanceId, active: true, eventPublished: true, ended: false);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Running);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Runnable);
+    }
+
+    [Theory]
+    // Waiting for an event that has not been delivered: there is nothing for the engine to route.
+    [InlineData(false, false, false)]
+    // A step interrupted mid-execution, not resumed by an event.
+    [InlineData(true, false, false)]
+    // The event was delivered and its step has already moved on.
+    [InlineData(false, true, true)]
+    public async Task RecoverStuckRunsAsync_NoDeliveredEventLeftToRoute_FailsTheRun(bool active, bool eventPublished, bool ended)
+    {
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Completed, WorkflowStatus.Runnable);
+        await AddExecutionPointerAsync(instanceId, active, eventPublished, ended);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Terminated);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_ApprovalDecidedAlongsideAnInterruptedStep_FailsTheRun()
+    {
+        // A step on another branch was interrupted mid-execution. Re-running the instance would repeat
+        // its side effect, so the run is failed even though the decision could still be routed.
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Completed, WorkflowStatus.Runnable);
+        await AddExecutionPointerAsync(instanceId, active: true, eventPublished: true, ended: false);
+        await AddStepRunAsync(runId, StepRunStatus.Running);
+
+        await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
+
+        await using var db = _fixture.CreateContext();
+        (await db.AutomationRuns.SingleAsync(r => r.Id == runId)).Status.ShouldBe((int)AutomationRunStatus.Failed);
+        (await db.WorkflowInstances.SingleAsync(wi => wi.Id == instanceId)).Status.ShouldBe((int)WorkflowStatus.Terminated);
+    }
+
+    [Fact]
+    public async Task RecoverStuckRunsAsync_ApprovalDecidedOnAnEndedInstance_FailsTheRun()
+    {
+        // The engine only executes Runnable instances, so this delivered event will never be routed.
+        var (runId, instanceId) = await SeedRunAsync(
+            AutomationRunStatus.Running, StepRunStatus.Completed, WorkflowStatus.Terminated, DateTime.UtcNow.AddHours(-1));
+        await AddExecutionPointerAsync(instanceId, active: true, eventPublished: true, ended: false);
 
         await _recovery.RecoverStuckRunsAsync(CancellationToken.None);
 
@@ -571,6 +625,27 @@ public class StuckRunRecoveryTests : IDisposable
 
         await db.SaveChangesAsync();
         return stepRunId;
+    }
+
+    /// <summary>Adds an approval step's execution pointer to the instance, in the given engine state.</summary>
+    private async Task AddExecutionPointerAsync(string instanceId, bool active, bool eventPublished, bool ended)
+    {
+        await using var db = _fixture.CreateContext();
+        db.WorkflowExecutionPointers.Add(new WorkflowExecutionPointerEntity
+        {
+            WorkflowInstanceId = instanceId,
+            PointerId = Guid.NewGuid().ToString(),
+            StepId = 1,
+            Active = active,
+            StartTime = DateTime.UtcNow,
+            EndTime = ended ? DateTime.UtcNow : null,
+            EventName = "approval",
+            EventKey = $"{Guid.NewGuid()}:{Guid.NewGuid()}",
+            EventPublished = eventPublished,
+            Status = (int)(ended ? PointerStatus.Complete : PointerStatus.WaitingForEvent),
+        });
+
+        await db.SaveChangesAsync();
     }
 
     public void Dispose() => _fixture.Dispose();

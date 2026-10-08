@@ -322,8 +322,8 @@ public class ApprovalOutcomeTests : IAsyncLifetime
         resumed!.Status.ShouldBe(AutomationRunStatus.Running);
     }
 
-    // --- Re-run without a restart: the decision was saved on the step run, the workflow was not ---
-    // (After a restart, stuck-run recovery fails the run first; see StuckRunRecoveryTests and #467.)
+    // --- Re-run: the decision was saved on the step run, the workflow was not ---
+    // (For the same window across a restart, see TerminalStepFailureTests and StuckRunRecoveryTests, #467.)
 
     [Fact]
     public async Task RecordedApproval_OnReRun_RunsTheApprovedLine()
