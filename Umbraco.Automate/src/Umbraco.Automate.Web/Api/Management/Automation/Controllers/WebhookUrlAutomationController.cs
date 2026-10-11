@@ -1,7 +1,6 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
@@ -42,13 +41,7 @@ public sealed class WebhookUrlAutomationController : AutomationControllerBase
     /// automation.
     /// </summary>
     /// <remarks>
-    /// Resolves the host the same way Umbraco's own <c>AspNetCoreRequestAccessor</c> does for
-    /// its links back to the site (that logic isn't exposed on the public
-    /// <c>IRequestAccessor</c> interface, so it's reproduced here): an explicit
-    /// <c>WebRouting:UmbracoApplicationUrl</c> config value wins, so an admin behind a load
-    /// balancer can pin the public host rather than have it guessed from this request.
-    /// Otherwise it falls back to the current request's own scheme and host, which needs no
-    /// extra configuration to work.
+    /// See <see cref="ApplicationUrlResolver"/> for how the host is resolved.
     /// </remarks>
     [HttpGet("{id:guid}/webhook-url")]
     [MapToApiVersion("1.0")]
@@ -69,16 +62,8 @@ public sealed class WebhookUrlAutomationController : AutomationControllerBase
         }
 
         var path = _hostingEnvironment.ToAbsolute($"/automate/webhook/{id}");
-        var url = new Uri(ResolveApplicationUrl(), path);
+        var url = ApplicationUrlResolver.Resolve(Request, _webRoutingSettings, path);
 
         return Ok(new WebhookUrlResponseModel { Url = url.ToString() });
-    }
-
-    private Uri ResolveApplicationUrl()
-    {
-        var configured = _webRoutingSettings.CurrentValue.UmbracoApplicationUrl;
-        return string.IsNullOrEmpty(configured)
-            ? new Uri(UriHelper.BuildAbsolute(Request.Scheme, Request.Host))
-            : new Uri(configured);
     }
 }
