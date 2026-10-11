@@ -14,7 +14,8 @@ public sealed class MoveContentSettings
         Label = "Content",
         Description = "The content item to move.",
         EditorUiAlias = "Umb.PropertyEditorUi.DocumentPicker",
-        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""")]
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""",
+        SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>
@@ -26,6 +27,8 @@ public sealed class MoveContentSettings
         Description = "The content item to move the item under. Leave empty to move to the content root.",
         SortOrder = 1,
         EditorUiAlias = "Umb.PropertyEditorUi.DocumentPicker",
-        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""")]
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""",
+        SupportsBindings = true,
+        BindingMustResolve = true)]
     public string? TargetParentKey { get; set; }
 }

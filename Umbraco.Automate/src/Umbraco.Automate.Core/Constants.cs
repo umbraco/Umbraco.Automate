@@ -35,6 +35,22 @@ public static class Constants
     }
 
     /// <summary>
+    /// Aliases of the property editor UIs Umbraco.Automate registers for settings fields, for use
+    /// as the editor UI alias of a settings field. Provider packages can point their own
+    /// fields at these to get the same editors.
+    /// </summary>
+    public static class EditorUiAliases
+    {
+        /// <summary>
+        /// Editor for a field holding a media key: a media picker. Honours the
+        /// <c>validationLimit</c> and <c>folderFilter</c> (<c>filesOnly</c>, <c>filesAndFolders</c>,
+        /// <c>foldersOnly</c>) config. Must match the manifest alias in
+        /// core/components/media-key-picker/manifests.ts.
+        /// </summary>
+        public const string MediaKeyPicker = "Umb.Automate.MediaKeyPicker";
+    }
+
+    /// <summary>
     /// Section constants for Umbraco.Automate.
     /// </summary>
     internal static class Sections

@@ -153,6 +153,7 @@ export default {
         filterPlaceholder: "Filter bindings...",
         noData: "No binding data available.",
         noResults: "No matching bindings found.",
+        useBinding: "Use a binding expression",
     },
     uaSettings: {
         noSettings: "This item has no configurable settings.",

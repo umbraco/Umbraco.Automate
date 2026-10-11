@@ -79,6 +79,7 @@ public static class EditableModelSchemaBuilder
             PropertyName = property.Name,
             Label = attr?.Label ?? $"#uaFields_{modelKey}{property.Name}Label",
             PropertyType = property.PropertyType,
+            ValueKind = InferValueKind(property.PropertyType),
             Description = attr?.Description ?? $"#uaFields_{modelKey}{property.Name}Description",
             EditorUiAlias = attr?.EditorUiAlias ?? InferEditorUiAlias(property.PropertyType, attr?.IsSensitive ?? false),
             EditorConfig = attr?.EditorConfig,
@@ -197,6 +198,16 @@ public static class EditableModelSchemaBuilder
         }
 
         return validationAttributes;
+    }
+
+    private static EditableModelValueKind InferValueKind(Type type)
+    {
+        if (type == typeof(string))
+        {
+            return EditableModelValueKind.String;
+        }
+
+        return IsCollection(type) ? EditableModelValueKind.Collection : EditableModelValueKind.Scalar;
     }
 
     private static bool IsCollection(Type type)

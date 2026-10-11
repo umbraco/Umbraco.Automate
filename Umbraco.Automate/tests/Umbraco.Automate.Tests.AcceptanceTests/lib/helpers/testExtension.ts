@@ -1,10 +1,11 @@
 import { test as base } from '@umbraco-cms/acceptance-test-helpers';
-import { ApiHelpers as AutomateApiHelpers, UiHelpers as AutomateUiHelpers } from '.';
+import { ApiHelpers as AutomateApiHelpers, CmsContentApiHelper, UiHelpers as AutomateUiHelpers } from '.';
 import type { TestWorkspace } from './WorkspaceApiHelper';
 
 type AutomateFixtures = {
   umbracoAutomateApi: AutomateApiHelpers;
   umbracoAutomateUi: AutomateUiHelpers;
+  cmsContent: CmsContentApiHelper;
   automateWorkspace: TestWorkspace;
   automateServiceAccountWorkspace: TestWorkspace;
 };
@@ -32,6 +33,16 @@ const test = base.extend<AutomateFixtures>({
 
     const umbracoAutomateUi = new AutomateUiHelpers(page, umbracoUi);
     await use(umbracoAutomateUi);
+  },
+
+  /**
+   * Real content and media for a spec to point an automation at. Removes all of it afterwards,
+   * live or in the recycle bin, so injecting this fixture leaves the demo site as it found it.
+   */
+  cmsContent: async ({ umbracoApi }, use) => {
+    const cmsContent = new CmsContentApiHelper(umbracoApi);
+    await use(cmsContent);
+    await cmsContent.cleanUp();
   },
 
   /**
