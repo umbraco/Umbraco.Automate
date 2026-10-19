@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core.Mail;
 using Umbraco.Cms.Core.Models.Email;
@@ -60,12 +61,14 @@ public sealed class SendEmailAction : ActionBase<SendEmailSettings, SendEmailOut
                 StepRunErrorCategory.Validation);
         }
 
+        var replyTo = ParseReplyTo(settings.ReplyTo, context);
+
         var emailMessage = new EmailMessage(
             from: null,
             to: recipients,
             cc: null,
             bcc: null,
-            replyTo: null,
+            replyTo: replyTo,
             subject: settings.Subject,
             body: settings.Body,
             isBodyHtml: settings.IsHtml,
@@ -85,5 +88,34 @@ public sealed class SendEmailAction : ActionBase<SendEmailSettings, SendEmailOut
             RecipientCount = recipients.Length,
             Subject = settings.Subject,
         });
+    }
+
+    /// <summary>
+    /// Splits the Reply-To setting and keeps the addresses that parse. Reply-To is usually bound
+    /// to visitor input, so a bad entry is skipped with a warning instead of failing the step -
+    /// the email still reaches its recipients, just without that reply address.
+    /// </summary>
+    private string[]? ParseReplyTo(string? value, ActionContext context)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var entries = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var valid = entries.Where(entry => MailAddress.TryCreate(entry, out _)).ToArray();
+
+        var skipped = entries.Length - valid.Length;
+        if (skipped > 0)
+        {
+            _logger.LogWarning(
+                "Automation {AutomationId} / Run {RunId}: Skipped {SkippedCount} Reply-To address(es) that could not be parsed",
+                context.AutomationId, context.RunId, skipped);
+
+            // A count only, as above: the addresses themselves are personal data.
+            context.LogWarning($"Skipped {skipped} Reply-To {(skipped == 1 ? "address" : "addresses")} that could not be parsed");
+        }
+
+        return valid.Length > 0 ? valid : null;
     }
 }
