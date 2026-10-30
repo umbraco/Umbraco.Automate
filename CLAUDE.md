@@ -182,7 +182,7 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 
 ## Multi-Version Support
 
-Umbraco.Automate major versions track Umbraco CMS major versions, and multiple version lines may be in active support simultaneously (following the [Umbraco CMS LTS/EOL policy](https://umbraco.com/products/knowledge-center/long-term-support-and-end-of-life/)). All branches are version-prefixed (`vN/dev`, `vN/main`, `vN/feature|release|hotfix/*`); `claude/*` is exempt. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full branch model, active version lines, support policy, and backport workflow.
+Umbraco.Automate major versions track Umbraco CMS major versions, and multiple version lines may be in active support simultaneously (following the [Umbraco CMS LTS/EOL policy](https://umbraco.com/products/knowledge-center/long-term-support-and-end-of-life/)). All branches are version-prefixed (`vN/dev`, `vN/main`, `vN/topic|release|hotfix/*`); `claude/*` is exempt. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full branch model, active version lines, support policy, and backport workflow.
 
 ### Keep Active Versions in Sync
 

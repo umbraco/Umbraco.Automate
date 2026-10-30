@@ -43,7 +43,7 @@ All long-term branches are **version-prefixed** with `vN`, where `N` is the CMS 
 | ------------------------- | ------------------------------------ | ----------------------------- |
 | `vN/dev`                  | Active development for version N     | `v18/dev`                     |
 | `vN/main`                 | Last released state for version N    | `v18/main`                    |
-| `vN/feature/<anything>`   | Feature or fix branch for version N  | `v18/feature/add-triggers`    |
+| `vN/topic/<anything>`     | Any work branch for version N        | `v18/topic/add-triggers`      |
 | `vN/release/<anything>`   | Release preparation for version N    | `v18/release/2026.03.1`       |
 | `vN/hotfix/<anything>`    | Emergency fixes for version N        | `v17/hotfix/2026.03.1`        |
 | `claude/<anything>`       | Claude Code automation (exempt)      | `claude/fix-thing`            |
@@ -61,17 +61,19 @@ A new CMS major ships via the `/post-release-cleanup` skill, which creates `v(N+
 
 **Release branches:** `vN/release/YYYY.MM.N`
 **Hotfix branches:** `vN/hotfix/YYYY.MM.N`
-**Feature branches:** `vN/feature/<descriptive-name>`
+**Topic branches:** `vN/topic/<descriptive-name>`, for any piece of work: a feature, a fix, a refactor,
+docs or tooling. `vN/feature/<name>` is the old name. Branches already open under it still push,
+but new branches should use `vN/topic/`.
 
 ## Development Workflow
 
 ### Feature Development
 
 ```bash
-# 1. Create feature branch from the target version line's dev
+# 1. Create a topic branch from the target version line's dev
 git checkout v18/dev
 git pull origin v18/dev
-git checkout -b v18/feature/add-triggers
+git checkout -b v18/topic/add-triggers
 
 # 2. Make changes in the product directory
 # Edit: Umbraco.Automate/src/Umbraco.Automate.Core/...
@@ -85,10 +87,10 @@ git add .
 git commit -m "feat(trigger): Add content published trigger"
 
 # 5. Push and create PR targeting v18/dev
-git push -u origin v18/feature/add-triggers
+git push -u origin v18/topic/add-triggers
 ```
 
-To backport a fix to an older line, branch from that line's dev instead (e.g. `git checkout v17/dev`, then `git checkout -b v17/feature/<name>`) and open the PR against `v17/dev`. Each version line is independent — do not forward-merge one line's `dev` into a newer line's `dev`.
+To backport a fix to an older line, branch from that line's dev instead (e.g. `git checkout v17/dev`, then `git checkout -b v17/topic/<name>`) and open the PR against `v17/dev`. Each version line is independent — do not forward-merge one line's `dev` into a newer line's `dev`.
 
 ## Commit Message Format
 
@@ -127,7 +129,7 @@ fix(trigger): Resolve memory leak in event listener
 
 ### PR Checklist
 
-- [ ] Branch name follows convention (`vN/feature/<anything>`)
+- [ ] Branch name follows convention (`vN/topic/<anything>`)
 - [ ] PR targets the correct `vN/dev` base branch
 - [ ] Code follows coding standards (see CLAUDE.md)
 - [ ] All tests pass
