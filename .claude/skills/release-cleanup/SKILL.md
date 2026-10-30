@@ -1,16 +1,16 @@
 ---
-name: post-release-cleanup
+name: release-cleanup
 description: Merges a release or hotfix branch back into its version line's vN/main and vN/dev, bumps version.json on vN/dev so nightly builds produce versions higher than the released version, and optionally deletes the release branch. Creates the next major's vN+1 line and updates the GitHub default branch on a major-version cutover. Use after a release has been deployed and tagged.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
 ---
 
-# Post-Release Cleanup
+# Release Cleanup
 
 You are the orchestrator for post-release cleanup in the Umbraco.Automate repository.
 
 ## Task
 
-After a release has been deployed and tagged by the release pipeline, merge the release/hotfix branch back into `main` and `dev`, bump `version.json` on `dev` so nightly builds produce versions **higher** than the released version, and optionally clean up the branch.
+After `/release-publish` has published a release and the pipeline's Release stage has tagged it, merge the release/hotfix branch back into `main` and `dev`, bump `version.json` on `dev` so nightly builds produce versions **higher** than the released version, and optionally clean up the branch.
 
 ## Why This Matters
 
@@ -72,10 +72,11 @@ Without the version bump on `dev`, NBGV + `Umbraco.GitVersioning.Extensions` pro
    If NO tags are found, warn the user:
    ```
    ⚠ No product version tags found on this branch.
-   This usually means the release pipeline hasn't run yet, or tags haven't been pushed.
+   Tags are only created after the pipeline's Release stage has published, so this usually
+   means the release hasn't been published yet. Run `/release-publish` first.
 
    Options:
-   - Wait for the release pipeline to complete and try again
+   - Publish with `/release-publish` (or wait for its run to finish) and try again
    - Proceed anyway (merge only, skip version bump)
    - Cancel
    ```
@@ -240,7 +241,7 @@ Increment the numeric portion of the pre-release identifier:
 
 ## Important Notes
 
-- **Always fetch tags first** — the release pipeline creates tags asynchronously after deploy
+- **Always fetch tags first** — the pipeline's Release stage creates them on GitHub, not locally
 - **Use `--no-ff` merges** — preserves the merge commit for clear history
 - **Post-merge hooks handle `release-manifest.json` cleanup** — don't manually delete it
 - **version.json only has a `"version"` field** — update only that field, preserve all other properties
