@@ -97,7 +97,7 @@ public class TerminalStepFailureTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddDebug());
-        services.AddWorkflow();
+        services.AddWorkflow(o => o.UsePollInterval(TestTimeouts.EventPollInterval));
         services.ReplaceWorkflowRetryHandler();
 
         // The run row only reaches its final status through RunFinalizer, which the production

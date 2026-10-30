@@ -22,4 +22,13 @@ public static class TestTimeouts
     /// its running state. Still polled, so a passing test finishes as soon as it can.
     /// </summary>
     public static readonly TimeSpan Cancellation = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// WorkflowCore's poll interval for fixtures that publish events (approval decisions). In
+    /// WorkflowCore 3.9.0 an event published while its subscription is being created can be
+    /// dropped from the queue ("Event locked") and is only picked up again by the poller, so with
+    /// the default 10 seconds a test stalls for 10 seconds or more under load. Fixed upstream in
+    /// WorkflowCore 3.22.0 (danielgerlag/workflow-core#1455); remove this once Automate upgrades.
+    /// </summary>
+    public static readonly TimeSpan EventPollInterval = TimeSpan.FromMilliseconds(500);
 }
