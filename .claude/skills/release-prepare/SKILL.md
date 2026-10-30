@@ -1,10 +1,10 @@
 ---
-name: release-management
+name: release-prepare
 description: Orchestrates the complete release preparation process - detects changed products, analyzes commits for version bumps, updates version.json files, generates manifests and changelogs, and creates release branches. Use when preparing a new release.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, AskUserQuestion
 ---
 
-# Release Manager
+# Release Prepare
 
 You are the orchestrator for preparing releases in the Umbraco.Automate repository.
 
@@ -202,7 +202,7 @@ while queue not empty:
         # so it does not itself trigger further cascade.
 ```
 
-`patchBump` mirrors `/post-release-cleanup` Phase 4 — reuse the same helper:
+`patchBump` mirrors `/release-cleanup` Phase 4 — reuse the same helper:
 - `0.2.1` → `0.2.2`
 - `1.0.0-beta1` → `1.0.0-beta2`
 - `1.0.0-alpha` → `1.0.0-alpha.1`
@@ -662,7 +662,9 @@ Verify all files are consistent:
     - Review the changes: git show HEAD
     - Push to remote: git push -u origin $prefix/release/2026.02.1
     - Create PR to merge into main
-    - CI will validate and build packages
+    - CI will validate and build packages (a push never publishes)
+    - Publish: /release-publish (prerelease to MyGet first if you want to test, then release)
+    - After the release is published and tagged, run /release-cleanup
     ```
 
 ## Important Notes
@@ -678,7 +680,7 @@ Verify all files are consistent:
 - Validate cross-product dependencies
 - This skill orchestrates `/release-manifest-management` and `/changelog-management`
 - Creates commits following conventional commit format
-- Release branches trigger CI validation and packaging
+- Release branches trigger CI validation and packaging; publishing is a separate step (`/release-publish`)
 
 ## Version Bump Decision Logic
 
@@ -711,7 +713,7 @@ Range updates follow the simplified Phase 4 rule (lower bound on every bump; bot
 ## Example Flow
 
 ```
-User invokes: /release-management
+User invokes: /release-prepare
 
 Phase 1: Detect changes
 You scan git history and show:
