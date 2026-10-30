@@ -90,7 +90,7 @@ public class ApprovalOutcomeTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddDebug());
-        services.AddWorkflow();
+        services.AddWorkflow(o => o.UsePollInterval(TestTimeouts.EventPollInterval));
 
         _runRepository = new EFCoreAutomationRunRepository(dbContextFactory);
         var hookedRepository = DispatchProxy.Create<IAutomationRunRepository, WaitingForInputHookProxy>();
