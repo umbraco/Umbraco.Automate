@@ -155,8 +155,8 @@ Bound to `Umbraco:Automate:Scripting`:
 | `MaxRecursionDepth` | `64` | Recursion cap. |
 | `MaxArraySize` | `1000` | Array-size cap. |
 | `MaxStatements` | `10000` | Statement-count cap. |
-| `StatementTimeout` | `00:00:03` | Per-statement engine timeout. |
-| `TotalExecutionTimeout` | `00:00:15` | Total run cap (also capped by the step timeout). |
+| `StatementTimeout` | `00:00:03` | Obsolete: has no effect, removed in v19. |
+| `TotalExecutionTimeout` | `00:00:15` | Total run cap, time awaiting `fetch` included (also capped by the step timeout). |
 | `HttpRequestTimeout` | `00:00:05` | Per-`fetch` timeout. |
 | `MaxResponseBodyBytes` | `10485760` (10 MB) | Max `fetch` response body a script may read. |
 
