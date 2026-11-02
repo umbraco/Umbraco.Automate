@@ -55,6 +55,7 @@ public class ScheduledTriggerBackgroundJobTests
             _runtimeState.Object,
             _serverRoleAccessor.Object,
             _mainDom.Object,
+            TimeProvider.System,
             Mock.Of<ILogger<ScheduledTriggerBackgroundJob>>());
     }
 
@@ -63,7 +64,7 @@ public class ScheduledTriggerBackgroundJobTests
     {
         _runtimeState.Setup(r => r.Level).Returns(RuntimeLevel.Boot);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _automationService.VerifyNoOtherCalls();
     }
@@ -73,7 +74,7 @@ public class ScheduledTriggerBackgroundJobTests
     {
         _serverRoleAccessor.Setup(r => r.CurrentServerRole).Returns(ServerRole.Subscriber);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _automationService.VerifyNoOtherCalls();
     }
@@ -83,7 +84,7 @@ public class ScheduledTriggerBackgroundJobTests
     {
         _mainDom.Setup(m => m.IsMainDom).Returns(false);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _automationService.VerifyNoOtherCalls();
     }
@@ -119,7 +120,7 @@ public class ScheduledTriggerBackgroundJobTests
         _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(DateTime.UtcNow.AddMinutes(-2));
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _dispatcher.Verify(
             d => d.DispatchAsync(
@@ -170,7 +171,7 @@ public class ScheduledTriggerBackgroundJobTests
             .Callback<TriggerEvent, CancellationToken>((e, _) => captured = e)
             .Returns(Task.CompletedTask);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         var withOutput = captured.ShouldBeOfType<TriggerEvent<ScheduledTriggerOutput>>();
         withOutput.Output.CronExpression.ShouldBe("* * * * *");
@@ -210,7 +211,7 @@ public class ScheduledTriggerBackgroundJobTests
         _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(lastFired);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _dispatcher.Verify(
             d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
@@ -244,7 +245,7 @@ public class ScheduledTriggerBackgroundJobTests
         _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(DateTime.UtcNow.AddMinutes(-2));
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         // The job must resolve the configured timezone for each due automation,
         // not silently evaluate the CRON in UTC.
@@ -285,7 +286,7 @@ public class ScheduledTriggerBackgroundJobTests
         _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(DateTime.UtcNow.AddSeconds(-10));
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _dispatcher.Verify(
             d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
@@ -323,7 +324,7 @@ public class ScheduledTriggerBackgroundJobTests
         scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("* * * * *");
         scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         // At least some automations must dispatch on the first poll. Before the lookback
         // fix, a freshly-created Flexible automation could be stuck waiting until the next
@@ -368,7 +369,7 @@ public class ScheduledTriggerBackgroundJobTests
         _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(DateTime.UtcNow.AddSeconds(-90));
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _dispatcher.Verify(
             d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
@@ -411,7 +412,7 @@ public class ScheduledTriggerBackgroundJobTests
             .Callback<TriggerEvent, CancellationToken>((e, _) => captured = e)
             .Returns(Task.CompletedTask);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         captured.ShouldNotBeNull();
         captured!.IdempotencyKey.ShouldStartWith($"scheduled:{automationId}:");
@@ -436,7 +437,7 @@ public class ScheduledTriggerBackgroundJobTests
         _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(automation);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         _dispatcher.Verify(
             d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()),
@@ -485,7 +486,7 @@ public class ScheduledTriggerBackgroundJobTests
             .Callback<TriggerEvent, CancellationToken>((e, _) => dispatched.Add(e))
             .Returns(Task.CompletedTask);
 
-        await _job.PerformExecuteAsync(null);
+        await _job.PerformExecuteAsync(CancellationToken.None);
 
         dispatched.Count.ShouldBe(2);
         dispatched.Select(e => e.TargetAutomationId).ShouldBe(new Guid?[] { firstId, secondId }, ignoreOrder: true);
