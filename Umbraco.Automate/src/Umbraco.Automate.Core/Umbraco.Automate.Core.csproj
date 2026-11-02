@@ -10,7 +10,6 @@
         <PackageReference Include="Jint" />
         <PackageReference Include="JsonSchema.Net.Generation" />
         <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
-        <PackageReference Include="Microsoft.Extensions.Options" />
         <PackageReference Include="WorkflowCore" />
         <PackageReference Include="Umbraco.Cms.Core" />
         <PackageReference Include="Umbraco.Cms.Infrastructure" />

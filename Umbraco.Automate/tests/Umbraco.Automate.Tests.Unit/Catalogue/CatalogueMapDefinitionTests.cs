@@ -21,7 +21,7 @@ public class CatalogueMapDefinitionTests
         var definitions = new MapDefinitionCollection(() => [mapDefinition]);
         _mapper = new UmbracoMapper(
             definitions,
-            Mock.Of<ICoreScopeProvider>(),
+            new Mock<ICoreScopeProvider> { DefaultValue = DefaultValue.Mock }.Object,
             Mock.Of<ILogger<UmbracoMapper>>());
     }
 

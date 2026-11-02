@@ -42,7 +42,7 @@ public sealed class EmailNotificationChannel : NotificationChannelBase<EmailNoti
             return;
         }
 
-        if (!_emailSender.CanSendRequiredEmail())
+        if (!_emailSender.IsEmailConfigured())
         {
             _logger.LogWarning("Email sender is not configured — cannot send notification");
             return;
