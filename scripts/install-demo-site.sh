@@ -142,14 +142,18 @@ popd > /dev/null
 # new entries as majors are released. Floating patterns keep multi-version installs correct:
 #   17 -> 7.*   (stable)
 #   18 -> 8.*-* (the CMS-v18-compatible Clean, e.g. 8.0.0-rc1, is still prerelease)
+#   19 -> none   (no Clean release supports CMS 19 yet; skipped until one ships)
 case "$VERSION_MAJOR" in
     17) CLEAN_VERSION="7.*" ;;
     18) CLEAN_VERSION="8.*-*" ;;
+    19) CLEAN_VERSION="none" ;;
     *)  CLEAN_VERSION="" ;;
 esac
-echo "Installing Clean starter kit..."
 pushd "$DEMO_SITE_DIR" > /dev/null
-if [ -n "$CLEAN_VERSION" ]; then
+if [ "$CLEAN_VERSION" = "none" ]; then
+    echo "Skipping Clean starter kit: no Clean release supports CMS v$VERSION_MAJOR yet."
+elif [ -n "$CLEAN_VERSION" ]; then
+    echo "Installing Clean starter kit..."
     dotnet add package Clean --version "$CLEAN_VERSION"
 else
     echo "Warning: No Clean version mapping for v$VERSION_MAJOR, using latest stable."

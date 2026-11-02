@@ -110,11 +110,15 @@ $devSettings.ConnectionStrings | Add-Member -NotePropertyName "umbracoAutomateDb
 
 $devSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $devSettingsPath -Encoding utf8 -Force
 
-# Step 5: Install Clean starter kit
-Write-Host "Installing Clean starter kit..." -ForegroundColor Green
-Push-Location "demos\v$VersionMajor\$SiteName"
-dotnet add package Clean
-Pop-Location
+# Step 5: Install Clean starter kit (none supports CMS 19 yet; skipped until one ships)
+if ($VersionMajor -eq 19) {
+    Write-Host "Skipping Clean starter kit: no Clean release supports CMS v$VersionMajor yet." -ForegroundColor Yellow
+} else {
+    Write-Host "Installing Clean starter kit..." -ForegroundColor Green
+    Push-Location "demos\v$VersionMajor\$SiteName"
+    dotnet add package Clean
+    Pop-Location
+}
 
 # Step 6: Configure NuGet sources and PackageSourceMapping
 Write-Host "Configuring NuGet sources and package routing..." -ForegroundColor Green

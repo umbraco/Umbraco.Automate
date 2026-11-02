@@ -135,11 +135,15 @@ pushd "demos/v${VERSION_MAJOR}" > /dev/null
 dotnet new umbraco --force -n "$SITE_NAME" --friendly-name "Administrator" --email "admin@example.com" --password "password1234" --development-database-type SQLite
 popd > /dev/null
 
-# Step 4: Install Clean starter kit
-echo "Installing Clean starter kit..."
-pushd "demos/v${VERSION_MAJOR}/$SITE_NAME" > /dev/null
-dotnet add package Clean
-popd > /dev/null
+# Step 4: Install Clean starter kit (none supports CMS 19 yet; skipped until one ships)
+if [ "$VERSION_MAJOR" = "19" ]; then
+    echo "Skipping Clean starter kit: no Clean release supports CMS v$VERSION_MAJOR yet."
+else
+    echo "Installing Clean starter kit..."
+    pushd "demos/v${VERSION_MAJOR}/$SITE_NAME" > /dev/null
+    dotnet add package Clean
+    popd > /dev/null
+fi
 
 # Step 5: Configure NuGet sources and PackageSourceMapping
 echo "Configuring NuGet sources and package routing..."
