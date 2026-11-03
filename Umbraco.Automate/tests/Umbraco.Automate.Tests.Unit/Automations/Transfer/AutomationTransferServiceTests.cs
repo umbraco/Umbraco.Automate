@@ -69,7 +69,8 @@ public class AutomationTransferTests
                 _actions, _triggers, _controlFlows, connectionTypes,
                 new WebhookAuthenticatorCollection(() => []),
                 new NotificationChannelCollection(() => [])),
-            new SectionAccessChecker());
+            new SectionAccessChecker(),
+            Mock.Of<IConfigurationReferenceResolver>());
     }
 
     #region Export Tests

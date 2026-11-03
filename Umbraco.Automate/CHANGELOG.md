@@ -5,6 +5,28 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.5.1](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.5.0...Umbraco.Automate@17.5.1) (2026-10-08)
+
+### fix
+
+* **action:** Check content access in Notify Editor ([bc89280](https://github.com/umbraco/Umbraco.Automate/commit/bc89280ac4ef8c0c5b677e1e9d811591b6f13ba7))
+* **api:** Return a validation problem when creating an invalid automation ([73f4739](https://github.com/umbraco/Umbraco.Automate/commit/73f47399ae886049fcd11271d25969ab71c3ba81))
+* **api:** Return a validation problem when importing or rolling back an invalid automation ([801ca77](https://github.com/umbraco/Umbraco.Automate/commit/801ca77be5377ce29d7f3cdc9c64038dc6018985))
+* **core:** Fail a step whose action is no longer available (#477) ([295f4ce](https://github.com/umbraco/Umbraco.Automate/commit/295f4ce0a66c561750919537bc65ba452de244ab)), closes [#477](https://github.com/umbraco/Umbraco.Automate/issues/477) [#343](https://github.com/umbraco/Umbraco.Automate/issues/343)
+* **core:** Leave runs to live nodes during startup recovery (#469) ([6a00721](https://github.com/umbraco/Umbraco.Automate/commit/6a007213488b81c3ba4b4b0485f1818732ac2d44)), closes [#469](https://github.com/umbraco/Umbraco.Automate/issues/469) [#424](https://github.com/umbraco/Umbraco.Automate/issues/424)
+* **core:** Leave runs with a delivered but unrouted event to the engine on recovery ([4e75d3a](https://github.com/umbraco/Umbraco.Automate/commit/4e75d3ad9636310e0de4620ea903c74e85c91216)), closes [#467](https://github.com/umbraco/Umbraco.Automate/issues/467)
+* **core:** Validate step settings against their settings type on publish ([aad5533](https://github.com/umbraco/Umbraco.Automate/commit/aad5533856b7c1e316fb2c0083d44e09dd613492))
+* **step:** Record a failed step run when a resumed approval has no decision ([e87134a](https://github.com/umbraco/Umbraco.Automate/commit/e87134ac9a8b3c3764541478aebb5fa760e7936a))
+* **step:** Resolve binding defaults for steps saved with empty settings (#441) (#468) ([d5e4c92](https://github.com/umbraco/Umbraco.Automate/commit/d5e4c92dd52af861daaedd5e36032a74181ff7ae)), closes [#441](https://github.com/umbraco/Umbraco.Automate/issues/441) [#468](https://github.com/umbraco/Umbraco.Automate/issues/468)
+* **step:** Route a resumed approval by its recorded decision ([19218d4](https://github.com/umbraco/Umbraco.Automate/commit/19218d404d6f2713c82b4132e4313c64007f46f6))
+* **step:** Stop the run when a retried step can't succeed ([3040690](https://github.com/umbraco/Umbraco.Automate/commit/30406900dd6ab216d7028d7fefb7ad629e2d0f87))
+* **trigger:** Apply node access checks to batch trigger items ([8b22d2d](https://github.com/umbraco/Umbraco.Automate/commit/8b22d2d8c0a26ed5adaf31b32d05c8a3b9f02518))
+* **ui:** Hide the Compensate error behaviour for steps ([4f1c104](https://github.com/umbraco/Umbraco.Automate/commit/4f1c104f47038342c65fb83fa19743ff3d992c6a))
+* **ui:** Keep binding syntax in settings field descriptions ([ec68130](https://github.com/umbraco/Umbraco.Automate/commit/ec6813002aaec24f55b49b71153c72b691cfd234))
+* **ui:** Leave code spans unescaped in settings descriptions ([17a93d0](https://github.com/umbraco/Umbraco.Automate/commit/17a93d0d00e96e7475281bb1101f2f4d4b730cdc))
+* **ui:** Show For Each's binding example as code, and cover it in the spec ([4a85cc2](https://github.com/umbraco/Umbraco.Automate/commit/4a85cc2d532562a2f4a330a018dce779d2bbe373))
+* **ui:** Validate the automation editor before Save and publish (#466) ([614bee1](https://github.com/umbraco/Umbraco.Automate/commit/614bee1d656ed6ac263e1348791d26b821ee8dc7)), closes [#466](https://github.com/umbraco/Umbraco.Automate/issues/466)
+
 ## [17.5.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.4.0...Umbraco.Automate@17.5.0) (2026-10-01)
 
 ### feat

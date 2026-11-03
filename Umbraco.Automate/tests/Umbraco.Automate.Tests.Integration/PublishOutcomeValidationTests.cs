@@ -115,7 +115,8 @@ public class PublishOutcomeValidationTests
                 connectionTypes,
                 new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
                 new NotificationChannelCollection(Array.Empty<INotificationChannel>)),
-            new SectionAccessChecker());
+            new SectionAccessChecker(),
+            Mock.Of<IConfigurationReferenceResolver>());
     }
 
     #region Given a step "Decide" with a stale line from outcome "b"

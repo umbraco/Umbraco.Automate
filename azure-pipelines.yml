@@ -23,6 +23,15 @@ parameters:
             changeVar: SlackChanged
             hasNpm: false
 
+    # Queue-time override: generate SBOMs and run the license policy check on any branch.
+    # SBOMs normally only run on vN/release/* and vN/hotfix/*, where they are also uploaded to
+    # Dependency-Track. Elsewhere this covers every product and never uploads, so in-progress
+    # versions don't land in Dependency-Track.
+    - name: generateSbom
+      displayName: Generate SBOMs and check licenses (no upload off release/hotfix)
+      type: boolean
+      default: false
+
 # Feature branches are not listed: their pull request builds them, and a branch
 # trigger as well would build every push twice.
 # batch: a burst of merges builds once, from the latest commit, rather than once per merge.
@@ -49,7 +58,7 @@ variables:
       value: "true"
     - name: DOTNET_CLI_TELEMETRY_OPTOUT
       value: "true"
-    # A push to vN/main, vN/dev, vN/release/* or vN/hotfix/*: the builds that publish SBOMs and packages.
+    # A push to vN/main, vN/dev, vN/release/* or vN/hotfix/*: the builds that publish packages.
     # Resolves to "True" or "False" at compile time; eq() compares case-insensitively.
     - name: isPublishBuild
       value: ${{ and(ne(variables['Build.Reason'], 'PullRequest'), or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/'), endsWith(variables['Build.SourceBranch'], '/main'), endsWith(variables['Build.SourceBranch'], '/dev'))) }}
@@ -612,57 +621,51 @@ stages:
                       publishLocation: pipeline
 
     # ============================================================
-    # Generate & Upload SBOMs - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/*
-    # Generates per-product SBOMs and uploads to Dependency-Track
+    # Generate & Upload SBOMs - Only runs on push to vN/release/* and vN/hotfix/*, or on any
+    # branch when generateSbom is ticked at queue time (generate + license check, no upload)
+    # Covers only the products being released (same change detection as Pack), uploads them to
+    # Dependency-Track, and gates Pack: a license policy violation stops the release
     # ============================================================
     - stage: GenerateSBOM
       displayName: Generate & Upload SBOMs
       dependsOn: Build
-      condition: and(succeeded(), eq(variables.isPublishBuild, 'True'))
+      condition: |
+          and(
+            succeeded(),
+            ne(variables['Build.Reason'], 'PullRequest'),
+            or(
+              eq('${{ parameters.generateSbom }}', 'true'),
+              contains(variables['Build.SourceBranch'], '/release/'),
+              contains(variables['Build.SourceBranch'], '/hotfix/')
+            )
+          )
       jobs:
-          # One job for every product: each SBOM takes about a minute, far less than the
-          # agent wait a job per product cost, and cdxgen is installed once, not per product.
           - job: GenerateSBOMs
             displayName: Generate SBOMs
-            continueOnError: true
             pool:
                 vmImage: "ubuntu-latest"
+            ${{ if or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/')) }}:
+                variables:
+                    # The products in the release, from the Build job's change detection
+                    sbomProducts: $[ stageDependencies.Build.BuildAndTest.outputs['detect.AllChangedProducts'] ]
             steps:
+                # nbgv needs full history to work out each product's version
                 - checkout: self
-                  fetchDepth: 1
+                  fetchDepth: 0
 
-                - task: UseNode@1
-                  displayName: Setup Node.js
-                  inputs:
-                      version: $(NODE_VERSION)
+                # A queue-time SBOM check on any other branch covers every product, since
+                # change detection only narrows the list to a release on release/hotfix.
+                - ${{ if and(not(contains(variables['Build.SourceBranch'], '/release/')), not(contains(variables['Build.SourceBranch'], '/hotfix/'))) }}:
+                      - pwsh: |
+                            $products = (Get-ChildItem -Directory | Where-Object { Test-Path (Join-Path $_.FullName "version.json") }).Name -join ","
+                            Write-Host "Products: $products"
+                            Write-Host "##vso[task.setvariable variable=sbomProducts]$products"
+                        displayName: List all products
 
-                - task: Npm@1
-                  displayName: Install cdxgen
-                  inputs:
-                      command: custom
-                      customCommand: install --global @cyclonedx/cdxgen
-
-                - template: .azure-pipelines/templates/generate-sbom.yml
+                - template: .azure-pipelines/templates/sbom.yml
                   parameters:
-                      product: Umbraco.Automate
-
-                - ${{ each product in parameters.level1Products }}:
-                      - template: .azure-pipelines/templates/generate-sbom.yml
-                        parameters:
-                            product: ${{ product.name }}
-
-                - ${{ each product in parameters.level2Products }}:
-                      - template: .azure-pipelines/templates/generate-sbom.yml
-                        parameters:
-                            product: ${{ product.name }}
-
-                - task: PublishPipelineArtifact@1
-                  displayName: Upload combined SBOM artifact
-                  condition: succeededOrFailed()
-                  inputs:
-                      targetPath: $(Build.ArtifactStagingDirectory)/sbom
-                      artifact: all-sboms
-                      publishLocation: pipeline
+                      products: $(sbomProducts)
+                      upload: ${{ or(contains(variables['Build.SourceBranch'], '/release/'), contains(variables['Build.SourceBranch'], '/hotfix/')) }}
 
     # ============================================================
     # Validate Changelogs - Only runs on release and hotfix branches
@@ -701,20 +704,23 @@ stages:
     # ============================================================
     # Pack Stage - Only runs on push to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches
     # Uses dynamic change detection to only pack products that changed
-    # Runs in parallel with GenerateSBOM after Build (through ValidateChangelogs dependency)
+    # Waits for GenerateSBOM so a license policy violation stops a release before it is packed
     # ============================================================
     - stage: Pack
       displayName: Pack NuGet & NPM Packages
       dependsOn:
           - Build
           - ValidateChangelogs
+          - GenerateSBOM
       # Only pack on push (not PR) to vN/main, vN/dev, vN/hotfix/*, vN/release/* branches,
       # and only when change detection (in the Build job) found something to pack.
-      # ValidateChangelogs may be skipped (on vN/main, vN/dev branches), which is OK
+      # ValidateChangelogs and GenerateSBOM may be skipped (on vN/main, vN/dev branches), which is OK.
+      # GenerateSBOM succeeds with issues when only the Dependency-Track upload failed.
       condition: |
           and(
             in(dependencies.Build.result, 'Succeeded'),
             in(dependencies.ValidateChangelogs.result, 'Succeeded', 'Skipped'),
+            in(dependencies.GenerateSBOM.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
             eq(variables.isPublishBuild, 'True'),
             eq(dependencies.Build.outputs['BuildAndTest.detect.AnyChanged'], 'true')
           )

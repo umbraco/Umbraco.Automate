@@ -1,5 +1,8 @@
 using System.Data;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
@@ -7,6 +10,7 @@ using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Versioning;
@@ -51,7 +55,12 @@ public class PublishValidationTests
         _repo.Setup(r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
 
-        var actions = new ActionCollection(() => []);
+        var configReferenceResolver = new ConfigurationReferenceResolver(new ConfigurationBuilder().Build());
+        var modelResolver = new EditableModelResolver(configReferenceResolver);
+        var actions = new ActionCollection(() =>
+        [
+            new LogMessageAction(new ActionInfrastructure(modelResolver), NullLogger<LogMessageAction>.Instance),
+        ]);
         var triggers = new TriggerCollection(() => []);
         var controlFlows = new ControlFlowCollection(() => []);
         var connectionTypes = new ConnectionTypeCollection(() => []);
@@ -79,7 +88,8 @@ public class PublishValidationTests
                 connectionTypes,
                 new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
                 new NotificationChannelCollection(Array.Empty<INotificationChannel>)),
-            new SectionAccessChecker());
+            new SectionAccessChecker(),
+            configReferenceResolver);
     }
 
     [Fact]
@@ -185,6 +195,41 @@ public class PublishValidationTests
         ex.Errors.Count.ShouldBeGreaterThanOrEqualTo(2);
         ex.Errors.ShouldContain(e => e.Contains("trigger"));
         ex.Errors.ShouldContain(e => e.Contains(disallowedConnectionId.ToString()));
+    }
+
+    [Fact]
+    public async Task Publish_WithEmptyRequiredStepSetting_Fails()
+    {
+        // Saved through the API or an import with "settings": {} — the flow editor would not allow it.
+        var step = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.logMessage")
+            .WithName("Log message")
+            .WithAlias("logMessage")
+            .Build();
+
+        var automation = SetupAutomation(new AutomationBuilder().AsDraft().WithManualTrigger().AddStep(step));
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain("Step 'Log message' (logMessage): The Message field is required.");
+    }
+
+    [Fact]
+    public async Task Publish_WithRequiredStepSettingAsBinding_Succeeds()
+    {
+        var step = new StepConfigurationBuilder()
+            .WithActionAlias("umbracoAutomate.logMessage")
+            .WithName("Log message")
+            .WithAlias("logMessage")
+            .WithSetting("message", "${ trigger.name }")
+            .Build();
+
+        var automation = SetupAutomation(new AutomationBuilder().AsDraft().WithManualTrigger().AddStep(step));
+
+        var result = await _service.PublishAutomationAsync(automation.Id);
+
+        result.Status.ShouldBe(AutomationStatus.Published);
     }
 
     private Automation SetupAutomation(AutomationBuilder builder)

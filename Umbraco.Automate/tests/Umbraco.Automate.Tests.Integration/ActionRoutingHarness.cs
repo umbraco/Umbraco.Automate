@@ -28,6 +28,7 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Automate.Extensions;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Testing.Builders;
 using Umbraco.Automate.Tests.Common;
@@ -94,6 +95,10 @@ internal sealed class ActionRoutingHarness : IAsyncDisposable
         services.AddLogging(b => b.AddDebug());
         services.AddWorkflow();
 
+        // Wire the Retry error handler as production does, so a step that retrying can't fix ends
+        // the run (Terminated) instead of being retried by WorkflowCore's default handler.
+        services.ReplaceWorkflowRetryHandler();
+
         IAutomationRunRepository runRepository = new EFCoreAutomationRunRepository(dbContextFactory);
         var recordingRepository = DispatchProxy.Create<IAutomationRunRepository, RecordingRepositoryProxy>();
         var recorder = (RecordingRepositoryProxy)(object)recordingRepository;
@@ -156,7 +161,10 @@ internal sealed class ActionRoutingHarness : IAsyncDisposable
         return new ActionRoutingHarness(provider, fixture, runRepository, recorder, handler, automationService);
     }
 
-    /// <summary>Starts the automation from its manual trigger and waits for the workflow to finish.</summary>
+    /// <summary>
+    /// Starts the automation from its manual trigger and waits for the workflow to finish: either
+    /// complete, or terminated by a step failure that retrying can't fix.
+    /// </summary>
     public async Task<ActionRoutingRun> RunToCompletionAsync(Automation automation, Dictionary<string, object?>? triggerOutput = null)
     {
         _automationService
@@ -173,7 +181,7 @@ internal sealed class ActionRoutingHarness : IAsyncDisposable
             var run = (await _runRepository.GetPagedByAutomationAsync(automation.Id)).Items.FirstOrDefault();
             var instanceId = run is null ? null : (await _runRepository.GetAsync(run.Id))?.WorkflowInstanceId;
             if (!string.IsNullOrEmpty(instanceId)
-                && await _persistence.GetWorkflowInstance(instanceId) is { Status: WorkflowStatus.Complete })
+                && await _persistence.GetWorkflowInstance(instanceId) is { Status: WorkflowStatus.Complete or WorkflowStatus.Terminated })
             {
                 var completed = (await _runRepository.GetAsync(run!.Id))!;
                 return new ActionRoutingRun(completed.StepRuns.ToList(), _recorder.Latest);

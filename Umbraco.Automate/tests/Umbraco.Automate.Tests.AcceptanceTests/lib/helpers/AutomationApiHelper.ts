@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
+import { ensureOk } from './ApiResponse';
 import { ConstantHelper } from './ConstantHelper';
 import { toAlias } from './TestData';
 
@@ -39,6 +40,7 @@ export class AutomationApiHelper {
   async getAll() {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, 'Listing automations');
     const body = await response.json();
     return body.items ?? [];
   }
@@ -64,6 +66,7 @@ export class AutomationApiHelper {
 
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + item.id;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting automation "${name}"`);
     return await response.json();
   }
 
@@ -86,6 +89,7 @@ export class AutomationApiHelper {
       connections: options.connections ?? [],
       notificationSettings: options.notificationSettings
     });
+    await ensureOk(response, `Creating automation "${name}"`);
 
     const location = response.headers()['location'];
     if (location) {
@@ -99,6 +103,7 @@ export class AutomationApiHelper {
   async getById(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting automation ${id}`);
     return await response.json();
   }
 
@@ -119,9 +124,7 @@ export class AutomationApiHelper {
       notificationSettings: current.notificationSettings,
       version: current.version
     });
-    if (!response.ok()) {
-      throw new Error(`Renaming automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Renaming automation ${id}`);
   }
 
   /* Publishes through the API. Throws with the server's problem detail on a validation failure,
@@ -129,33 +132,28 @@ export class AutomationApiHelper {
   async publish(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/publish';
     const response = await this.api.post(requestUrl, {});
-    if (!response.ok()) {
-      throw new Error(`Publishing automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Publishing automation ${id}`);
   }
 
   /* Unpublishes through the API, as the Unpublish workspace action does. */
   async unpublish(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/unpublish';
     const response = await this.api.post(requestUrl, {});
-    if (!response.ok()) {
-      throw new Error(`Unpublishing automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Unpublishing automation ${id}`);
   }
 
   /* Starts a run, as Run now does. The automation must be published and have a manual trigger. */
   async run(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/trigger';
     const response = await this.api.post(requestUrl, {});
-    if (!response.ok()) {
-      throw new Error(`Running automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Running automation ${id}`);
   }
 
   /* The runs of one automation, newest first. */
   async getRuns(id: string): Promise<any[]> {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/runs';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Listing the runs of automation ${id}`);
     const body = await response.json();
     return body.items ?? [];
   }
@@ -164,6 +162,7 @@ export class AutomationApiHelper {
   async getRun(runId: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting run ${runId}`);
     return await response.json();
   }
 
@@ -232,6 +231,7 @@ export class AutomationApiHelper {
   async getPendingApprovals(automationId: string): Promise<any[]> {
     const requestUrl = this.api.baseUrl + this.basePath + 'approvals/pending';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, 'Listing pending approvals');
     const items = await response.json();
     return (items ?? []).filter((item: any) => item.automationId === automationId);
   }
@@ -241,9 +241,7 @@ export class AutomationApiHelper {
   async decideApproval(runId: string, stepId: string, outcome: ApprovalOutcome) {
     const requestUrl = this.api.baseUrl + this.basePath + 'approvals/' + runId + '/steps/' + stepId + '/decision';
     const response = await this.api.post(requestUrl, { outcome });
-    if (!response.ok()) {
-      throw new Error(`Deciding approval ${runId}/${stepId} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Deciding approval ${runId}/${stepId}`);
   }
 
   /**

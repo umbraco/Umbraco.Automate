@@ -211,6 +211,7 @@ public class BuiltInActionOutcomeTests
                 Mock.Of<IContentService>(),
                 Mock.Of<IAutomationService>(),
                 Mock.Of<IEditorNotifier>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
                 Mock.Of<ILogger<NotifyEditorAction>>()),
             _ => throw new ArgumentOutOfRangeException(nameof(actionType), actionType, null),
         };
