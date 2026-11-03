@@ -873,8 +873,6 @@ builder.Services.Configure<RunCleanupPolicy>(builder.Config.GetSection("Umbraco:
 
 `Execution:PollInterval` and `Execution:MaxConcurrentRuns` are WorkflowCore engine settings. WorkflowCore takes them only through its `AddWorkflow` callback, so they are read once at startup and passed to `UsePollInterval` / `UseMaxConcurrentWorkflows`. `MaxConcurrentRuns` is a per-node limit on runs actively executing (0 = WorkflowCore's default, processor count with a minimum of 4); the per-automation limit is `RateLimiting:MaxConcurrentRunsPerAutomation`.
 
-> **Obsolete, never read:** `Umbraco:Automate:Enabled` and the whole `Umbraco:Automate:Governance` section (`AuditLogEnabled`, `AuditLogRetentionDays`, `SensitiveDataMasking`, `DefaultNotifyOn`). They are marked `[Obsolete]` and scheduled for removal in Umbraco Automate 19. Run retention is `RunCleanup:*`; masking and the CMS audit trail are always on; notification policy is set per automation.
-
 ### Infrastructure Providers (Queue, Lock, Lifecycle)
 
 WorkflowCore has three pluggable infrastructure abstractions: `IQueueProvider`, `IDistributedLockProvider`, and `ILifeCycleEventHub`. Swapping these is a **code-level decision** (requires installing a NuGet package), so it's configured in a Composer via `AddUmbracoAutomate()`, not in appsettings.

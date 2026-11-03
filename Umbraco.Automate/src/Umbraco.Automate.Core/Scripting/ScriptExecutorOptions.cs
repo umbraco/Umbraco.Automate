@@ -28,15 +28,6 @@ public sealed class ScriptExecutorOptions
     /// <summary>Gets or sets the maximum number of statements. Default: 10,000.</summary>
     public int MaxStatements { get; set; } = 10_000;
 
-    /// <summary>Gets or sets the per-statement engine timeout. Default: 3 seconds.</summary>
-    /// <remarks>
-    /// Not applied. Jint has no per-statement timeout: its time limit covers the whole call, time
-    /// spent awaiting <c>fetch</c> included, so a slow response failed the script. Runaway loops are
-    /// stopped by <see cref="MaxStatements"/> and <see cref="TotalExecutionTimeout"/>.
-    /// </remarks>
-    [Obsolete("This setting has no effect and is not read. Scripts are bounded by MaxStatements and TotalExecutionTimeout. Scheduled for removal in Umbraco Automate 19.")]
-    public TimeSpan StatementTimeout { get; set; } = TimeSpan.FromSeconds(3);
-
     /// <summary>
     /// Gets or sets the timeout for a single <c>fetch</c> HTTP request. Default: 5 seconds.
     /// </summary>

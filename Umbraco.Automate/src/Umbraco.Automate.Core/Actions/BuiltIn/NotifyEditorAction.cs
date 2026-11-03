@@ -1,11 +1,9 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Core.Security;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
-using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
@@ -36,27 +34,6 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
     /// <summary>
     /// Initializes a new instance of the <see cref="NotifyEditorAction"/> class.
     /// </summary>
-    [Obsolete("Use the constructor that takes an IAutomationActionAuthorizer. Scheduled for removal in Umbraco Automate 19.")]
-    public NotifyEditorAction(
-        ActionInfrastructure infrastructure,
-        IContentService contentService,
-        IAutomationService automationService,
-        IEditorNotifier editorNotifier,
-        ILogger<NotifyEditorAction> logger)
-        : this(
-            infrastructure,
-            contentService,
-            automationService,
-            editorNotifier,
-            StaticServiceProvider.Instance.GetRequiredService<IAutomationActionAuthorizer>(),
-            logger)
-    {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="NotifyEditorAction"/> class.
-    /// </summary>
-    [ActivatorUtilitiesConstructor]
     public NotifyEditorAction(
         ActionInfrastructure infrastructure,
         IContentService contentService,
