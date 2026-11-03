@@ -195,6 +195,33 @@ test.describe('Pick or bind', () => {
   });
 
   test.describe('sad path', () => {
+    test('keeps a node picked while the bindings are still loading', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateUi,
+      umbracoAutomateApi,
+      cmsContent
+    }) => {
+      // Arrange: the canvas loaded, then the catalogue slowed down, so the step settings wait on
+      // their bindings the way a slow site does.
+      const home = await cmsContent.createPage('Home');
+      const seeded = await seedStep(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.publishContent, {});
+      await openAutomation(umbracoAutomateUi, seeded);
+      const unroute = await umbracoAutomateUi.automate.delayRequests(`**${ConstantHelper.api.basePath}catalogue/**`, 4000);
+
+      // Act: open the step and pick Home as soon as the picker allows, but confirm only once the
+      // bindings have arrived (the switch is there), which is when a field still showing the plain
+      // picker would have been swapped out from under the open picker.
+      await umbracoAutomateUi.automate.openStepSettings(seeded.stepId);
+      await umbracoAutomateUi.automate.openDocumentPicker('contentKey');
+      await umbracoAutomateUi.automate.selectInDocumentPicker(home.name);
+      await umbracoAutomateUi.automate.bindingSwitchHost('contentKey').waitFor({ state: 'attached' });
+      await umbracoAutomateUi.automate.confirmDocumentPicker();
+      await unroute();
+
+      // Assert: the Home node card is shown.
+      await expect(umbracoAutomateUi.automate.pickedDocumentCard('contentKey')).toHaveAttribute('name', home.name);
+    });
+
     test('shows no switch when nothing is in scope and the field is empty', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateUi,

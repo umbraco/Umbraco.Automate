@@ -596,9 +596,22 @@ export class AutomateUiHelper {
    * confirms. Names are the unique ones the spec created, so this cannot hit a look-alike.
    */
   async pickDocument(key: string, nodeName: string) {
+    await this.openDocumentPicker(key);
+    await this.selectInDocumentPicker(nodeName);
+    await this.confirmDocumentPicker();
+  }
+
+  /* The three steps of `pickDocument`, for a spec that has to act between selecting and confirming. */
+  async openDocumentPicker(key: string) {
     await this.clickInModal(this.pickerChooseButton(key));
     await this.documentPickerModal.waitFor({ state: 'visible' });
+  }
+
+  async selectInDocumentPicker(nodeName: string) {
     await this.clickInModal(this.documentPickerModal.locator(`uui-menu-item[label="${nodeName}"]`));
+  }
+
+  async confirmDocumentPicker() {
     await this.clickInModal(this.documentPickerModal.locator('uui-button[look="primary"]'));
     await this.documentPickerModal.waitFor({ state: 'detached' });
   }
@@ -669,6 +682,21 @@ export class AutomateUiHelper {
         contentType: 'application/problem+json',
         body: JSON.stringify({ type: 'Error', title: 'Stubbed failure', status: 500 }),
       });
+    await this.page.route(pattern, handler);
+    return async () => await this.page.unroute(pattern, handler);
+  }
+
+  /**
+   * Holds every request matching `pattern` for `ms` before sending it on, and returns the matching
+   * unroute. Used to open a window a fast local site never shows, e.g. a panel used while the data
+   * it depends on is still loading.
+   */
+  async delayRequests(pattern: string, ms: number): Promise<() => Promise<void>> {
+    const handler = async (route: import('@playwright/test').Route) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      // The page may have navigated away during the delay, which aborts the request.
+      await route.continue().catch(() => {});
+    };
     await this.page.route(pattern, handler);
     return async () => await this.page.unroute(pattern, handler);
   }
