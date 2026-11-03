@@ -62,9 +62,10 @@ test.describe('Workspace management', () => {
     );
     await umbracoAutomateUi.automate.waitForWorkspaceEditor();
 
-    // Assert — the settings view renders the resolved user, not the raw key.
+    // Assert — the settings view renders the resolved user, not the raw key. Umbraco 19's user
+    // reference also renders the name in a hidden umb-entity-frame, so match the visible link.
     await expect(
-      umbracoAutomateUi.page.getByText('Acceptance Test Service Account', { exact: false })
+      umbracoAutomateUi.page.getByRole('link', { name: /Acceptance Test Service Account/ })
     ).toBeVisible();
   });
 
