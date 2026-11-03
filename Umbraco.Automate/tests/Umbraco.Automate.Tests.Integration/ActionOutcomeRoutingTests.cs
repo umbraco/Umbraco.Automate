@@ -30,6 +30,7 @@ public class ActionOutcomeRoutingTests : IAsyncLifetime
             new TimeoutOutcomesAction(deps),
             new BoundOptionsAction(deps),
             new FailingAction(deps),
+            new DefaultedOptionsAction(deps),
         ]);
 
     public async Task DisposeAsync() => await _harness.DisposeAsync();
@@ -273,6 +274,21 @@ public class ActionOutcomeRoutingTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Run_DynamicStepSavedWithEmptySettings_RoutesOnItsDefaultedOptions()
+    {
+        // The editor doesn't save defaults the user left alone, so this step is saved as {} and runs
+        // with Options = "yes,no". Its exits must come from the same defaults, so the "yes" it returns
+        // is a declared outcome. (An undeclared "yes" would still route, but with a warning.)
+        var step = Step("test.defaultedOptions");
+        var yes = Log("yes");
+        var automation = Build(step, [yes], (step, yes, "yes"));
+
+        var run = await _harness.RunToCompletionAsync(automation);
+
+        run.For(step.Id).Single().LogEntries.ShouldNotContain(e => e.Message.Contains("does not declare"));
+    }
+
+    [Fact]
     public async Task Run_ActionFails_RunsNeitherExit()
     {
         var failing = Step("test.failing");
@@ -459,6 +475,29 @@ public class ActionOutcomeRoutingTests : IAsyncLifetime
 
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => Task.FromResult(ActionResult.Success());
+    }
+
+    internal sealed class DefaultedOptionsSettings
+    {
+        [Field(Label = "Options")]
+        public string Options { get; set; } = "yes,no";
+    }
+
+    /// <summary>Lists its comma-separated options as outcomes and returns the first one.</summary>
+    [Action("test.defaultedOptions", "Defaulted options")]
+    private sealed class DefaultedOptionsAction(ActionInfrastructure infrastructure) : ActionBase<DefaultedOptionsSettings>(infrastructure)
+    {
+        public override bool HasDynamicOutcomes => true;
+
+        protected override Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
+            DefaultedOptionsSettings? settings, CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyList<StepOutcome>>(
+                (settings?.Options ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(o => new StepOutcome(o, o)).ToList());
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => Task.FromResult(ActionResult.SuccessWithOutcome(
+                ((DefaultedOptionsSettings)context.Settings!).Options.Split(',')[0]));
     }
 
     [Action("test.failing", "Failing")]

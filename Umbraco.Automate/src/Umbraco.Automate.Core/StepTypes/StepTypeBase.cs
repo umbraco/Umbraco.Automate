@@ -126,7 +126,11 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
     /// side-effect free (no network or database access), and must work from saved, unbound settings.
     /// The default implementation returns the static outcomes from <see cref="GetOutcomes"/>.
     /// </summary>
-    /// <param name="settings">The resolved typed settings, or null if unconfigured.</param>
+    /// <param name="settings">
+    /// The step's saved settings resolved to <typeparamref name="TSettings"/>. A step saved with no
+    /// settings gets the settings type's defaults, because that is what it runs with. Null only when
+    /// no settings were given at all.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The outcomes for the given settings, or an empty list if none.</returns>
     protected virtual Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(TSettings? settings, CancellationToken cancellationToken = default)
@@ -135,7 +139,17 @@ public abstract class StepTypeBase<TSettings, TOutput, TAttribute, TInfrastructu
     /// <inheritdoc />
     Task<IReadOnlyList<StepOutcome>> IStepType.GetOutcomesAsync(Dictionary<string, object?>? settings, CancellationToken cancellationToken)
     {
-        var typed = settings is { Count: > 0 } ? ResolveSettings(settings) : null;
+        // The editor doesn't save a default the user left untouched, so a step saved as {} still runs
+        // with the settings type's defaults (see ActionStepBody). Resolve {} to those defaults so the
+        // exits drawn and checked match the outcome the action returns. It isn't validated: a fresh
+        // step with an unset required field should still show its exits, and the run fails setup anyway.
+        var typed = settings switch
+        {
+            null => null,
+            { Count: 0 } => _infrastructure.ModelResolver.ResolveModel<TSettings>(Alias, settings),
+            _ => ResolveSettings(settings),
+        };
+
         return GetOutcomesAsync(typed, cancellationToken);
     }
 
