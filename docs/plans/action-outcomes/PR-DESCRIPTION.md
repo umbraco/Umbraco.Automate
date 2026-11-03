@@ -6,15 +6,16 @@ Actions can now declare named outcomes that the canvas draws as separate exits, 
 
 ## Special things to note
 
-- **Needs a decision:** With error behaviour **Retry**, a step that fails terminally (for example a broken outcome declaration) returns `Next()` and the run carries on, so an "Any result" line from that step still fires. This is existing behaviour for every terminal failure, not new here, but outcomes make it more visible. Should a terminal failure stop "Any result" lines?
+- **Resolved on dev:** a step under error behaviour **Retry** that fails in a way retrying can't fix (for example a broken outcome declaration) now ends the run (8d89a947), so no "Any result" line from it fires. Covered by `Run_BrokenDeclarationWithRetry_DoesNotRunAnyResultLine`.
 - **Needs a decision:** A service account with **root** start nodes can still update or create under content and media that is in the recycle bin (the authorizer allows it and `GetById` returns the trashed node). Scoped accounts now get "Not found" instead. Existing behaviour; a `Trashed` check would make both behave the same.
-- **Needs a decision:** Exit tooltips for built-ins are a hard-coded alias table in the canvas (`outcome-exits.ts`). An optional `Description` on `StepOutcome` would let any action supply its own, but it changes the public contract, so it was left out.
-- **Behaviour change (changelog):** 8 built-in actions now take their not-found exit instead of failing the step when the item (or parent) no longer exists or is in the recycle bin: Get Content, Get Content Property, Update Content Property, Create Content (parent), Get Media, Get Media Property, Update Media Property, Create Media (parent). Permission failures still fail with the same message. A saved automation that relied on that failure will now continue down its not-found or "Any result" line. Agreed with the product owner during the build.
-- **Behaviour change (public test package):** `ActionTestHarness`'s default `IEditableModelResolver` now returns the `WithSettings` object for non-null data (it used to always return null). Null data still returns null, and a resolver registered with `WithService` still wins. Documented on `WithSettings`.
-- **Migration:** `UmbracoAutomate_AddStepRunBranchOutcome` adds a nullable, unbounded `BranchOutcome` column to `umbracoAutomateStepRun` for SQL Server and SQLite. `StepRun.BranchOutcome` was set by If/Switch before but never saved; this fixes that too. Applied to an existing SQLite demo DB and to a fresh SQL Server 2022 container. Existing rows read back null.
-- **New public API (additive):** `StepOutcome`, outcome members on `IStepType` (default interface members) and `StepTypeBase`, `SettingsResolutionException`, `string.ContainsBinding()`, `AutomationAuthorizationResult.IsNotFound`, `ToFailedActionResult()`, an `AuthorizeContentAsync(Guid, IReadOnlyList<string>, …)` overload, and harness `GetOutcomesAsync` / `ExecuteWithOutcomeAsync` / `RoutedActionResult`. `CatalogueMapDefinition`'s parameterless constructor is kept but `[Obsolete]`.
+- **Exit tooltips:** `StepOutcome` has an optional `Description` (a `#term` or literal text, shown as text), which the canvas shows as the exit's tooltip. The built-in actions set theirs.
+- **Behaviour change (changelog):** 8 built-in actions now take their not-found exit instead of failing the step when the item (or parent) no longer exists, or is in the recycle bin for a service account scoped to start nodes (root accounts are unchanged, see above): Get Content, Get Content Property, Update Content Property, Create Content (parent), Get Media, Get Media Property, Update Media Property, Create Media (parent). Permission failures still fail with the same message. A saved automation that relied on that failure will now continue down its not-found or "Any result" line. Agreed with the product owner during the build.
+- **Behaviour change (public test package):** `ActionTestHarness`'s default `IEditableModelResolver` now returns the `WithSettings` object for non-null data (it used to always return null). Null data still returns null, with no settings given it returns a new instance of the settings type (its defaults), and a resolver registered with `WithService` still wins. Documented on `WithSettings`.
+- **Empty saved settings:** the editor doesn't save defaults the user left untouched, so a step saved as `{}` runs with its settings type's defaults. `StepTypeBase` now lists a dynamic step's outcomes from those defaults too (without validating them, so a fresh step with an unset required field still shows its exits).
+- **Migration:** `UmbracoAutomate_AddStepRunBranchOutcome` adds a nullable, unbounded `BranchOutcome` column to `umbracoAutomateStepRun` for SQL Server and SQLite. `StepRun.BranchOutcome` was set by If/Switch before but never saved; this fixes that too. Applied to an existing SQLite demo DB and to a fresh SQL Server 2022 container. Existing rows read back null. The migration IDs (`20261005102711` SQL Server, `20261005102714` SQLite) must match the v17 port, or a site upgrading from 17 to 18 runs the migration twice.
+- **New public API (additive):** `StepOutcome`, outcome members on `IStepType` (default interface members) and `StepTypeBase`, `SettingsResolutionException`, `string.ContainsBinding()`, `AutomationAuthorizationResult.IsNotFound`, `ToFailedActionResult()` and an `AuthorizeContentAsync(Guid, IReadOnlyList<string>, …)` overload (both in `Umbraco.Automate.Extensions.AutomationAuthorizationResultExtensions`), and harness `GetOutcomesAsync` / `ExecuteWithOutcomeAsync` / `RoutedActionResult`. `CatalogueMapDefinition`'s parameterless constructor is kept but `[Obsolete]`.
 - **Security fix along the way:** settings-resolution error messages could include a resolved configuration value; they now name the key only. This also covers step run errors and publish validation, which already showed these messages.
-- **Consumers:** Umbraco.AI.Automate must raise its Automate minimum to the release that ships this before it overrides the outcome members (plan task T23). The v17 port is in progress on a separate branch.
+- **Consumers:** Umbraco.AI.Automate must raise its Automate minimum to the release that ships this before it overrides the outcome members (plan task T23). The v17 port is #449.
 - **Not in this PR:** If, Switch and Request Approval still use their hard-coded handles (they now record the exit taken, though). `resolveOutputSchema` still resolves a 500 silently; fixing it adds toasts to the binding picker, so it's a follow-up.
 
 ## Change outline
@@ -28,7 +29,7 @@ An action describes its exits through the step type, the same way it already des
 +  HasDynamicOutcomes                    => false
 +  GetOutcomesAsync(savedSettings)       => GetOutcomes()
 
-+record StepOutcome(string Key, string Label) { bool IsDefault }   // label may be "#term"
++record StepOutcome(string Key, string Label) { bool IsDefault; string? Description }   // label/description may be "#term"
 ```
 
 At run time the engine still routes with WorkflowCore's `ValueOutcome`; the step body only maps "no outcome" to the default and checks the declaration.
@@ -40,6 +41,7 @@ At run time the engine still routes with WorkflowCore's `ValueOutcome`; the step
 +    static → GetOutcomes(); dynamic → GetOutcomesAsync(saved, unbound settings)
 +    invalid declaration / no outcome + no default / list throws → terminal Validation failure
 +    no outcome + default → default key; undeclared key → route + run-log warning
++    bounded by the step timeout; a step resumed after a sleep takes its default exit
 +  stepRun.BranchOutcome = routedKey                                 // now persisted
    return ExecutionResult.Outcome(routedKey)                         // WorkflowCore picks the lines
 ```
