@@ -1,6 +1,8 @@
 import { css, html, customElement, nothing, property, repeat, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UMB_VALIDATION_EMPTY_LOCALIZATION_KEY } from "@umbraco-cms/backoffice/validation";
+import { UaRequiredFieldValidator } from "./required-field.validator.js";
 import type { UmbPropertyValueData, UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
 import type { EditableModelFieldDescriptorModel } from "../../../api/types.gen.js";
 import type { BindingSource } from "../../utils/binding-context.utils.js";
@@ -63,6 +65,17 @@ export class UaSettingsFormElement extends UmbLitElement {
      */
     #lastEmittedSettings: Record<string, unknown> | null = null;
 
+    /**
+     * One validator per visible required field, keyed by field. The `mandatory` flag on
+     * `umb-property` only reaches editors that implement it, and the Document Type, Media Type
+     * and Media pickers don't, so without these an empty required pick passes the dialog's
+     * validation. For editors that do honour `mandatory` the validator reports the same state.
+     * Empty means undefined, null or "" (an emptied picker emits undefined; "" is the stored
+     * default); an empty list is valid,
+     * as it is on the server.
+     */
+    #requiredValidators = new Map<string, UaRequiredFieldValidator>();
+
     override shouldUpdate(changedProperties: Map<string, unknown>): boolean {
         if (this.#isInitialized && changedProperties.size === 1 && changedProperties.has("values")) {
             if (this.#isEchoUpdate(this.values)) {
@@ -100,6 +113,29 @@ export class UaSettingsFormElement extends UmbLitElement {
         if (!this.#isInitialized && this.fields.length > 0) {
             this.#populatePropertyValues();
             this.#isInitialized = true;
+        }
+
+        this.#syncRequiredValidators();
+    }
+
+    #syncRequiredValidators() {
+        // Hidden fields are not rendered, so (like the editors' own mandatory validation) they
+        // are not required while hidden. Destroying a validator also clears its message.
+        const required = new Set(this.fields.filter((f) => f.isRequired && this.#isVisible(f)).map((f) => f.key));
+
+        for (const [key, validator] of this.#requiredValidators) {
+            if (required.has(key)) continue;
+            validator.destroy();
+            this.#requiredValidators.delete(key);
+        }
+
+        for (const key of required) {
+            let validator = this.#requiredValidators.get(key);
+            if (!validator) {
+                validator = new UaRequiredFieldValidator(this, `$.${key}`);
+                this.#requiredValidators.set(key, validator);
+            }
+            validator.value = this._currentValues[key];
         }
     }
 
@@ -246,7 +282,7 @@ export class UaSettingsFormElement extends UmbLitElement {
                 .validation=${{
                 mandatory: field.isRequired,
                 mandatoryMessage: field.isRequired
-                    ? this.localize.string("This field is required")
+                    ? UMB_VALIDATION_EMPTY_LOCALIZATION_KEY
                     : undefined,
             }}
             >

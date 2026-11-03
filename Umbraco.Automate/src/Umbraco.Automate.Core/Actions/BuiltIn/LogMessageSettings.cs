@@ -32,7 +32,7 @@ public sealed class LogMessageSettings
         Label = "Log Level",
         Description = "The severity level used when writing the message to the log.",
         SortOrder = 1,
-        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown.Single",
         EditorConfig = """[{ "alias": "items", "value": ["Debug", "Information", "Warning", "Error"] }]""")]
     public string LogLevel { get; set; } = "Information";
 }

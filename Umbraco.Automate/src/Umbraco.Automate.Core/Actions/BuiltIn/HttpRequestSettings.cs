@@ -27,7 +27,7 @@ public sealed class HttpRequestSettings
         Label = "Body type",
         Description = "Raw sends the body text as-is (JSON, XML, ...). Form fields builds an application/x-www-form-urlencoded body and sets the Content-Type for you.",
         SortOrder = 2,
-        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown.Single",
         EditorConfig = """[{ "alias": "items", "value": ["Raw", "Form"] }]""")]
     public HttpRequestBodyMode BodyMode { get; set; } = HttpRequestBodyMode.Raw;
 

@@ -3,7 +3,12 @@ import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { UMB_AUTH_CONTEXT } from "@umbraco-cms/backoffice/auth";
 import { UMB_SERVER_CONTEXT } from "@umbraco-cms/backoffice/server";
 import { UMB_NOTIFICATION_CONTEXT, type UmbNotificationContext, type UmbNotificationColor } from "@umbraco-cms/backoffice/notification";
-import { HubConnectionBuilder, type HubConnection } from "@umbraco-cms/backoffice/external/signalr";
+import {
+    HttpTransportType,
+    HubConnectionBuilder,
+    type HubConnection,
+    type IHttpConnectionOptions,
+} from "@umbraco-cms/backoffice/external/signalr";
 import { EditorNotificationSeverity, type EditorNotificationMessage } from "./editor-notification.types.js";
 
 const HUB_PATH = "/umbraco/automate/hubs/editor-notification";
@@ -57,10 +62,16 @@ export class UaEditorNotificationListener extends UmbControllerBase {
         const serverUrl = this.#serverContext?.getServerUrl();
         if (!serverUrl) return;
 
+        // The backoffice authenticates with its cookie, so no access token is sent. Behind a proxy
+        // that can't negotiate, the server config asks for WebSockets only, as Umbraco's own hub does.
+        const hubOptions: IHttpConnectionOptions = {};
+        if (this.#serverContext?.getServerConnection()?.getSignalRSkipNegotiation()) {
+            hubOptions.skipNegotiation = true;
+            hubOptions.transport = HttpTransportType.WebSockets;
+        }
+
         this.#connection = new HubConnectionBuilder()
-            // Cookie auth is used for same-origin SignalR connections — the redacted
-            // token mirrors the pattern used by Umbraco's own server event hub.
-            .withUrl(`${serverUrl}${HUB_PATH}`, { accessTokenFactory: () => "[redacted]" })
+            .withUrl(`${serverUrl}${HUB_PATH}`, hubOptions)
             .withAutomaticReconnect()
             .build();
 

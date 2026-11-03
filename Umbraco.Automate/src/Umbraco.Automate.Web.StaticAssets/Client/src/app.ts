@@ -18,11 +18,10 @@ export const onInit: UmbEntryPointOnInit = (_host, _extensionRegistry) => {
     _host.consumeContext(UMB_AUTH_CONTEXT, (authContext) => {
         if (!authContext) return;
 
-        // Delegates to the auth context, which sets baseUrl, credentials, and a
-        // per-request auth callback (inline refresh + cross-tab Web Lock
-        // coordination), and binds the default response interceptors (401 retry,
-        // 403 handling, error normalization, server notifications). Replaces the
-        // deprecated getOpenApiConfiguration()/setConfig() path.
+        // Delegates to the auth context, which sets baseUrl and credentials (cookie auth,
+        // no bearer token since Umbraco 19) and binds the default response interceptors
+        // (401 retry, 403 handling, error normalization, server notifications). Replaces
+        // the deprecated getOpenApiConfiguration()/setConfig() path.
         authContext.configureClient(client);
 
         if (coreClientReadyResolve) {
