@@ -304,7 +304,7 @@ export class AutomateUiHelper {
    * (Delay, Run Script, Request Approval, If, While, Parallel) unless the spec fills them in.
    */
   async submitNodeSettings() {
-    await this.nodeSettingsModal.waitFor({ state: 'visible' });
+    await this.waitForNodeSettingsForm();
     await this.clickInModal(this.nodeSettingsModal.getByRole('button', { name: 'Save', exact: true }));
     await this.nodeSettingsModal.waitFor({ state: 'detached' });
   }
@@ -635,7 +635,15 @@ export class AutomateUiHelper {
    * stayed open because a field failed validation. `submitNodeSettings` is the one that waits
    * for it to close. */
   async attemptSaveNodeSettings() {
+    await this.waitForNodeSettingsForm();
     await this.clickInModal(this.nodeSettingsModal.locator('[slot="actions"] uui-button[look="primary"]'));
+  }
+
+  /* The step settings hold back their form, and keep Save disabled, until the binding sources
+   * have loaded. Save is force-clicked, so it has to wait for the form or the click is lost. */
+  async waitForNodeSettingsForm() {
+    await this.nodeSettingsModal.waitFor({ state: 'visible' });
+    await this.nodeSettingsModal.locator('ua-settings-form').waitFor({ state: 'attached' });
   }
 
   /* Closes the step settings without saving, as the modal's Close button does. */
