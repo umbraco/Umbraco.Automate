@@ -67,12 +67,12 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             "Content authorisation denied for service account {UserKey} on node {ContentKey} (permissions [{Permissions}]): {Status}",
             user.Key, contentKey, string.Join(", ", permissions), status);
 
-        var reason = MapContentReason(ContentAuthorizationStatus.NotFound, contentKey, permissions);
         return status == ContentAuthorizationStatus.NotFound
             || IsHiddenInRecycleBin(status == ContentAuthorizationStatus.UnauthorizedMissingPathAccess, UmbracoObjectTypes.Document, contentKey, UmbracoConstants.System.RecycleBinContentPathPrefix)
-            ? AutomationAuthorizationResult.NotFound(reason)
+            ? AutomationAuthorizationResult.NotFound(MapContentReason(ContentAuthorizationStatus.NotFound, contentKey, permissions))
             : AutomationAuthorizationResult.Fail(MapContentReason(status, contentKey, permissions));
     }
+
     /// <inheritdoc />
     public Task<AutomationAuthorizationResult> AuthorizeMediaAsync(
         Guid mediaKey,
