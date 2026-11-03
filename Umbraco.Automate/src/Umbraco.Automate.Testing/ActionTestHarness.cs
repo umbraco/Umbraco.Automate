@@ -50,7 +50,9 @@ public sealed class ActionTestHarness<TAction> where TAction : class, IAction
     /// <remarks>
     /// When no <see cref="IEditableModelResolver"/> is registered with <see cref="WithService{TService}"/>, the
     /// harness's default resolver returns these settings for non-null data (previously it always returned null),
-    /// so action code that resolves settings or injects the resolver now sees the configured settings.
+    /// so action code that resolves settings or injects the resolver now sees the configured settings. With no
+    /// settings given, it returns a new instance of the requested settings type, as the real resolver does
+    /// for a step saved with empty settings.
     /// </remarks>
     public ActionTestHarness<TAction> WithSettings<TSettings>(TSettings settings) where TSettings : class
     {
@@ -168,8 +170,8 @@ public sealed class ActionTestHarness<TAction> where TAction : class, IAction
     /// <remarks>
     /// Unless an <see cref="IEditableModelResolver"/> was registered with <see cref="WithService{TService}"/>,
     /// the settings given to <see cref="WithSettings{TSettings}"/> are handed to the action as its typed
-    /// settings. When no settings were given, a dynamic action sees null settings, exactly as at run time
-    /// for a step with empty saved settings. Settings that serialise to an empty object are treated the same way.
+    /// settings. When no settings were given, a dynamic action sees a new instance of its settings type
+    /// (its defaults), as at run time for a step saved with empty settings.
     /// </remarks>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The declared outcomes in declaration order, or an empty list when none are declared.</returns>
@@ -214,17 +216,18 @@ public sealed class ActionTestHarness<TAction> where TAction : class, IAction
     }
 
     // Saved settings look like a camelCase JSON object; the step type only resolves them when non-empty.
-    private Dictionary<string, object?>? ToSavedSettings()
+    // A run always has a settings dictionary, empty when nothing was saved, so this never returns null.
+    private Dictionary<string, object?> ToSavedSettings()
     {
         if (_settings is null)
         {
-            return null;
+            return [];
         }
 
         var element = JsonSerializer.SerializeToElement(_settings, JsonSerializerOptions.Web);
         return element.ValueKind == JsonValueKind.Object
             ? element.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone())
-            : null;
+            : [];
     }
 
     /// <summary>
@@ -236,12 +239,25 @@ public sealed class ActionTestHarness<TAction> where TAction : class, IAction
     /// </summary>
     internal sealed class HarnessModelResolver(Func<object?> getSettings) : IEditableModelResolver
     {
+        // With no settings given, resolve to the model's defaults, as the real resolver does for {}.
         public TModel? ResolveModel<TModel>(string modelId, object? data, EditableModelSchema? schema = null)
             where TModel : class, new()
-            => data is null ? null : getSettings() as TModel;
+            => data is null ? null : getSettings() as TModel ?? new TModel();
 
         public object? ResolveModel(string modelId, Type modelType, object? data, EditableModelSchema? schema = null)
-            => data is not null && getSettings() is { } settings && modelType.IsInstanceOfType(settings) ? settings : null;
+        {
+            if (data is null)
+            {
+                return null;
+            }
+
+            if (getSettings() is { } settings && modelType.IsInstanceOfType(settings))
+            {
+                return settings;
+            }
+
+            return modelType.GetConstructor(Type.EmptyTypes) is not null ? Activator.CreateInstance(modelType) : null;
+        }
     }
 
     private async Task<ActionResult> ExecuteActionAsync(TAction action, CancellationToken cancellationToken)

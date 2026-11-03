@@ -64,6 +64,23 @@ public class ActionTestHarnessOutcomeTests
         (execution.BranchOutcome, execution.UndeclaredOutcomeWarning).ShouldBe(("b", null));
     }
 
+    [Fact]
+    public async Task Outcomes_DynamicActionWithNoSettings_AreResolvedFromTheSettingsDefaults()
+    {
+        // A step saved as {} runs with its settings type's defaults, so its exits come from them too.
+        var outcomes = await ActionTestHarness.For<DefaultedDynamicAction>().GetOutcomesAsync();
+
+        outcomes.Select(o => o.Key).ShouldBe(["yes", "no"]);
+    }
+
+    [Fact]
+    public async Task EffectiveBranchOutcome_DynamicActionWithNoSettings_IsDeclared()
+    {
+        var execution = await ActionTestHarness.For<DefaultedDynamicAction>().ExecuteWithOutcomeAsync();
+
+        (execution.BranchOutcome, execution.UndeclaredOutcomeWarning).ShouldBe(("yes", null));
+    }
+
     #endregion
 
     [Fact]
@@ -139,6 +156,29 @@ public class ActionTestHarnessOutcomeTests
 
         public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
             => Task.FromResult(context.GetSettings<DynamicSettings>().Returns is { } r ? SuccessWithOutcome(r) : Success());
+    }
+
+    public class DefaultedSettings
+    {
+        public string Cases { get; set; } = "yes,no";
+    }
+
+    /// <summary>Lists its cases as outcomes and returns the first; the cases come from a settings default.</summary>
+    [Action("test.defaulted", "Defaulted Dynamic Action")]
+    private class DefaultedDynamicAction(ActionInfrastructure infrastructure) : ActionBase<DefaultedSettings>(infrastructure)
+    {
+        public override bool HasDynamicOutcomes => true;
+
+        protected override Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(
+            DefaultedSettings? settings,
+            CancellationToken cancellationToken = default)
+        {
+            var cases = (settings?.Cases ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries);
+            return Task.FromResult<IReadOnlyList<StepOutcome>>(cases.Select(c => new StepOutcome(c, c)).ToList());
+        }
+
+        public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
+            => Task.FromResult(SuccessWithOutcome(context.GetSettings<DefaultedSettings>().Cases.Split(',')[0]));
     }
 
     #endregion
