@@ -82,7 +82,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Resume path: workflow is resuming after Sleep with persisted data.
         if (context.PersistenceData is SleepPersistenceData sleepData)
         {
-            return await HandleSleepResumeAsync(sleepData, data, cancellationToken);
+            return await HandleSleepResumeAsync(sleepData, context, cancellationToken);
         }
 
         // Resume path: workflow is resuming after WaitForEvent with the event data.
@@ -203,7 +203,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         var routedOutcome = result.Outcome;
         if (result.Status == ActionResultStatus.Success && result.Suspension is null)
         {
-            var routing = await ResolveOutcomeRoutingAsync(result.Outcome, cancellationToken);
+            var routing = await ResolveOutcomeRoutingAsync(result.Outcome, cancellationToken, stepCancellationToken);
             if (routing.FailureMessage is not null)
             {
                 result = ActionResult.Failed(new ValidationException(routing.FailureMessage), StepRunErrorCategory.Validation);
@@ -324,9 +324,28 @@ internal sealed class ActionStepBody : StepBodyAsync
     /// settings (never the binding-resolved settings the action ran with) so run time agrees with
     /// what the author published. The rule itself lives in <see cref="StepOutcomeRouter"/>.
     /// </summary>
-    private async Task<StepOutcomeRouting> ResolveOutcomeRoutingAsync(string? returnedOutcome, CancellationToken cancellationToken)
+    /// <param name="returnedOutcome">The outcome the action returned, or <c>null</c> for none.</param>
+    /// <param name="cancellationToken">The workflow host's token. Its cancellation is a real cancellation and escapes.</param>
+    /// <param name="stepCancellationToken">
+    /// The step's timeout-linked token, so a step type whose outcome list hangs is bounded by the
+    /// step timeout like the action itself. Running out of time is reported as a routing failure.
+    /// </param>
+    private async Task<StepOutcomeRouting> ResolveOutcomeRoutingAsync(
+        string? returnedOutcome,
+        CancellationToken cancellationToken,
+        CancellationToken stepCancellationToken)
     {
-        var routing = await StepOutcomeRouter.ResolveAsync(_action, _stepConfig.Settings, returnedOutcome, cancellationToken);
+        StepOutcomeRouting routing;
+        try
+        {
+            routing = await StepOutcomeRouter.ResolveAsync(_action, _stepConfig.Settings, returnedOutcome, stepCancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            routing = StepOutcomeRouting.Failure(
+                $"Action '{_action.Alias}' could not list its outcomes before the step timed out.", ex);
+        }
+
         if (routing.Exception is not null)
         {
             _logger.LogError(routing.Exception, "Action '{ActionAlias}' could not list its outcomes for step {StepId}", _action.Alias, _stepConfig.Id);
@@ -677,7 +696,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
     private async Task<ExecutionResult> HandleSleepResumeAsync(
         SleepPersistenceData sleepData,
-        AutomationWorkflowData data,
+        IStepExecutionContext context,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Step {StepId} resumed after sleep", sleepData.StepId);
@@ -691,7 +710,13 @@ internal sealed class ActionStepBody : StepBodyAsync
             return ExecutionResult.Next();
         }
 
-        stepRun.Status = StepRunStatus.Completed;
+        // A sleeping action can't name an outcome, so it finishes on its default exit, the same as
+        // an action that succeeds without naming one. Without this, an action that declares outcomes
+        // would resume with no outcome and none of its named lines would run.
+        using var routingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        routingCts.CancelAfter(_executionOptions.Value.DefaultTimeout);
+        var routing = await ResolveOutcomeRoutingAsync(returnedOutcome: null, cancellationToken, routingCts.Token);
+
         stepRun.CompletedUtc = DateTime.UtcNow;
         stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
 
@@ -700,10 +725,23 @@ internal sealed class ActionStepBody : StepBodyAsync
             _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
         }
 
+        if (routing.FailureMessage is not null)
+        {
+            stepRun.Status = StepRunStatus.Failed;
+            stepRun.Error = routing.FailureMessage;
+            stepRun.ErrorCategory = StepRunErrorCategory.Validation;
+            _metrics.StepFailed(_action.Alias);
+            await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
+
+            throw SelectFailureToThrow(new ValidationException(routing.FailureMessage), StepRunErrorCategory.Validation, context);
+        }
+
+        stepRun.Status = StepRunStatus.Completed;
+        stepRun.BranchOutcome = routing.Outcome;
         _metrics.StepExecuted(_action.Alias);
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
-        return ExecutionResult.Next();
+        return routing.Outcome is null ? ExecutionResult.Next() : ExecutionResult.Outcome(routing.Outcome);
     }
 
     private void StoreOutputData(
