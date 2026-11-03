@@ -37,45 +37,15 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             return null;
         }
 
-        // If already the correct type, clone via JSON round-trip to avoid mutating the original object.
-        if (modelType.IsInstanceOfType(data))
+        if (modelType.IsInstanceOfType(data) || data is JsonElement)
         {
-            var json = JsonSerializer.Serialize(data, JsonOptions.Settings);
-            var deserialized = JsonSerializer.Deserialize(json, modelType, JsonOptions.Settings);
-            if (deserialized is not null)
-            {
-                ResolveConfigurationVariablesInObject(deserialized);
-                ValidateModel(modelId, deserialized, schema);
-            }
-
-            return deserialized;
+            return ResolveDeserializedModel(modelId, DeserializeModel(modelType, data), schema);
         }
 
-        // Handle JsonElement deserialization.
-        if (data is JsonElement jsonElement)
-        {
-            var deserialized = jsonElement.Deserialize(modelType, JsonOptions.Settings);
-            if (deserialized is not null)
-            {
-                ResolveConfigurationVariablesInObject(deserialized);
-                ValidateModel(modelId, deserialized, schema);
-            }
-
-            return deserialized;
-        }
-
-        // Try to serialize/deserialize through JSON as fallback.
+        // Anything else goes through JSON as a fallback, with failures reported against the model.
         try
         {
-            var json = JsonSerializer.Serialize(data, JsonOptions.Settings);
-            var deserialized = JsonSerializer.Deserialize(json, modelType, JsonOptions.Settings);
-            if (deserialized is not null)
-            {
-                ResolveConfigurationVariablesInObject(deserialized);
-                ValidateModel(modelId, deserialized, schema);
-            }
-
-            return deserialized;
+            return ResolveDeserializedModel(modelId, DeserializeModel(modelType, data), schema);
         }
         catch (Exception ex)
         {
@@ -83,6 +53,30 @@ internal sealed class EditableModelResolver : IEditableModelResolver
                 BuildResolveFailureMessage(modelId, modelType, ex),
                 ex);
         }
+    }
+
+    /// <summary>
+    /// Deserializes stored settings data into a new <paramref name="modelType"/> instance, without
+    /// substituting configuration references or validating. An instance of the model type is cloned
+    /// through a JSON round-trip so the original is never mutated.
+    /// </summary>
+    internal static object? DeserializeModel(Type modelType, object? data) => data switch
+    {
+        null => null,
+        JsonElement jsonElement => jsonElement.Deserialize(modelType, JsonOptions.Settings),
+        _ => JsonSerializer.Deserialize(JsonSerializer.Serialize(data, JsonOptions.Settings), modelType, JsonOptions.Settings),
+    };
+
+    private object? ResolveDeserializedModel(string modelId, object? model, EditableModelSchema? schema)
+    {
+        if (model is null)
+        {
+            return null;
+        }
+
+        ResolveConfigurationVariablesInObject(model);
+        ValidateModel(modelId, model, schema);
+        return model;
     }
 
     /// <summary>
@@ -198,6 +192,31 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             return;
         }
 
+        var validationErrors = GetValidationErrors(model, schema);
+        if (validationErrors.Count > 0)
+        {
+            var errorMessage = $"Validation failed for model '{modelId}':\n" +
+                               string.Join("\n", validationErrors);
+            throw new InvalidOperationException(errorMessage);
+        }
+    }
+
+    /// <summary>
+    /// Collects the messages of the schema's validation rules that <paramref name="model"/> breaks.
+    /// Fields hidden by their controlling field are skipped.
+    /// </summary>
+    /// <param name="model">The deserialized model.</param>
+    /// <param name="schema">The schema whose field rules are checked.</param>
+    /// <param name="isResolvedLater">
+    /// Optional. Returns <c>true</c> for a field value that only takes its final form later (a
+    /// <c>${ binding }</c> or a configuration reference); that field's rules are then skipped and
+    /// the value counts as provided.
+    /// </param>
+    internal static List<string> GetValidationErrors(
+        object model,
+        EditableModelSchema schema,
+        Func<object?, bool>? isResolvedLater = null)
+    {
         var modelType = model.GetType();
         var validationErrors = new List<string>();
 
@@ -222,6 +241,10 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             }
 
             var value = property.GetValue(model);
+            if (isResolvedLater?.Invoke(value) == true)
+            {
+                continue;
+            }
 
             foreach (var validationRule in field.ValidationRules)
             {
@@ -239,11 +262,6 @@ internal sealed class EditableModelResolver : IEditableModelResolver
             }
         }
 
-        if (validationErrors.Count > 0)
-        {
-            var errorMessage = $"Validation failed for model '{modelId}':\n" +
-                               string.Join("\n", validationErrors);
-            throw new InvalidOperationException(errorMessage);
-        }
+        return validationErrors;
     }
 }

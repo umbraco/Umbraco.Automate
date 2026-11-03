@@ -51,6 +51,7 @@ internal sealed class AutomationService : IAutomationService
     private readonly ControlFlowCollection _controlFlows;
     private readonly ISensitiveSettingsStripper _sensitiveStripper;
     private readonly ISectionAccessChecker _sectionAccessChecker;
+    private readonly IConfigurationReferenceResolver _configurationReferenceResolver;
 
     public AutomationService(
         IAutomationRepository automationRepository,
@@ -65,7 +66,8 @@ internal sealed class AutomationService : IAutomationService
         TriggerCollection triggers,
         ControlFlowCollection controlFlows,
         ISensitiveSettingsStripper sensitiveStripper,
-        ISectionAccessChecker sectionAccessChecker)
+        ISectionAccessChecker sectionAccessChecker,
+        IConfigurationReferenceResolver configurationReferenceResolver)
     {
         _automationRepository = automationRepository;
         _runRepository = runRepository;
@@ -80,6 +82,7 @@ internal sealed class AutomationService : IAutomationService
         _controlFlows = controlFlows;
         _sensitiveStripper = sensitiveStripper;
         _sectionAccessChecker = sectionAccessChecker;
+        _configurationReferenceResolver = configurationReferenceResolver;
     }
 
     public Task<Automation?> GetAutomationAsync(Guid id, CancellationToken cancellationToken = default)
@@ -396,10 +399,16 @@ internal sealed class AutomationService : IAutomationService
     }
 
     /// <summary>
-    /// Collects a message for every step whose action opts into <see cref="IPublishValidatableStepType"/>
-    /// (e.g. the Start Automation action requiring a target) and reports settings that are not
-    /// ready to publish.
+    /// Collects a message for every step (action or control flow) whose settings break their
+    /// settings type's rules, such as a required field left empty, and for every step whose action
+    /// opts into <see cref="IPublishValidatableStepType"/> (e.g. the Start Automation action
+    /// requiring a target) and reports settings that are not ready to publish.
     /// </summary>
+    /// <remarks>
+    /// Draft saves skip the settings-type rules on purpose: a draft may be incomplete, as the flow
+    /// editor allows while a step is being configured. Publish is the last point to catch them
+    /// before every run of the automation fails on the step.
+    /// </remarks>
     private async Task AddStepPublishSettingsErrorsAsync(
         Automation automation,
         List<string> errors,
@@ -407,7 +416,21 @@ internal sealed class AutomationService : IAutomationService
     {
         foreach (var step in automation.Steps)
         {
-            if (_actions.GetByAlias(step.ActionAlias) is not IPublishValidatableStepType validatable)
+            var stepType = (IStepType?)_actions.GetByAlias(step.ActionAlias) ?? _controlFlows.GetByAlias(step.ActionAlias);
+            if (stepType is null)
+            {
+                continue;
+            }
+
+            var settingsErrors = GetStepSettingsErrors(stepType, step);
+            if (settingsErrors.Count > 0)
+            {
+                var label = string.IsNullOrEmpty(step.Alias) ? $"Step '{step.Name}'" : $"Step '{step.Name}' ({step.Alias})";
+                errors.AddRange(settingsErrors.Select(error => $"{label}: {error}"));
+                continue;
+            }
+
+            if (stepType is not IPublishValidatableStepType validatable)
             {
                 continue;
             }
@@ -415,7 +438,7 @@ internal sealed class AutomationService : IAutomationService
             object? resolved;
             try
             {
-                resolved = ((IStepType)validatable).ResolveSettings(step.Settings);
+                resolved = stepType.ResolveSettings(step.Settings);
             }
             catch (Exception ex)
             {
@@ -429,6 +452,40 @@ internal sealed class AutomationService : IAutomationService
             }
         }
     }
+
+    /// <summary>
+    /// Checks a step's saved settings against its settings type's schema with the same
+    /// deserialization and rules the runtime applies when it resolves them
+    /// (<see cref="EditableModelResolver"/>), so the two cannot drift. A value holding a
+    /// <c>${ binding }</c> or a configuration reference counts as provided and its rules are left to
+    /// the run: neither has its final value until then, and a referenced configuration key may only
+    /// be set on the environment the automation runs on.
+    /// </summary>
+    private List<string> GetStepSettingsErrors(IStepType stepType, StepConfiguration step)
+    {
+        if (stepType.SettingsType is not { } settingsType || stepType.GetSettingsSchema() is not { } schema)
+        {
+            return [];
+        }
+
+        object? settings;
+        try
+        {
+            settings = EditableModelResolver.DeserializeModel(settingsType, step.Settings);
+        }
+        catch (Exception ex)
+        {
+            return [$"Invalid settings: {ex.Message}"];
+        }
+
+        return settings is null
+            ? []
+            : EditableModelResolver.GetValidationErrors(settings, schema, IsResolvedAtRunTime);
+    }
+
+    private bool IsResolvedAtRunTime(object? value)
+        => value is string text
+           && (BindingTokenizer.FindBindings(text).Any() || _configurationReferenceResolver.ContainsReference(text));
 
     public async Task<Automation> UnpublishAutomationAsync(Guid id, Guid? userId = null, CancellationToken cancellationToken = default)
     {

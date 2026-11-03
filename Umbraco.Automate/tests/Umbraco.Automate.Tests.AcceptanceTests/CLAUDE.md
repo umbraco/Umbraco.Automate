@@ -200,6 +200,18 @@ fetched from a legacy CDN path that stalls on hosted agents. Keep this at 1.60.0
   icons nested in `uui-button`s. A normal `.click()` silently no-ops and a later wait hangs. Use
   `{ force: true }`. It shows up only in the click-action error log, never in a snapshot.
 
+## API helpers throw on a failed call
+
+Every helper in `lib/helpers` that creates, reads or updates something passes its response to
+`ensureOk()` (`ApiResponse.ts`), which throws with the server's status and message. Do the same in
+any helper you add. A helper that ignores a failed response hides the real error: in #442 a
+rejected `create` showed up one step later as "Unexpected end of JSON input" from `getById`, and
+the spec failed the same way on every CI attempt.
+
+Two deliberate exceptions. `postRunLifecycle` returns the raw response, because a refusal (409)
+is behaviour a spec asserts on. `deleteById` returns it too, so teardown doesn't fail on something
+that is already gone.
+
 ## Connection types come from installed packages
 
 There is no built-in connection type. Whatever provider packages the site has installed is what

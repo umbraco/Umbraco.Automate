@@ -32,6 +32,8 @@ public class UmbracoAutomateDbContext : DbContext
 
     internal DbSet<WorkflowLockEntity> WorkflowLocks { get; set; } = null!;
 
+    internal DbSet<WorkflowNodeHeartbeatEntity> WorkflowNodeHeartbeats { get; set; } = null!;
+
     internal DbSet<EventSubscriptionEntity> EventSubscriptions { get; set; } = null!;
 
     internal DbSet<EventEntity> Events { get; set; } = null!;
@@ -237,6 +239,16 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.OwnerToken).IsRequired();
             entity.Property(e => e.AcquiredUtc).IsRequired();
             entity.Property(e => e.ExpiresUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<WorkflowNodeHeartbeatEntity>(entity =>
+        {
+            entity.ToTable("umbracoAutomateWorkflowNodeHeartbeat");
+            entity.HasKey(e => e.NodeId);
+
+            entity.Property(e => e.NodeId).ValueGeneratedNever();
+            entity.Property(e => e.Beat).IsRequired();
+            entity.Property(e => e.HeartbeatUtc).IsRequired();
         });
 
         modelBuilder.Entity<EventSubscriptionEntity>(entity =>
