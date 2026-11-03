@@ -115,14 +115,18 @@ Pop-Location
 # new entries as majors are released. Floating patterns keep multi-version installs correct:
 #   17 -> 7.*   (stable)
 #   18 -> 8.*-* (the CMS-v18-compatible Clean, e.g. 8.0.0-rc1, is still prerelease)
+#   19 -> none   (no Clean release supports CMS 19 yet; skipped until one ships)
 $cleanVersionMap = @{
     "17" = "7.*"
     "18" = "8.*-*"
+    "19" = $null
 }
 $cleanVersion = $cleanVersionMap["$VersionMajor"]
-Write-Host "Installing Clean starter kit..." -ForegroundColor Green
 Push-Location $DemoSiteDir
-if ($cleanVersion) {
+if ($cleanVersionMap.ContainsKey("$VersionMajor") -and -not $cleanVersion) {
+    Write-Host "Skipping Clean starter kit: no Clean release supports CMS v$VersionMajor yet." -ForegroundColor Yellow
+} elseif ($cleanVersion) {
+    Write-Host "Installing Clean starter kit..." -ForegroundColor Green
     dotnet add package Clean --version $cleanVersion
 } else {
     Write-Host "Warning: No Clean version mapping for v$VersionMajor, using latest stable." -ForegroundColor Yellow

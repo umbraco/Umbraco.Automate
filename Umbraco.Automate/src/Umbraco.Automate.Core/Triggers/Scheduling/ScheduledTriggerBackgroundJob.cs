@@ -33,8 +33,9 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
         IRuntimeState runtimeState,
         IServerRoleAccessor serverRoleAccessor,
         IMainDom mainDom,
+        TimeProvider timeProvider,
         ILogger<ScheduledTriggerBackgroundJob> logger)
-        : base(logger, options.CurrentValue.PollInterval, options.CurrentValue.StartupDelay)
+        : base(logger, options.CurrentValue.PollInterval, options.CurrentValue.StartupDelay, timeProvider)
     {
         _serviceProvider = serviceProvider;
         _options = options;
@@ -44,7 +45,7 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
         _logger = logger;
     }
 
-    public override async Task PerformExecuteAsync(object? state)
+    public override async Task PerformExecuteAsync(CancellationToken cancellationToken)
     {
         if (_runtimeState.Level != RuntimeLevel.Run)
         {
@@ -77,14 +78,14 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
         var stateStore = scope.ServiceProvider.GetRequiredService<IScheduledTriggerStateStore>();
         var dispatcher = scope.ServiceProvider.GetRequiredService<ITriggerDispatcher>();
 
-        var publishedRefs = await automationService.GetPublishedVersionReferencesAsync(CancellationToken.None);
+        var publishedRefs = await automationService.GetPublishedVersionReferencesAsync(cancellationToken);
         var now = DateTime.UtcNow;
 
         foreach (var (automationId, _) in publishedRefs)
         {
             try
             {
-                var automation = await automationService.GetAutomationAsync(automationId, CancellationToken.None);
+                var automation = await automationService.GetAutomationAsync(automationId, cancellationToken);
                 if (automation?.Trigger is null)
                 {
                     continue;
@@ -125,7 +126,7 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
 
                 var timeZone = scheduledTrigger.GetTimeZone(triggerSettings);
 
-                var lastFired = await stateStore.GetLastFiredAsync(automationId, CancellationToken.None);
+                var lastFired = await stateStore.GetLastFiredAsync(automationId, cancellationToken);
                 // For first-fire (lastFired is null), the lookback must span the jitter window
                 // plus a poll's worth of slack so a tick we observed but skipped (because the
                 // jittered dueAt was in the future) is still in scope on the next poll.
@@ -184,8 +185,12 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                     },
                 };
 
-                await dispatcher.DispatchAsync(triggerEvent, CancellationToken.None);
-                await stateStore.SetLastFiredAsync(automationId, now, CancellationToken.None);
+                await dispatcher.DispatchAsync(triggerEvent, cancellationToken);
+                await stateStore.SetLastFiredAsync(automationId, now, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

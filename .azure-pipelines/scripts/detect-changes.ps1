@@ -616,7 +616,7 @@ function Get-ChangedProducts {
     }
     else {
         # For feature branches: compare with merge-base against this version line's dev
-        $versionPrefix = if ($SourceBranch -match '^refs/heads/(v[0-9]+)/') { $Matches[1] } else { 'v18' }
+        $versionPrefix = if ($SourceBranch -match '^refs/heads/(v[0-9]+)/') { $Matches[1] } else { 'v19' }
         Write-Host "  Feature branch detected, comparing against $versionPrefix/dev" -ForegroundColor Cyan
 
         $mergeBase = git merge-base "origin/$versionPrefix/dev" HEAD 2>&1

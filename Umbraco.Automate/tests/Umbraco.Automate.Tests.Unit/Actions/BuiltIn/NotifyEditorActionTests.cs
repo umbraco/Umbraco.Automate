@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
@@ -9,13 +8,11 @@ using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
-using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
-[Collection(Runs.StaticServiceProviderCollection.Name)]
 public class NotifyEditorActionTests
 {
     private const string ContentName = "Secret Quarterly Plan";
@@ -131,37 +128,6 @@ public class NotifyEditorActionTests
         await _action.ExecuteAsync(CreateContext(contentKey), CancellationToken.None);
 
         _notifier.Verify(n => n.NotifyAsync(It.IsAny<EditorNotificationMessage>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task ObsoleteConstructor_ResolvesAuthorizerAndDeniesAccess()
-    {
-        var contentKey = SetupExistingContent();
-        DenyAccess(contentKey);
-        var original = StaticServiceProvider.Instance;
-        try
-        {
-            var services = new ServiceCollection();
-            services.AddSingleton(_authorizer.Object);
-            StaticServiceProvider.Instance = services.BuildServiceProvider();
-
-#pragma warning disable CS0618 // Deliberately exercising the obsolete constructor
-            var legacyAction = new NotifyEditorAction(
-                new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
-                _contentService.Object,
-                _automationService.Object,
-                _notifier.Object,
-                Mock.Of<ILogger<NotifyEditorAction>>());
-#pragma warning restore CS0618
-
-            var result = await legacyAction.ExecuteAsync(CreateContext(contentKey), CancellationToken.None);
-
-            result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
-        }
-        finally
-        {
-            StaticServiceProvider.Instance = original!;
-        }
     }
 
     [Fact]

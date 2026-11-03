@@ -35,8 +35,9 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
         IServerRoleAccessor serverRoleAccessor,
         IMainDom mainDom,
         RunCleanupTracker tracker,
+        TimeProvider timeProvider,
         ILogger<RunCleanupBackgroundJob> logger)
-        : base(logger, CleanupInterval, StartupDelay)
+        : base(logger, CleanupInterval, StartupDelay, timeProvider)
     {
         _serviceProvider = serviceProvider;
         _options = options;
@@ -47,7 +48,7 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
         _logger = logger;
     }
 
-    public override async Task PerformExecuteAsync(object? state)
+    public override async Task PerformExecuteAsync(CancellationToken cancellationToken)
     {
         var policy = _options.CurrentValue;
 
@@ -99,19 +100,19 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
             if (policy.RetentionDays > 0)
             {
                 var threshold = DateTime.UtcNow.AddDays(-policy.RetentionDays);
-                deletedByAge = await repository.DeleteRunsOlderThanAsync(threshold, CancellationToken.None);
+                deletedByAge = await repository.DeleteRunsOlderThanAsync(threshold, cancellationToken);
 
                 // Engine state for finished workflows follows the same retention as run history.
                 // Only complete/terminated instances are purged; runnable and suspended ones (which
                 // stuck-run recovery and resume depend on) are never touched.
                 var purger = scope.ServiceProvider.GetRequiredService<IWorkflowPurger>();
-                await purger.PurgeWorkflows(WorkflowStatus.Complete, threshold, CancellationToken.None);
-                await purger.PurgeWorkflows(WorkflowStatus.Terminated, threshold, CancellationToken.None);
+                await purger.PurgeWorkflows(WorkflowStatus.Complete, threshold, cancellationToken);
+                await purger.PurgeWorkflows(WorkflowStatus.Terminated, threshold, cancellationToken);
             }
 
             if (policy.MaxRunsPerAutomation > 0)
             {
-                deletedByCount = await repository.DeleteExcessRunsAsync(policy.MaxRunsPerAutomation, CancellationToken.None);
+                deletedByCount = await repository.DeleteExcessRunsAsync(policy.MaxRunsPerAutomation, cancellationToken);
             }
 
             var totalDeleted = deletedByAge + deletedByCount;
@@ -128,6 +129,10 @@ internal sealed class RunCleanupBackgroundJob : RecurringHostedServiceBase
             }
 
             _tracker.RecordSuccess();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -309,7 +309,7 @@ stages:
                             case "$file" in
                               *.md|docs/*|.claude/*|.github/*|.githooks/*|assets/*|templates/*|LICENSE|commitlint.config.js|.git-blame-ignore-revs|.prettierrc|.prettierignore|.mcp.json|.worktreeinclude|*/changelog.config.json|*/umbraco-marketplace*.json|scripts/generate-changelog*|scripts/generate-release-manifest*|scripts/list-commit-options.js|scripts/setup-git-hooks*|.azure-pipelines/scripts/validate-changelogs.ps1)
                                 area=none ;;
-                              Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/*|Umbraco.Automate/tests/Directory.*|Umbraco.Automate.OpenIddict/tests/*|Umbraco.Automate.Slack/tests/*)
+                              Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.CmsIntegration/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/*|Umbraco.Automate/tests/Directory.*|Umbraco.Automate.OpenIddict/tests/*|Umbraco.Automate.Slack/tests/*)
                                 area=tests ;;
                               "$acc"/tests/*|"$acc"/lib/*|"$acc"/umbraco.config.ts)
                                 area=specs ;;

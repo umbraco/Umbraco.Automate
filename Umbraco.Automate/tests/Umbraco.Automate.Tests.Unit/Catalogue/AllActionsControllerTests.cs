@@ -98,7 +98,7 @@ public class AllActionsControllerTests
         var definitions = new MapDefinitionCollection(() => [mapDefinition]);
         return new UmbracoMapper(
             definitions,
-            Mock.Of<ICoreScopeProvider>(),
+            new Mock<ICoreScopeProvider> { DefaultValue = DefaultValue.Mock }.Object,
             Mock.Of<ILogger<UmbracoMapper>>());
     }
 

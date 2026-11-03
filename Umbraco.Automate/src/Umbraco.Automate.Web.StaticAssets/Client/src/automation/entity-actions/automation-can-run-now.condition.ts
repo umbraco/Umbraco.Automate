@@ -43,7 +43,13 @@ export class UaEntityAutomationCanRunNowCondition
             this.observe(context?.unique, async (unique) => {
                 this.permitted = await this.#evaluate(unique ?? null);
             }, "uaEntityUnique");
-        });
+        })
+            .asPromise()
+            .catch(() => {
+                // No entity context ever arrived. Since Umbraco 19 a condition that never sets
+                // `permitted` is no longer treated as "not permitted", so say it explicitly.
+                this.permitted = false;
+            });
     }
 
     async #evaluate(unique: string | null): Promise<boolean> {

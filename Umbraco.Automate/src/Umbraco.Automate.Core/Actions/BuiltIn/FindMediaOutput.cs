@@ -7,7 +7,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// </summary>
 public sealed class FindMediaOutput
 {
-    /// <summary>Gets the matching media items, ordered by Examine relevance score.</summary>
+    /// <summary>Gets the matching media items, ordered by relevance score.</summary>
     [Description("The matching media items, ordered by relevance score.")]
     public IReadOnlyList<FindMediaMatch> Matches { get; init; } = [];
 
@@ -24,8 +24,9 @@ public sealed class FindMediaOutput
 
     /// <summary>
     /// Gets a value indicating whether the match count equals the configured <c>Limit</c>.
-    /// True means more matches may exist in the index — tighten the query or raise the limit.
+    /// True means more matches may exist in the index — tighten the query or raise the limit. It is also true when the
+    /// search stopped at its ceiling of examined results (<c>FindByNameSearch.MaxHitsExamined</c>) before reaching the limit.
     /// </summary>
-    [Description("Whether the match count reached the configured limit — true means more matches may exist in the index.")]
+    [Description("Whether the match count reached the configured limit, or the search stopped at its ceiling of 2000 examined results — true means more matches may exist.")]
     public bool LimitReached { get; init; }
 }

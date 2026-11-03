@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
@@ -29,6 +30,7 @@ public sealed class CreateMediaSettings
         SortOrder = 1,
         EditorUiAlias = "Umb.PropertyEditorUi.MediaTypePicker",
         EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""")]
+    [Required]
     public string MediaType { get; set; } = string.Empty;
 
     /// <summary>

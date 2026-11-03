@@ -26,7 +26,7 @@ public sealed class ScheduledTriggerSettings
     /// round-trips cleanly — parsed into <see cref="ScheduleTiming"/> at evaluation time.
     /// </summary>
     [Field(
-        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown.Single",
         EditorConfig = """[{ "alias": "items", "value": ["Flexible", "Precise"] }]""",
         SortOrder = 2)]
     public string Timing { get; set; } = nameof(ScheduleTiming.Flexible);

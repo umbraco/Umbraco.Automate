@@ -24,7 +24,7 @@ public sealed class UserDeletedTriggerSettings : IAutomationOriginatedEventBehav
     [Field(
         Label = "When triggered by another automation",
         Description = "How to handle deletes performed by another automation.",
-        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown.Single",
         EditorConfig = """
             [{ "alias": "items", "value": [
                 { "name": "Always run", "value": "Run" },

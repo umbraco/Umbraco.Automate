@@ -10,13 +10,16 @@ public enum FindContentMatchMode
     /// <summary>Match the whole name exactly (case-insensitive).</summary>
     Exact = 0,
 
-    /// <summary>Match names starting with the value.</summary>
+    /// <summary>
+    /// Match names where every word of the value starts a word of the name, in any order,
+    /// so <c>"home"</c> matches <c>"Homepage"</c> and <c>"The Homepage"</c>.
+    /// </summary>
     StartsWith = 1,
 
     /// <summary>
-    /// Match names containing the value. Note: Examine's default name analyser tokenises
-    /// on whole words, so <c>"bread"</c> will NOT match <c>"breadcrumbs"</c> — this mode
-    /// matches any name containing the whole token.
+    /// Match names containing the value as one run of text. Umbraco Search matches whole words and
+    /// word starts, so <c>"bread"</c> matches <c>"Breadcrumbs"</c> and <c>"Bread Basket"</c> but NOT
+    /// <c>"Sourbread"</c> — a match in the middle of a word is not found.
     /// </summary>
     Contains = 2,
 }
@@ -50,26 +53,26 @@ public sealed class FindContentSettings
     /// </summary>
     [Field(
         Label = "Match mode",
-        Description = "Exact (default) requires the whole name to match. StartsWith and Contains are token-based — Contains does not match substrings within a word.",
+        Description = "Exact (default) requires the whole name to match. StartsWith matches names where every word of the text starts a word of the name. Contains needs the text as one run inside the name, but matches whole words and word starts, not text in the middle of a word.",
         SortOrder = 2,
-        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown.Single",
         EditorConfig = """[{ "alias": "items", "value": ["Exact", "StartsWith", "Contains"] }]""")]
     public string MatchMode { get; set; } = nameof(FindContentMatchMode.Exact);
 
     /// <summary>
     /// Gets or sets the culture (e.g. <c>"en-US"</c>) for matching variant content.
-    /// Leave empty to match invariant names only.
+    /// Leave empty to search the default language. Invariant content is always included.
     /// </summary>
     [Field(
         Label = "Culture",
-        Description = "Culture code (e.g. en-US) for matching variant content names. Leave empty for invariant.",
+        Description = "Culture code (e.g. en-US) for matching variant content names. Leave empty to search the default language. Invariant content is always included.",
         SupportsBindings = true,
         SortOrder = 3)]
     public string? Culture { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to include unpublished (draft) content.
-    /// <c>false</c> (default) searches the ExternalIndex (published). <c>true</c> searches the InternalIndex (all content).
+    /// <c>false</c> (default) searches the published content index. <c>true</c> searches the draft content index (all content except items in the recycle bin).
     /// </summary>
     [Field(
         Label = "Include unpublished",

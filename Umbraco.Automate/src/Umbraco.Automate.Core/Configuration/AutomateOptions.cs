@@ -15,16 +15,6 @@ namespace Umbraco.Automate.Core.Configuration;
 public class AutomateOptions
 {
     /// <summary>
-    /// Gets or sets whether the automation engine is enabled.
-    /// </summary>
-    /// <remarks>
-    /// Never read: setting this has no effect. Control who can work with automations through
-    /// access to the Automate section instead.
-    /// </remarks>
-    [Obsolete("This setting has no effect and is not read. Control access to automations through the Automate section instead. Scheduled for removal in Umbraco Automate 19.")]
-    public bool Enabled { get; set; } = true;
-
-    /// <summary>
     /// Gets or sets the name of the connection string Automate resolves from
     /// <c>ConnectionStrings</c>. Defaults to <c>umbracoAutomateDbDSN</c> so a standard
     /// dedicated configuration just works. Set to <c>umbracoDbDSN</c> to share the
@@ -287,40 +277,6 @@ public enum ExecutionMode
     /// Requires shared persistence and a real message transport.
     /// </summary>
     Distributed,
-}
-
-/// <summary>
-/// Configuration options for governance and audit features.
-/// </summary>
-/// <remarks>
-/// Never bound to configuration: <c>Umbraco:Automate:Governance</c> settings have no effect.
-/// </remarks>
-[Obsolete("Governance settings have no effect and are not read. Scheduled for removal in Umbraco Automate 19.")]
-public sealed class GovernanceOptions
-{
-    /// <summary>
-    /// Gets or sets whether the audit log is enabled.
-    /// </summary>
-    [Obsolete("This setting has no effect. CMS actions always write to the Umbraco audit log, and runs are always recorded. Scheduled for removal in Umbraco Automate 19.")]
-    public bool AuditLogEnabled { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets the number of days to retain audit log data.
-    /// </summary>
-    [Obsolete("This setting has no effect. Use Umbraco:Automate:RunCleanup:RetentionDays (RunCleanupPolicy.RetentionDays) instead. Scheduled for removal in Umbraco Automate 19.")]
-    public int AuditLogRetentionDays { get; set; } = 90;
-
-    /// <summary>
-    /// Gets or sets whether sensitive data is masked in run logs.
-    /// </summary>
-    [Obsolete("This setting has no effect. Sensitive data in run payloads is always masked. Scheduled for removal in Umbraco Automate 19.")]
-    public bool SensitiveDataMasking { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets the default notification policy for new automations.
-    /// </summary>
-    [Obsolete("This setting has no effect. Configure notifications per automation through notification channels instead. Scheduled for removal in Umbraco Automate 19.")]
-    public NotifyOn DefaultNotifyOn { get; set; } = NotifyOn.Failed;
 }
 
 /// <summary>

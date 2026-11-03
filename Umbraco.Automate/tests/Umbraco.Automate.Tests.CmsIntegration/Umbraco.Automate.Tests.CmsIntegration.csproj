@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tests that need a real Umbraco database and services, on Umbraco's own NUnit integration test base.
+       Kept apart from Umbraco.Automate.Tests.Integration, which is xUnit. -->
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Umbraco.Cms.Tests.Integration" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <!-- Umbraco.Code (pulled in by the CMS test packages) asks for Workspaces 5.0.0, while the CMS pins
+         Microsoft.CodeAnalysis.Common and CSharp to 5.9.0. Matching them clears NU1608. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" VersionOverride="5.9.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" VersionOverride="5.9.0" />
+    <!-- Umbraco.Cms.Tests.Integration requires 18.11.0 or later; the shared central version is older. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" VersionOverride="18.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.Tests.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

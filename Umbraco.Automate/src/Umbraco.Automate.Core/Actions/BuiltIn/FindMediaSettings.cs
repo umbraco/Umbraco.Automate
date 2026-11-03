@@ -31,9 +31,9 @@ public sealed class FindMediaSettings
     /// </summary>
     [Field(
         Label = "Match mode",
-        Description = "Exact (default) requires the whole name to match. StartsWith and Contains are token-based — Contains does not match substrings within a word.",
+        Description = "Exact (default) requires the whole name to match. StartsWith matches names where every word of the text starts a word of the name. Contains needs the text as one run inside the name, but matches whole words and word starts, not text in the middle of a word.",
         SortOrder = 2,
-        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown",
+        EditorUiAlias = "Umb.PropertyEditorUi.Dropdown.Single",
         EditorConfig = """[{ "alias": "items", "value": ["Exact", "StartsWith", "Contains"] }]""")]
     public string MatchMode { get; set; } = nameof(FindContentMatchMode.Exact);
 

@@ -31,7 +31,7 @@ Add the OAuth callback URI `{your-site}/umbraco/automate/oauth/callback/slack` t
 
 ### Requirements
 
-- Umbraco CMS 17.4.0+
-- Umbraco.Automate 17.0.0+
-- .NET 10.0
+- Umbraco CMS 19.0.0+
+- Umbraco.Automate 19.0.0+
+- .NET 11.0
 - A Slack app with client ID and secret

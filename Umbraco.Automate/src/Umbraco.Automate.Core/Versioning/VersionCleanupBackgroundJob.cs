@@ -31,8 +31,9 @@ internal sealed class VersionCleanupBackgroundJob : RecurringHostedServiceBase
         IRuntimeState runtimeState,
         IServerRoleAccessor serverRoleAccessor,
         IMainDom mainDom,
+        TimeProvider timeProvider,
         ILogger<VersionCleanupBackgroundJob> logger)
-        : base(logger, CleanupInterval, StartupDelay)
+        : base(logger, CleanupInterval, StartupDelay, timeProvider)
     {
         _serviceProvider = serviceProvider;
         _options = options;
@@ -42,7 +43,7 @@ internal sealed class VersionCleanupBackgroundJob : RecurringHostedServiceBase
         _logger = logger;
     }
 
-    public override async Task PerformExecuteAsync(object? state)
+    public override async Task PerformExecuteAsync(CancellationToken cancellationToken)
     {
         if (!_options.CurrentValue.Enabled)
         {
@@ -80,7 +81,7 @@ internal sealed class VersionCleanupBackgroundJob : RecurringHostedServiceBase
 
         try
         {
-            var result = await versionService.CleanupVersionsAsync(CancellationToken.None);
+            var result = await versionService.CleanupVersionsAsync(cancellationToken);
 
             if (result.WasSkipped)
             {
@@ -98,6 +99,10 @@ internal sealed class VersionCleanupBackgroundJob : RecurringHostedServiceBase
                     "Version cleanup completed. No old versions to delete. {RemainingVersions} remaining",
                     result.RemainingVersions);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

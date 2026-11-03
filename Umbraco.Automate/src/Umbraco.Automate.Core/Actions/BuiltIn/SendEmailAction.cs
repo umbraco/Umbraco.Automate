@@ -43,7 +43,7 @@ public sealed class SendEmailAction : ActionBase<SendEmailSettings, SendEmailOut
                 StepRunErrorCategory.Validation);
         }
 
-        if (!_emailSender.CanSendRequiredEmail())
+        if (!_emailSender.IsEmailConfigured())
         {
             return ActionResult.Failed(
                 new InvalidOperationException("Email sender is not configured. Check SMTP settings."),

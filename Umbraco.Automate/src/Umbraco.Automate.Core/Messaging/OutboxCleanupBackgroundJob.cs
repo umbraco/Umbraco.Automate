@@ -31,8 +31,9 @@ internal sealed class OutboxCleanupBackgroundJob : RecurringHostedServiceBase
         IRuntimeState runtimeState,
         IServerRoleAccessor serverRoleAccessor,
         IMainDom mainDom,
+        TimeProvider timeProvider,
         ILogger<OutboxCleanupBackgroundJob> logger)
-        : base(logger, CleanupInterval, StartupDelay)
+        : base(logger, CleanupInterval, StartupDelay, timeProvider)
     {
         _serviceProvider = serviceProvider;
         _options = options;
@@ -42,7 +43,7 @@ internal sealed class OutboxCleanupBackgroundJob : RecurringHostedServiceBase
         _logger = logger;
     }
 
-    public override async Task PerformExecuteAsync(object? state)
+    public override async Task PerformExecuteAsync(CancellationToken cancellationToken)
     {
         var retention = _options.CurrentValue.CompletedRetention;
 
@@ -82,8 +83,12 @@ internal sealed class OutboxCleanupBackgroundJob : RecurringHostedServiceBase
 
         try
         {
-            await store.CleanupCompletedAsync(retention, CancellationToken.None);
+            await store.CleanupCompletedAsync(retention, cancellationToken);
             _logger.LogDebug("Outbox cleanup completed (retention: {Retention})", retention);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

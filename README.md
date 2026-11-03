@@ -91,7 +91,7 @@ The fastest way to get started is using the install-demo script, which creates a
 This creates:
 
 - `Umbraco.Automate.local.slnx` - Unified solution with all products
-- `demos/v18/Umbraco.Automate.DemoSite/` - Umbraco instance with all packages referenced
+- `demos/v19/Umbraco.Automate.DemoSite/` - Umbraco instance with all packages referenced
 
 The demo site is configured to share the CMS's SQLite database (`Umbraco:Automate:UseNamedConnectionString` is set to `umbracoDbDSN` in `appsettings.Development.json`), so no separate Automate database setup is required.
 
@@ -107,8 +107,8 @@ npm run build
 # Build the unified solution
 dotnet build Umbraco.Automate.local.slnx
 
-# Run the demo site (from demos/v18/Umbraco.Automate.DemoSite/)
-cd demos/v18/Umbraco.Automate.DemoSite
+# Run the demo site (from demos/v19/Umbraco.Automate.DemoSite/)
+cd demos/v19/Umbraco.Automate.DemoSite
 dotnet run
 ```
 
@@ -118,7 +118,7 @@ dotnet run
 
 ### Prerequisites
 
-- .NET 10.0 SDK
+- .NET 11.0 SDK
 - Node.js 22.x
 - Git
 
@@ -179,8 +179,8 @@ Built on [WorkflowCore](https://github.com/danielgerlag/workflow-core) with a pr
 
 ## Target Framework
 
-- .NET 10.0 (`net10.0`)
-- Umbraco CMS 17.x
+- .NET 11.0 (`net11.0`)
+- Umbraco CMS 19.x
 - WorkflowCore 3.9.0
 - Central Package Management via `Directory.Packages.props`
 

@@ -25,7 +25,7 @@ Each product has its own solution file, CLAUDE.md, and can be built independentl
 
 ### Prerequisites
 
-- .NET 10.0 SDK
+- .NET 11.0 SDK
 - Node.js 22.x
 - Git
 
@@ -33,7 +33,7 @@ Each product has its own solution file, CLAUDE.md, and can be built independentl
 
 A demo Umbraco site is available at `demos/vN/Umbraco.Automate.DemoSite/` (N = major from `Umbraco.Cms.Core` version in `Directory.Packages.props`) for manual testing. Use the `/demo-site-management` skill to start/stop it.
 
-- **Path convention:** demo sites live under `demos/vN/` — one directory per CMS major version line (e.g. `demos/v18/`, `demos/v17/`). Never the old top-level `demo/`. The whole `demos/` tree is gitignored and generated per-developer.
+- **Path convention:** demo sites live under `demos/vN/` — one directory per CMS major version line (e.g. `demos/v19/`, `demos/v18/`). Never the old top-level `demo/`. The whole `demos/` tree is gitignored and generated per-developer.
 - **If `demos/vN/` doesn't exist**, generate it with `scripts/install-demo-site.{sh,ps1}` (auto-detects the version from your branch) or run `/repo-setup`. Do not create demo files by hand.
 - One `DemoSite` profile for everyone — each worktree gets its own stable port, assigned once by the `Umbraco.Community.WorktreeDevPort` NuGet package and stored in that worktree's own git config. The main checkout gets the familiar `44380` when free; other worktrees get the next free port from the pool
 - Port lookup: `git config --worktree --get wdp.port 2>/dev/null`
@@ -174,10 +174,10 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 
 ## Target Framework
 
-- .NET 10.0 (`net10.0`)
-- Umbraco CMS 18.x (`[18.0.0-rc2, 18.999.999)`)
+- .NET 11.0 (`net11.0`)
+- Umbraco CMS 19.x (minimum `19.0.0-beta1`, no upper bound; see `Directory.Packages.props`)
 - WorkflowCore 3.9.0
-- EF Core 10.x
+- EF Core 11.x
 - Central Package Management via `Directory.Packages.props`
 
 ## Multi-Version Support

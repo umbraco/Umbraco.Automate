@@ -16,7 +16,7 @@ public class EmailNotificationChannelTests
 
     public EmailNotificationChannelTests()
     {
-        _emailSender.Setup(e => e.CanSendRequiredEmail()).Returns(true);
+        _emailSender.Setup(e => e.IsEmailConfigured()).Returns(true);
 
         var infrastructure = new NotificationChannelInfrastructure(Mock.Of<IEditableModelResolver>());
         _channel = new EmailNotificationChannel(
@@ -124,7 +124,7 @@ public class EmailNotificationChannelTests
     [Fact]
     public async Task NotifyAsync_EmailSenderNotConfigured_DoesNotSend()
     {
-        _emailSender.Setup(e => e.CanSendRequiredEmail()).Returns(false);
+        _emailSender.Setup(e => e.IsEmailConfigured()).Returns(false);
 
         var message = CreateMessage();
         var settings = new EmailNotificationChannelSettings { Recipients = "admin@example.com" };

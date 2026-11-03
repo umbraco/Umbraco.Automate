@@ -121,11 +121,11 @@ export class UmbAutomatePropertyEditorUIOAuthElement
         this.#checkedProvider = provider;
 
         try {
-            const { base, credentials, token } = this.#authContext.getOpenApiConfiguration();
-            const response = await fetch(
-                `${base}/umbraco/automate/oauth/status/${encodeURIComponent(provider)}`,
-                { credentials, headers: { Authorization: `Bearer ${await token()}` } },
-            );
+            // Cookie auth: the backoffice sends no bearer token since Umbraco 19.
+            const { base } = this.#authContext.getOpenApiConfiguration();
+            const response = await fetch(`${base}/umbraco/automate/oauth/status/${encodeURIComponent(provider)}`, {
+                credentials: "include",
+            });
 
             if (!response.ok) {
                 // Allow a retry, and keep any previously-known state rather than resetting to
