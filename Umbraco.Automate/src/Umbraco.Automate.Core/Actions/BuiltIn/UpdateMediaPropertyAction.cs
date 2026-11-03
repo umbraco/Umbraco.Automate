@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.StepTypes;
+using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
