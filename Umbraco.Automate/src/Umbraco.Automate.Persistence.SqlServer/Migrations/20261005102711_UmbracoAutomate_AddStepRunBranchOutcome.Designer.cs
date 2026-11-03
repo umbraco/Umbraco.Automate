@@ -678,6 +678,22 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                     b.ToTable("umbracoAutomateWorkflowLock", (string)null);
                 });
 
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowNodeHeartbeatEntity", b =>
+                {
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Beat")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("HeartbeatUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("NodeId");
+
+                    b.ToTable("umbracoAutomateWorkflowNodeHeartbeat", (string)null);
+                });
+
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>
                 {
                     b.Property<Guid>("WorkspaceId")
