@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Extensions;
 
 namespace Umbraco.Automate.Core.Security;
 
@@ -8,28 +9,6 @@ namespace Umbraco.Automate.Core.Security;
 /// </summary>
 public static class AutomationActionAuthorizerExtensions
 {
-    /// <summary>
-    /// Converts a denied authorisation result into the failed <see cref="ActionResult"/> that
-    /// the <c>*OrFailAsync</c> helpers return: an <see cref="UnauthorizedAccessException"/>
-    /// carrying the failure reason, categorised as <see cref="StepRunErrorCategory.Authentication"/>.
-    /// </summary>
-    public static ActionResult ToFailedActionResult(this AutomationAuthorizationResult result)
-        => ActionResult.Failed(
-            new UnauthorizedAccessException(result.FailureReason),
-            StepRunErrorCategory.Authentication);
-
-    /// <summary>
-    /// Authorises the service account against <paramref name="contentKey"/> for the given
-    /// permission letters, without converting the outcome to an <see cref="ActionResult"/>, so
-    /// the caller can inspect <see cref="AutomationAuthorizationResult.IsNotFound"/>.
-    /// </summary>
-    public static Task<AutomationAuthorizationResult> AuthorizeContentAsync(
-        this IAutomationActionAuthorizer authorizer,
-        Guid contentKey,
-        IReadOnlyList<string> permissions,
-        CancellationToken cancellationToken)
-        => authorizer.AuthorizeContentAsync(contentKey, ToSet(permissions), cancellationToken);
-
     /// <summary>
     /// Authorises the service account against <paramref name="contentKey"/> for the given
     /// permission letters and returns a failed <see cref="ActionResult"/> when access is
@@ -130,7 +109,7 @@ public static class AutomationActionAuthorizerExtensions
             : result.ToFailedActionResult();
     }
 
-    private static IReadOnlySet<string> ToSet(IReadOnlyList<string> permissions)
+    internal static IReadOnlySet<string> ToSet(IReadOnlyList<string> permissions)
         => permissions.Count == 0
             ? EmptyPermissionSet
             : new HashSet<string>(permissions, StringComparer.Ordinal);

@@ -1,6 +1,7 @@
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Extensions;
 
 namespace Umbraco.Automate.Tests.Unit.Security;
 
