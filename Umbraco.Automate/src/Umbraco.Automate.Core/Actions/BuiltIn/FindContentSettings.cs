@@ -61,18 +61,18 @@ public sealed class FindContentSettings
 
     /// <summary>
     /// Gets or sets the culture (e.g. <c>"en-US"</c>) for matching variant content.
-    /// Leave empty to match invariant names only.
+    /// Leave empty to search the default language. Invariant content is always included.
     /// </summary>
     [Field(
         Label = "Culture",
-        Description = "Culture code (e.g. en-US) for matching variant content names. Leave empty for invariant.",
+        Description = "Culture code (e.g. en-US) for matching variant content names. Leave empty to search the default language. Invariant content is always included.",
         SupportsBindings = true,
         SortOrder = 3)]
     public string? Culture { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to include unpublished (draft) content.
-    /// <c>false</c> (default) searches the published content index. <c>true</c> searches the draft content index (all content).
+    /// <c>false</c> (default) searches the published content index. <c>true</c> searches the draft content index (all content except items in the recycle bin).
     /// </summary>
     [Field(
         Label = "Include unpublished",
