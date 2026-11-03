@@ -1,4 +1,4 @@
-// S4 — Outcomes driven by step settings: binding helper (docs/plans/action-outcomes/STORIES.md)
+// S4 — Outcomes driven by step settings: binding helper
 
 using Umbraco.Automate.Extensions;
 

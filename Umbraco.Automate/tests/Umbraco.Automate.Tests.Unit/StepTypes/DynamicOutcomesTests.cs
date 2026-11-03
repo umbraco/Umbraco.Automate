@@ -1,4 +1,4 @@
-// S4 — Outcomes driven by step settings (docs/plans/action-outcomes/STORIES.md)
+// S4 — Outcomes driven by step settings
 //
 // Uses a test-only dynamic action whose settings hold a list of options plus a default "other".
 

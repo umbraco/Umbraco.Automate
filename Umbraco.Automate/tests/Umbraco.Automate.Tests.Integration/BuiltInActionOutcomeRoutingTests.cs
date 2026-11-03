@@ -1,4 +1,4 @@
-// S9 — Content and media actions offer named exits: routing (docs/plans/action-outcomes/STORIES.md)
+// S9 — Content and media actions offer named exits: routing
 //
 // Automation under test: Get Content with "success" → A and "notFound" → B. A real GetContentAction
 // needs the published cache, the Umbraco context, a URL provider and property conversion, none of

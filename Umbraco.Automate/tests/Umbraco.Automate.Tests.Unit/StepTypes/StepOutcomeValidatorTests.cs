@@ -1,4 +1,4 @@
-// S1 — Declare fixed outcomes on an action: declaration rules (docs/plans/action-outcomes/STORIES.md)
+// S1 — Declare fixed outcomes on an action: declaration rules
 
 using Umbraco.Automate.Core.StepTypes;
 

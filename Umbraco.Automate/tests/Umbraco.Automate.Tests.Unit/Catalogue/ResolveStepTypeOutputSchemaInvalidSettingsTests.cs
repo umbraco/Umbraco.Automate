@@ -1,4 +1,4 @@
-// S8 — Invalid settings return a clear error from output schema too (docs/plans/action-outcomes/STORIES.md)
+// S8 — Invalid settings return a clear error from output schema too
 
 using Json.Schema;
 using Json.Schema.Generation;
