@@ -49,6 +49,8 @@ No .NET open-source CMS has a built-in automation engine. Umbraco users currentl
 | JSON/YAML definitions | `WorkflowCore.DSL` for runtime-loaded definitions |
 | Observability | OpenTelemetry built-in |
 
+> **Note:** Compensate is hidden from the backoffice error-behaviour options until compensation steps exist (the compiler does not yet wire `CompensateWith`). The API still accepts it, and steps already saved with Compensate keep their current behaviour.
+
 **Key limitation to mitigate**: WorkflowCore has no visual designer or REST API — we build both. Its polling-based execution model adds latency; we may need to optimize the poll interval or consider a push notification layer for time-sensitive automations.
 
 **Risk**: Single-maintainer project. Mitigation: we depend on the stable 3.x API surface. If maintenance stalls, the library is small enough to fork/vendor. Elsa Workflows exists as a fallback but has a much larger footprint. See Appendix A for the full comparison.

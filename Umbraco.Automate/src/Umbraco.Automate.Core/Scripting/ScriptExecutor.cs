@@ -20,9 +20,9 @@ namespace Umbraco.Automate.Core.Scripting;
 /// </summary>
 /// <remarks>
 /// Ported from the Umbraco Headless Orchestration platform's <c>FunctionExecutor</c>. Termination
-/// is defended in layers: the per-statement <c>TimeoutInterval</c>, the statement/memory/recursion
-/// limits, and a cancellation constraint tied to <see cref="ScriptExecutorOptions.TotalExecutionTimeout"/>
-/// that aborts statement execution when the budget is exceeded. Because all of those are only
+/// is defended in layers: the statement/memory/recursion limits, and a cancellation constraint tied
+/// to <see cref="ScriptExecutorOptions.TotalExecutionTimeout"/> that aborts statement execution when
+/// the budget is exceeded. Because all of those are only
 /// checked when a statement runs, a script parked on a never-resolving promise (which executes no
 /// statements) cannot be force-terminated at our budget — but Jint's own <c>UnwrapIfPromise</c>
 /// promise-settlement timeout (10s) then aborts it, so the worker thread is reclaimed shortly after
@@ -55,7 +55,10 @@ internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, I
             engineOptions.LimitRecursion(options.MaxRecursionDepth);
             engineOptions.MaxArraySize((uint)options.MaxArraySize);
             engineOptions.MaxStatements(options.MaxStatements);
-            engineOptions.TimeoutInterval(options.StatementTimeout);
+
+            // No TimeoutInterval: Jint times the whole call, so an awaited fetch counted against it
+            // and a slow response failed the script. The cancellation constraint below is the time
+            // limit, and MaxStatements stops runaway loops.
             engineOptions.CancellationToken(cts.Token);
 
             engineOptions.Culture = CultureInfo.InvariantCulture;
@@ -143,6 +146,11 @@ internal sealed partial class ScriptExecutor(IHttpClientFactory clientFactory, I
             {
                 // Memory / recursion / statement-count / cancellation-constraint hits.
                 ReportError(ScriptErrorKind.Timeout, jex.Message);
+            }
+            else if (task.Exception?.InnerException is TimeoutException)
+            {
+                // Jint's own time limits: promise settlement in UnwrapIfPromise, or a regex match.
+                ReportError(ScriptErrorKind.Timeout, "Script execution timed out.");
             }
             else if (cts.IsCancellationRequested)
             {

@@ -117,8 +117,9 @@ export class UaAutomationWorkspaceContext
     }
 
     /**
-     * Save & Publish calls submit() before publish(), so hooking submit() here covers both the
-     * plain Save action (CMS-default UmbSubmitWorkspaceAction) and Save & Publish with one check.
+     * Both the plain Save action (CMS-default UmbSubmitWorkspaceAction) and Save & Publish go
+     * through requestSubmit(), which calls submit() once validation passes, so hooking submit()
+     * here covers both with one check.
      */
     override async submit() {
         await this.#warnIfDisconnectedSteps();

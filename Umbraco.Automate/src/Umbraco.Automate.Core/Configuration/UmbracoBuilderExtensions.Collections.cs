@@ -71,6 +71,8 @@ public static partial class UmbracoBuilderExtensions
             builder.Config.GetSection("Umbraco:Automate:CircuitBreaker"));
         builder.Services.Configure<WorkflowLockOptions>(
             builder.Config.GetSection("Umbraco:Automate:WorkflowLock"));
+        builder.Services.AddSingleton<IValidateOptions<WorkflowLockOptions>, WorkflowLockOptionsValidator>();
+        builder.Services.AddOptions<WorkflowLockOptions>().ValidateOnStart();
 
         // Collection builders — triggers, actions, connections, filters auto-discovered
         builder.AutomateTriggers()
@@ -253,6 +255,9 @@ public static partial class UmbracoBuilderExtensions
             cfg.UseDistributedLockManager(sp => sp.GetRequiredService<WorkflowLockProvider>());
             WorkflowEngineSettings.Apply(cfg, executionOptions);
         });
+        // A Retry step that retrying cannot fix (terminal category, exhausted budget) ends the run
+        // through WorkflowCore's own Terminate handler instead of being retried.
+        builder.Services.ReplaceWorkflowRetryHandler();
         // Per-step cooperative cancellation: TerminateWorkflow alone races the executor's
         // workflow lock and silently fails while a run is actively executing. AddMemoryCache
         // is idempotent (TryAdd) — this backs the short-TTL run-status cache the middleware

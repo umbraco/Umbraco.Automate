@@ -732,6 +732,10 @@ export type PostAutomationsErrors = {
      * The authenticated user does not have access to this resource
      */
     403: unknown;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsError = PostAutomationsErrors[keyof PostAutomationsErrors];
@@ -950,6 +954,10 @@ export type PutAutomationsByIdImportErrors = {
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PutAutomationsByIdImportError = PutAutomationsByIdImportErrors[keyof PutAutomationsByIdImportErrors];
@@ -1239,6 +1247,10 @@ export type PostAutomationsImportErrors = {
      * The authenticated user does not have access to this resource
      */
     403: unknown;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostAutomationsImportError = PostAutomationsImportErrors[keyof PostAutomationsImportErrors];
@@ -2161,6 +2173,10 @@ export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackError
      * Not Found
      */
     404: ProblemDetails;
+    /**
+     * Unprocessable Entity
+     */
+    422: ProblemDetails;
 };
 
 export type PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackError = PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors[keyof PostVersionHistoryByEntityTypeByEntityIdByEntityVersionRollbackErrors];

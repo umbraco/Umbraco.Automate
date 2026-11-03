@@ -7,7 +7,7 @@ namespace Umbraco.Automate.Core.Triggers;
 /// from a single notification event.
 /// </summary>
 /// <typeparam name="TItem">The per-item output type (reused from the corresponding per-item trigger).</typeparam>
-public sealed class BatchTriggerOutput<TItem> where TItem : class
+public sealed class BatchTriggerOutput<TItem> : IBatchTriggerOutput where TItem : class
 {
     /// <summary>
     /// Gets the collection of items from the notification.
@@ -20,4 +20,18 @@ public sealed class BatchTriggerOutput<TItem> where TItem : class
     /// </summary>
     [Description("The total number of items in the collection.")]
     public int Count { get; init; }
+
+    /// <inheritdoc />
+    IReadOnlyList<object> IBatchTriggerOutput.GetItems() => Items;
+
+    /// <inheritdoc />
+    IBatchTriggerOutput IBatchTriggerOutput.WithItems(IReadOnlyList<object> items)
+    {
+        var typedItems = items.Cast<TItem>().ToList();
+        return new BatchTriggerOutput<TItem>
+        {
+            Items = typedItems,
+            Count = typedItems.Count,
+        };
+    }
 }
