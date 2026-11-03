@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
@@ -15,6 +16,7 @@ public sealed class MoveContentSettings
         Description = "The content item to move.",
         EditorUiAlias = "Umb.PropertyEditorUi.DocumentPicker",
         EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""")]
+    [Required]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>

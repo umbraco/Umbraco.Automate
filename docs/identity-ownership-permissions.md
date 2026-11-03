@@ -88,6 +88,12 @@ All automations in a workspace execute as the workspace's service account:
 - If the service account is disabled, **all automations in the workspace fail** with a clear error — the dashboard surfaces this prominently
 - Non-CMS actions (HTTP Request, Log Message, etc.) don't interact with Umbraco's permission system but still execute in the context of the workspace's service account for audit purposes
 
+### Editing Shared Content (Umbraco 19)
+
+On culture-variant content, Umbraco 19 only publishes a shared (invariant) property when one of the publishing user's groups has **Allow editing shared content** (the group's `HasAccessToInvariantForVariant` setting). A service account needs it on one of its groups for Publish Content to publish shared properties when the automation names cultures.
+
+Without it the step still succeeds: the named cultures publish, but the shared properties keep their last published values, because Umbraco reports success. Publish Content then writes a warning to the step's run log naming the shared properties that stayed unpublished, and tells you to enable the setting on one of the account's groups. The warning is only written when a shared property has an unpublished change. Shared values inside block list and block grid properties are checked too, and the block property is reported when one of them is held back. Pending block changes for another culture are not, because Umbraco publishes those per culture. Automate doesn't create or change the service account's groups, so it never grants this setting. An admin decides, as for any other permission.
+
 ---
 
 ## Access Management

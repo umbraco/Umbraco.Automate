@@ -100,6 +100,9 @@ refs/
 # Generated appsettings JSON schemas (build artifacts produced by the
 # GenerateAppsettingsSchema target — never committed so they can't go stale)
 appsettings-schema.Umbraco.Automate*.json
+# Same, copied into the CMS integration test project by the Umbraco JSON schema build step
+Umbraco.Automate/tests/Umbraco.Automate.Tests.CmsIntegration/appsettings-schema*.json
+Umbraco.Automate/tests/Umbraco.Automate.Tests.CmsIntegration/umbraco-package-schema.json
 
 # Superpowers brainstorming scratch
 .superpowers/

@@ -26,6 +26,10 @@
     <!-- Test-only (never shipped): the real Umbraco Search provider the Find Content / Find Media tests run against.
          Must equal the Umbraco.Cms.* version above; bump them together. -->
     <PackageVersion Include="Umbraco.Cms.Search.Provider.Examine" Version="19.0.0-beta1" />
+    <!-- Test-only (never shipped): Umbraco's own integration test base (NUnit), for tests that need a real CMS
+         database. Same lock-step rule as above. -->
+    <PackageVersion Include="Umbraco.Cms.Tests.Integration" Version="19.0.0-beta1" />
+    <PackageVersion Include="NUnit3TestAdapter" Version="5.1.0" />
   </ItemGroup>
   <!-- OpenAPI (replaces Swashbuckle, which CMS v18 and later no longer ship transitively) -->
   <ItemGroup>

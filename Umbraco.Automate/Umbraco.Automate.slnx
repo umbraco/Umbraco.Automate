@@ -11,6 +11,7 @@
     <Project Path="src/Umbraco.Automate/Umbraco.Automate.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="tests/Umbraco.Automate.Tests.CmsIntegration/Umbraco.Automate.Tests.CmsIntegration.csproj" />
     <Project Path="tests/Umbraco.Automate.Tests.Common/Umbraco.Automate.Tests.Common.csproj" />
     <Project Path="tests/Umbraco.Automate.Tests.Integration/Umbraco.Automate.Tests.Integration.csproj" />
     <Project Path="tests/Umbraco.Automate.Tests.Unit/Umbraco.Automate.Tests.Unit.csproj" />

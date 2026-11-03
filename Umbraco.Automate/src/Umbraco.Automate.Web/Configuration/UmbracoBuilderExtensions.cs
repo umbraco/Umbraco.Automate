@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
-using OpenIddict.Validation.AspNetCore;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Web.Authorization;
@@ -98,20 +97,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAuthorizationHandler, WorkspaceAccessHandler>();
         builder.Services.AddSingleton<IAuthorizationHandler, AutomateSectionAuthorizationHandler>();
 
-        builder.Services.AddAuthorization(o =>
-        {
-            o.AddPolicy(AutomateAuthorizationPolicies.SectionAccessAutomate, policy =>
-            {
-                policy.AuthenticationSchemes.Add(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
-                policy.Requirements.Add(new AutomateSectionRequirement());
-            });
-
-            o.AddPolicy(AutomateAuthorizationPolicies.WorkspaceAccess, policy =>
-            {
-                policy.AuthenticationSchemes.Add(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
-                policy.Requirements.Add(new WorkspaceAccessRequirement());
-            });
-        });
+        builder.Services.AddAuthorization(AutomateAuthorizationPolicyConfiguration.Configure);
 
         return builder;
     }

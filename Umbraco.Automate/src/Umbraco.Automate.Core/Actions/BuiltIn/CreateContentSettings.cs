@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
@@ -35,6 +36,7 @@ public sealed class CreateContentSettings
                 { "alias": "onlyPickDocumentTypes", "value": true }
             ]
             """)]
+    [Required]
     public string ContentType { get; set; } = string.Empty;
 
     /// <summary>
