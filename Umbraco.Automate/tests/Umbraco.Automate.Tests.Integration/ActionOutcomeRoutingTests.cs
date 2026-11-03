@@ -213,6 +213,19 @@ public class ActionOutcomeRoutingTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Run_BrokenDeclarationWithRetry_DoesNotRunAnyResultLine()
+    {
+        var step = Step("test.twoDefaults");
+        step.ErrorBehavior = StepErrorBehavior.Retry;
+        var anyResult = Log("any");
+        var automation = Build(step, [anyResult], (step, anyResult, null));
+
+        var run = await _harness.RunToCompletionAsync(automation);
+
+        run.For(anyResult.Id).ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Run_BrokenDeclarationWithRetry_IsNotRetried()
     {
         var step = Step("test.twoDefaults");
