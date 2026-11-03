@@ -1,4 +1,4 @@
-// S9 — Content and media actions offer named exits (docs/plans/action-outcomes/STORIES.md)
+// S9 — Content and media actions offer named exits
 //
 // Get Content is live (T8), the other content actions are live (T18) and the media actions are live (T19).
 

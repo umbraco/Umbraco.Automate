@@ -1,4 +1,4 @@
-// S10 — Exit taken on step runs (docs/plans/action-outcomes/STORIES.md), AC3.
+// S10 — Exit taken on step runs, AC3.
 
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Runs;

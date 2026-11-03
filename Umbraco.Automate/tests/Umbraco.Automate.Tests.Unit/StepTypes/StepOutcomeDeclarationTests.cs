@@ -1,4 +1,4 @@
-// S1 — Declare fixed outcomes on an action (docs/plans/action-outcomes/STORIES.md)
+// S1 — Declare fixed outcomes on an action
 
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Settings;

@@ -1,4 +1,4 @@
-// S2 — The run follows the exit the action picked (docs/plans/action-outcomes/STORIES.md)
+// S2 — The run follows the exit the action picked
 // Also covers S4 AC8 (run time uses saved settings) and S6 AC5–AC6 ("Any result" lines).
 //
 // Real WorkflowCore host and compiler (see ActionRoutingHarness). Automation under test: a

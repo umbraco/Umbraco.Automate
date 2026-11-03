@@ -1,4 +1,4 @@
-// S4 — Outcomes driven by step settings: resolve endpoint (docs/plans/action-outcomes/STORIES.md)
+// S4 — Outcomes driven by step settings: resolve endpoint
 // Also covers S7 AC3 (labels returned raw).
 
 using Microsoft.AspNetCore.Mvc;

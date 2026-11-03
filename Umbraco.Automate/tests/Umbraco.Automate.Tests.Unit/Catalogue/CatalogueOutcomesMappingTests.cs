@@ -1,4 +1,4 @@
-// S3 — See and connect one exit per outcome: catalogue (docs/plans/action-outcomes/STORIES.md)
+// S3 — See and connect one exit per outcome: catalogue
 // Also covers S7 AC3 (catalogue labels returned raw).
 
 using Microsoft.Extensions.Logging.Abstractions;

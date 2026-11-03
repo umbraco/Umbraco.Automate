@@ -1,4 +1,4 @@
-// S1 — Declare fixed outcomes on an action: test harness (docs/plans/action-outcomes/STORIES.md)
+// S1 — Declare fixed outcomes on an action: test harness
 
 using Shouldly;
 using Umbraco.Automate.Core.Actions;

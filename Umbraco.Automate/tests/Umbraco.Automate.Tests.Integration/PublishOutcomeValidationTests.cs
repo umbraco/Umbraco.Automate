@@ -1,4 +1,4 @@
-// S5 — Stale lines are caught before publish (docs/plans/action-outcomes/STORIES.md)
+// S5 — Stale lines are caught before publish
 
 using System.Data;
 using Umbraco.Automate.Core.Actions;
