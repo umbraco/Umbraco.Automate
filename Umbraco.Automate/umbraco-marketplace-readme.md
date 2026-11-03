@@ -18,5 +18,5 @@ Built on [WorkflowCore](https://github.com/danielgerlag/workflow-core).
 
 ### Requirements
 
-- Umbraco CMS 17.4.0+
-- .NET 10.0
+- Umbraco CMS 19.0.0+
+- .NET 11.0

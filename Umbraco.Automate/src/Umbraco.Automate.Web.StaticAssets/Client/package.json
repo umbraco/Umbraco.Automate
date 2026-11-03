@@ -1,6 +1,6 @@
 {
     "name": "@umbraco-automate/core",
-    "version": "18.0.0",
+    "version": "19.0.0-beta",
     "type": "module",
     "scripts": {
         "watch": "tsc && vite build --watch",

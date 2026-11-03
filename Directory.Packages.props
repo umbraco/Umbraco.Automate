@@ -37,8 +37,8 @@
   </ItemGroup>
   <!-- Inter-product (Umbraco.Automate) -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[18.5.1, 18.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[18.1.5, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[19.0.0-beta, 19.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[19.0.0-beta, 19.999.999)" />
   </ItemGroup>
   <!-- WorkflowCore (automation engine) -->
   <ItemGroup>
