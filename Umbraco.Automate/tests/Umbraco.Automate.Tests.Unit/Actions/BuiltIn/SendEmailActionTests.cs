@@ -38,12 +38,14 @@ public class SendEmailActionTests
         Settings = settings,
     };
 
-    private static SendEmailSettings Settings(string? replyTo = null) => new()
+    private static SendEmailSettings Settings(string? replyTo = null, string? cc = null, string? bcc = null) => new()
     {
         To = "owner@example.com",
         Subject = "New booking",
         Body = "<p>Hello</p>",
         ReplyTo = replyTo,
+        Cc = cc,
+        Bcc = bcc,
     };
 
     [Fact]
@@ -108,17 +110,114 @@ public class SendEmailActionTests
         result.Status.ShouldBe(ActionResultStatus.Success);
         _sent.ShouldNotBeNull();
         _sent.ReplyTo.ShouldBe(["visitor@example.com"]);
+
+        // A count only: the skipped value is visitor input, so it must not reach the run log.
+        context.LogEntries.ShouldContain(e => e.Level == ActionLogLevel.Warning && e.Message.Contains("Skipped 1 Reply-To address"));
+        context.LogEntries.ShouldAllBe(e => !e.Message.Contains("not an address"));
+    }
+
+    // Each of these reads as a display name plus an address to MailAddress, but MimeKit - which the
+    // CMS sends with - rejects it and would silently drop the Reply-To. A group address and an
+    // address without a domain are accepted by MimeKit only. All must be skipped with a warning.
+    [Theory]
+    [InlineData("visitor@example.com; other@example.com")]
+    [InlineData("visitor@example.com other@example.com")]
+    [InlineData("Team: visitor@example.com;")]
+    [InlineData("visitor")]
+    public async Task ExecuteAsync_WithReplyToTheSenderWouldDrop_SkipsItWithAWarning(string replyTo)
+    {
+        var context = CreateContext(Settings(replyTo));
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        _sent.ShouldNotBeNull();
+        _sent.ReplyTo.ShouldBeNull();
         context.LogEntries.ShouldContain(e => e.Level == ActionLogLevel.Warning);
+        context.LogEntries.ShouldAllBe(e => !e.Message.Contains("visitor"));
     }
 
     [Fact]
     public async Task ExecuteAsync_WithOnlyUnparseableReplyTo_SendsWithoutReplyTo()
     {
-        var result = await _action.ExecuteAsync(CreateContext(Settings("not an address")), CancellationToken.None);
+        var context = CreateContext(Settings("not an address"));
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
 
         result.Status.ShouldBe(ActionResultStatus.Success);
         _sent.ShouldNotBeNull();
         _sent.ReplyTo.ShouldBeNull();
+        context.LogEntries.ShouldContain(e => e.Level == ActionLogLevel.Warning);
+        context.LogEntries.ShouldAllBe(e => !e.Message.Contains("not an address"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithACommaInAQuotedDisplayName_KeepsTheAddressWhole()
+    {
+        var context = CreateContext(Settings("\"Doe, John\" <j@example.com>, visitor@example.com"));
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        _sent.ShouldNotBeNull();
+        _sent.ReplyTo.ShouldBe(["\"Doe, John\" <j@example.com>", "visitor@example.com"]);
+        context.LogEntries.ShouldNotContain(e => e.Level == ActionLogLevel.Warning);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithACommaInAQuotedDisplayNameInTo_KeepsTheRecipientWhole()
+    {
+        var settings = Settings();
+        settings.To = "\"Doe, John\" <j@example.com>, owner@example.com";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _sent.ShouldNotBeNull();
+        _sent.To.ShouldBe(["\"Doe, John\" <j@example.com>", "owner@example.com"]);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ExecuteAsync_WithoutCcOrBcc_SetsNeither(string? value)
+    {
+        await _action.ExecuteAsync(CreateContext(Settings(cc: value, bcc: value)), CancellationToken.None);
+
+        _sent.ShouldNotBeNull();
+        _sent.Cc.ShouldBeNull();
+        _sent.Bcc.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCcAndBcc_SplitsAndSetsBoth()
+    {
+        var settings = Settings(cc: " team@example.com , \"Doe, John\" <j@example.com>", bcc: "archive@example.com,");
+
+        var result = await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+        _sent.ShouldNotBeNull();
+        _sent.Cc.ShouldBe(["team@example.com", "\"Doe, John\" <j@example.com>"]);
+        _sent.Bcc.ShouldBe(["archive@example.com"]);
+    }
+
+    // CC and BCC are usually typed by the editor, so a typo fails the step instead of the email
+    // silently going out without that copy. Nothing is sent, and the error gives a count only.
+    [Theory]
+    [InlineData("team@example.com; archive@example.com", null)]
+    [InlineData(null, "archive@")]
+    [InlineData(null, "archive")]
+    public async Task ExecuteAsync_WithUnparseableCcOrBcc_FailsValidationWithoutSending(string? cc, string? bcc)
+    {
+        var context = CreateContext(Settings(cc: cc, bcc: bcc));
+
+        var result = await _action.ExecuteAsync(context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        result.Exception.ShouldNotBeNull();
+        result.Exception.Message.ShouldBe("1 CC/BCC address could not be parsed.");
+        _sent.ShouldBeNull();
     }
 
     [Fact]
@@ -134,10 +233,13 @@ public class SendEmailActionTests
         _sent.ShouldBeNull();
     }
 
-    [Fact]
-    public void ReplyTo_SupportsBindings()
+    [Theory]
+    [InlineData(nameof(SendEmailSettings.ReplyTo))]
+    [InlineData(nameof(SendEmailSettings.Cc))]
+    [InlineData(nameof(SendEmailSettings.Bcc))]
+    public void AddressFields_SupportBindings(string property)
     {
-        var field = typeof(SendEmailSettings).GetProperty(nameof(SendEmailSettings.ReplyTo))!
+        var field = typeof(SendEmailSettings).GetProperty(property)!
             .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
 
         field.SupportsBindings.ShouldBeTrue();

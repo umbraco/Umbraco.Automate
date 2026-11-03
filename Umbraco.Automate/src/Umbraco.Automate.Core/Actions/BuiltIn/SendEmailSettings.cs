@@ -21,21 +21,43 @@ public sealed class SendEmailSettings
     /// Typically bound to visitor input (e.g. <c>${ trigger.email }</c> on a form notification),
     /// so an address that does not parse is skipped rather than failing the step.
     /// </remarks>
-    [Field(Label = "Reply-To", Description = "Optional. Address(es) replies should go to, separated by commas.",
+    [Field(Label = "Reply-To", Description = "Optional. Address(es) replies should go to, separated by commas. An address that can't be parsed is skipped with a warning.",
         SortOrder = 1, SupportsBindings = true)]
     public string? ReplyTo { get; set; }
 
     /// <summary>
+    /// Gets or sets the addresses that receive a copy (comma-separated). Optional.
+    /// </summary>
+    /// <remarks>
+    /// Usually typed by the editor, so an address that does not parse fails the step instead of
+    /// being dropped.
+    /// </remarks>
+    [Field(Label = "CC", Description = "Optional. Addresses that receive a copy, separated by commas. The step fails if one can't be parsed.",
+        SortOrder = 2, SupportsBindings = true)]
+    public string? Cc { get; set; }
+
+    /// <summary>
+    /// Gets or sets the addresses that receive a hidden copy (comma-separated). Optional.
+    /// </summary>
+    /// <remarks>
+    /// Usually typed by the editor, so an address that does not parse fails the step instead of
+    /// being dropped.
+    /// </remarks>
+    [Field(Label = "BCC", Description = "Optional. Addresses that receive a hidden copy, separated by commas. The step fails if one can't be parsed.",
+        SortOrder = 3, SupportsBindings = true)]
+    public string? Bcc { get; set; }
+
+    /// <summary>
     /// Gets or sets the email subject line.
     /// </summary>
-    [Field(Label = "Subject", Description = "The email subject line.", SortOrder = 2, SupportsBindings = true)]
+    [Field(Label = "Subject", Description = "The email subject line.", SortOrder = 4, SupportsBindings = true)]
     public string Subject { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the email body. Supports HTML.
     /// </summary>
     [Field(Label = "Body", Description = "The email body content. HTML is supported.",
-        SortOrder = 3, SupportsBindings = true,
+        SortOrder = 5, SupportsBindings = true,
         EditorUiAlias = "Umb.PropertyEditorUi.CodeEditor",
         EditorConfig = """
             [
@@ -50,7 +72,7 @@ public sealed class SendEmailSettings
     /// Gets or sets whether the body is HTML. Defaults to true.
     /// </summary>
     [Field(Label = "HTML Body", Description = "Whether the body contains HTML.",
-        SortOrder = 4,
+        SortOrder = 6,
         EditorUiAlias = "Umb.PropertyEditorUi.Toggle")]
     public bool IsHtml { get; set; } = true;
 }
