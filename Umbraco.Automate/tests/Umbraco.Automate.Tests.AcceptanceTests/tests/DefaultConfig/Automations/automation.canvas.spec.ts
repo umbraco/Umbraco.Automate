@@ -15,13 +15,14 @@ import {
  * saves, and then asserts on the saved **model** — connections, source handles, positions — so
  * a regression reports the wiring that broke rather than a screenshot diff.
  *
- * Every spec uses the tier-2 `automateServiceAccountWorkspace`, even those that never run or
- * publish: the action picker is scoped to what the workspace's service account may do, so in a
+ * Every spec that opens the action picker uses the tier-2 `automateServiceAccountWorkspace`, even
+ * those that never run or publish: the action picker is scoped to what the workspace's service account may do, so in a
  * tier-1 workspace it lists control flows only and no actions at all.
  *
  * Covers #322 (placement beside the clicked handle), #323 (several connections into one step),
  * #324 (inserting a container keeps the downstream step), #325 (actions needing a connection the
- * workspace does not allow) and #346 (+ on a connected output inserts rather than replaces).
+ * workspace does not allow), #346 (+ on a connected output inserts rather than replaces) and
+ * #521 (the canvas renders again after its element is re-attached).
  */
 const { actions, handles } = ConstantHelper;
 
@@ -240,6 +241,35 @@ test.describe('Automation canvas', () => {
     expect(connectionsFrom(saved, firstId).map((c: any) => c.targetStepId)).toEqual([added.id]);
     expect(connectionsFrom(saved, added.id, handles.done).map((c: any) => c.targetStepId)).toEqual([secondId]);
     expect(connectionsFrom(saved, added.id, handles.body)).toHaveLength(0);
+  });
+
+  test('renders the graph again after the canvas element is re-attached (#521)', async ({
+    automateWorkspace,
+    umbracoUi,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange — trigger → step.
+    const step = automationStep(actions.delay, 'step', { duration: '00:00:01' }, { x: 250, y: 200 });
+    const id = await umbracoAutomateApi.automations.create(uniqueName('Canvas Reattach'), automateWorkspace.id, {
+      trigger: manualTrigger(),
+      steps: [step],
+      connections: [automationConnection('trigger', step)]
+    });
+    const stepId = umbracoAutomateApi.automations.stepByAlias(await umbracoAutomateApi.automations.getById(id), 'step').id;
+
+    await umbracoUi.goToBackOffice();
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+    await umbracoAutomateUi.automate.waitForCanvas();
+    await expect(umbracoAutomateUi.automate.canvasNode(stepId)).toBeVisible();
+
+    // Act — take the canvas out of the page and put it back, twice.
+    await umbracoAutomateUi.automate.reattachCanvas();
+    await umbracoAutomateUi.automate.reattachCanvas();
+
+    // Assert — both nodes are drawn again, not a blank canvas.
+    await expect(umbracoAutomateUi.automate.triggerNode).toBeVisible();
+    await expect(umbracoAutomateUi.automate.canvasNode(stepId)).toBeVisible();
   });
 
   test('marks an action whose connection the workspace does not allow as unavailable (#325)', async ({
