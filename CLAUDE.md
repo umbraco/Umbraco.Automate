@@ -161,6 +161,7 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 | `docs/functional-overview.md`           | Business-focused feature overview                      |
 | `docs/identity-ownership-permissions.md`| Workspaces, service accounts, access control spec      |
 | `docs/vocabulary.md`                    | Standard terminology reference                         |
+| `docs/plans/<feature-slug>/`             | Per-feature plan folder (BRIEF, ARCHITECTURE, SPEC, STORIES, PLAN, BUILD-LOG, DECISION-LOG) |
 
 ## Database
 
