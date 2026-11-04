@@ -12,6 +12,7 @@ import { SENSITIVE_FIELD_UI_ALIAS } from "../sensitive-field/manifests.js";
 import { CONDITION_BUILDER_UI_ALIAS } from "../condition-builder/manifests.js";
 import { SWITCH_CASE_BUILDER_UI_ALIAS } from "../switch-case-builder/manifests.js";
 import { KEY_VALUE_EDITOR_UI_ALIAS } from "../key-value-editor/manifests.js";
+import { EMAIL_ADDRESS_INPUT_UI_ALIAS } from "../email-address-input/manifests.js";
 import { BINDABLE_EDITOR_CONFIG_ALIASES, BINDABLE_EDITOR_UI_ALIAS } from "../bindable-editor/manifests.js";
 import { isBindingExpression } from "../bindable-editor/bindable-value.utils.js";
 
@@ -29,6 +30,7 @@ const BINDING_AWARE_EDITOR_UI_ALIASES = new Set<string>([
     CONDITION_BUILDER_UI_ALIAS,
     SWITCH_CASE_BUILDER_UI_ALIAS,
     KEY_VALUE_EDITOR_UI_ALIAS,
+    EMAIL_ADDRESS_INPUT_UI_ALIAS,
 ]);
 
 export interface SettingsChangeDetail {

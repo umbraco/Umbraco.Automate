@@ -345,6 +345,13 @@ export default {
         removeRowConfirm: (key: string) =>
             key ? `Are you sure you want to remove "${key}"?` : "Are you sure you want to remove this row?",
     },
+    uaInputEmailAddress: {
+        label: "Add address",
+        placeholder: "Type an address and press Enter",
+        edit: (address: string) => `Edit ${address}`,
+        remove: (address: string) => `Remove ${address}`,
+        invalid: "This doesn't look like an email address",
+    },
     uaVersionHistory: {
         history: "History",
         compare: "Compare",

@@ -2,6 +2,7 @@ import { manifests as versionHistoryManifests } from "./version-history/manifest
 import { conditionBuilderManifests } from "./components/condition-builder/manifests.js";
 import { switchCaseBuilderManifests } from "./components/switch-case-builder/manifests.js";
 import { keyValueEditorManifests } from "./components/key-value-editor/manifests.js";
+import { emailAddressInputManifests } from "./components/email-address-input/manifests.js";
 import { bindingPickerManifests } from "./components/binding-picker/manifests.js";
 import { bindingTextBoxManifests } from "./components/binding-text-box/manifests.js";
 import { bindingTextAreaManifests } from "./components/binding-text-area/manifests.js";
@@ -22,6 +23,7 @@ export const manifests: UmbExtensionManifest[] = [
     ...conditionBuilderManifests,
     ...switchCaseBuilderManifests,
     ...keyValueEditorManifests,
+    ...emailAddressInputManifests,
     ...bindingPickerManifests,
     ...bindingTextBoxManifests,
     ...bindingTextAreaManifests,
