@@ -31,6 +31,13 @@ export class UaAutomationCanvasElement extends UmbLitElement {
     @state()
     private _colorMode: ColorMode = "light";
 
+    // New identity whenever localization changes, so memoised nodes re-render translated labels.
+    #localizeString = this.#createLocalizeString();
+
+    #createLocalizeString() {
+        return (value: string) => this.localize.string(value);
+    }
+
     #root: Root | null = null;
     #container: HTMLDivElement | null = null;
 
@@ -63,7 +70,13 @@ export class UaAutomationCanvasElement extends UmbLitElement {
 
     override updated(changedProperties: Map<string, unknown>) {
         super.updated(changedProperties);
-        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport") || changedProperties.has("readOnly"))) {
+        // The localization controller calls requestUpdate() with no property when terms load or
+        // the language changes, which arrives here as an empty change set.
+        const localizationChanged = changedProperties.size === 0;
+        if (localizationChanged) {
+            this.#localizeString = this.#createLocalizeString();
+        }
+        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport") || changedProperties.has("readOnly") || localizationChanged)) {
             this.#renderReact();
         }
     }
@@ -85,6 +98,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 viewport: this.viewport,
                 colorMode: this._colorMode,
                 readOnly: this.readOnly,
+                localize: this.#localizeString,
                 onCanvasChange: this.#onCanvasChange,
                 onAddNodeRequest: this.#onAddNodeRequest,
                 onDeleteRequest: this.#onDeleteRequest,

@@ -161,6 +161,13 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 | `docs/functional-overview.md`           | Business-focused feature overview                      |
 | `docs/identity-ownership-permissions.md`| Workspaces, service accounts, access control spec      |
 | `docs/vocabulary.md`                    | Standard terminology reference                         |
+| `docs/plans/<feature-slug>/`             | Per-feature plan folder (BRIEF, ARCHITECTURE, SPEC, STORIES, PLAN, BUILD-LOG, DECISION-LOG) |
+
+## Feature Plans
+
+- **Per-feature plan folders** live at `docs/plans/<feature-slug>/` (one folder per feature, one file per planning phase: `BRIEF.md`, `ARCHITECTURE.md`, `SPEC.md`, `STORIES.md`, `PLAN.md`, `BUILD-LOG.md`, plus `README.md` and `DECISION-LOG.md`).
+- `docs/plans/internal/` holds older single-file plans. Leave them as they are; don't add new folders there.
+- **Finding the current feature's plan folder:** match the current branch/worktree name against the folder slugs under `docs/plans/`.
 
 ## Database
 

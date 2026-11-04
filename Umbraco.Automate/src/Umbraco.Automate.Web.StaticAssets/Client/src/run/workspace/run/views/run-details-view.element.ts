@@ -3,6 +3,10 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import { UA_RUN_WORKSPACE_CONTEXT } from "../run-workspace.context-token.js";
 import type { UaRunDetailModel } from "../../../types.js";
+import type { UaAutomationDetailModel } from "../../../../automation/types.js";
+import type { CatalogueLookupEntry } from "../../../../automation/workspace/automation/canvas/types.js";
+import { resolveDynamicStepOutcomes } from "../../../utils/run-outcomes.js";
+import type { UaStepOutcome } from "../../../../catalogue/types.js";
 import { UaCatalogueRepository } from "../../../../catalogue/repository/catalogue.repository.js";
 import { formatDateTime, getRunStatusColor } from "../../../../core/index.js";
 import "../../../components/step-run-detail/step-run-detail.element.js";
@@ -21,6 +25,10 @@ export class UaRunDetailsViewElement extends UmbLitElement {
     @state()
     private _actionNames = new Map<string, string>();
 
+    /** Exits per step id: the action's static outcomes, or the resolved ones for a dynamic action. */
+    @state()
+    private _stepOutcomes = new Map<string, UaStepOutcome[]>();
+
     @state()
     private _triggerNames = new Map<string, string>();
 
@@ -29,6 +37,10 @@ export class UaRunDetailsViewElement extends UmbLitElement {
         this.#catalogueRepository = new UaCatalogueRepository(this);
         this.consumeContext(UA_RUN_WORKSPACE_CONTEXT, (context) => {
             if (!context) return;
+            this.observe(context.automation, (automation) => {
+                this.#automation = automation;
+                this.#loadStepOutcomes();
+            });
             this.observe(context.run, (run) => {
                 this._run = run;
                 if (run) {
@@ -40,6 +52,31 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                 }
             });
         });
+    }
+
+    #automation?: UaAutomationDetailModel;
+
+    /** Looks up each step's exits from its saved settings, so a step run can show its exit's label. */
+    async #loadStepOutcomes() {
+        const automation = this.#automation;
+        if (!automation) return;
+
+        const { data: actions } = await this.#catalogueRepository.requestActions();
+        const catalogue = new Map<string, CatalogueLookupEntry>(
+            (actions ?? []).map((a) => [
+                a.alias,
+                { name: a.name, outcomes: a.outcomes ?? [], hasDynamicOutcomes: a.hasDynamicOutcomes ?? false },
+            ]),
+        );
+        const dynamic = await resolveDynamicStepOutcomes(this.#catalogueRepository, automation.steps, catalogue);
+        if (automation !== this.#automation) return;
+
+        this._stepOutcomes = new Map(
+            automation.steps.map((step) => [
+                step.id,
+                dynamic.get(step.id) ?? catalogue.get(step.actionAlias)?.outcomes ?? [],
+            ]),
+        );
     }
 
     async #loadCatalogueNames() {
@@ -92,6 +129,7 @@ export class UaRunDetailsViewElement extends UmbLitElement {
                                           .actionName=${this._actionNames.get(sr.actionAlias) ?? sr.actionAlias}
                                           .expanded=${this._expandedStep === sr.id}
                                           .runId=${this._run!.unique}
+                                          .outcomes=${this._stepOutcomes.get(sr.stepId)}
                                       ></ua-step-run-detail>
                                   `,
                               )}

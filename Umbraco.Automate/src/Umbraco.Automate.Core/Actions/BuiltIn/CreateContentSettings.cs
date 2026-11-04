@@ -16,7 +16,9 @@ public sealed class CreateContentSettings
         Label = "Parent",
         Description = "The content item the new item is created under. Leave empty to create at the content root.",
         EditorUiAlias = "Umb.PropertyEditorUi.DocumentPicker",
-        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""")]
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""",
+        SupportsBindings = true,
+        BindingMustResolve = true)]
     public string? ParentKey { get; set; }
 
     /// <summary>

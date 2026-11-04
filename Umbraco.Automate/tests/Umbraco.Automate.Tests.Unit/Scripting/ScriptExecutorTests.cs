@@ -97,8 +97,8 @@ public class ScriptExecutorTests
     [Fact]
     public async Task ExecuteAsync_NeverResolvingPromise_TimesOut()
     {
-        // The engine's per-statement timeout cannot interrupt this — only the total-execution
-        // timeout backstop can. This is the single most important guarantee of the executor.
+        // No statement runs while the promise is pending, so only the total-execution timeout
+        // backstop can interrupt this. This is the single most important guarantee of the executor.
         ScriptError? error = null;
         var (executor, options) = Create();
         options.TotalExecutionTimeout = TimeSpan.FromMilliseconds(300);
@@ -473,6 +473,32 @@ public class ScriptExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FetchSlowerThanTheOldStatementTimeout_StillParsesResponseBody()
+    {
+        // The engine's time limit used to be 3s for the whole call, awaited fetch included, so a
+        // response that took longer failed the script with "Unexpected error." (and slow CI agents
+        // tripped it on a cold first fetch). Only TotalExecutionTimeout bounds the wait now.
+        ScriptError? error = null;
+        var (executor, options) = CreateDelayed(TimeSpan.FromSeconds(3.5), """{ "value": 7 }""");
+        options.OnError = e => error = e;
+
+        var result = await executor.ExecuteAsync(
+            "script",
+            """
+            export default async function () {
+                const r = await fetch('https://example.org/data');
+                const body = await r.json();
+                return body.value * 6;
+            }
+            """,
+            null,
+            options);
+
+        error.ShouldBeNull();
+        result!.GetValue<int>().ShouldBe(42);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_FetchPost_SendsMethodAndBody()
     {
         HttpRequestMessage? captured = null;
@@ -683,6 +709,29 @@ public class ScriptExecutorTests
                 ItExpr.IsAny<CancellationToken>())
             .Callback<HttpRequestMessage, CancellationToken>((req, _) => onRequest(req))
             .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
+
+        var client = new HttpClient(handler.Object);
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
+
+        var executor = new ScriptExecutor(factory.Object, NullLogger<ScriptExecutor>.Instance);
+        return (executor, new ScriptExecutorOptions { AllowFetch = true });
+    }
+
+    private static (ScriptExecutor Executor, ScriptExecutorOptions Options) CreateDelayed(TimeSpan delay, string body)
+    {
+        var handler = new Mock<HttpMessageHandler>();
+        handler
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(async () =>
+            {
+                await Task.Delay(delay);
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) };
+            });
 
         var client = new HttpClient(handler.Object);
         var factory = new Mock<IHttpClientFactory>();

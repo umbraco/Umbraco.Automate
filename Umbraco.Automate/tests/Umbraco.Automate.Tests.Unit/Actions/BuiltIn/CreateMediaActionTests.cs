@@ -63,6 +63,58 @@ public class CreateMediaActionTests
         => _action.Alias.ShouldBe("umbracoAutomate.createMedia");
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe("parentNotFound");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_DoesNotWrite()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        _mediaService.Verify(x => x.CreateMedia(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_EmptyMediaType_ReturnsValidationError()
     {
         var context = CreateContext(new CreateMediaSettings
