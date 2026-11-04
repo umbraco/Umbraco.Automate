@@ -21,6 +21,8 @@ export interface UaStepRunModel {
     error: string | null;
     retryCount: number;
     durationMs: number | null;
+    /** The exit the step took (outcome key, or If/Switch/Approval handle id); null when it did not branch. */
+    branchOutcome: string | null;
     logEntries: UaStepRunLogEntryModel[];
 }
 

@@ -191,9 +191,12 @@ fetched from a legacy CDN path that stalls on hosted agents. Keep this at 1.60.0
 
 ## Selector & assertion hygiene
 
-- **Do not assert on user-facing labels.** They get localised and break selectors. The one
-  deliberate exception is the section tab in `UiHelpers.goToAutomateSection`, which has no
-  stable alternative; its label lives in `ConstantHelper.sections.automate`.
+- **Do not assert on user-facing labels.** They get localised and break selectors. The
+  deliberate exceptions are the section tab in `UiHelpers.goToAutomateSection`, which has no
+  stable alternative (its label lives in `ConstantHelper.sections.automate`), and the outcome-exit
+  specs, whose acceptance criteria are about the English exit labels. Those live in
+  `ConstantHelper.outcomeLabels` (use `withDefault()` for the "(default)" mark) and
+  `ConstantHelper.staleOutcomeError()`; never spell them out in a spec.
 - Prefer per-property `expect()` over opaque boolean helpers. `AutomationApiHelper.getFullByName`
   exists so a failure pinpoints the exact field.
 - Expect pointer interception on elements under a resizable `umb-split-panel` divider and on

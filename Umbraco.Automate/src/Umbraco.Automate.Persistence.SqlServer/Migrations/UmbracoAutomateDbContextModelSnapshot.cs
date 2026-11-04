@@ -289,6 +289,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("BranchOutcome")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("CompletedUtc")
                         .HasColumnType("datetime2");
 

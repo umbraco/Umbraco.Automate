@@ -11,6 +11,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Umbraco.Automate.Tests.Unit</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj" />
   </ItemGroup>
 
