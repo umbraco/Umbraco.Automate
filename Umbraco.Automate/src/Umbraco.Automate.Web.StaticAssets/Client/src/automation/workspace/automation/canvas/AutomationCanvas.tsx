@@ -249,10 +249,12 @@ export default function AutomationCanvas({
     }, []);
 
     // Persist viewport changes (pan/zoom) — onMoveEnd fires after the user finishes
-    // panning or zooming, so the saved viewport survives reload.
+    // panning or zooming, so the saved viewport survives reload. React Flow passes a
+    // null event for programmatic moves (e.g. the mount-time fitView), which must not
+    // be treated as a user change or the workspace reports unsaved changes on load.
     const handleMoveEnd = useCallback(
-        (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
-            if (!onCanvasChange) return;
+        (event: MouseEvent | TouchEvent | null, vp: Viewport) => {
+            if (!onCanvasChange || !event) return;
             setNodes((currentNodes) => {
                 setEdges((currentEdges) => {
                     onCanvasChange({ nodes: currentNodes, edges: currentEdges, viewport: vp });
