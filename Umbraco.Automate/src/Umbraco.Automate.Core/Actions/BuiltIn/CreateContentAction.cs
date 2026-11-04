@@ -123,8 +123,9 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
         }
         else
         {
-            // A parent the CMS reports as not existing (deleted, or in the recycle bin) is not a
-            // permission problem, so it routes to the parentNotFound outcome.
+            // A parent reported as not existing (deleted, or in the recycle bin for an account
+            // confined to a start node) is not a permission problem, so it routes to the
+            // parentNotFound outcome.
             var authorization = await _authorizer.AuthorizeContentAsync(parentKey, RequiredPermissions, cancellationToken);
             if (authorization.IsNotFound)
             {
@@ -144,8 +145,11 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             }
         }
 
+        // A service account with a root start node is authorised for the recycle bin too, so a
+        // trashed parent gets this far. Treat it as missing: creating under it would save a live
+        // node inside the bin, where the recycle bin view doesn't list it.
         var parent = atRoot ? null : _contentService.GetById(parentKey);
-        if (!atRoot && parent is null)
+        if (!atRoot && (parent is null || parent.Trashed))
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Parent content {ParentKey} not found.",

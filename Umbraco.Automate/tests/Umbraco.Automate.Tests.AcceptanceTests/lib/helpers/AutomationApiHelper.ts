@@ -205,6 +205,15 @@ export class AutomationApiHelper {
    */
   async publishAndRunUntil(automationId: string, status: string, timeout: number = 30000): Promise<string> {
     await this.publish(automationId);
+    return await this.runUntil(automationId, status, timeout);
+  }
+
+  /**
+   * Runs an automation that is already published, waits for its newest run to reach `status`,
+   * and returns that run's id. For a spec that has to change something between publishing and
+   * running, such as trashing the item a step points at.
+   */
+  async runUntil(automationId: string, status: string, timeout: number = 30000): Promise<string> {
     await this.run(automationId);
 
     let runId = '';

@@ -156,6 +156,27 @@ public class UpdateContentPropertyActionTests
         result.Outcome.ShouldBe(UpdateContentPropertyAction.OutcomeNotFound);
     }
 
+    // A root start node passes the authorizer for an item in the recycle bin (#507).
+    [Fact]
+    public async Task ExecuteAsync_ContentInRecycleBin_ReturnsNotFoundOutcome()
+    {
+        var contentKey = SetupTrashedContent();
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateContentPropertySettings { ContentKey = contentKey.ToString(), PropertyAlias = "title", Value = "Hello" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe(UpdateContentPropertyAction.OutcomeNotFound);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ContentInRecycleBin_DoesNotSave()
+    {
+        var contentKey = SetupTrashedContent();
+
+        await _action.ExecuteAsync(CreateContext(new UpdateContentPropertySettings { ContentKey = contentKey.ToString(), PropertyAlias = "title", Value = "Hello" }, Guid.NewGuid()), CancellationToken.None);
+
+        _contentService.Verify(x => x.Save(It.IsAny<IContent>(), It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()), Times.Never);
+    }
+
     [Fact]
     public async Task ExecuteAsync_PropertyNotFound_ReturnsPropertyNotFoundOutcome()
     {
@@ -237,6 +258,15 @@ public class UpdateContentPropertyActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Failed);
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Cancelled);
+    }
+
+    private Guid SetupTrashedContent()
+    {
+        var contentKey = Guid.NewGuid();
+        var content = MockContent(contentKey, propertyAliases: ["title"]);
+        content.SetupGet(x => x.Trashed).Returns(true);
+        _contentService.Setup(x => x.GetById(contentKey)).Returns(content.Object);
+        return contentKey;
     }
 
     private static Mock<IContent> MockContent(Guid key, string[] propertyAliases)

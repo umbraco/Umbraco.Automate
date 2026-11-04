@@ -56,6 +56,7 @@ export class ConstantHelper {
     getMedia: 'umbracoAutomate.getMedia',
     getMediaProperty: 'umbracoAutomate.getMediaProperty',
     updateContentProperty: 'umbracoAutomate.updateContentProperty',
+    updateMediaProperty: 'umbracoAutomate.updateMediaProperty',
     httpRequest: 'umbracoAutomate.httpRequest',
     logMessage: 'umbracoAutomate.logMessage',
     moveContent: 'umbracoAutomate.moveContent',
@@ -77,6 +78,7 @@ export class ConstantHelper {
   public static readonly outcomes = {
     success: 'success',
     notFound: 'notFound',
+    parentNotFound: 'parentNotFound',
     anyResult: '__any__'
   };
 
