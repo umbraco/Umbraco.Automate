@@ -157,27 +157,29 @@ export class UaInputEmailAddressElement extends UmbFormControlMixin<string, type
                 color=${valid ? "default" : "danger"}
                 title=${valid ? item : this.localize.term("uaInputEmailAddress_invalid")}
             >
-                ${icon ? html`<uui-icon name=${icon}></uui-icon>` : nothing}
-                ${this.readonly
-                    ? html`<span class="text">${item}</span>`
-                    : html`
-                          <button
-                              type="button"
-                              class="text"
-                              aria-label=${this.localize.term("uaInputEmailAddress_edit", item)}
-                              @click=${() => this.#editItem(index)}
-                          >
-                              ${item}
-                          </button>
-                          <button
-                              type="button"
-                              class="remove"
-                              aria-label=${this.localize.term("uaInputEmailAddress_remove", item)}
-                              @click=${() => this.#removeItem(index)}
-                          >
-                              <uui-icon name="icon-wrong"></uui-icon>
-                          </button>
-                      `}
+                <span class="tag">
+                    ${icon ? html`<uui-icon name=${icon}></uui-icon>` : nothing}
+                    ${this.readonly
+                        ? html`<span class="text">${item}</span>`
+                        : html`
+                              <button
+                                  type="button"
+                                  class="text"
+                                  aria-label=${this.localize.term("uaInputEmailAddress_edit", item)}
+                                  @click=${() => this.#editItem(index)}
+                              >
+                                  ${item}
+                              </button>
+                              <button
+                                  type="button"
+                                  class="remove"
+                                  aria-label=${this.localize.term("uaInputEmailAddress_remove", item)}
+                                  @click=${() => this.#removeItem(index)}
+                              >
+                                  <uui-icon name="icon-wrong"></uui-icon>
+                              </button>
+                          `}
+                </span>
             </uui-tag>
         `;
     }
@@ -262,7 +264,14 @@ export class UaInputEmailAddressElement extends UmbFormControlMixin<string, type
 
             uui-tag {
                 max-width: 100%;
-                gap: var(--uui-size-space-1);
+            }
+
+            /* uui-tag lays its content out inline, on the text baseline. The address is clipped,
+               which moves its baseline to its bottom edge, so the icons would sit off-centre. */
+            .tag {
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-2);
             }
 
             button {
@@ -283,7 +292,6 @@ export class UaInputEmailAddressElement extends UmbFormControlMixin<string, type
 
             .remove {
                 display: inline-flex;
-                margin-left: var(--uui-size-space-1);
             }
         `,
     ];
