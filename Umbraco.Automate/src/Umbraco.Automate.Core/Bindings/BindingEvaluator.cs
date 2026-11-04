@@ -181,7 +181,7 @@ public sealed class BindingEvaluator
     /// <summary>
     /// Converts a resolved value to its string representation.
     /// Lists and dictionaries are serialized to JSON; numbers use the invariant culture;
-    /// other values use <see cref="object.ToString"/>.
+    /// dates use ISO 8601 round-trip; other values use <see cref="object.ToString"/>.
     /// </summary>
     internal static string Stringify(object? value)
     {
@@ -207,6 +207,13 @@ public sealed class BindingEvaluator
             or Int128 or UInt128 or BigInteger or Half or float or double or decimal)
         {
             return ((IFormattable)value).ToString(null, CultureInfo.InvariantCulture);
+        }
+
+        // Dates render as ISO 8601 round-trip ("O") for the same reason; a date with no time
+        // zone is written as is, without guessing one. formatDate:<format> gives readable text.
+        if (value is DateTime or DateTimeOffset or DateOnly or TimeOnly)
+        {
+            return ((IFormattable)value).ToString("O", CultureInfo.InvariantCulture);
         }
 
         return value.ToString() ?? string.Empty;

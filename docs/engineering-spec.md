@@ -1648,6 +1648,8 @@ ${ trigger.email | fallback:no-reply@example.com }
 | `stripHtml` | Remove HTML tags | `${ body \| stripHtml }` |
 | `json` | Serialize to JSON | `${ data \| json }` |
 
+Numbers and dates render the same on every server. Numbers use the invariant culture (`0.8`). A bare date, or `formatDate` with no format, renders as ISO 8601 round-trip (`2026-11-04T10:00:00.0000000Z`); use `formatDate:<format>` for readable text.
+
 #### Where bindings are used
 
 Bindings can appear in any **string-type** settings field on an action. The `EditableModelSchemaBuilder` marks string fields as binding-enabled by default. The middleware resolves bindings before passing settings to `ExecuteAsync`.
