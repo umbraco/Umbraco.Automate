@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OpenIddict.Client;
 using Umbraco.Automate.Core.Connections;
@@ -94,21 +96,11 @@ public static class UmbracoBuilderExtensions
 
     private static void AddPersistence(IUmbracoBuilder builder)
     {
-        // Resolve the connection string lazily inside the factory (run time), not here at
-        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
-        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
-        //
         // shareUmbracoConnection: false — nothing here resolves an IEfCoreScope<OpenIddictDbContext>.
         // Sharing the ambient connection is handled by AmbientDbContextFactory below, which decides
         // per call rather than once at composition time.
         builder.Services.AddUmbracoDbContext<OpenIddictDbContext>(
-            (IServiceProvider serviceProvider, DbContextOptionsBuilder options, string? _, string? _) =>
-            {
-                var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
-                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                    serviceProvider.GetRequiredService<IConfiguration>());
-                OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
-            },
+            OpenIddictPooledDbContextOptions.Configure,
             shareUmbracoConnection: false);
 
         // Same reasoning as Umbraco.Automate's own persistence: this DbContext resolves the same
@@ -130,5 +122,64 @@ public static class UmbracoBuilderExtensions
 
         // Run pending migrations on startup.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunOpenIddictMigrationNotificationHandler>();
+    }
+}
+
+/// <summary>
+/// The options delegate for the pooled <see cref="OpenIddictDbContext"/> factory, shared between
+/// <c>AddPersistence</c> and the tests that guard it.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Resolves the connection string lazily inside the factory (run time), not at composition time:
+/// hosts like Umbraco Cloud / Deploy synthesise the DSN through the ConnectionStrings options
+/// pipeline, which has not run yet during AddComposers().
+/// </para>
+/// <para>
+/// But <c>AddPooledDbContextFactory</c> runs this delegate the moment something first resolves
+/// <c>IDbContextFactory&lt;OpenIddictDbContext&gt;</c>, and the generic host resolves that while
+/// building every <c>IHostedService</c>'s constructor graph at <c>Host.StartAsync</c>, before
+/// Umbraco's runtime level is known. A genuinely unconfigured connection string (a fresh,
+/// not-yet-installed site; an ephemeral CI boot serving only <c>swagger.json</c>) must not throw
+/// here, so this falls back to <see cref="DatabaseConnectionInfo.PlaceholderConnection"/>, the same
+/// way Umbraco.Automate's own persistence does. Nothing reads or writes OAuth credentials below
+/// <c>RuntimeLevel.Run</c>, and the migration handler skips that level too. The pooled options are
+/// built once per process, though, so the placeholder outlives the CMS's in-process runtime restart
+/// after an install: OAuth credentials only work once the application process itself restarts.
+/// See <see href="https://github.com/umbraco/Umbraco.Automate/issues/487"/>.
+/// </para>
+/// </remarks>
+internal static class OpenIddictPooledDbContextOptions
+{
+    internal static void Configure(
+        IServiceProvider serviceProvider,
+        DbContextOptionsBuilder options,
+        string? cmsConnectionString,
+        string? cmsProviderName)
+    {
+        string connectionString;
+        string providerName;
+        try
+        {
+            (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                serviceProvider.GetRequiredService<IConfiguration>());
+        }
+        catch (InvalidOperationException ex)
+        {
+            (connectionString, providerName) = DatabaseConnectionInfo.PlaceholderConnection;
+
+            // GetService, not GetRequiredService: this catch block exists so a missing connection
+            // string can never crash the host, so logging it must not risk crashing the host either.
+            (serviceProvider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance)
+                .CreateLogger(typeof(OpenIddictPooledDbContextOptions))
+                .LogWarning(
+                    ex,
+                    "Umbraco Automate OpenIddict has no database connection string configured yet. OAuth " +
+                    "connections will remain unavailable until one is configured and the application " +
+                    "process restarts.");
+        }
+
+        OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
     }
 }
