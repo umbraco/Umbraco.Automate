@@ -704,4 +704,41 @@ public class BindingEvaluatorTests
             CultureInfo.CurrentCulture = original;
         }
     }
+
+    // Regression (#517): dates were formatted with the server culture, so the same automation
+    // wrote different text on every server. They now render as ISO 8601 round-trip ("O"),
+    // both as a bare binding and through formatDate with no format.
+    [Fact]
+    public void Evaluate_DateOnAnyServerCulture_UsesIso8601RoundTrip()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["trigger"] = new Dictionary<string, object?>
+            {
+                ["utc"] = new DateTime(2026, 11, 4, 10, 0, 0, DateTimeKind.Utc),
+                ["offset"] = new DateTimeOffset(2026, 11, 4, 10, 0, 0, TimeSpan.FromHours(1)),
+
+                // No time zone attached: written as is, without guessing one.
+                ["unspecified"] = new DateTime(2026, 11, 4, 10, 0, 0, DateTimeKind.Unspecified),
+                ["day"] = new DateOnly(2026, 11, 4),
+
+                // formatDate with no format leaves a non-date to the normal rendering.
+                ["amount"] = 0.8m,
+            },
+        };
+
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("da-DK");
+        try
+        {
+            _evaluator.Evaluate(
+                    "${ trigger.utc } | ${ trigger.offset } | ${ trigger.utc | formatDate } | ${ trigger.unspecified } | ${ trigger.day } | ${ trigger.amount | formatDate }",
+                    data)
+                .ShouldBe("2026-11-04T10:00:00.0000000Z | 2026-11-04T10:00:00.0000000+01:00 | 2026-11-04T10:00:00.0000000Z | 2026-11-04T10:00:00.0000000 | 2026-11-04 | 0.8");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
 }
