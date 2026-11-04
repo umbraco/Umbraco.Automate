@@ -199,8 +199,12 @@ test.describe('Get Content outcomes', () => {
       // Act
       await umbracoAutomateUi.automate.clickEdgeInsert(firstId, secondId);
       await umbracoAutomateUi.automate.chooseActionInPicker(await umbracoAutomateApi.catalogue.getStepTypeName(actions.getContent));
-      await umbracoAutomateUi.automate.nodeSettingsModal.waitFor({ state: 'visible' });
-      await umbracoAutomateUi.automate.changeStepSettingAndSave('Content Key', randomUUID());
+      // Content Key is a document picker; a key that doesn't exist can only go in as a binding.
+      await umbracoAutomateUi.automate.waitForNodeSettingsForm();
+      await umbracoAutomateUi.automate.toggleBindingSwitch('contentKey');
+      await umbracoAutomateUi.automate.enterBindingExpression('contentKey', randomUUID());
+      await umbracoAutomateUi.automate.attemptSaveNodeSettings();
+      await umbracoAutomateUi.automate.nodeSettingsModal.waitFor({ state: 'detached' });
       await umbracoAutomateUi.automate.clickSave();
 
       // Assert — the inserted Get Content step carries the old line on its default exit, `success`.
