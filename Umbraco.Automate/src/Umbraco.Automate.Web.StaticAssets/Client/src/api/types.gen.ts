@@ -494,6 +494,8 @@ export type StepRunResponseModel = {
     retryCount: number;
     durationMs?: null | number;
     branchOutcome?: null | string;
+    iterationIndex?: null | number;
+    iterationTotal?: null | number;
     logEntries: Array<StepRunLogEntryResponseModel>;
 };
 
