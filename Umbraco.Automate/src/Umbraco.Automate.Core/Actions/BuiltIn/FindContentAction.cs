@@ -5,6 +5,7 @@ using Examine.Lucene.Search;
 using Examine.Search;
 using Lucene.Net.QueryParsers.Classic;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
@@ -32,6 +33,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class FindContentAction : ActionBase<FindContentSettings, FindContentOutput>
 {
     // Not ICmsAction — this is a read, so no audit trail entry is written.
+
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
 
     /// <summary>Outcome emitted when no content matches.</summary>
     public const string OutcomeNotFound = "notFound";
@@ -69,6 +76,14 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
         _authorizer = authorizer;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

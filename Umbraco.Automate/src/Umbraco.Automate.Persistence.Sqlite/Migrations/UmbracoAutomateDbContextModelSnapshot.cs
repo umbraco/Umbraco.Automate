@@ -282,6 +282,9 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BranchOutcome")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("CompletedUtc")
                         .HasColumnType("TEXT");
 

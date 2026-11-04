@@ -2,6 +2,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Shouldly;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Models;
+using Umbraco.Cms.Core.Models.Entities;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -59,6 +62,142 @@ public class AutomationActionAuthorizerTests
 
         result.Authorized.ShouldBeFalse();
         result.FailureReason.ShouldContain("Umb.Document.Publish");
+    }
+
+    [Fact]
+    public async Task AuthorizeContentAsync_flags_not_found_when_cms_reports_not_found()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.NotFound);
+
+        var result = await sut.AuthorizeContentAsync(Guid.NewGuid(), new HashSet<string>(), default);
+
+        result.IsNotFound.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeContentAsync_keeps_not_found_reason_message_and_unauthorised()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        var key = Guid.NewGuid();
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.NotFound);
+
+        var result = await sut.AuthorizeContentAsync(key, new HashSet<string>(), default);
+
+        (result.Authorized, result.FailureReason).ShouldBe((false, $"Content node '{key}' not found."));
+    }
+
+    [Fact]
+    public async Task AuthorizeContentAsync_does_not_flag_not_found_for_a_permission_failure()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.UnauthorizedMissingPathAccess);
+
+        var result = await sut.AuthorizeContentAsync(Guid.NewGuid(), new HashSet<string>(), default);
+
+        result.IsNotFound.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaAsync_flags_not_found_when_cms_reports_not_found()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+        media
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(MediaAuthorizationStatus.NotFound);
+
+        var result = await sut.AuthorizeMediaAsync(Guid.NewGuid(), default);
+
+        result.IsNotFound.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaAsync_keeps_not_found_reason_message_and_unauthorised()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+        var key = Guid.NewGuid();
+        media
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(MediaAuthorizationStatus.NotFound);
+
+        var result = await sut.AuthorizeMediaAsync(key, default);
+
+        (result.Authorized, result.FailureReason).ShouldBe((false, $"Media node '{key}' not found."));
+    }
+
+    [Fact]
+    public async Task AuthorizeContentAsync_flags_not_found_for_a_trashed_node_denied_on_path()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.UnauthorizedMissingPathAccess);
+        SetupPath(UmbracoObjectTypes.Document, "-1,-20,1234");
+
+        var result = await sut.AuthorizeContentAsync(Guid.NewGuid(), new HashSet<string>(), default);
+
+        result.IsNotFound.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeContentAsync_does_not_flag_not_found_for_a_live_node_denied_on_path()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.UnauthorizedMissingPathAccess);
+        SetupPath(UmbracoObjectTypes.Document, "-1,1100,1234");
+
+        var result = await sut.AuthorizeContentAsync(Guid.NewGuid(), new HashSet<string>(), default);
+
+        result.IsNotFound.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task AuthorizeContentParentAsync_does_not_flag_not_found_when_parent_is_missing()
+    {
+        var (sut, content, _, _) = BuildSut(withUser: true);
+        content
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>(), It.IsAny<ISet<string>>()))
+            .ReturnsAsync(ContentAuthorizationStatus.NotFound);
+
+        var result = await sut.AuthorizeContentParentAsync(Guid.NewGuid(), new HashSet<string>(), default);
+
+        result.IsNotFound.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaAsync_flags_not_found_for_a_trashed_node_denied_on_path()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+        media
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(MediaAuthorizationStatus.UnauthorizedMissingPathAccess);
+        SetupPath(UmbracoObjectTypes.Media, "-1,-21,1234");
+
+        var result = await sut.AuthorizeMediaAsync(Guid.NewGuid(), default);
+
+        result.IsNotFound.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeMediaAsync_does_not_flag_not_found_for_a_live_node_denied_on_path()
+    {
+        var (sut, _, media, _) = BuildSut(withUser: true);
+        media
+            .Setup(s => s.AuthorizeAccessAsync(It.IsAny<IUser>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(MediaAuthorizationStatus.UnauthorizedMissingPathAccess);
+        SetupPath(UmbracoObjectTypes.Media, "-1,1100,1234");
+
+        var result = await sut.AuthorizeMediaAsync(Guid.NewGuid(), default);
+
+        result.IsNotFound.ShouldBeFalse();
     }
 
     [Fact]
@@ -335,7 +474,14 @@ public class AutomationActionAuthorizerTests
         result.FailureReason.ShouldContain("No backoffice identity");
     }
 
-    private static (AutomationActionAuthorizer Sut,
+    private readonly Mock<IEntityService> _entityService = new();
+
+    private void SetupPath(UmbracoObjectTypes type, string path)
+        => _entityService
+            .Setup(e => e.GetAllPaths(type, It.IsAny<Guid[]>()))
+            .Returns([new TreeEntityPath { Id = 1234, Path = path }]);
+
+    private (AutomationActionAuthorizer Sut,
                     Mock<IContentPermissionService> Content,
                     Mock<IMediaPermissionService> Media,
                     Mock<IBackOfficeSecurityAccessor> Accessor)
@@ -363,6 +509,7 @@ public class AutomationActionAuthorizerTests
             content.Object,
             media.Object,
             accessor.Object,
+            _entityService.Object,
             NullLogger<AutomationActionAuthorizer>.Instance);
 
         return (sut, content, media, accessor);
