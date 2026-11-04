@@ -274,6 +274,7 @@ export type EditableModelFieldDescriptorModel = {
     key: string;
     label: string;
     description?: string | null;
+    valueKind: EditableModelValueKindModel;
     editorUiAlias?: string | null;
     editorConfig?: string | null;
     defaultValue?: unknown;
@@ -293,6 +294,8 @@ export type EditableModelFieldVisibilityModel = {
 export type EditableModelSchemaModel = {
     fields: Array<EditableModelFieldDescriptorModel>;
 };
+
+export type EditableModelValueKindModel = 'String' | 'Scalar' | 'Collection';
 
 export type EntityVersionComparisonResponseModel = {
     fromVersion: number;
@@ -2225,6 +2228,10 @@ export type PutWorkspacesByIdData = {
 };
 
 export type PutWorkspacesByIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
     /**
      * The resource is protected and requires an authentication token
      */

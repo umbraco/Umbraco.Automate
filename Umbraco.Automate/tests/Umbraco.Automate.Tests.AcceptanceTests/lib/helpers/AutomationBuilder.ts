@@ -79,3 +79,8 @@ export function automationConnection(
 export function manualTrigger() {
   return { triggerAlias: ConstantHelper.triggers.manual, settings: {} };
 }
+
+/** The Content Saved trigger, with no content type filter. Its output carries `contentKey` for steps to bind. */
+export function contentSavedTrigger() {
+  return { triggerAlias: ConstantHelper.triggers.contentSaved, settings: {} };
+}
