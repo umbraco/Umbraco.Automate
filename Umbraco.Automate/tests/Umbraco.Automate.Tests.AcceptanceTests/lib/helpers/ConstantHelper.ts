@@ -34,15 +34,21 @@ export class ConstantHelper {
     approvalDecisionModal: 'ua-approval-decision-modal',
     edgeFilterModal: 'ua-edge-filter-modal',
     connectionTypePickerModal: 'ua-connection-type-picker-modal',
-    oauthEditor: 'umb-automate-property-editor-ui-oauth'
+    oauthEditor: 'umb-automate-property-editor-ui-oauth',
+    /* CMS pickers the settings form opens (not Automate's own). */
+    treePickerModal: 'umb-tree-picker-modal',
+    mediaPickerModal: 'umb-media-picker-modal'
   };
 
   /* Trigger and step type aliases, as the catalogue API reports them. */
   public static readonly triggers = {
-    manual: 'umbracoAutomate.manual'
+    manual: 'umbracoAutomate.manual',
+    contentSaved: 'umbracoAutomate.contentSaved'
   };
 
   public static readonly actions = {
+    createContent: 'umbracoAutomate.createContent',
+    createMedia: 'umbracoAutomate.createMedia',
     delay: 'umbracoAutomate.delay',
     findContent: 'umbracoAutomate.findContent',
     getContent: 'umbracoAutomate.getContent',
@@ -52,6 +58,9 @@ export class ConstantHelper {
     updateContentProperty: 'umbracoAutomate.updateContentProperty',
     httpRequest: 'umbracoAutomate.httpRequest',
     logMessage: 'umbracoAutomate.logMessage',
+    moveContent: 'umbracoAutomate.moveContent',
+    moveMedia: 'umbracoAutomate.moveMedia',
+    publishContent: 'umbracoAutomate.publishContent',
     requestApproval: 'umbracoAutomate.requestApproval',
     runScript: 'umbracoAutomate.runScript',
     setVariable: 'umbracoAutomate.setVariable',

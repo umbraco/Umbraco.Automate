@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Execution;
 
 namespace Umbraco.Automate.Tests.Unit.Execution;
@@ -30,6 +31,16 @@ public class DefaultStepErrorClassifierTests
     public void Classify_ValidationException_ReturnsValidation()
         => _classifier.Classify(new ValidationException("bad"))
             .ShouldBe(StepRunErrorCategory.Validation);
+
+    [Fact]
+    public void Classify_SettingsBindingException_ReturnsConfigurationError()
+        => _classifier.Classify(new SettingsBindingException("ParentKey", "${ x }"))
+            .ShouldBe(StepRunErrorCategory.ConfigurationError);
+
+    [Fact]
+    public void Classify_SettingsBindingException_IsTerminal()
+        => _classifier.IsTerminal(_classifier.Classify(new SettingsBindingException("ParentKey", "${ x }")))
+            .ShouldBeTrue();
 
     [Fact]
     public void Classify_ArgumentException_ReturnsConfigurationError()

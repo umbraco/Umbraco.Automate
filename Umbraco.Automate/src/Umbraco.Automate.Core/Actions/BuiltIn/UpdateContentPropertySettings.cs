@@ -12,7 +12,9 @@ public sealed class UpdateContentPropertySettings
     /// </summary>
     [Field(
         Label = "Content Key",
-        Description = "The key of the content item to update.",
+        Description = "The content item to update.",
+        EditorUiAlias = "Umb.PropertyEditorUi.DocumentPicker",
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""",
         SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 

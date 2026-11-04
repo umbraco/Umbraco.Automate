@@ -40,6 +40,14 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     @state()
     private _bindingSources: BindingSource[] = [];
 
+    /**
+     * False until the binding sources are known. The settings form waits for them because it
+     * picks each field's editor from them: a picker that is swapped for the bindable editor
+     * after the author has opened it loses whatever they then pick.
+     */
+    @state()
+    private _bindingSourcesLoaded = false;
+
     @state()
     private _connectionId: string | null = null;
 
@@ -69,15 +77,22 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
 
     async #loadBindingSources() {
         const ctx = this.data?.automationContext;
-        if (!ctx || !this.data?.stepId) return;
+        if (!ctx || !this.data?.stepId) {
+            this._bindingSourcesLoaded = true;
+            return;
+        }
 
-        this._bindingSources = await buildBindingSources(
-            this.data.stepId,
-            ctx.trigger ?? null,
-            ctx.steps,
-            ctx.connections,
-            this.#catalogueRepo,
-        );
+        try {
+            this._bindingSources = await buildBindingSources(
+                this.data.stepId,
+                ctx.trigger ?? null,
+                ctx.steps,
+                ctx.connections,
+                this.#catalogueRepo,
+            );
+        } finally {
+            this._bindingSourcesLoaded = true;
+        }
     }
 
     /**
@@ -268,6 +283,7 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
                         look="primary"
                         color="positive"
                         label=${this.localize.term("uaGeneral_save")}
+                        ?disabled=${!this._bindingSourcesLoaded}
                         @click=${this.#onSubmit}
                     ></uui-button>
                 </div>
@@ -278,6 +294,8 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     // `noBox` avoids nesting uui-boxes when the settings form is already inside one;
     // ua-settings-form otherwise wraps each group in its own uui-box.
     #renderSettingsForm(noBox: boolean) {
+        if (!this._bindingSourcesLoaded) return html`<uui-loader></uui-loader>`;
+
         return html`
             <ua-settings-form
                 label-on-top
