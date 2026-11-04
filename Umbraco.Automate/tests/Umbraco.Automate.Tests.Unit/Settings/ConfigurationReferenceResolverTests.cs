@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Umbraco.Automate.Core.Settings;
 
@@ -67,6 +68,49 @@ public class ConfigurationReferenceResolverTests
         var result = Resolve(typeof(decimal), "2");
 
         result.ShouldBe(2m);
+    }
+
+    // Configuration values are invariant text, so a server whose culture uses ',' for decimals
+    // (and '.' as the group separator, as da-DK does) must not read "0.5" as 5.
+    [Theory]
+    [InlineData(typeof(double), "0.5")]
+    [InlineData(typeof(double), "1.5")]
+    [InlineData(typeof(decimal), "0.5")]
+    [InlineData(typeof(decimal), "1.5")]
+    public void Resolve_DecimalPointValueOnCommaDecimalServer_ReadsTheValueInvariantly(Type targetType, string value)
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("da-DK");
+        try
+        {
+            var result = Resolve(targetType, value);
+
+            result.ShouldBe(Convert.ChangeType(decimal.Parse(value, CultureInfo.InvariantCulture), targetType, CultureInfo.InvariantCulture));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
+    // A comma-decimal value such as "0,5" must fail rather than be read as 5 through grouping.
+    [Theory]
+    [InlineData(typeof(double))]
+    [InlineData(typeof(decimal))]
+    public void Resolve_CommaDecimalValueOnCommaDecimalServer_ThrowsSettingsResolutionException(Type targetType)
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("da-DK");
+        try
+        {
+            var exception = Record.Exception(() => Resolve(targetType, "0,5"));
+
+            exception.ShouldBeOfType<SettingsResolutionException>();
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
     }
 
     #endregion
