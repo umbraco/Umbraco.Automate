@@ -4,13 +4,16 @@ namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 
 public class FindContentActionTests
 {
+    // Every query leaves out items in the recycle bin (#513).
+    private const string NotInRecycleBin = @" -__Path:\-1,\-20,*";
+
     [Fact]
     public void BuildQuery_Exact_NoCulture_NoTypeFilter_ProducesPhraseQuery()
     {
         var query = FindContentAction.BuildQuery(
             "Homepage", FindContentMatchMode.Exact, culture: null, contentTypeAliases: []);
 
-        query.ShouldBe("+__IndexType:content +(nodeName:\"homepage\")");
+        query.ShouldBe("+__IndexType:content +(nodeName:\"homepage\")" + NotInRecycleBin);
     }
 
     [Fact]
@@ -19,7 +22,7 @@ public class FindContentActionTests
         var query = FindContentAction.BuildQuery(
             "home", FindContentMatchMode.StartsWith, culture: null, contentTypeAliases: []);
 
-        query.ShouldBe("+__IndexType:content +(nodeName:home*)");
+        query.ShouldBe("+__IndexType:content +(nodeName:home*)" + NotInRecycleBin);
     }
 
     [Fact]
@@ -28,7 +31,7 @@ public class FindContentActionTests
         var query = FindContentAction.BuildQuery(
             "press", FindContentMatchMode.Contains, culture: null, contentTypeAliases: []);
 
-        query.ShouldBe("+__IndexType:content +(nodeName:*press*)");
+        query.ShouldBe("+__IndexType:content +(nodeName:*press*)" + NotInRecycleBin);
     }
 
     [Fact]
@@ -40,7 +43,7 @@ public class FindContentActionTests
         var query = FindContentAction.BuildQuery(
             "Homepage", FindContentMatchMode.Exact, culture: "en-US", contentTypeAliases: []);
 
-        query.ShouldBe("+__IndexType:content +(nodeName_en-us:\"homepage\" nodeName:\"homepage\")");
+        query.ShouldBe("+__IndexType:content +(nodeName_en-us:\"homepage\" nodeName:\"homepage\")" + NotInRecycleBin);
     }
 
     [Fact]
