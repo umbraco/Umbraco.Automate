@@ -23,6 +23,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// A built-in action that searches content by name, optionally restricted by content type.
 /// Queries the Examine <c>ExternalIndex</c> (published content) by default, or the
 /// <c>InternalIndex</c> when <see cref="FindContentSettings.IncludeUnpublished"/> is true.
+/// Items in the recycle bin are never matched.
 /// </summary>
 [Action("umbracoAutomate.findContent", "Find Content",
     Description = "Finds content items by name, optionally filtered by content type.",
@@ -254,6 +255,12 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
                 contentTypeAliases.Select(a => $"{ExamineFieldNames.ItemTypeFieldName}:{QueryParserBase.Escape(a.ToLowerInvariant())}"));
             query += $" +({aliasClause})";
         }
+
+        // Leave out items in the recycle bin. "Include unpublished" searches the internal index,
+        // which keeps them, and the permission filter only drops them for start-node-scoped
+        // service accounts, never for a root one. Excluding them in the query (as the CMS's own
+        // backoffice search does) also keeps them from using up the Limit.
+        query += $" -{UmbracoExamineFieldNames.IndexPathFieldName}:{QueryParserBase.Escape(UmbracoConstants.System.RecycleBinContentPathPrefix)}*";
 
         return query;
     }
