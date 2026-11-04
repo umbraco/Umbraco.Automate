@@ -376,6 +376,47 @@ export class AutomateUiHelper {
     await this.bindingPicker.waitFor({ state: 'detached' });
   }
 
+  /**
+   * An email address field in the step settings modal (Send Email's To, Reply-To, CC and BCC),
+   * by its settings key. Each address in it is a `uui-tag`.
+   */
+  emailAddressField(key: string): Locator {
+    return this.nodeSettingsModal
+      .locator(`umb-property[alias="${key}"]`)
+      .locator(ConstantHelper.elements.emailAddressInput);
+  }
+
+  /* The tags of an email address field, one per address. */
+  emailAddressTags(key: string): Locator {
+    return this.emailAddressField(key).locator('uui-tag');
+  }
+
+  /* The input of an email address field, where the next address is typed. */
+  emailAddressInput(key: string): Locator {
+    return this.emailAddressField(key).locator('#input');
+  }
+
+  /**
+   * Types into an email address field key by key, as a person would, so each comma, semicolon
+   * or quote is handled as it is typed rather than in one go.
+   */
+  async typeEmailAddresses(key: string, text: string) {
+    await this.clickInModal(this.emailAddressInput(key));
+    await this.emailAddressInput(key).pressSequentially(text);
+  }
+
+  /**
+   * Opens the binding picker of an email address field. Unlike a text field's, it is a button
+   * beside the field rather than a property action, so `openBindingPicker` does not reach it.
+   */
+  async openEmailAddressBindingPicker(key: string) {
+    await this.clickInModal(
+      this.nodeSettingsModal.locator(`umb-property[alias="${key}"]`).locator('uui-button[slot="actions"]')
+    );
+    await this.bindingPicker.waitFor({ state: 'visible' });
+    await this.waitForStopMoving(this.bindingPicker);
+  }
+
   get runsTable(): Locator {
     return this.page.locator(ConstantHelper.elements.runsTable);
   }
