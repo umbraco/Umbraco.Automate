@@ -193,6 +193,30 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
             });
         }
 
+        // The backoffice only creates a media type at the root when it allows that, and only
+        // a child type the parent's type allows. IMediaService.CreateMedia checks neither.
+        if (atRoot && !mediaType.AllowedAsRoot)
+        {
+            return ActionResult.Failed(
+                new ArgumentException(
+                    $"Media type '{mediaType.Alias}' is not allowed at the media root. " +
+                    "Pick a parent, or enable 'Allow at root' on the media type."),
+                StepRunErrorCategory.Validation);
+        }
+
+        if (parent is not null)
+        {
+            var parentType = _mediaTypeService.Get(parent.ContentType.Key);
+            if (parentType?.AllowedContentTypes?.Any(t => t.Key == mediaTypeKey) != true)
+            {
+                return ActionResult.Failed(
+                    new ArgumentException(
+                        $"Media type '{mediaType.Alias}' is not allowed under '{parent.Name}'. " +
+                        $"Pick another parent, or add it to the allowed child types of '{parentType?.Alias}'."),
+                    StepRunErrorCategory.Validation);
+            }
+        }
+
         var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key
             ?? context.ExecutionContext?.ServiceAccountKey
             ?? throw new InvalidOperationException("No backoffice identity available. Ensure the automation is running within a workspace with a valid service account.");
