@@ -278,6 +278,7 @@ export type EditableModelFieldDescriptorModel = {
     key: string;
     label: string;
     description?: null | string;
+    valueKind: EditableModelValueKindModel;
     editorUiAlias?: null | string;
     editorConfig?: null | string;
     defaultValue?: unknown;
@@ -297,6 +298,8 @@ export type EditableModelFieldVisibilityModel = {
 export type EditableModelSchemaModel = {
     fields: Array<EditableModelFieldDescriptorModel>;
 };
+
+export type EditableModelValueKindModel = 'String' | 'Scalar' | 'Collection';
 
 export type EntityVersionComparisonResponseModel = {
     fromVersion: number;
