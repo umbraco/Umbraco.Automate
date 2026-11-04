@@ -79,6 +79,7 @@ npx playwright test -g "loads the Automate section"
 | `Automations/automation.lifecycle.spec.ts` | Automation create, rename, delete |
 | `Automations/automation.canvas.spec.ts` | Branches rejoining and publishing (#323), Approval rejected branch, placement beside the clicked output (#322), insert between on a connected output (#346), inserting a container (#324), unavailable actions (#325) |
 | `Automations/automation.binding-picker.spec.ts` | Predecessors in flow order (#299), expression descriptions (#307), readable value types, inserting an expression |
+| `Automations/automation.email-address-input.spec.ts` | Send Email's address fields: typed addresses as tags saved comma-separated, quoted display names, invalid entries marked, Backspace to edit, a picked binding as a tag (#486) |
 | `Automations/automation.run-view.spec.ts` | Keyboard access to runs, steps and the trigger row, the Logs tab, the failing step's error as the run's error, whole-millisecond step durations, Replay disabled once unpublished |
 | `Automations/automation.run.spec.ts` | Publish, Run now, Runs view, Run Script reading upstream `data` (#345), Run now hidden on a draft (#366), step output in the run view (#376) |
 | `Outcomes/outcomes.get-content.spec.ts` | Action outcomes on Get Content: right-edge Found/Not found exits, drawing and saving `notFound`, runs taking the notFound or success path, old unnamed lines as "Any result" and the both-paths warning, the stale-outcome publish error, auto-layout, the run view's taken and not-taken lines and "Exit taken" |
