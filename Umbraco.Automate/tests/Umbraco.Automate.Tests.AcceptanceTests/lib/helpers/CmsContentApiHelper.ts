@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
 import { uniqueName } from './TestData';
 
@@ -56,7 +57,8 @@ export class CmsContentApiHelper {
 
     if (options.publish) {
       await this.api.document.publish(id);
-      await this.api.document.waitUntilDocumentIsPublished(id);
+      // 17.x test helpers have no waitUntilDocumentIsPublished; poll the state it would wait on.
+      await expect.poll(() => this.api.document.isDocumentPublished(id)).toBeTruthy();
     }
 
     return { id, name };
