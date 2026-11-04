@@ -267,6 +267,32 @@ public class CreateMediaActionTests
         output.MediaTypeKey.ShouldBe(mediaTypeKey);
     }
 
+    // A root start node passes the authorizer for a parent in the recycle bin (#507).
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_ReturnsParentNotFoundOutcome()
+    {
+        var parentKey = SetupTrashedParent();
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = parentKey.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe(CreateMediaAction.OutcomeParentNotFound);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_DoesNotWrite()
+    {
+        var parentKey = SetupTrashedParent();
+        var mediaTypeKey = Guid.NewGuid();
+        var mediaType = new Mock<IMediaType>();
+        mediaType.SetupGet(x => x.Alias).Returns("Image");
+        mediaType.SetupGet(x => x.Variations).Returns(ContentVariation.Nothing);
+        _mediaTypeService.Setup(x => x.Get(mediaTypeKey)).Returns(mediaType.Object);
+
+        await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = parentKey.ToString(), MediaType = mediaTypeKey.ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        _mediaService.Verify(x => x.CreateMedia(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
     [Fact]
     public async Task ExecuteAsync_MediaTypeNotFound_ReturnsMediaTypeNotFoundOutcome()
     {
@@ -540,6 +566,16 @@ public class CreateMediaActionTests
         }));
 
     private sealed record MediaSetup(ActionContext Context, IMedia Created, Guid MediaKey, string? SourceUrl);
+
+    private Guid SetupTrashedParent()
+    {
+        var parentKey = Guid.NewGuid();
+        var parent = new Mock<IMedia>();
+        parent.SetupGet(x => x.Key).Returns(parentKey);
+        parent.SetupGet(x => x.Trashed).Returns(true);
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(parent.Object);
+        return parentKey;
+    }
 
     private static ActionContext CreateContext(CreateMediaSettings settings, Guid? serviceAccountKey = null)
         => new()

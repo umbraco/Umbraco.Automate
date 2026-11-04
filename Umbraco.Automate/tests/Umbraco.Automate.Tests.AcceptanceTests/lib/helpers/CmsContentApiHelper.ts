@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
+import { ensureOk } from './ApiResponse';
 import { uniqueName } from './TestData';
 
 export type TestPage = { id: string; name: string };
@@ -80,6 +81,18 @@ export class CmsContentApiHelper {
       : await this.api.media.createDefaultMediaWithImage(name);
     this.mediaIds.push(id);
     return { id, name };
+  }
+
+  /** Moves a page to the recycle bin. `cleanUp()` still removes it from there. */
+  async trashPage(id: string) {
+    const response = await this.api.put(`${this.api.baseUrl}/umbraco/management/api/v1/document/${id}/move-to-recycle-bin`);
+    await ensureOk(response, `Moving page ${id} to the recycle bin`);
+  }
+
+  /** Moves a media item to the recycle bin. `cleanUp()` still removes it from there. */
+  async trashMedia(id: string) {
+    const response = await this.api.put(`${this.api.baseUrl}/umbraco/management/api/v1/media/${id}/move-to-recycle-bin`);
+    await ensureOk(response, `Moving media ${id} to the recycle bin`);
   }
 
   /**
