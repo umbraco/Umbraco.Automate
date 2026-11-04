@@ -7,10 +7,14 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// </summary>
 public sealed class SendEmailSettings
 {
+    // Shows each address as a tag, as an email client does, and stores them comma-separated.
+    private const string EmailAddressInput = "UmbracoAutomate.PropertyEditorUi.EmailAddressInput";
+
     /// <summary>
     /// Gets or sets the recipient email addresses (comma-separated).
     /// </summary>
-    [Field(Label = "To", Description = "Recipient email addresses, separated by commas.", SupportsBindings = true)]
+    [Field(Label = "To", Description = "Recipient email addresses.", SupportsBindings = true,
+        EditorUiAlias = EmailAddressInput)]
     public string To { get; set; } = string.Empty;
 
     /// <summary>
@@ -21,8 +25,8 @@ public sealed class SendEmailSettings
     /// Typically bound to visitor input (e.g. <c>${ trigger.email }</c> on a form notification),
     /// so an address that does not parse is skipped rather than failing the step.
     /// </remarks>
-    [Field(Label = "Reply-To", Description = "Optional. Address(es) replies should go to, separated by commas. An address that can't be parsed is skipped with a warning.",
-        SortOrder = 1, SupportsBindings = true)]
+    [Field(Label = "Reply-To", Description = "Optional. Where replies should go. An address that can't be parsed is skipped with a warning.",
+        SortOrder = 1, SupportsBindings = true, EditorUiAlias = EmailAddressInput)]
     public string? ReplyTo { get; set; }
 
     /// <summary>
@@ -32,8 +36,8 @@ public sealed class SendEmailSettings
     /// Usually typed by the editor, so an address that does not parse fails the step instead of
     /// being dropped.
     /// </remarks>
-    [Field(Label = "CC", Description = "Optional. Addresses that receive a copy, separated by commas. The step fails if one can't be parsed.",
-        SortOrder = 2, SupportsBindings = true)]
+    [Field(Label = "CC", Description = "Optional. Addresses that receive a copy. The step fails if one can't be parsed.",
+        SortOrder = 2, SupportsBindings = true, EditorUiAlias = EmailAddressInput)]
     public string? Cc { get; set; }
 
     /// <summary>
@@ -43,8 +47,8 @@ public sealed class SendEmailSettings
     /// Usually typed by the editor, so an address that does not parse fails the step instead of
     /// being dropped.
     /// </remarks>
-    [Field(Label = "BCC", Description = "Optional. Addresses that receive a hidden copy, separated by commas. The step fails if one can't be parsed.",
-        SortOrder = 3, SupportsBindings = true)]
+    [Field(Label = "BCC", Description = "Optional. Addresses that receive a hidden copy. The step fails if one can't be parsed.",
+        SortOrder = 3, SupportsBindings = true, EditorUiAlias = EmailAddressInput)]
     public string? Bcc { get; set; }
 
     /// <summary>

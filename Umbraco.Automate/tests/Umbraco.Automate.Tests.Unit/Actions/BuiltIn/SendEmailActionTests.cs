@@ -234,14 +234,16 @@ public class SendEmailActionTests
     }
 
     [Theory]
+    [InlineData(nameof(SendEmailSettings.To))]
     [InlineData(nameof(SendEmailSettings.ReplyTo))]
     [InlineData(nameof(SendEmailSettings.Cc))]
     [InlineData(nameof(SendEmailSettings.Bcc))]
-    public void AddressFields_SupportBindings(string property)
+    public void AddressFields_SupportBindings_AndUseTheEmailAddressInput(string property)
     {
         var field = typeof(SendEmailSettings).GetProperty(property)!
             .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
 
         field.SupportsBindings.ShouldBeTrue();
+        field.EditorUiAlias.ShouldBe("UmbracoAutomate.PropertyEditorUi.EmailAddressInput");
     }
 }
