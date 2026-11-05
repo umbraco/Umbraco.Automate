@@ -37,7 +37,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: `GetElementPropertyActionTests.cs` green.
   depends-on: T2, T3, T4. parallel-group: B
 
-- [ ] **T7** - story: STORY-4 (AC1–AC18). `UpdateElementPropertyAction` with its settings and output, copying `UpdateContentPropertyAction`. Group "Library", icon `icon-edit`, `Umb.Element.Update`, `ICmsAction`. Loads through `IElementService`, checks `Trashed` before writing, writes one value in the culture and segment the way Update Content Property does, and saves with `IElementService.Save` (ARCHITECTURE). Outcomes `success` "Updated", `notFound`, `propertyNotFound`. Output includes `PreviousValue`. A save cancelled by a notification maps to the Cancelled category.
+- [x] **T7** - story: STORY-4 (AC1–AC18). `UpdateElementPropertyAction` with its settings and output, copying `UpdateContentPropertyAction`. Group "Library", icon `icon-edit`, `Umb.Element.Update`, `ICmsAction`. Loads through `IElementService`, checks `Trashed` before writing, writes one value in the culture and segment the way Update Content Property does, and saves with `IElementService.Save` (ARCHITECTURE). Outcomes `success` "Updated", `notFound`, `propertyNotFound`. Output includes `PreviousValue`. A save cancelled by a notification maps to the Cancelled category.
   Acceptance: `UpdateElementPropertyActionTests.cs` green.
   depends-on: T2, T4. parallel-group: B
 
