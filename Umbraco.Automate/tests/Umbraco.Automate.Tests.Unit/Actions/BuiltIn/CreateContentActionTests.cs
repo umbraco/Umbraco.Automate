@@ -325,7 +325,7 @@ public class CreateContentActionTests
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
         _contentTypeService.Setup(x => x.Get(contentTypeKey)).Returns((IContentType?)null);
 
         var context = CreateContext(
@@ -343,12 +343,27 @@ public class CreateContentActionTests
         result.Outcome.ShouldBe(CreateContentAction.OutcomeContentTypeNotFound);
     }
 
+    // The backoffice refuses a child type the parent's type doesn't allow; IContentService doesn't (#515).
+    [Fact]
+    public async Task ExecuteAsync_ParentTypeDoesNotAllowTheContentType_ReturnsValidationErrorWithoutCreating()
+    {
+        var parentKey = Guid.NewGuid();
+        SetupInvariantCreate(parentKey, out var contentTypeKey);
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(Guid.NewGuid()));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = parentKey.ToString(), ContentType = contentTypeKey.ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        _contentService.Verify(x => x.Create(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
     [Fact]
     public async Task ExecuteAsync_VariantContentTypeWithoutCulture_ReturnsValidationError()
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -376,7 +391,7 @@ public class CreateContentActionTests
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
         var contentKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -422,7 +437,7 @@ public class CreateContentActionTests
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -459,7 +474,7 @@ public class CreateContentActionTests
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -616,7 +631,7 @@ public class CreateContentActionTests
     {
         var typeKey = Guid.NewGuid();
         contentTypeKey = typeKey;
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var shortStringHelper = new Mock<IShortStringHelper>();
         shortStringHelper
@@ -740,7 +755,7 @@ public class CreateContentActionTests
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -827,7 +842,7 @@ public class CreateContentActionTests
     {
         var typeKey = Guid.NewGuid();
         contentTypeKey = typeKey;
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -854,6 +869,22 @@ public class CreateContentActionTests
             .Returns(new OperationResult(OperationResultType.Success, new EventMessages()));
 
         return created;
+    }
+
+    /// <summary>
+    /// A live parent whose content type allows <paramref name="childTypeKey"/> as a child.
+    /// </summary>
+    private IContent ParentAllowing(Guid childTypeKey)
+    {
+        var parentTypeKey = Guid.NewGuid();
+        var parentType = new Mock<IContentType>();
+        parentType.SetupGet(x => x.Alias).Returns("parentPage");
+        parentType.SetupGet(x => x.AllowedContentTypes).Returns([new ContentTypeSort(childTypeKey, 0, "page")]);
+        _contentTypeService.Setup(x => x.Get(parentTypeKey)).Returns(parentType.Object);
+
+        var parent = new Mock<IContent>();
+        parent.SetupGet(x => x.ContentType).Returns(Mock.Of<ISimpleContentType>(t => t.Key == parentTypeKey));
+        return parent.Object;
     }
 
     private Guid SetupTrashedParent(Guid? key = null)
