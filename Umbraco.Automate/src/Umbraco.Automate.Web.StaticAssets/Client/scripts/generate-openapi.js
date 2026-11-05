@@ -1,9 +1,27 @@
 import chalk from "chalk";
 import https from "https";
+import { readFileSync } from "fs";
+import { createRequire } from "module";
 import { createClient, defaultPlugins } from "@hey-api/openapi-ts";
 import { getPort } from "worktree-dev-port";
 
 console.log(chalk.green("Generating OpenAPI client..."));
+
+// @umbraco-cms/backoffice depends on its own, newer @hey-api/openapi-ts, which npm hoists to the
+// repo root. If this workspace's copy is missing from node_modules, the import above silently
+// falls back to that one, and its output rewrites most of src/api for no API change (#535).
+// Stop unless the generator is the version this package asks for.
+const requireFromHere = createRequire(import.meta.url);
+const wanted = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).devDependencies[
+    "@hey-api/openapi-ts"
+];
+const installed = requireFromHere("@hey-api/openapi-ts/package.json").version;
+const majorMinor = (version) => version.replace(/^[\^~]/, "").split(".").slice(0, 2).join(".");
+if (majorMinor(installed) !== majorMinor(wanted)) {
+    console.error(chalk.red(`ERROR: Found @hey-api/openapi-ts ${installed}, but package.json asks for ${wanted}`));
+    console.error(`Run ${chalk.yellow("npm ci")} at the repo root, then try again.`);
+    process.exit(1);
+}
 
 const documentName = process.argv[2];
 if (documentName === undefined) {
@@ -65,12 +83,17 @@ try {
         input: JSON.parse(specData),
         output: "src/api",
         plugins: [
-            ...defaultPlugins,
+            // The sdk plugin is configured below, so leave the default one out.
+            ...defaultPlugins.filter((plugin) => plugin !== "@hey-api/sdk"),
             "@hey-api/client-fetch",
             {
                 name: "@hey-api/sdk",
-                asClass: true,
-                classNameBuilder: "{{name}}Service",
+                // One `<Tag>Service` class per OpenAPI tag, with static methods.
+                operations: {
+                    strategy: "byTags",
+                    container: "class",
+                    containerName: "{{name}}Service",
+                },
             },
         ],
     });
