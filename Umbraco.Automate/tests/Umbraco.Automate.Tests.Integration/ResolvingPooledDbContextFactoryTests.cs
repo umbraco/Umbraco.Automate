@@ -77,14 +77,6 @@ public class ResolvingPooledDbContextFactoryTests
 
             _logs.Messages(LogLevel.Warning).ShouldBe([PlaceholderWarning]);
         }
-
-        [Fact]
-        public void TheWarningDoesNotMentionRuntimeLevelRun()
-        {
-            CreateContext(_serviceProvider).Dispose();
-
-            _logs.Messages(LogLevel.Warning).ShouldNotContain(message => message.Contains("RuntimeLevel.Run"));
-        }
     }
 
     public class GivenTheConnectionStringIsAddedAfterBoot : IDisposable

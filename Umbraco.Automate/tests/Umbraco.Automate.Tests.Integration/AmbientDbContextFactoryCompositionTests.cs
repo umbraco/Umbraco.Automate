@@ -25,7 +25,7 @@ namespace Umbraco.Automate.Tests.Integration;
 public class AmbientDbContextFactoryCompositionTests
 {
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_ReplacesTheResolvedFactory()
+    public void AddUmbracoAutomateDbContext_ReplacesTheResolvedFactory()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -34,7 +34,7 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_StillCreatesAWorkingContext()
+    public void AddUmbracoAutomateDbContext_StillCreatesAWorkingContext()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -53,7 +53,7 @@ public class AmbientDbContextFactoryCompositionTests
     /// enlisting and nothing else would notice.
     /// </summary>
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_KeepsThePooledFactoryReachableAsDetached()
+    public void AddUmbracoAutomateDbContext_KeepsThePooledFactoryReachableAsDetached()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -85,7 +85,7 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_KeepsTheTransientDbContextRegistrationWorking()
+    public void AddUmbracoAutomateDbContext_KeepsTheTransientDbContextRegistrationWorking()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -103,7 +103,7 @@ public class AmbientDbContextFactoryCompositionTests
     /// package does not own.
     /// </summary>
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_RegistersAnAmbientConnectionThatResolvesInAnUmbracoHost()
+    public void AddUmbracoAutomateDbContext_RegistersAnAmbientConnectionThatResolvesInAnUmbracoHost()
     {
         ServiceProvider serviceProvider = BuildServiceProvider(useRealAmbientConnection: true);
 
@@ -128,7 +128,7 @@ public class AmbientDbContextFactoryCompositionTests
     /// site; an ephemeral CI boot serving only <c>swagger.json</c>).
     /// </summary>
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_DoesNotThrowWhenNoConnectionStringIsConfigured()
+    public void AddUmbracoAutomateDbContext_DoesNotThrowWhenNoConnectionStringIsConfigured()
     {
         ServiceProvider serviceProvider = BuildServiceProvider(configureConnectionString: false);
 

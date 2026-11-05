@@ -83,17 +83,18 @@ internal sealed class ResolvingPooledDbContextFactory<TDbContext> : IDbContextFa
 
     private IDbContextFactory<TDbContext> CurrentPool()
     {
+        // The flag is set once (false to true) while the DI pool is constructed, before this wrapper
+        // exists, and never flips back. _realPool is only ever set when the flag is true, so a site
+        // whose DI pool was real at boot pays one flag read per create.
+        if (!_state.BuiltOnPlaceholder)
+        {
+            return _diPool;
+        }
+
         var realPool = _realPool;
         if (realPool is not null)
         {
             return realPool;
-        }
-
-        // The flag is read per create, after the DI pool was resolved: resolving it is what runs the
-        // options delegate that sets the flag.
-        if (!_state.BuiltOnPlaceholder)
-        {
-            return _diPool;
         }
 
         return TryBuildRealPool() ?? _diPool;
