@@ -1,5 +1,3 @@
-// STORY-6. Pending until T9: delete the LIBRARY_ELEMENT_ACTIONS guard and the Skip, then make it compile and pass.
-#if LIBRARY_ELEMENT_ACTIONS
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -57,7 +55,7 @@ public class UnpublishElementActionTests
 
     // STORY-6 AC1: All cultures
     // For an invariant element the CMS wants no cultures at all (null).
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_CulturesEmptyOnInvariantElement_UnpublishesWithoutCultures()
     {
         var key = SetupElement(ContentVariation.Nothing);
@@ -70,7 +68,7 @@ public class UnpublishElementActionTests
     // STORY-6 AC1: All cultures
     // For a culture-variant element the CMS refuses null (CannotPublishInvariantWhenVariant) and
     // reads "*" as every culture.
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_CulturesEmptyOnVariantElement_UnpublishesEveryCulture()
     {
         var key = SetupElement(ContentVariation.Culture);
@@ -83,7 +81,7 @@ public class UnpublishElementActionTests
     }
 
     // STORY-6 AC1: All cultures
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_CulturesEmpty_Succeeds()
     {
         var key = SetupElement(ContentVariation.Nothing);
@@ -94,7 +92,7 @@ public class UnpublishElementActionTests
     }
 
     // STORY-6 AC2: One culture
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_OneCulture_UnpublishesOnlyThatCulture()
     {
         var key = SetupElement(ContentVariation.Culture);
@@ -110,12 +108,12 @@ public class UnpublishElementActionTests
 
     // STORY-6 AC3: Audit entry
     // AuditTrailMiddleware writes the audit entry for every ICmsAction that succeeds.
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public void Action_IsACmsAction()
         => _action.ShouldBeAssignableTo<ICmsAction>();
 
     // STORY-6 AC4: Run log
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_UnpublishSucceeds_WritesOneRunLogLine()
     {
         var key = SetupElement(ContentVariation.Nothing);
@@ -128,7 +126,7 @@ public class UnpublishElementActionTests
 
     // STORY-6 AC4: Run log
     // Unpublish Content logs only the key; the element action names the element too (R16).
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_UnpublishSucceeds_RunLogNamesTheElement()
     {
         var key = SetupElement(ContentVariation.Nothing);
@@ -144,7 +142,7 @@ public class UnpublishElementActionTests
     #region Sad path
 
     // STORY-6 AC5: Not a GUID
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_ElementKeyIsNotAGuid_FailsWithValidationError()
     {
         var result = await _action.ExecuteAsync(CreateContext(new UnpublishElementSettings { ElementKey = "abc" }), CancellationToken.None);
@@ -153,7 +151,7 @@ public class UnpublishElementActionTests
     }
 
     // STORY-6 AC6: Missing element
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerReportsElementNotFound_Fails()
     {
         var key = Guid.NewGuid();
@@ -167,7 +165,7 @@ public class UnpublishElementActionTests
     }
 
     // STORY-6 AC6: Missing element
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_ElementDoesNotExist_Fails()
     {
         var key = Guid.NewGuid();
@@ -180,7 +178,7 @@ public class UnpublishElementActionTests
 
     // STORY-6 AC7: Trashed element
     // A root Library start node passes the authorizer for an element in the recycle bin (#507).
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_ElementInRecycleBin_Fails()
     {
         var key = SetupElement(ContentVariation.Nothing, trashed: true);
@@ -191,7 +189,7 @@ public class UnpublishElementActionTests
     }
 
     // STORY-6 AC7: Trashed element
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_ElementInRecycleBin_NeverCallsUnpublish()
     {
         var key = SetupElement(ContentVariation.Nothing, trashed: true);
@@ -202,7 +200,7 @@ public class UnpublishElementActionTests
     }
 
     // STORY-6 AC8: Permission refused
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerDenies_FailsWithAuthenticationError()
     {
         var key = Guid.NewGuid();
@@ -217,7 +215,7 @@ public class UnpublishElementActionTests
 
     // STORY-6 AC8: Permission refused
     // Unpublish Content asks for the publish letter; elements have their own unpublish permission.
-    [Fact(Skip = "Pending: T9")]
+    [Fact]
     public async Task ExecuteAsync_AnyElement_AsksForTheUnpublishPermission()
     {
         var key = SetupElement(ContentVariation.Nothing);
@@ -230,6 +228,16 @@ public class UnpublishElementActionTests
                 It.Is<IReadOnlySet<string>>(s => s.Contains(ActionElementUnpublish.ActionLetter)),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    // STORY-8 AC3: Element picker
+    [Fact]
+    public void ElementKeyField_UsesTheElementPicker()
+    {
+        var field = typeof(UnpublishElementSettings).GetProperty(nameof(UnpublishElementSettings.ElementKey))!
+            .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
+
+        field.EditorUiAlias.ShouldBe(Umbraco.Automate.Core.Constants.EditorUiAliases.ElementKeyPicker);
     }
 
     #endregion
@@ -277,4 +285,3 @@ public class UnpublishElementActionTests
             },
         };
 }
-#endif
