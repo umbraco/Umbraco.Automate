@@ -752,42 +752,16 @@ internal static IUmbracoBuilder AddUmbracoAutomateCore(this IUmbracoBuilder buil
     return builder;
 }
 
-// Registers EF Core persistence — resolved via DatabaseConnectionInfo (explicit opt-in)
-internal static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
-{
-    builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-        (serviceProvider, options, _, _) =>
-    {
-        var config = serviceProvider.GetRequiredService<IConfiguration>();
+```
 
-        // Resolve from dedicated umbracoAutomateDbDSN, OR umbracoDbDSN when
-        // Umbraco:Automate:UseUmbracoDbDSN is explicitly set. Throws if neither is configured.
-        var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(config);
+**Persistence registration.** `AddUmbracoAutomatePersistence` registers the repositories, the WorkflowCore persistence provider and the startup migrations. It calls `AddUmbracoAutomateDbContext` for the database itself, which does two things:
 
-        switch (providerName)
-        {
-            case Constants.ProviderNames.SQLServer:
-                options.UseSqlServer(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.SqlServer");
-                    x.MigrationsHistoryTable("__UmbracoAutomate_MigrationsHistory");
-                });
-                break;
+- Registers the pooled `UmbracoAutomateDbContext` factory with `AutomatePooledDbContextOptions.Configure`. That resolves the connection string at run time through `DatabaseConnectionInfo.Resolve`. If nothing is configured, it falls back to a placeholder connection and logs a warning instead of throwing.
+- Enlists the factory in the ambient Umbraco scope (`EnlistDbContextFactoryInAmbientScope`), so that when Automate shares the CMS database its reads and writes join the CMS transaction.
 
-            case Constants.ProviderNames.SQLLite:
-            case "Microsoft.Data.SQLite":
-                options.UseSqlite(connectionString, x =>
-                {
-                    x.MigrationsAssembly("Umbraco.Automate.Persistence.Sqlite");
-                    x.MigrationsHistoryTable("__UmbracoAutomate_MigrationsHistory");
-                });
-                break;
-        }
-    });
+The code is the reference, in `Umbraco.Automate/src/Umbraco.Automate.Persistence/Configuration/UmbracoBuilderExtensions.cs`. It isn't copied here so this spec doesn't drift from it.
 
-    return builder;
-}
-
+```csharp
 // Registers WorkflowCore with Umbraco's connection string as default
 internal static IUmbracoBuilder AddUmbracoAutomateWorkflowEngine(
     this IUmbracoBuilder builder,
