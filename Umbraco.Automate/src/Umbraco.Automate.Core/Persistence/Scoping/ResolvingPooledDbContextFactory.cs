@@ -42,6 +42,11 @@ internal sealed record ResolvingPooledFactorySettings(
 /// The real pool is never replaced, and the placeholder pool is abandoned rather than disposed: it
 /// holds no live connections, as an in-memory SQLite context was never used.
 /// </para>
+/// <para>
+/// The real pool replays only the caller's provider-setup delegate, not any separate
+/// <c>ConfigureDbContext&lt;T&gt;</c> registrations. "Built once" assumes this factory is a singleton,
+/// which is the lifetime <c>AddPooledDbContextFactory</c> registers.
+/// </para>
 /// </remarks>
 internal sealed class ResolvingPooledDbContextFactory<TDbContext> : IDbContextFactory<TDbContext>
     where TDbContext : DbContext

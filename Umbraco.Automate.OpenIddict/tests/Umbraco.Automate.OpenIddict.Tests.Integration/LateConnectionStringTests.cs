@@ -43,7 +43,7 @@ public class LateConnectionStringTests
 
         public void Dispose() => _serviceProvider.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void CreatesAContextOnThePlaceholder()
         {
             using OpenIddictDbContext context = CreateContext(_serviceProvider);
@@ -51,7 +51,7 @@ public class LateConnectionStringTests
             context.Database.GetConnectionString().ShouldBe(Placeholder);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void LogsTheWarningOnceWithTheNewWording()
         {
             CreateContext(_serviceProvider).Dispose();
@@ -81,7 +81,7 @@ public class LateConnectionStringTests
 
         public void Dispose() => _serviceProvider.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void UsesTheConfiguredConnection()
         {
             using OpenIddictDbContext context = CreateContext(_serviceProvider);
@@ -89,7 +89,7 @@ public class LateConnectionStringTests
             context.Database.GetConnectionString().ShouldBe(RealConnectionString);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void LogsTheSwitchOnce()
         {
             CreateContext(_serviceProvider).Dispose();
