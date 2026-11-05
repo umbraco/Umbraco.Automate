@@ -1,6 +1,3 @@
-// STORY-3. Pending until T6: delete the LIBRARY_ELEMENT_ACTIONS guard and the Skip, then make it compile and pass.
-
-#if LIBRARY_ELEMENT_ACTIONS
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -8,6 +5,7 @@ using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -62,7 +60,7 @@ public class GetElementPropertyActionTests
     #region Happy path
 
     // STORY-3 AC1: Value present
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_PropertyHasAValue_TakesTheSuccessOutcome()
     {
         var elementKey = Guid.NewGuid();
@@ -76,7 +74,7 @@ public class GetElementPropertyActionTests
     }
 
     // STORY-3 AC2: Output
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_PropertyHasAValue_ReturnsTheProjectedOutput()
     {
         var elementKey = Guid.NewGuid();
@@ -97,7 +95,7 @@ public class GetElementPropertyActionTests
 
     // STORY-3 AC3: Value empty
     // The normaliser returns null for an empty property, as for content; HasValue follows it.
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_PropertyIsEmpty_ReportsNoValue()
     {
         var elementKey = Guid.NewGuid();
@@ -110,7 +108,7 @@ public class GetElementPropertyActionTests
     }
 
     // STORY-3 AC4: Culture given
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_CultureGiven_ReturnsThatCulturesValue()
     {
         var elementKey = Guid.NewGuid();
@@ -128,7 +126,7 @@ public class GetElementPropertyActionTests
     #region Sad path
 
     // STORY-3 AC5: Not a GUID
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_ElementKeyNotAGuid_FailsWithValidationError()
     {
         var result = await _action.ExecuteAsync(CreateContext("abc", "customSchema"), CancellationToken.None);
@@ -137,7 +135,7 @@ public class GetElementPropertyActionTests
     }
 
     // STORY-3 AC6: Missing element
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerReportsElementNotFound_TakesTheNotFoundOutcome()
     {
         var elementKey = Guid.NewGuid();
@@ -154,7 +152,7 @@ public class GetElementPropertyActionTests
     // The published element cache drops trashed elements, so a root-start-node account that
     // passes the authorizer still reads nothing. A folder-start-node account gets NotFound from
     // the authorizer instead (STORY-1 AC10), which AC6's path already covers.
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_ElementNotInPublishedCache_TakesTheNotFoundOutcome()
     {
         var elementKey = Guid.NewGuid();
@@ -167,7 +165,7 @@ public class GetElementPropertyActionTests
     }
 
     // STORY-3 AC8: Missing property
-    [Fact(Skip = "Pending: T6")]
+    [Fact]
     public async Task ExecuteAsync_ElementTypeHasNoSuchProperty_TakesThePropertyNotFoundOutcome()
     {
         var elementKey = Guid.NewGuid();
@@ -227,4 +225,3 @@ public class GetElementPropertyActionTests
             },
         };
 }
-#endif
