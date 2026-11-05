@@ -19,7 +19,7 @@
 
 ## Persistence and OpenIddict
 
-- [ ] **T2** - **wire: core's DbContext into the shared helper.** story: S1 (AC1-AC10), S2 (AC1, AC2), S3 (AC1, AC2).
+- [x] **T2** - **wire: core's DbContext into the shared helper.** story: S1 (AC1-AC10), S2 (AC1, AC2), S3 (AC1, AC2).
   - `AddUmbracoAutomateDbContext` (`Umbraco.Automate/src/Umbraco.Automate.Persistence/Configuration/UmbracoBuilderExtensions.cs`) calls `AddAutomatePooledDbContext<UmbracoAutomateDbContext>`.
   - `AutomatePooledDbContextOptions` shrinks to the provider setup (`UmbracoAutomateDbContext.ConfigureProvider` plus `AutomateReadinessInterceptor`). Its resolve-or-fallback copy and the old warning go.
   - The S3 warning text and the S1 AC6 "found" text are passed in.
