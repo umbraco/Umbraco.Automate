@@ -14,7 +14,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
 
 ## Core
 
-- [ ] **T2** - story: STORY-1 (AC1–AC13). Element access on the authorizer (ARCHITECTURE "New members on `IAutomationActionAuthorizer`" and "The authorizer wraps…"):
+- [x] **T2** - story: STORY-1 (AC1–AC13). Element access on the authorizer (ARCHITECTURE "New members on `IAutomationActionAuthorizer`" and "The authorizer wraps…"):
   - `IAutomationActionAuthorizer`: add `AuthorizeElementAsync` (the same two overloads `AuthorizeContentAsync` has) and `AuthorizeElementParentAsync(Guid? folderKey, …)`. Give each a default that fails with an "element authorization isn't supported" message, marked `// TODO (V19): Remove the default implementation.` like the existing ones.
   - `AutomationActionAuthorizer`: elements go through `IElementPermissionService`, and a folder goes through `IElementContainerPermissionService`. No folder means root access, through `AuthorizeRootAccessAsync`. Map `ElementAuthorizationStatus` the same way the content statuses are mapped, and reuse `IsHiddenInRecycleBin` with `UmbracoObjectTypes.Element` / `ElementContainer` and `Constants.System.RecycleBinElementPathPrefix`.
   - `AutomationActionAuthorizerExtensions`: add `AuthorizeElementOrFailAsync` and `AuthorizeElementParentOrFailAsync`, matching the content pair.

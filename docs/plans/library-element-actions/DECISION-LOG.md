@@ -34,3 +34,8 @@
 - **Corrected while writing specs: the CMS doesn't refuse creating an element in a trashed folder.** BRIEF and ARCHITECTURE said it did (`InTrash`, `ElementEditingService.cs:357`), but that check is only on move and restore. On create, 18.1.0 only checks that the folder exists (`:254`). Create Element now checks the folder's `Trashed` itself, the same #514 rule as everywhere else.
 - **Get Element and Get Element Property don't check `Trashed`.** `IPublishedElement` has no such property, and the published cache already drops trashed elements.
 - **Pending C# specs are wrapped in `#if LIBRARY_ELEMENT_ACTIONS`.** `bindable-settings` used reflection to keep its specs compiling, which doesn't scale to six new actions and the authorizer. Each task deletes its file's guard. Pending acceptance specs are `test.fixme`, as before.
+
+## 05-11-2026 · feature-build
+- **T2: a trashed folder hidden from a scoped account is "not found", unlike content and media parents, which fail.** STORY-1 AC11 asks for it, so Create Element can take `parentNotFound` for every account.
+- **T2: "no folder" uses `IElementPermissionService.AuthorizeRootAccessAsync`**, the same call the CMS's create-element endpoint makes for the Library root. The container service's root check has the same body.
+- **T2 note for the action tasks:** `AuthorizeElementOrFailAsync` and `AuthorizeElementParentOrFailAsync` turn "not found" into an Authentication failure, as the content pair does. Actions with a `notFound` or `parentNotFound` outcome call the interface member and branch on `IsNotFound` first, as the content actions do.
