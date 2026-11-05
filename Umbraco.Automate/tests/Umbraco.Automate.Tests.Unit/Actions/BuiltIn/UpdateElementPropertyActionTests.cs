@@ -1,5 +1,3 @@
-// STORY-4. Pending until T7: delete the LIBRARY_ELEMENT_ACTIONS guard and the Skip, then make it compile and pass.
-#if LIBRARY_ELEMENT_ACTIONS
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -58,7 +56,7 @@ public class UpdateElementPropertyActionTests
     #region Happy path
 
     // STORY-4 AC1: Value written
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_PropertyExists_WritesTheNewValue()
     {
         var key = Guid.NewGuid();
@@ -70,7 +68,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC1: Value written
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_PropertyExists_SavesTheElement()
     {
         var key = Guid.NewGuid();
@@ -82,7 +80,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC2: Outcome
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_Succeeds()
     {
         var key = Guid.NewGuid();
@@ -95,7 +93,7 @@ public class UpdateElementPropertyActionTests
 
     // STORY-4 AC2: Outcome
     // No outcome on the result routes the step through its default exit, "success".
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_TakesTheDefaultOutcome()
     {
         var key = Guid.NewGuid();
@@ -107,7 +105,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC3: Previous value
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_OutputsThePreviousValue()
     {
         var key = Guid.NewGuid();
@@ -120,7 +118,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC4: Other properties untouched
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_LeavesOtherPropertiesAlone()
     {
         var key = Guid.NewGuid();
@@ -132,7 +130,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC5: Published version untouched
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_DoesNotPublish()
     {
         var key = Guid.NewGuid();
@@ -144,7 +142,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC5: Published version untouched
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_DoesNotSaveAndPublish()
     {
         var key = Guid.NewGuid();
@@ -156,7 +154,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC6: Culture and segment
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_CultureAndSegmentGiven_WritesOnlyThatVariant()
     {
         var key = Guid.NewGuid();
@@ -170,7 +168,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC7: Blank culture, variant element
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_BlankCultureOnVariantElement_WritesTheFirstCulture()
     {
         var key = Guid.NewGuid();
@@ -185,7 +183,7 @@ public class UpdateElementPropertyActionTests
     // STORY-4 AC8: Bound key
     // Bindings resolve before the action runs, so the action only ever sees the resolved key.
     // The field has to accept a binding for that to happen.
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public void ElementKeyField_SupportsBindings()
     {
         var field = typeof(UpdateElementPropertySettings).GetProperty(nameof(UpdateElementPropertySettings.ElementKey))!
@@ -194,14 +192,24 @@ public class UpdateElementPropertyActionTests
         field.SupportsBindings.ShouldBeTrue();
     }
 
+    // STORY-8 AC3: Element picker
+    [Fact]
+    public void ElementKeyField_UsesTheElementPicker()
+    {
+        var field = typeof(UpdateElementPropertySettings).GetProperty(nameof(UpdateElementPropertySettings.ElementKey))!
+            .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
+
+        field.EditorUiAlias.ShouldBe(Umbraco.Automate.Core.Constants.EditorUiAliases.ElementKeyPicker);
+    }
+
     // STORY-4 AC9: Audit entry
     // AuditTrailMiddleware writes the audit entry for every ICmsAction that succeeds.
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public void Action_IsACmsAction()
         => _action.ShouldBeAssignableTo<ICmsAction>();
 
     // STORY-4 AC10: Run log
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_WritesOneRunLogLine()
     {
         var key = Guid.NewGuid();
@@ -214,7 +222,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC10: Run log
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_RunLogNamesTheElement()
     {
         var key = Guid.NewGuid();
@@ -227,7 +235,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC10: Run log
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_WriteSucceeds_RunLogNamesTheCultureAndSegment()
     {
         var key = Guid.NewGuid();
@@ -244,7 +252,7 @@ public class UpdateElementPropertyActionTests
     #region Sad path
 
     // STORY-4 AC11: Not a GUID
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_ElementKeyIsNotAGuid_FailsWithValidationError()
     {
         var context = CreateContext(new UpdateElementPropertySettings
@@ -260,7 +268,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC12: Missing element, outcome
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerReportsElementNotFound_TakesNotFoundOutcome()
     {
         var key = SetupAuthorizerNotFound();
@@ -271,7 +279,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC12: Missing element, outcome
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_ElementDoesNotExist_TakesNotFoundOutcome()
     {
         var key = Guid.NewGuid();
@@ -283,7 +291,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC13: Missing element, nothing saved
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerReportsElementNotFound_DoesNotSave()
     {
         var key = SetupAuthorizerNotFound();
@@ -294,7 +302,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC13: Missing element, nothing saved
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_ElementDoesNotExist_DoesNotSave()
     {
         var key = Guid.NewGuid();
@@ -307,7 +315,7 @@ public class UpdateElementPropertyActionTests
 
     // STORY-4 AC14: Trashed element, outcome
     // A root Library start node passes the authorizer for an element in the recycle bin (#507).
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_ElementInRecycleBin_TakesNotFoundOutcome()
     {
         var key = Guid.NewGuid();
@@ -320,7 +328,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC15: Trashed element, nothing saved
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_ElementInRecycleBin_DoesNotSave()
     {
         var key = Guid.NewGuid();
@@ -333,7 +341,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC16: Missing property, outcome
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_PropertyNotOnElementType_TakesPropertyNotFoundOutcome()
     {
         var key = Guid.NewGuid();
@@ -345,7 +353,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC17: Missing property, nothing saved
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_PropertyNotOnElementType_DoesNotSave()
     {
         var key = Guid.NewGuid();
@@ -357,7 +365,7 @@ public class UpdateElementPropertyActionTests
     }
 
     // STORY-4 AC18: Save cancelled
-    [Fact(Skip = "Pending: T7")]
+    [Fact]
     public async Task ExecuteAsync_SaveCancelledByNotification_FailsWithCancelledError()
     {
         var key = Guid.NewGuid();
@@ -448,4 +456,3 @@ public class UpdateElementPropertyActionTests
             },
         };
 }
-#endif
