@@ -33,7 +33,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: `GetElementActionTests.cs` green.
   depends-on: T2, T3, T4. parallel-group: B
 
-- [ ] **T6** - story: STORY-3 (AC1–AC8). `GetElementPropertyAction` with its settings and output, copying `GetContentPropertyAction`. Same attributes as T5. Outcomes `success`, `notFound`, `propertyNotFound`.
+- [x] **T6** - story: STORY-3 (AC1–AC8). `GetElementPropertyAction` with its settings and output, copying `GetContentPropertyAction`. Same attributes as T5. Outcomes `success`, `notFound`, `propertyNotFound`.
   Acceptance: `GetElementPropertyActionTests.cs` green.
   depends-on: T2, T3, T4. parallel-group: B
 
