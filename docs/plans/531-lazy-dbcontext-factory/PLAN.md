@@ -43,7 +43,7 @@
 
 ## Smoke
 
-- [ ] **T5** - **wire: the fix into a fresh backoffice install.** story: S5 (AC1-AC4). Run the brief's Repro on a scratch demo with no connection strings, `UseNamedConnectionString: umbracoDbDSN` and unattended install off. Use an explicit `--urls` port, and check the listener's exe path is this worktree's. Complete the installer with SQLite. Then, without restarting, log in, create, publish and run a Manual automation with a Log Message step. Check the log for OAuth cleanup errors five minutes after boot.
+- [x] **T5** - **wire: the fix into a fresh backoffice install.** story: S5 (AC1-AC4). Run the brief's Repro on a scratch demo with no connection strings, `UseNamedConnectionString: umbracoDbDSN` and unattended install off. Use an explicit `--urls` port, and check the listener's exe path is this worktree's. Complete the installer with SQLite. Then, without restarting, log in, create, publish and run a Manual automation with a Log Message step. Check the log for OAuth cleanup errors five minutes after boot.
   Acceptance: all four S5 criteria hold in one process, and the log has no "no such table" errors after `RestartRuntimeStep`.
   depends-on: T2, T3
 
