@@ -29,6 +29,9 @@ public sealed class FindContentQueryExecutionTests : IDisposable
         var options = Microsoft.Extensions.Options.Options.Create(new LuceneDirectoryIndexOptions
         {
             DirectoryFactory = directoryFactory,
+
+            // Umbraco indexes __Path as a raw (untokenised) field, so path-prefix queries work.
+            FieldDefinitions = new FieldDefinitionCollection(new FieldDefinition("__Path", FieldDefinitionTypes.Raw)),
         });
 
         _index = new LuceneIndex(
@@ -53,6 +56,8 @@ public sealed class FindContentQueryExecutionTests : IDisposable
             CreateItem("2", "Pressure Vessel"),
             CreateItem("3", "Compress Archive"),
             CreateItem("4", "Homepage"),
+            CreateItem("5", "Duplicate Page", path: "-1,1230"),
+            CreateItem("6", "Duplicate Page", path: "-1,-20,1231"),
         ]);
 
         if (!indexingComplete.Wait(TimeSpan.FromSeconds(30)))
@@ -118,6 +123,20 @@ public sealed class FindContentQueryExecutionTests : IDisposable
         Should.NotThrow(() => Execute(query).ToList());
     }
 
+    [Fact]
+    public void Query_LeavesOutItemsInTheRecycleBin()
+    {
+        // Regression for #513: "Include unpublished" searches the internal index, which keeps
+        // trashed items (path under -1,-20). A root service account passes the permission filter
+        // for them, so the query itself has to leave them out.
+        var query = FindContentAction.BuildQuery(
+            "Duplicate Page", FindContentMatchMode.Exact, culture: null, contentTypeAliases: []);
+
+        var ids = Execute(query).Select(r => r.Id).ToList();
+
+        ids.ShouldBe(["5"]);
+    }
+
     /// <summary>
     /// Mirrors the production execution path: leading wildcards are enabled so the Contains
     /// query parses. Lives in the test rather than reflecting into the private production helper
@@ -137,12 +156,16 @@ public sealed class FindContentQueryExecutionTests : IDisposable
             .Execute(QueryOptions.SkipTake(0, 10));
     }
 
-    private static ValueSet CreateItem(string id, string nodeName)
-        => ValueSet.FromObject(id, "content", new
+    private static ValueSet CreateItem(string id, string nodeName, string? path = null)
+    {
+        var values = new Dictionary<string, object> { ["nodeName"] = nodeName, ["__IndexType"] = "content" };
+        if (path is not null)
         {
-            nodeName,
-            __IndexType = "content",
-        });
+            values["__Path"] = path;
+        }
+
+        return new ValueSet(id, "content", values);
+    }
 
     public void Dispose() => _index.Dispose();
 

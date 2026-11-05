@@ -69,7 +69,7 @@ public sealed class FindContentSettings
 
     /// <summary>
     /// Gets or sets a value indicating whether to include unpublished (draft) content.
-    /// <c>false</c> (default) searches the ExternalIndex (published). <c>true</c> searches the InternalIndex (all content).
+    /// <c>false</c> (default) searches the ExternalIndex (published). <c>true</c> searches the InternalIndex (all content outside the recycle bin).
     /// </summary>
     [Field(
         Label = "Include unpublished",
