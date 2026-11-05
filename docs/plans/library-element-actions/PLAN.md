@@ -41,7 +41,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: `UpdateElementPropertyActionTests.cs` green.
   depends-on: T2, T4. parallel-group: B
 
-- [ ] **T8** - story: STORY-5 (AC1–AC3, AC5–AC11). `PublishElementAction` with its settings and output, copying `PublishContentAction`. Icon `icon-globe`, `Umb.Element.Publish`, `ICmsAction`, no outcomes. Loads the element and checks `Trashed` before calling `IElementPublishingService.PublishAsync`. Maps the CMS's publish statuses to error categories the way `PublishContentAction.MapErrorCategory` does.
+- [x] **T8** - story: STORY-5 (AC1–AC3, AC5–AC11). `PublishElementAction` with its settings and output, copying `PublishContentAction`. Icon `icon-globe`, `Umb.Element.Publish`, `ICmsAction`, no outcomes. Loads the element and checks `Trashed` before calling `IElementPublishingService.PublishAsync`. Maps the CMS's publish statuses to error categories the way `PublishContentAction.MapErrorCategory` does.
   Acceptance: `PublishElementActionTests.cs` green.
   depends-on: T2, T4. parallel-group: B
 
