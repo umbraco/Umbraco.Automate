@@ -3,11 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Automate.Core.Persistence.Scoping;
-using Umbraco.Automate.Extensions;
 using Umbraco.Automate.OpenIddict.Credentials.Persistence;
 using Umbraco.Automate.OpenIddict.Extensions;
 using Umbraco.Cms.Core.Configuration.Models;
-using Umbraco.Extensions;
 
 namespace Umbraco.Automate.OpenIddict.Tests.Integration;
 
@@ -35,19 +33,8 @@ public class PooledDbContextOptionsTests
         services.AddLogging();
         services.AddSingleton<IAmbientAutomateConnection, NoAmbientConnection>();
 
-        // The registration block from AddPersistence, which is private behind an IUmbracoBuilder. The
-        // options delegate is the production one, so this exercises the real fallback.
-        services.AddUmbracoDbContext<OpenIddictDbContext>(
-            OpenIddictPooledDbContextOptions.Configure,
-            shareUmbracoConnection: false);
-        services.EnlistDbContextFactoryInAmbientScope(
-            (_, connection, providerName) =>
-            {
-                var options = new DbContextOptionsBuilder<OpenIddictDbContext>();
-                OpenIddictDbContext.ConfigureProvider(options, connection, providerName);
-
-                return new OpenIddictDbContext(options.Options);
-            });
+        // The DbContext registration AddPersistence uses, so this exercises the real fallback.
+        services.AddOpenIddictDbContext();
 
         using ServiceProvider serviceProvider = services.BuildServiceProvider();
 
