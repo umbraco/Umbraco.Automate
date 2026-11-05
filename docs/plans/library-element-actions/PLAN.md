@@ -29,7 +29,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: the frontend build passes; on the demo site, a test settings field using the alias picks an element and stores one GUID string (checked by hand, recorded in BUILD-LOG). The real field check is T12.
   depends-on: T1. parallel-group: A
 
-- [ ] **T5** - story: STORY-2 (AC1–AC10). `GetElementAction`, `GetElementSettings`, `GetElementOutput` in `Actions/BuiltIn/`, copying `GetContentAction`: `[Action]` with group "Library", icon `icon-plugin`, `RequiredSections = [Constants.Applications.Library]`, `Umb.Element.Read`. Element field uses `ElementKeyPicker` with `SupportsBindings`. Reads `IPublishedElementCache.GetByIdAsync`. `IPublishedElement` has no `Trashed`, and the cache drops trashed elements (`ElementCacheService.cs:331`), so a trashed element comes back null and takes `notFound`. Outcomes `success` "Found" (default) and `notFound`. Output fields as SPEC. Logs one line with `ActionLogFormat.Item`.
+- [x] **T5** - story: STORY-2 (AC1–AC10). `GetElementAction`, `GetElementSettings`, `GetElementOutput` in `Actions/BuiltIn/`, copying `GetContentAction`: `[Action]` with group "Library", icon `icon-plugin`, `RequiredSections = [Constants.Applications.Library]`, `Umb.Element.Read`. Element field uses `ElementKeyPicker` with `SupportsBindings`. Reads `IPublishedElementCache.GetByIdAsync`. `IPublishedElement` has no `Trashed`, and the cache drops trashed elements (`ElementCacheService.cs:331`), so a trashed element comes back null and takes `notFound`. Outcomes `success` "Found" (default) and `notFound`. Output fields as SPEC. Logs one line with `ActionLogFormat.Item`.
   Acceptance: `GetElementActionTests.cs` green.
   depends-on: T2, T3, T4. parallel-group: B
 
