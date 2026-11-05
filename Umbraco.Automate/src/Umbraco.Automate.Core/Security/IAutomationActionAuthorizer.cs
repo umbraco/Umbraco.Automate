@@ -15,6 +15,9 @@ public interface IAutomationActionAuthorizer
     private const string RootAuthorizationNotSupportedMessage =
         "This authorizer does not implement root-level authorization, so access to the root is denied.";
 
+    private const string ElementAuthorizationNotSupportedMessage =
+        "This authorizer does not implement element authorization, so access to Library elements and folders is denied.";
+
     /// <summary>
     /// Authorises the service account currently set on the ambient backoffice accessor for
     /// the given content node and permission letters.
@@ -127,4 +130,43 @@ public interface IAutomationActionAuthorizer
         => parentKey.HasValue
             ? AuthorizeMediaAsync(parentKey.Value, cancellationToken)
             : AuthorizeMediaRootAsync(cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for
+    /// the given Library element and permission letters.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. Element access cannot be derived from the content members, so it fails closed.
+    Task<AutomationAuthorizationResult> AuthorizeElementAsync(
+        Guid elementKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+        => Task.FromResult(AutomationAuthorizationResult.Fail(ElementAuthorizationNotSupportedMessage));
+
+    /// <summary>
+    /// Authorises an explicit user for the given Library element and permission letters. Used
+    /// by dispatch-time authorisation, before any action middleware has set the ambient accessor.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. Element access cannot be derived from the content members, so it fails closed.
+    Task<AutomationAuthorizationResult> AuthorizeElementAsync(
+        IUser user,
+        Guid elementKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+        => Task.FromResult(AutomationAuthorizationResult.Fail(ElementAuthorizationNotSupportedMessage));
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for a
+    /// target Library folder, or the Library root when <paramref name="folderKey"/> is
+    /// <c>null</c>. A folder is checked through the container permissions, not the element
+    /// permissions, because an element lookup resolves element keys only.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling. Folder and root access cannot be derived from the element member, so it fails closed.
+    Task<AutomationAuthorizationResult> AuthorizeElementParentAsync(
+        Guid? folderKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+        => Task.FromResult(AutomationAuthorizationResult.Fail(ElementAuthorizationNotSupportedMessage));
 }

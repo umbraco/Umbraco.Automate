@@ -109,6 +109,42 @@ public static class AutomationActionAuthorizerExtensions
             : result.ToFailedActionResult();
     }
 
+    /// <summary>
+    /// Authorises the service account against the Library element <paramref name="elementKey"/>
+    /// for the given permission letters and returns a failed <see cref="ActionResult"/> when
+    /// access is denied. Returns <c>null</c> on success.
+    /// </summary>
+    public static async Task<ActionResult?> AuthorizeElementOrFailAsync(
+        this IAutomationActionAuthorizer authorizer,
+        Guid elementKey,
+        IReadOnlyList<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var result = await authorizer.AuthorizeElementAsync(elementKey, ToSet(permissions), cancellationToken);
+        return result.Authorized
+            ? null
+            : result.ToFailedActionResult();
+    }
+
+    /// <summary>
+    /// Authorises the service account against a target Library folder (or the Library root
+    /// when <paramref name="folderKey"/> is <c>null</c>) for the given permission letters, and
+    /// returns a failed <see cref="ActionResult"/> when access is denied. Returns <c>null</c>
+    /// on success. Used alongside <see cref="AuthorizeElementOrFailAsync"/> by actions that
+    /// relocate or create elements.
+    /// </summary>
+    public static async Task<ActionResult?> AuthorizeElementParentOrFailAsync(
+        this IAutomationActionAuthorizer authorizer,
+        Guid? folderKey,
+        IReadOnlyList<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var result = await authorizer.AuthorizeElementParentAsync(folderKey, ToSet(permissions), cancellationToken);
+        return result.Authorized
+            ? null
+            : result.ToFailedActionResult();
+    }
+
     internal static IReadOnlySet<string> ToSet(IReadOnlyList<string> permissions)
         => permissions.Count == 0
             ? EmptyPermissionSet

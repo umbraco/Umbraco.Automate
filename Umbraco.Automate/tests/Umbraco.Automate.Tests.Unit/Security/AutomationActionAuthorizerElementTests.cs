@@ -1,6 +1,3 @@
-// STORY-1. Pending until T2: delete the LIBRARY_ELEMENT_ACTIONS guard and the Skip, then make it compile and pass.
-
-#if LIBRARY_ELEMENT_ACTIONS
 using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Cms.Core.Actions;
@@ -71,7 +68,7 @@ public class AutomationActionAuthorizerElementTests
     #region Happy path
 
     // STORY-1 AC1: Element in reach
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_returns_success_when_cms_authorises_the_element()
     {
         var elementKey = Guid.NewGuid();
@@ -83,7 +80,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC1: Element in reach (explicit-user overload, used at dispatch time)
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_for_an_explicit_user_returns_success_when_cms_authorises_the_element()
     {
         var user = MockUser();
@@ -96,7 +93,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC2: Folder in reach
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementParentAsync_returns_success_when_cms_authorises_the_folder()
     {
         var folderKey = Guid.NewGuid();
@@ -108,7 +105,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC3: Library root
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementParentAsync_returns_success_at_the_root_when_cms_authorises_root_access()
     {
         _elements
@@ -127,7 +124,7 @@ public class AutomationActionAuthorizerElementTests
     #region Sad path
 
     // STORY-1 AC4: Permission missing
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_fails_naming_the_permission_when_cms_reports_it_missing()
     {
         var elementKey = Guid.NewGuid();
@@ -140,7 +137,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC5: Element outside the start node
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_fails_when_a_live_element_is_outside_the_start_node()
     {
         var elementKey = Guid.NewGuid();
@@ -156,7 +153,7 @@ public class AutomationActionAuthorizerElementTests
     // The CMS resolves a granular permission set on the element's folder through the element's
     // path, and reports it as a missing permission. The acceptance spec ("Folder permissions",
     // STORY-1 AC14) covers the real resolution; here the authorizer must pass that refusal on.
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_fails_when_a_folder_permission_removes_the_verb()
     {
         var elementKey = Guid.NewGuid();
@@ -168,7 +165,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC7: Folder outside the start node
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementParentAsync_fails_when_a_live_folder_is_outside_the_start_node()
     {
         var folderKey = Guid.NewGuid();
@@ -181,7 +178,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC8: No root access
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementParentAsync_fails_at_the_root_without_root_access()
     {
         _elements
@@ -194,7 +191,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC9: Element missing
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_flags_not_found_when_cms_reports_not_found()
     {
         var elementKey = Guid.NewGuid();
@@ -206,7 +203,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC9: Element missing (explicit-user overload)
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_for_an_explicit_user_flags_not_found_when_cms_reports_not_found()
     {
         var user = MockUser();
@@ -221,7 +218,7 @@ public class AutomationActionAuthorizerElementTests
     // STORY-1 AC10: Trashed element, scoped account
     // The CMS reports a trashed element as missing path access to an account with a folder start
     // node, because the Library recycle bin (-1,-22,) sits outside every start-node path.
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_flags_not_found_for_a_trashed_element_denied_on_path()
     {
         var elementKey = Guid.NewGuid();
@@ -234,7 +231,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC11: Trashed folder, scoped account
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementParentAsync_flags_not_found_for_a_trashed_folder_denied_on_path()
     {
         var folderKey = Guid.NewGuid();
@@ -249,7 +246,7 @@ public class AutomationActionAuthorizerElementTests
     // STORY-1 AC12: Old decorator, element check
     // Same approach as AutomationActionAuthorizerDefaultsTests: a CallBase mock stands in for a
     // site decorator that predates the element members, so the interface defaults run.
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_default_fails_as_unsupported()
     {
         var result = await BuildDecoratorWithoutElementMembers().Object.AuthorizeElementAsync(Guid.NewGuid(), Update, default);
@@ -259,7 +256,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC12: Old decorator, element check (explicit-user overload)
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementAsync_for_an_explicit_user_default_fails_as_unsupported()
     {
         var result = await BuildDecoratorWithoutElementMembers().Object.AuthorizeElementAsync(MockUser(), Guid.NewGuid(), Update, default);
@@ -269,7 +266,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC13: Old decorator, folder check
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementParentAsync_default_fails_as_unsupported_for_a_folder()
     {
         var result = await BuildDecoratorWithoutElementMembers().Object.AuthorizeElementParentAsync(Guid.NewGuid(), Create, default);
@@ -279,7 +276,7 @@ public class AutomationActionAuthorizerElementTests
     }
 
     // STORY-1 AC13: Old decorator, folder check (no folder, so the Library root)
-    [Fact(Skip = "Pending: T2")]
+    [Fact]
     public async Task AuthorizeElementParentAsync_default_fails_as_unsupported_at_the_root()
     {
         var result = await BuildDecoratorWithoutElementMembers().Object.AuthorizeElementParentAsync(null, Create, default);
@@ -320,4 +317,3 @@ public class AutomationActionAuthorizerElementTests
             .Setup(e => e.GetAllPaths(type, It.IsAny<Guid[]>()))
             .Returns([new TreeEntityPath { Id = 1234, Path = path }]);
 }
-#endif
