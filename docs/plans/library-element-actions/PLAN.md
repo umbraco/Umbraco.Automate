@@ -21,7 +21,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: `Security/AutomationActionAuthorizerElementTests.cs` goes green, and the existing authorizer tests stay green.
   depends-on: T1. parallel-group: A
 
-- [ ] **T3** - story: STORY-2 (AC2), STORY-3 (AC2). `IContentValueNormaliser` overloads that take `IPublishedElement`, implemented in `ContentValueNormaliser` with the same output shape as content. The interface defaults hand an `IPublishedContent` to the existing method and throw for anything else (ARCHITECTURE).
+- [x] **T3** - story: STORY-2 (AC2), STORY-3 (AC2). `IContentValueNormaliser` overloads that take `IPublishedElement`, implemented in `ContentValueNormaliser` with the same output shape as content. The interface defaults hand an `IPublishedContent` to the existing method and throw for anything else (ARCHITECTURE).
   Acceptance: new unit specs in `Umbraco.Automate.Tests.Unit/Cms/ContentValueNormaliserTests.cs` show an element's text, number and picker values come out in the same shape as the same values on a page.
   depends-on: T1. parallel-group: A
 
