@@ -25,7 +25,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: new unit specs in `Umbraco.Automate.Tests.Unit/Cms/ContentValueNormaliserTests.cs` show an element's text, number and picker values come out in the same shape as the same values on a page.
   depends-on: T1. parallel-group: A
 
-- [ ] **T4** - story: STORY-8 (AC3, AC4, AC6). The element key picker: `Constants.EditorUiAliases.ElementKeyPicker = "Umb.Automate.ElementKeyPicker"`, plus `core/components/element-key-picker/element-key-picker.element.ts` and `manifests.ts`, registered in `core/manifests.ts`. It wraps `umb-input-element` with max 1, stores one key as a string, and takes `folderOnly` from its config. Copy `ua-media-key-picker` for structure. Check that `umb-input-element` with `folderOnly` lists folders only on CMS 18.1.0.
+- [x] **T4** - story: STORY-8 (AC3, AC4, AC6). The element key picker: `Constants.EditorUiAliases.ElementKeyPicker = "Umb.Automate.ElementKeyPicker"`, plus `core/components/element-key-picker/element-key-picker.element.ts` and `manifests.ts`, registered in `core/manifests.ts`. It wraps `umb-input-element` with max 1, stores one key as a string, and takes `folderOnly` from its config. Copy `ua-media-key-picker` for structure. Check that `umb-input-element` with `folderOnly` lists folders only on CMS 18.1.0.
   Acceptance: the frontend build passes; on the demo site, a test settings field using the alias picks an element and stores one GUID string (checked by hand, recorded in BUILD-LOG). The real field check is T12.
   depends-on: T1. parallel-group: A
 
