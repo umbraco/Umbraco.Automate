@@ -1,5 +1,4 @@
-// STORY-5. Pending until T8: delete the LIBRARY_ELEMENT_ACTIONS guard and the Skip, then make it compile and pass.
-#if LIBRARY_ELEMENT_ACTIONS
+// STORY-5.
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -54,7 +53,7 @@ public class PublishElementActionTests
 
     // STORY-5 AC1: Invariant publish
     // Same shape as PublishContentAction: one entry with a null culture, which the CMS reads as "*".
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_CulturesEmpty_PublishesTheInvariantCulture()
     {
         var key = SetupPublishableElement();
@@ -70,7 +69,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC1: Invariant publish
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_CulturesEmpty_Succeeds()
     {
         var key = SetupPublishableElement();
@@ -81,7 +80,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC2: Some cultures
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_TwoCultures_PublishesBoth()
     {
         var key = SetupPublishableElement();
@@ -100,7 +99,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC3: Output
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_PublishSucceeds_OutputsTheElementKey()
     {
         var key = SetupPublishableElement();
@@ -113,7 +112,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC3: Output
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_PublishSucceeds_OutputsTheCultures()
     {
         var key = SetupPublishableElement();
@@ -127,12 +126,12 @@ public class PublishElementActionTests
 
     // STORY-5 AC5: Audit entry
     // AuditTrailMiddleware writes the audit entry for every ICmsAction that succeeds.
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public void Action_IsACmsAction()
         => _action.ShouldBeAssignableTo<ICmsAction>();
 
     // STORY-5 AC6: Run log
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_PublishSucceeds_WritesOneRunLogLine()
     {
         var key = SetupPublishableElement();
@@ -144,7 +143,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC6: Run log
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_PublishSucceeds_RunLogNamesTheElement()
     {
         var key = SetupPublishableElement();
@@ -155,12 +154,22 @@ public class PublishElementActionTests
         context.LogEntries[0].Message.ShouldContain($"'{ElementName}' ({key})");
     }
 
+    // STORY-5 AC3: Element picker
+    [Fact]
+    public void ElementKeyField_UsesTheElementPicker()
+    {
+        var field = typeof(PublishElementSettings).GetProperty(nameof(PublishElementSettings.ElementKey))!
+            .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
+
+        field.EditorUiAlias.ShouldBe(Umbraco.Automate.Core.Constants.EditorUiAliases.ElementKeyPicker);
+    }
+
     #endregion
 
     #region Sad path
 
     // STORY-5 AC7: Not a GUID
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_ElementKeyIsNotAGuid_FailsWithValidationError()
     {
         var result = await _action.ExecuteAsync(CreateContext(new PublishElementSettings { ElementKey = "abc" }), CancellationToken.None);
@@ -169,7 +178,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC8: Missing element
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerReportsElementNotFound_Fails()
     {
         var key = Guid.NewGuid();
@@ -183,7 +192,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC8: Missing element
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_ElementDoesNotExist_Fails()
     {
         var key = Guid.NewGuid();
@@ -196,7 +205,7 @@ public class PublishElementActionTests
 
     // STORY-5 AC9: Trashed element
     // A root Library start node passes the authorizer for an element in the recycle bin (#507).
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_ElementInRecycleBin_Fails()
     {
         var key = SetupPublishableElement(trashed: true);
@@ -207,7 +216,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC9: Trashed element
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_ElementInRecycleBin_DoesNotPublish()
     {
         var key = SetupPublishableElement(trashed: true);
@@ -220,7 +229,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC10: CMS refuses
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_MandatoryPropertyEmpty_FailsWithValidationError()
     {
         var key = SetupInvalidElement();
@@ -231,7 +240,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC10: CMS refuses
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_MandatoryPropertyEmpty_ErrorCarriesTheCmsReason()
     {
         var key = SetupInvalidElement();
@@ -242,7 +251,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC11: Permission refused
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerDenies_FailsWithAuthenticationError()
     {
         var key = Guid.NewGuid();
@@ -256,7 +265,7 @@ public class PublishElementActionTests
     }
 
     // STORY-5 AC11: Permission refused
-    [Fact(Skip = "Pending: T8")]
+    [Fact]
     public async Task ExecuteAsync_AnyElement_AsksForThePublishPermission()
     {
         var key = SetupPublishableElement();
@@ -335,4 +344,3 @@ public class PublishElementActionTests
             },
         };
 }
-#endif
