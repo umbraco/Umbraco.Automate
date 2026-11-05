@@ -42,40 +42,7 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
     {
-        // Resolve the connection string lazily inside the factory (run time), not here at
-        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
-        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
-        //
-        // shareUmbracoConnection: false — Automate defaults to its own database, and even when it is
-        // pointed at umbracoDbDSN nothing here resolves an IEfCoreScope<UmbracoAutomateDbContext>.
-        // Sharing the ambient connection is handled by AmbientAutomateDbContextFactory below, which
-        // decides per call rather than once at composition time.
-        builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-            AutomatePooledDbContextOptions.Configure,
-            shareUmbracoConnection: false);
-
-        // Decorate the pooled factory so that when Automate is pointed at the Umbraco CMS database
-        // (Umbraco:Automate:UseNamedConnectionString: umbracoDbDSN — the required setting on Umbraco
-        // Cloud, where the CMS connection string is not user-editable) its reads and writes join the
-        // ambient Umbraco transaction instead of opening a second connection to the same database.
-        // On SQLite a second connection cannot get the write lock the ambient scope is holding, which
-        // deadlocks any caller that keeps a transaction open across an Automate write — Umbraco
-        // Deploy's restore being the reported case. See AmbientDbContextFactory.
-        builder.Services.EnlistDbContextFactoryInAmbientScope(
-            (serviceProvider, connection, providerName) =>
-            {
-                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
-
-                // Mirrors the interceptor on the pooled factory, so a write is gated on Automate's
-                // startup migrations whichever path it takes — but with a timeout, because this path
-                // waits while holding the caller's transaction (and on SQLite, its write lock).
-                options.AddInterceptors(new AutomateReadinessInterceptor(
-                    serviceProvider.GetRequiredService<AutomateReadinessSignal>(),
-                    AutomateReadinessInterceptor.EnlistedWaitTimeout));
-
-                return new UmbracoAutomateDbContext(options.Options);
-            });
+        builder.Services.AddUmbracoAutomateDbContext();
 
         builder.Services.AddSingleton<AutomationFactory>();
         builder.Services.AddSingleton<ConnectionFactory>();
@@ -120,6 +87,51 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IStuckRunRecovery, EFCoreStuckRunRecovery>();
 
         return builder;
+    }
+
+    /// <summary>
+    /// Registers the pooled <see cref="UmbracoAutomateDbContext"/> factory and enlists it in the ambient
+    /// Umbraco scope. Split out of <see cref="AddUmbracoAutomatePersistence"/> so the composition tests
+    /// exercise this exact registration instead of a hand-kept copy of it.
+    /// </summary>
+    internal static IServiceCollection AddUmbracoAutomateDbContext(this IServiceCollection services)
+    {
+        // Resolve the connection string lazily inside the factory (run time), not here at
+        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
+        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
+        //
+        // shareUmbracoConnection: false — Automate defaults to its own database, and even when it is
+        // pointed at umbracoDbDSN nothing here resolves an IEfCoreScope<UmbracoAutomateDbContext>.
+        // Sharing the ambient connection is handled by AmbientAutomateDbContextFactory below, which
+        // decides per call rather than once at composition time.
+        services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
+            AutomatePooledDbContextOptions.Configure,
+            shareUmbracoConnection: false);
+
+        // Decorate the pooled factory so that when Automate is pointed at the Umbraco CMS database
+        // (Umbraco:Automate:UseNamedConnectionString: umbracoDbDSN — the required setting on Umbraco
+        // Cloud, where the CMS connection string is not user-editable) its reads and writes join the
+        // ambient Umbraco transaction instead of opening a second connection to the same database.
+        // On SQLite a second connection cannot get the write lock the ambient scope is holding, which
+        // deadlocks any caller that keeps a transaction open across an Automate write — Umbraco
+        // Deploy's restore being the reported case. See AmbientDbContextFactory.
+        services.EnlistDbContextFactoryInAmbientScope(
+            (serviceProvider, connection, providerName) =>
+            {
+                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
+                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
+
+                // Mirrors the interceptor on the pooled factory, so a write is gated on Automate's
+                // startup migrations whichever path it takes — but with a timeout, because this path
+                // waits while holding the caller's transaction (and on SQLite, its write lock).
+                options.AddInterceptors(new AutomateReadinessInterceptor(
+                    serviceProvider.GetRequiredService<AutomateReadinessSignal>(),
+                    AutomateReadinessInterceptor.EnlistedWaitTimeout));
+
+                return new UmbracoAutomateDbContext(options.Options);
+            });
+
+        return services;
     }
 }
 

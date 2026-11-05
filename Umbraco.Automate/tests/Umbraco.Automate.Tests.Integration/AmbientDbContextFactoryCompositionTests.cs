@@ -11,7 +11,6 @@ using Umbraco.Automate.Core.Persistence.Scoping;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Infrastructure.Scoping;
-using Umbraco.Extensions;
 
 namespace Umbraco.Automate.Tests.Integration;
 
@@ -142,12 +141,10 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     /// <summary>
-    /// Replicates the persistence-layer registration block from
-    /// <c>UmbracoBuilderExtensions.AddUmbracoAutomatePersistence</c>. Kept in step with it by hand,
-    /// as <c>IUmbracoBuilder</c> is not constructible outside a full Umbraco host — except for the
-    /// pooled factory's options delegate, which is shared with production via
-    /// <c>AutomatePooledDbContextOptions.Configure</c> so this test exercises the real fallback
-    /// behaviour rather than a hand-copied approximation of it.
+    /// Builds a container with the DbContext registration <c>AddUmbracoAutomatePersistence</c> uses
+    /// (<c>AddUmbracoAutomateDbContext</c>), plus the few host services it depends on. The registration
+    /// itself is the production one, as <c>IUmbracoBuilder</c> is not constructible outside a full
+    /// Umbraco host.
     /// </summary>
     /// <param name="useRealAmbientConnection">
     /// When <c>true</c>, leaves <see cref="IAmbientAutomateConnection"/> to the extension and registers
@@ -190,18 +187,7 @@ public class AmbientDbContextFactoryCompositionTests
             services.AddSingleton(Mock.Of<IAmbientAutomateConnection>());
         }
 
-        services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-            AutomatePooledDbContextOptions.Configure,
-            shareUmbracoConnection: false);
-
-        services.EnlistDbContextFactoryInAmbientScope(
-            (_, connection, providerName) =>
-            {
-                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
-
-                return new UmbracoAutomateDbContext(options.Options);
-            });
+        services.AddUmbracoAutomateDbContext();
 
         return services.BuildServiceProvider();
     }

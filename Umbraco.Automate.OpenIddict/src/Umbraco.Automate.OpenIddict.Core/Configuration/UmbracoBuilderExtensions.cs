@@ -103,10 +103,26 @@ public static class UmbracoBuilderExtensions
 
     private static void AddPersistence(IUmbracoBuilder builder)
     {
+        builder.Services.AddOpenIddictDbContext();
+
+        builder.Services.AddSingleton<OAuthCredentialsFactory>();
+        builder.Services.AddSingleton<IOAuthCredentialsRepository, EFCoreOAuthCredentialsRepository>();
+
+        // Run pending migrations on startup.
+        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunOpenIddictMigrationNotificationHandler>();
+    }
+
+    /// <summary>
+    /// Registers the pooled <see cref="OpenIddictDbContext"/> factory and enlists it in the ambient
+    /// Umbraco scope. Split out of <c>AddPersistence</c> so the composition tests exercise this exact
+    /// registration instead of a hand-kept copy of it.
+    /// </summary>
+    internal static IServiceCollection AddOpenIddictDbContext(this IServiceCollection services)
+    {
         // shareUmbracoConnection: false — nothing here resolves an IEfCoreScope<OpenIddictDbContext>.
         // Sharing the ambient connection is handled by AmbientDbContextFactory below, which decides
         // per call rather than once at composition time.
-        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>(
+        services.AddUmbracoDbContext<OpenIddictDbContext>(
             OpenIddictPooledDbContextOptions.Configure,
             shareUmbracoConnection: false);
 
@@ -115,7 +131,7 @@ public static class UmbracoBuilderExtensions
         // connection would compete with the ambient scope for it — and on SQLite, which permits one
         // writer per database file, deadlock against a caller holding the write lock across the write.
         // See AmbientDbContextFactory.
-        builder.Services.EnlistDbContextFactoryInAmbientScope(
+        services.EnlistDbContextFactoryInAmbientScope(
             (_, connection, providerName) =>
             {
                 var options = new DbContextOptionsBuilder<OpenIddictDbContext>();
@@ -124,11 +140,7 @@ public static class UmbracoBuilderExtensions
                 return new OpenIddictDbContext(options.Options);
             });
 
-        builder.Services.AddSingleton<OAuthCredentialsFactory>();
-        builder.Services.AddSingleton<IOAuthCredentialsRepository, EFCoreOAuthCredentialsRepository>();
-
-        // Run pending migrations on startup.
-        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunOpenIddictMigrationNotificationHandler>();
+        return services;
     }
 }
 
