@@ -291,4 +291,149 @@ public class BuiltInActionOutcomeTests
             Mock.Of<IDocumentNavigationQueryService>(),
             Mock.Of<IVariationContextAccessor>(),
             Mock.Of<ILogger<GetContentAction>>());
+
+#if LIBRARY_ELEMENT_ACTIONS
+    // STORY-8 and the element outcome keys. Pending until T11: delete this LIBRARY_ELEMENT_ACTIONS
+    // guard and the Skips, then make it compile and pass.
+
+    #region Given each Library element action
+
+    public static TheoryData<string> ElementActionTypes => new()
+    {
+        "GetElementAction",
+        "GetElementPropertyAction",
+        "CreateElementAction",
+        "UpdateElementPropertyAction",
+        "PublishElementAction",
+        "UnpublishElementAction",
+    };
+
+    // Expected keys are literal on purpose, as for the content actions above.
+    public static TheoryData<string, string[]> ElementActionOutcomeKeys => new()
+    {
+        { "GetElementAction", ["success", "notFound"] },
+        { "GetElementPropertyAction", ["success", "notFound", "propertyNotFound"] },
+        { "CreateElementAction", ["success", "parentNotFound", "elementTypeNotFound"] },
+        { "UpdateElementPropertyAction", ["success", "notFound", "propertyNotFound"] },
+    };
+
+    #region Happy path
+
+    // STORY-8 AC10: Section declared
+    [Theory(Skip = "Pending: T11")]
+    [MemberData(nameof(ElementActionTypes))]
+    public void RequiredSections_ElementAction_IsTheLibrarySection(string actionType)
+        => CreateElementAction(actionType).RequiredSections.ShouldBe([Umbraco.Cms.Core.Constants.Applications.Library]);
+
+    // STORY-2 AC1, STORY-3 AC1, STORY-4 AC2, STORY-7 AC1: Found / Value present / Outcome / In a folder (success is the default exit)
+    [Theory(Skip = "Pending: T11")]
+    [MemberData(nameof(ElementActionOutcomeKeys))]
+    public void GetOutcomes_ElementAction_DefaultIsSuccess(string actionType, string[] expectedKeys)
+    {
+        _ = expectedKeys;
+
+        CreateElementAction(actionType).GetOutcomes().Single(o => o.IsDefault).Key.ShouldBe("success");
+    }
+
+    // STORY-2 AC8, STORY-3 AC6 and AC8, STORY-4 AC12 and AC16, STORY-7 AC10 and AC14: the outcome keys those criteria take
+    [Theory(Skip = "Pending: T11")]
+    [MemberData(nameof(ElementActionOutcomeKeys))]
+    public void GetOutcomes_ElementAction_KeysAreSuccessThenExistingConstants(string actionType, string[] expectedKeys)
+        => CreateElementAction(actionType).GetOutcomes().Select(o => o.Key).ShouldBe(expectedKeys);
+
+    // STORY-8 AC9: Exits on the canvas (every label is a localization term)
+    [Theory(Skip = "Pending: T11")]
+    [MemberData(nameof(ElementActionOutcomeKeys))]
+    public void GetOutcomes_ElementAction_AllLabelsAreLocalizationKeys(string actionType, string[] expectedKeys)
+    {
+        _ = expectedKeys;
+
+        CreateElementAction(actionType).GetOutcomes().ShouldAllBe(o => o.Label.StartsWith("#uaOutcomes_"));
+    }
+
+    // STORY-8 AC9: Exits on the canvas (Created, Folder not found, Element type not found)
+    [Fact(Skip = "Pending: T11")]
+    public void GetOutcomes_CreateElement_LabelsAreCreatedFolderNotFoundAndElementTypeNotFound()
+        => CreateElementAction("CreateElementAction").GetOutcomes().Select(o => o.Label)
+            .ShouldBe(["#uaOutcomes_created", "#uaOutcomes_folderNotFound", "#uaOutcomes_elementTypeNotFound"]);
+
+    // STORY-3 AC1: Value present (the success exit carries the property-found description, as for content)
+    [Fact(Skip = "Pending: T11")]
+    public void GetOutcomes_GetElementProperty_SuccessDescriptionIsThePropertyFoundTerm()
+        => CreateElementAction("GetElementPropertyAction").GetOutcomes().Single(o => o.Key == "success")
+            .Description.ShouldBe("#uaOutcomes_propertyFoundDescription");
+
+    // STORY-5 AC8, STORY-6 AC6: a missing element fails the step, so Publish and Unpublish declare no exits
+    [Theory(Skip = "Pending: T11")]
+    [InlineData("PublishElementAction")]
+    [InlineData("UnpublishElementAction")]
+    public void GetOutcomes_PublishingElementAction_DeclaresNone(string actionType)
+        => CreateElementAction(actionType).GetOutcomes().ShouldBeEmpty();
+
+    #endregion
+
+    #endregion
+
+    // Constructor arguments mirror each element action's content counterpart with the element
+    // services swapped in (ARCHITECTURE "What changes"). Fix them to match the real constructors.
+    private static IAction CreateElementAction(string actionType)
+    {
+        var infrastructure = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
+
+        return actionType switch
+        {
+            "GetElementAction" => new GetElementAction(
+                infrastructure,
+                Mock.Of<IPublishedElementCache>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IContentValueNormaliser>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<IVariationContextAccessor>(),
+                Mock.Of<ILogger<GetElementAction>>()),
+            "GetElementPropertyAction" => new GetElementPropertyAction(
+                infrastructure,
+                Mock.Of<IPublishedElementCache>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IContentValueNormaliser>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<IVariationContextAccessor>(),
+                Mock.Of<ILogger<GetElementPropertyAction>>()),
+            "CreateElementAction" => new CreateElementAction(
+                infrastructure,
+                Mock.Of<IElementEditingService>(),
+                Mock.Of<IContentTypeService>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<CreateElementAction>>()),
+            "UpdateElementPropertyAction" => new UpdateElementPropertyAction(
+                infrastructure,
+                Mock.Of<IElementService>(),
+                Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<UpdateElementPropertyAction>>()),
+            "PublishElementAction" => new PublishElementAction(
+                infrastructure,
+                Mock.Of<IElementPublishingService>(),
+                Mock.Of<IElementService>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<PublishElementAction>>()),
+            "UnpublishElementAction" => new UnpublishElementAction(
+                infrastructure,
+                Mock.Of<IElementPublishingService>(),
+                Mock.Of<IElementService>(),
+                Mock.Of<IBackOfficeSecurityAccessor>(),
+                Mock.Of<IUmbracoContextFactory>(),
+                Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ILogger<UnpublishElementAction>>()),
+            _ => throw new ArgumentOutOfRangeException(nameof(actionType), actionType, null),
+        };
+    }
+#endif
 }
