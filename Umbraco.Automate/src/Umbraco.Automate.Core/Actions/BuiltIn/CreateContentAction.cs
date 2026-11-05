@@ -182,8 +182,8 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             });
         }
 
-        // Unlike media, a content type has to opt in to sitting at the root. Checking it here
-        // turns what would be a save-time throw into an actionable message.
+        // The backoffice only creates a content type at the root when it allows that, and only
+        // a child type the parent's type allows. IContentService.Create checks neither.
         if (atRoot && !contentType.AllowedAsRoot)
         {
             return ActionResult.Failed(
@@ -191,6 +191,19 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
                     $"Content type '{contentType.Alias}' is not allowed at the content root. " +
                     "Pick a parent, or enable 'Allow as root' on the content type."),
                 StepRunErrorCategory.Validation);
+        }
+
+        if (parent is not null)
+        {
+            var parentType = _contentTypeService.Get(parent.ContentType.Key);
+            if (parentType?.AllowedContentTypes?.Any(t => t.Key == contentTypeKey) != true)
+            {
+                return ActionResult.Failed(
+                    new ArgumentException(
+                        $"Content type '{contentType.Alias}' is not allowed under '{parent.Name}'. " +
+                        $"Pick another parent, or add it to the allowed child types of '{parentType?.Alias}'."),
+                    StepRunErrorCategory.Validation);
+            }
         }
 
         var variesByCulture = (contentType.Variations & ContentVariation.Culture) != 0;
