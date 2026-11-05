@@ -253,3 +253,10 @@ All commits should follow the [Conventional Commits](https://www.conventionalcom
 **Scope must not repeat the type** - commitlint's `scope-not-type` rule rejects `ci(ci):`, `docs(docs):`, `build(build):`. Drop the scope (`ci: ...`) or use a more specific one (`ci(hooks): ...`).
 
 **Subject must be sentence-case** - Capitalize the first word after the scope.
+
+## Issue tracker
+- Type: GitHub Issues
+- Location: umbraco/Umbraco.Automate (same repo as the source code)
+- Access: `gh` CLI
+- State labels: ready → `state/sprint-candidate`, needs-decision → `state/needs-design`, blocked → `state/blocked`, in-progress → `state/in-progress`, needs-info → `question`, needs-investigation → no label (comment only; the issue stays untriaged until proven)
+- Needs-info timeout: 30 days
