@@ -20,3 +20,4 @@
 - **T1: the real pool calls `UseApplicationServiceProvider`**, the same as EF Core's own options building, so logging and interceptors resolve the same way as on the DI pool.
 - **T1: log lines use the `{Message}` template**, so the caller's text renders exactly and braces in it can't be read as placeholders.
 - **T1: the abandoned placeholder pool isn't disposed early.** It's a DI singleton, so the container disposes it at shutdown.
+- **T2: `AutomatePooledDbContextOptions.Configure` takes non-nullable connection string and provider name**, matching the helper's delegate. It's internal, and its only caller is `AddUmbracoAutomateDbContext`.
