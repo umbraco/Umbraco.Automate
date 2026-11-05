@@ -27,7 +27,7 @@
   Acceptance: the S1, S2 and S3 specs in `ResolvingPooledDbContextFactoryTests` go green against the real `AddUmbracoAutomateDbContext` registration, and the full `Umbraco.Automate.slnx` test run is green.
   depends-on: T1. parallel-group: B
 
-- [ ] **T3** - **wire: OpenIddict's DbContext into the shared helper.** story: S4 (AC1-AC4).
+- [x] **T3** - **wire: OpenIddict's DbContext into the shared helper.** story: S4 (AC1-AC4).
   - `AddOpenIddictDbContext` (`Umbraco.Automate.OpenIddict/src/Umbraco.Automate.OpenIddict.Core/Configuration/UmbracoBuilderExtensions.cs`) calls `AddAutomatePooledDbContext<OpenIddictDbContext>`.
   - `OpenIddictPooledDbContextOptions` shrinks to `OpenIddictDbContext.ConfigureProvider`, and its fallback copy goes. This closes #532's duplicate.
   - `PooledDbContextOptionsTests` follows the shared helper.
