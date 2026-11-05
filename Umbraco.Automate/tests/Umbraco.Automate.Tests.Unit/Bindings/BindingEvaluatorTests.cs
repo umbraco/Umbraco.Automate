@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Bindings.Filters;
@@ -676,5 +677,31 @@ public class BindingEvaluatorTests
         // Array length.
         BindingEvaluator.ResolvePath("steps.abc-123.availableCultures.length", data)
             .ShouldBe(2);
+    }
+
+    // Regression (#489): numbers were formatted with the server culture, so a da-DK
+    // server wrote "701,1" and downstream numeric comparisons misread it.
+    [Fact]
+    public void Evaluate_NumberOnCommaDecimalCulture_UsesInvariantFormat()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?>
+            {
+                ["extract"] = new Dictionary<string, object?> { ["amount"] = 701.1m, ["ratio"] = 0.25d },
+            },
+        };
+
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("da-DK");
+        try
+        {
+            _evaluator.Evaluate("${ steps.extract.amount } / ${ steps.extract.ratio }", data)
+                .ShouldBe("701.1 / 0.25");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 }

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
 
@@ -178,7 +180,8 @@ public sealed class BindingEvaluator
 
     /// <summary>
     /// Converts a resolved value to its string representation.
-    /// Lists and dictionaries are serialized to JSON; primitives use <see cref="object.ToString"/>.
+    /// Lists and dictionaries are serialized to JSON; numbers use the invariant culture;
+    /// other values use <see cref="object.ToString"/>.
     /// </summary>
     internal static string Stringify(object? value)
     {
@@ -195,6 +198,15 @@ public sealed class BindingEvaluator
         if (value is IList<object?> or IDictionary<string, object?> or IReadOnlyDictionary<string, object?>)
         {
             return JsonSerializer.Serialize(value, Dispatch.JsonOptions.Default);
+        }
+
+        // Numbers use the invariant culture so they read the same on every server; a
+        // comma-decimal culture (e.g. da-DK) would write "0,8", which downstream numeric
+        // comparisons and other servers misread.
+        if (value is sbyte or byte or short or ushort or int or uint or long or ulong or nint or nuint
+            or Int128 or UInt128 or BigInteger or Half or float or double or decimal)
+        {
+            return ((IFormattable)value).ToString(null, CultureInfo.InvariantCulture);
         }
 
         return value.ToString() ?? string.Empty;
