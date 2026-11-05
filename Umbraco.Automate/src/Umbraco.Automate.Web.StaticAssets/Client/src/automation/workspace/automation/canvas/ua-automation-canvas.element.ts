@@ -66,6 +66,9 @@ export class UaAutomationCanvasElement extends UmbLitElement {
     override connectedCallback() {
         super.connectedCallback();
         document.body.addEventListener("keydown", this.#onBodyKeyDown);
+        // firstUpdated only runs once, so re-create the root that disconnectedCallback tore down
+        // when the element is re-attached. On first connect the container doesn't exist yet.
+        this.#mountReact();
     }
 
     /**
@@ -94,11 +97,15 @@ export class UaAutomationCanvasElement extends UmbLitElement {
         this.shadowRoot!.prepend(styleEl);
 
         this.#container = this.shadowRoot!.querySelector<HTMLDivElement>("#canvas-container");
-        if (this.#container) {
-            this.#root = createRoot(this.#container);
-            this._mounted = true;
-            this.#renderReact();
-        }
+        this.#mountReact();
+    }
+
+    #mountReact() {
+        if (!this.#container || this.#root) return;
+
+        this.#root = createRoot(this.#container);
+        this._mounted = true;
+        this.#renderReact();
     }
 
     override updated(changedProperties: Map<string, unknown>) {
