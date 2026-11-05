@@ -1,6 +1,6 @@
 # Plan: Survive the installer restart without a connection string
 
-**7 tasks in 5 areas.** T1 comes first, then T2 and T3 can run in parallel (group B). T4 and T5 follow both of them, and T6 and T7 follow T5.
+**8 tasks in 5 areas.** T1 comes first, then T2 and T3 can run in parallel (group B). T4 and T5 follow both of them, T6 and T7 follow T5, and T8 runs in the release PR.
 
 ## Core
 
@@ -56,3 +56,7 @@
 - [ ] **T7** - story: S1-S5. Port the merged v18 PR to `v17/dev` with `change-backport`. Same code on v17: core fallback at `UmbracoBuilderExtensions.cs:187`, OpenIddict at `:189`, CMS 17.3.4's `RestartAsync` identical. Run the same specs. Re-run T5's smoke on a v17 demo if one can be set up; otherwise the PR says it wasn't run.
   Acceptance: a v17 PR is open with the specs and full suites green.
   depends-on: T5
+
+- [ ] **T8** - story: S4. **In the release PR that ships this fix:** raise OpenIddict's `Umbraco.Automate.Core` floor in `Directory.Packages.props` (today `[18.5.1, 18.999.999)`) to the first Core version containing `AddAutomatePooledDbContext`. OpenIddict now calls it, so the next OpenIddict on an older Core would fail at startup with `MissingMethodException`. Do the same on the v17 line for T7's port. Not done in this PR, because nightly Core builds sit below the next minor (see ARCHITECTURE "Decisions").
+  Acceptance: the release PR raises the floor, and the PR for this feature lists it under "Left out".
+  depends-on: T7
