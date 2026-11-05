@@ -49,7 +49,7 @@
 
 ## Follow-ups and port
 
-- [ ] **T6** - story: S5. Draft a follow-up issue: `WorkflowHostLifecycle` lets a stuck-run recovery exception stop the host (`WorkflowHostLifecycle.cs:46`). It should log and carry on. The draft is for Rick to approve before filing.
+- [x] **T6** - story: S5. Draft a follow-up issue: `WorkflowHostLifecycle` lets a stuck-run recovery exception stop the host (`WorkflowHostLifecycle.cs:46`). It should log and carry on. The draft is for Rick to approve before filing.
   Acceptance: the issue text is drafted, and it's listed in the PR's "Left out".
   depends-on: T5
 
