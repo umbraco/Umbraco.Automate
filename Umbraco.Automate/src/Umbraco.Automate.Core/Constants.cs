@@ -48,6 +48,13 @@ public static class Constants
         /// core/components/media-key-picker/manifests.ts.
         /// </summary>
         public const string MediaKeyPicker = "Umb.Automate.MediaKeyPicker";
+
+        /// <summary>
+        /// Editor for a field holding an element key: a Library element picker that stores one key.
+        /// Honours the <c>folderOnly</c> config (boolean): true picks a folder, otherwise an element.
+        /// Must match the manifest alias in core/components/element-key-picker/manifests.ts.
+        /// </summary>
+        public const string ElementKeyPicker = "Umb.Automate.ElementKeyPicker";
     }
 
     /// <summary>
