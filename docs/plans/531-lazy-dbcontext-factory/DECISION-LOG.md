@@ -13,3 +13,10 @@
   - The installer smoke (T5) runs after both wires, because the repro needs core and OpenIddict fixed to pass.
   - `docs/engineering-spec.md` joined the design's "What changes" here, because the #561 paragraph would otherwise describe the placeholder as permanent.
 - **Specs live in the feature worktree, not on trunk.** The main checkout holds another session's uncommitted work, so writing test files there could break that session's builds. The plan folder moves into the worktree with them and becomes the branch's first commit.
+
+## 05-11-2026: Build
+
+- **T1: the wrapper is opt-in through an optional settings argument on `EnlistDbContextFactoryInAmbientScope`**, so callers that haven't moved yet behave exactly as before. T3 makes it required (or makes `Enlist` private to the helper) once both contexts use the helper, so a future context can't miss the fix.
+- **T1: the real pool calls `UseApplicationServiceProvider`**, the same as EF Core's own options building, so logging and interceptors resolve the same way as on the DI pool.
+- **T1: log lines use the `{Message}` template**, so the caller's text renders exactly and braces in it can't be read as placeholders.
+- **T1: the abandoned placeholder pool isn't disposed early.** It's a DI singleton, so the container disposes it at shutdown.

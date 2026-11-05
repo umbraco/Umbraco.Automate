@@ -4,7 +4,7 @@
 
 ## Core
 
-- [ ] **T1** - story: S1 (AC1-AC10), S2 (AC1). Add `PlaceholderConnectionState<TDbContext>` and `ResolvingPooledDbContextFactory<TDbContext>` in `Umbraco.Automate/src/Umbraco.Automate.Core/Persistence/Scoping/`, both internal.
+- [x] **T1** - story: S1 (AC1-AC10), S2 (AC1). Add `PlaceholderConnectionState<TDbContext>` and `ResolvingPooledDbContextFactory<TDbContext>` in `Umbraco.Automate/src/Umbraco.Automate.Core/Persistence/Scoping/`, both internal.
   - **Factory:** while the state says the DI pool was built on the placeholder, it calls `DatabaseConnectionInfo.Resolve(IOptionsMonitor<ConnectionStrings>, IConfiguration)` on each create. On success it builds the real `DbContextOptions<TDbContext>` with the caller's provider-setup delegate and wraps them in `new PooledDbContextFactory<TDbContext>(options, 1024)`. That happens once, under a lock, with a volatile field. It logs the caller's "found" line once, then uses the real pool from then on. When `Resolve` still throws, it returns a context from the DI pool. When the state says the DI pool is real, it returns the DI pool's context after one flag check.
   - **Shared helper:** `AddAutomatePooledDbContext<TDbContext>(this IServiceCollection, ...)` in `AmbientDbContextFactoryExtensions.cs` takes:
     - the provider-setup delegate `(IServiceProvider, DbContextOptionsBuilder, string connectionString, string providerName)`,
