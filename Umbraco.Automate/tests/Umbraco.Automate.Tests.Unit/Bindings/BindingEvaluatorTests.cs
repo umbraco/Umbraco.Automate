@@ -16,6 +16,7 @@ public class BindingEvaluatorTests
             new UppercaseFilter(),
             new FallbackFilter(),
             new StripHtmlFilter(),
+            new FormatDateFilter(),
         ]));
 
     [Fact]
@@ -741,4 +742,35 @@ public class BindingEvaluatorTests
             CultureInfo.CurrentCulture = original;
         }
     }
+
+    // Regression (#538): trigger-edge filters bind against trigger output read with
+    // System.Text.Json, where a date is still an ISO 8601 string, so formatDate left it
+    // unchanged. ISO strings now format like the typed dates steps see; other strings don't.
+    [Theory]
+    [InlineData("${ trigger.value | formatDate:yyyy }", "2026-11-04T10:00:00Z", "2026")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00Z", "2026-11-04T10:00:00.0000000Z")]
+    [InlineData("${ trigger.value | formatDate:fffffff }", "2026-11-04T10:00:00.1234567Z", "1234567")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00+01:00", "2026-11-04T10:00:00.0000000+01:00")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00", "2026-11-04T10:00:00.0000000")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00-05:00", "2026-11-04T10:00:00.0000000-05:00")]
+    [InlineData("${ trigger.value | formatDate:yyyy }", "2026-11-04", "2026")]
+    public void Evaluate_FormatDateOnAnIsoString_FormatsItAsADate(string expression, string value, string expected)
+        => _evaluator.Evaluate(expression, TriggerValue(value)).ShouldBe(expected);
+
+    // Anything that isn't an ISO 8601 date is left as it is, rather than read in a guessed culture.
+    [Theory]
+    [InlineData("11/04/2026")]
+    [InlineData("2026-ish")]
+    [InlineData("2026-11-04X")]
+    [InlineData("2026-11-04 10:00:00")]
+    [InlineData("2026-11-04T10:00:00 junk-1")]
+    [InlineData("not a date")]
+    public void Evaluate_FormatDateOnANonIsoString_LeavesItUnchanged(string value)
+        => _evaluator.Evaluate("${ trigger.value | formatDate:yyyy }", TriggerValue(value)).ShouldBe(value);
+
+    private static Dictionary<string, object?> TriggerValue(string value)
+        => new()
+        {
+            ["trigger"] = new Dictionary<string, object?> { ["value"] = value },
+        };
 }
