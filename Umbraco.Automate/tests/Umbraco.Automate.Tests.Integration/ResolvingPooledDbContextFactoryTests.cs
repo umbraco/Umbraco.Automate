@@ -47,7 +47,7 @@ public class ResolvingPooledDbContextFactoryTests
 
         public void Dispose() => _serviceProvider.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void CreatesAContextOnThePlaceholder()
         {
             using UmbracoAutomateDbContext context = CreateContext(_serviceProvider);
@@ -55,11 +55,11 @@ public class ResolvingPooledDbContextFactoryTests
             context.Database.GetConnectionString().ShouldBe(Placeholder);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void CreatingAContextDoesNotThrow()
             => Should.NotThrow(() => CreateContext(_serviceProvider).Dispose());
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void StaysOnThePlaceholderOnTheNextCreate()
         {
             CreateContext(_serviceProvider).Dispose();
@@ -69,7 +69,7 @@ public class ResolvingPooledDbContextFactoryTests
             context.Database.GetConnectionString().ShouldBe(Placeholder);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void LogsTheWarningOnceWithTheNewWording()
         {
             CreateContext(_serviceProvider).Dispose();
@@ -78,7 +78,7 @@ public class ResolvingPooledDbContextFactoryTests
             _logs.Messages(LogLevel.Warning).ShouldBe([PlaceholderWarning]);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void TheWarningDoesNotMentionRuntimeLevelRun()
         {
             CreateContext(_serviceProvider).Dispose();
@@ -112,7 +112,7 @@ public class ResolvingPooledDbContextFactoryTests
             _database.Dispose();
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void UsesTheConfiguredConnection()
         {
             using UmbracoAutomateDbContext context = CreateContext(_serviceProvider);
@@ -120,7 +120,7 @@ public class ResolvingPooledDbContextFactoryTests
             context.Database.GetConnectionString().ShouldBe(_database.ConnectionString);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void ReachesTheRealDatabase()
         {
             using UmbracoAutomateDbContext context = CreateContext(_serviceProvider);
@@ -128,7 +128,7 @@ public class ResolvingPooledDbContextFactoryTests
             Should.NotThrow(() => context.Automations.Any());
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void TheDetachedFactoryUsesTheConfiguredConnection()
         {
             using UmbracoAutomateDbContext context = _serviceProvider
@@ -138,7 +138,7 @@ public class ResolvingPooledDbContextFactoryTests
             context.Database.GetConnectionString().ShouldBe(_database.ConnectionString);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void LogsTheSwitchOnce()
         {
             CreateContext(_serviceProvider).Dispose();
@@ -147,7 +147,7 @@ public class ResolvingPooledDbContextFactoryTests
             _logs.Messages(LogLevel.Information).ShouldBe([FoundMessage]);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void KeepsTheReadinessGate()
         {
             using UmbracoAutomateDbContext context = CreateContext(_serviceProvider);
@@ -158,7 +158,7 @@ public class ResolvingPooledDbContextFactoryTests
                 .ShouldContain(interceptor => interceptor is AutomateReadinessInterceptor);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void KeepsAutomatesMigrationsHistoryTable()
         {
             using UmbracoAutomateDbContext context = CreateContext(_serviceProvider);
@@ -168,7 +168,7 @@ public class ResolvingPooledDbContextFactoryTests
                 .ShouldBe("__UmbracoAutomate_MigrationsHistory");
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void RacingCreatesBuildOnePool()
         {
             Parallel.For(0, 50, _ => CreateContext(_serviceProvider).Dispose());
@@ -194,7 +194,7 @@ public class ResolvingPooledDbContextFactoryTests
             _database.Dispose();
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void NeverBuildsASecondPool()
         {
             CreateContext(_serviceProvider).Dispose();
@@ -231,7 +231,7 @@ public class ResolvingPooledDbContextFactoryTests
             _database.Dispose();
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void EnlistsTheContextOnTheAmbientTransaction()
         {
             using UmbracoAutomateDbContext context = CreateContext(_serviceProvider);
