@@ -37,7 +37,7 @@
 
 ## Docs
 
-- [ ] **T4** - story: S3 (AC1). Update the "Persistence registration" paragraph in `docs/engineering-spec.md`: the factory picks up a connection string that appears after boot, so the placeholder is temporary.
+- [x] **T4** - story: S3 (AC1). Update the "Persistence registration" paragraph in `docs/engineering-spec.md`: the factory picks up a connection string that appears after boot, so the placeholder is temporary.
   Acceptance: the paragraph matches the code after T2 and T3.
   depends-on: T2, T3
 
