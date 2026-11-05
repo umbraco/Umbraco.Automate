@@ -3,10 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Core.Persistence.Scoping;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Extensions;
 
 namespace Umbraco.Automate.Extensions;
 
@@ -16,6 +19,79 @@ namespace Umbraco.Automate.Extensions;
 /// </summary>
 internal static class AmbientDbContextFactoryExtensions
 {
+    /// <summary>
+    /// Registers the pooled factory for <typeparamref name="TDbContext"/> and enlists it in the ambient
+    /// scope, so a connection string that appears after boot is picked up without a restart.
+    /// </summary>
+    /// <typeparam name="TDbContext">The DbContext to register.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configureProvider">
+    /// Applies the provider and interceptors for a resolved connection string and provider name. Used
+    /// for the DI pool and, once a connection string appears, for the real pool.
+    /// </param>
+    /// <param name="createEnlistedContext">
+    /// Builds a context bound to the ambient connection. See
+    /// <see cref="EnlistDbContextFactoryInAmbientScope{TDbContext}"/>.
+    /// </param>
+    /// <param name="placeholderWarning">
+    /// Logged, with the exception, when the DI pool falls back to the placeholder.
+    /// </param>
+    /// <param name="foundMessage">Logged once when a real connection string is picked up.</param>
+    /// <param name="loggerCategory">The logger category for both messages.</param>
+    /// <remarks>
+    /// The connection string is resolved when the pool's options are built, not at composition time:
+    /// hosts like Umbraco Cloud / Deploy synthesise it through the ConnectionStrings options pipeline,
+    /// which has not run yet during AddComposers(). A genuinely unconfigured connection string falls
+    /// back to <see cref="DatabaseConnectionInfo.PlaceholderConnection"/> so the host can still boot
+    /// (see #226); <see cref="ResolvingPooledDbContextFactory{TDbContext}"/> then replaces it.
+    /// <c>shareUmbracoConnection: false</c> because sharing the ambient connection is decided per call
+    /// by <see cref="AmbientDbContextFactory{TDbContext}"/>, not once at composition time.
+    /// </remarks>
+    internal static IServiceCollection AddAutomatePooledDbContext<TDbContext>(
+        this IServiceCollection services,
+        Action<IServiceProvider, DbContextOptionsBuilder, string, string> configureProvider,
+        Func<IServiceProvider, DbConnection, string, TDbContext> createEnlistedContext,
+        string placeholderWarning,
+        string foundMessage,
+        string loggerCategory)
+        where TDbContext : DbContext
+    {
+        services.TryAddSingleton<PlaceholderConnectionState<TDbContext>>();
+
+        services.AddUmbracoDbContext<TDbContext>(
+            (serviceProvider, options, _, _) =>
+            {
+                string connectionString;
+                string providerName;
+                try
+                {
+                    (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
+                        serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
+                        serviceProvider.GetRequiredService<IConfiguration>());
+                }
+                catch (InvalidOperationException ex)
+                {
+                    (connectionString, providerName) = DatabaseConnectionInfo.PlaceholderConnection;
+
+                    // GetService, not GetRequiredService: this catch block exists so a missing
+                    // connection string can never crash the host, so logging it must not either.
+                    (serviceProvider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance)
+                        .CreateLogger(loggerCategory)
+                        .LogWarning(ex, "{Message}", placeholderWarning);
+
+                    serviceProvider.GetRequiredService<PlaceholderConnectionState<TDbContext>>()
+                        .MarkBuiltOnPlaceholder();
+                }
+
+                configureProvider(serviceProvider, options, connectionString, providerName);
+            },
+            shareUmbracoConnection: false);
+
+        return services.EnlistDbContextFactoryInAmbientScope(
+            createEnlistedContext,
+            new ResolvingPooledFactorySettings(configureProvider, foundMessage, loggerCategory));
+    }
+
     /// <summary>
     /// Wraps the already-registered <see cref="IDbContextFactory{TContext}"/> for
     /// <typeparamref name="TDbContext"/> in an <see cref="AmbientDbContextFactory{TDbContext}"/>, so
@@ -28,6 +104,12 @@ internal static class AmbientDbContextFactoryExtensions
     /// Builds a context bound to the ambient connection, for the resolved provider. Must configure the
     /// same provider and interceptors as the pooled factory, so a write behaves the same however it is
     /// created.
+    /// </param>
+    /// <param name="resolvingSettings">
+    /// When supplied, the pooled factory is wrapped in a
+    /// <see cref="ResolvingPooledDbContextFactory{TDbContext}"/>, which needs a registered
+    /// <see cref="PlaceholderConnectionState{TDbContext}"/>. When <see langword="null"/> the pooled
+    /// factory is used as it is.
     /// </param>
     /// <remarks>
     /// <para>
@@ -42,7 +124,8 @@ internal static class AmbientDbContextFactoryExtensions
     /// </remarks>
     internal static IServiceCollection EnlistDbContextFactoryInAmbientScope<TDbContext>(
         this IServiceCollection services,
-        Func<IServiceProvider, DbConnection, string, TDbContext> createEnlistedContext)
+        Func<IServiceProvider, DbConnection, string, TDbContext> createEnlistedContext,
+        ResolvingPooledFactorySettings? resolvingSettings = null)
         where TDbContext : DbContext
     {
         // Shared by every participating DbContext: whether Automate targets the Umbraco database, and
@@ -63,7 +146,10 @@ internal static class AmbientDbContextFactoryExtensions
         services.Add(ServiceDescriptor.Describe(
             typeof(IDetachedDbContextFactory<TDbContext>),
             serviceProvider => new DetachedDbContextFactory<TDbContext>(
-                ResolvePooledFactory<TDbContext>(serviceProvider, pooled)),
+                WrapInResolvingFactory(
+                    serviceProvider,
+                    ResolvePooledFactory<TDbContext>(serviceProvider, pooled),
+                    resolvingSettings)),
             pooled.Lifetime));
 
         services.Add(ServiceDescriptor.Describe(
@@ -91,6 +177,23 @@ internal static class AmbientDbContextFactoryExtensions
             serviceProvider.GetRequiredService<IConfiguration>());
 
         return providerName;
+    }
+
+    private static IDbContextFactory<TDbContext> WrapInResolvingFactory<TDbContext>(
+        IServiceProvider serviceProvider,
+        IDbContextFactory<TDbContext> pooledFactory,
+        ResolvingPooledFactorySettings? settings)
+        where TDbContext : DbContext
+    {
+        // The state is read by the factory per create, after the pool above was resolved: resolving
+        // the pool is what runs the options delegate that sets it.
+        return settings is null
+            ? pooledFactory
+            : new ResolvingPooledDbContextFactory<TDbContext>(
+                pooledFactory,
+                serviceProvider.GetRequiredService<PlaceholderConnectionState<TDbContext>>(),
+                serviceProvider,
+                settings);
     }
 
     private static IDbContextFactory<TDbContext> ResolvePooledFactory<TDbContext>(
