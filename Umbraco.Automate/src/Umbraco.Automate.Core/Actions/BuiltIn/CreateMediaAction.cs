@@ -134,8 +134,9 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
         }
         else
         {
-            // A parent the CMS reports as not existing (deleted, or in the recycle bin) is not a
-            // permission problem, so it routes to the parentNotFound outcome.
+            // A parent reported as not existing (deleted, or in the recycle bin for an account
+            // confined to a start node) is not a permission problem, so it routes to the
+            // parentNotFound outcome.
             var authorization = await _authorizer.AuthorizeMediaAsync(parentKey, cancellationToken);
             if (authorization.IsNotFound)
             {
@@ -155,8 +156,11 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
             }
         }
 
+        // A service account with a root start node is authorised for the recycle bin too, so a
+        // trashed parent gets this far. Treat it as missing: creating under it would save a live
+        // item inside the bin, where the recycle bin view doesn't list it.
         var parent = atRoot ? null : _mediaService.GetById(parentKey);
-        if (!atRoot && parent is null)
+        if (!atRoot && (parent is null || parent.Trashed))
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Parent media {ParentKey} not found.",

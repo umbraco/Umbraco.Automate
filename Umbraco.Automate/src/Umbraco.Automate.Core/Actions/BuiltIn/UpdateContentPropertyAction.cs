@@ -117,8 +117,10 @@ public sealed class UpdateContentPropertyAction : ActionBase<UpdateContentProper
             return authorization.ToFailedActionResult();
         }
 
+        // A service account with a root start node is authorised for the recycle bin too, so a
+        // trashed item gets this far. Treat it as missing, as every other account already does.
         var content = _contentService.GetById(contentKey);
-        if (content is null)
+        if (content is null || content.Trashed)
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found.",

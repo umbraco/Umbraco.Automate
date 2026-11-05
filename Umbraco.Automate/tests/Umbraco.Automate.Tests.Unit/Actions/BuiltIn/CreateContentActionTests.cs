@@ -297,6 +297,29 @@ public class CreateContentActionTests
         output.ContentTypeKey.ShouldBe(contentTypeKey);
     }
 
+    // A root start node passes the authorizer for a parent in the recycle bin (#507).
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_ReturnsParentNotFoundOutcome()
+    {
+        var parentKey = SetupTrashedParent();
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = parentKey.ToString(), ContentType = Guid.NewGuid().ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe(CreateContentAction.OutcomeParentNotFound);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_DoesNotCreate()
+    {
+        var parentKey = Guid.NewGuid();
+        SetupInvariantCreate(parentKey, out var contentTypeKey);
+        SetupTrashedParent(parentKey);
+
+        await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = parentKey.ToString(), ContentType = contentTypeKey.ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        _contentService.Verify(x => x.Create(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
     [Fact]
     public async Task ExecuteAsync_ContentTypeNotFound_ReturnsContentTypeNotFoundOutcome()
     {
@@ -831,6 +854,16 @@ public class CreateContentActionTests
             .Returns(new OperationResult(OperationResultType.Success, new EventMessages()));
 
         return created;
+    }
+
+    private Guid SetupTrashedParent(Guid? key = null)
+    {
+        var parentKey = key ?? Guid.NewGuid();
+        var parent = new Mock<IContent>();
+        parent.SetupGet(x => x.Key).Returns(parentKey);
+        parent.SetupGet(x => x.Trashed).Returns(true);
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(parent.Object);
+        return parentKey;
     }
 
     private static ActionContext CreateContext(CreateContentSettings settings, Guid? serviceAccountKey = null)
