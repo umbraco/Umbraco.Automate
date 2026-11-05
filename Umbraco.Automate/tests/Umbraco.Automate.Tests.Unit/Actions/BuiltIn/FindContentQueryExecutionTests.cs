@@ -19,6 +19,8 @@ namespace Umbraco.Automate.Tests.Unit.Actions.BuiltIn;
 /// </summary>
 public sealed class FindContentQueryExecutionTests : IDisposable
 {
+    private static readonly DateTime HomepageCreateDate = new(2026, 11, 5, 10, 30, 15, 250, DateTimeKind.Utc);
+
     private readonly LuceneIndex _index;
 
     public FindContentQueryExecutionTests()
@@ -30,8 +32,11 @@ public sealed class FindContentQueryExecutionTests : IDisposable
         {
             DirectoryFactory = directoryFactory,
 
-            // Umbraco indexes __Path as a raw (untokenised) field, so path-prefix queries work.
-            FieldDefinitions = new FieldDefinitionCollection(new FieldDefinition("__Path", FieldDefinitionTypes.Raw)),
+            // Umbraco indexes __Path as a raw (untokenised) field, so path-prefix queries work,
+            // and createDate as a DateTime field (UmbracoFieldDefinitionCollection).
+            FieldDefinitions = new FieldDefinitionCollection(
+                new FieldDefinition("__Path", FieldDefinitionTypes.Raw),
+                new FieldDefinition("createDate", FieldDefinitionTypes.DateTime)),
         });
 
         _index = new LuceneIndex(
@@ -55,7 +60,7 @@ public sealed class FindContentQueryExecutionTests : IDisposable
             CreateItem("1", "Press Release"),
             CreateItem("2", "Pressure Vessel"),
             CreateItem("3", "Compress Archive"),
-            CreateItem("4", "Homepage"),
+            CreateItem("4", "Homepage", createDate: HomepageCreateDate),
             CreateItem("5", "Duplicate Page", path: "-1,1230"),
             CreateItem("6", "Duplicate Page", path: "-1,-20,1231"),
         ]);
@@ -137,6 +142,22 @@ public sealed class FindContentQueryExecutionTests : IDisposable
         ids.ShouldBe(["5"]);
     }
 
+    [Fact]
+    public void IndexedDate_ReadsBackAsTheIndexedValue()
+    {
+        // Regression for #536: Examine stores a DateTime field as ticks, which the date parser
+        // didn't recognise, so Find Content and Find Media returned 0001-01-01 for every match.
+        var query = FindContentAction.BuildQuery(
+            "Homepage", FindContentMatchMode.Exact, culture: null, contentTypeAliases: []);
+
+        var raw = Execute(query).Single().Values["createDate"];
+
+        var parsed = IndexedDateParser.Parse(raw);
+
+        parsed.ShouldBe(HomepageCreateDate);
+        parsed.Kind.ShouldBe(DateTimeKind.Utc);
+    }
+
     /// <summary>
     /// Mirrors the production execution path: leading wildcards are enabled so the Contains
     /// query parses. Lives in the test rather than reflecting into the private production helper
@@ -156,12 +177,17 @@ public sealed class FindContentQueryExecutionTests : IDisposable
             .Execute(QueryOptions.SkipTake(0, 10));
     }
 
-    private static ValueSet CreateItem(string id, string nodeName, string? path = null)
+    private static ValueSet CreateItem(string id, string nodeName, string? path = null, DateTime? createDate = null)
     {
         var values = new Dictionary<string, object> { ["nodeName"] = nodeName, ["__IndexType"] = "content" };
         if (path is not null)
         {
             values["__Path"] = path;
+        }
+
+        if (createDate is not null)
+        {
+            values["createDate"] = createDate.Value;
         }
 
         return new ValueSet(id, "content", values);
