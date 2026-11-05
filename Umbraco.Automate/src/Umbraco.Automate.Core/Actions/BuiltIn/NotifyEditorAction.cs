@@ -101,8 +101,10 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
         }
 
         // Use IContentService so editors on unpublished / draft content still get notified.
+        // A trashed item counts as missing for every account, including one with a root start
+        // node, which the authorizer below would otherwise let through to the recycle bin.
         var content = _contentService.GetById(contentKey);
-        if (content is null)
+        if (content is null || content.Trashed)
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found — skipping editor notification.",

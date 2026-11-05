@@ -429,6 +429,11 @@ matches = matches.Where(m => authorizedKeys.Contains(m.ContentKey)).ToList();
 Media actions use `AuthorizeMediaAsync(mediaKey, ct)` — media has no permission
 verbs in CMS, so it is binary (start-node access only).
 
+Check `Trashed` after loading the item. An account confined to a start node gets
+`IsNotFound` for an item in the recycle bin, but an account with a root start node
+is allowed into the bin, so the authorizer returns success. Treat a trashed item
+(or a trashed parent, when creating) as missing, as the built-in actions do.
+
 The authorizer wraps Umbraco's `IContentPermissionService` /
 `IMediaPermissionService`, so behaviour matches the backoffice's own
 access-control enforcement.

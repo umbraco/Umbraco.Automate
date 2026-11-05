@@ -80,6 +80,40 @@ test.describe('Automation canvas', () => {
     expect(connectionsFrom(saved, trueId).map((c: any) => c.targetStepId)).toEqual([mergeId]);
   });
 
+  test('leaves Space and Backspace to a code editor in the step settings (#511)', async ({
+    automateServiceAccountWorkspace,
+    umbracoUi,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange — trigger → Run Script, whose Script setting is a code editor.
+    const script = automationStep(actions.runScript, 'script', { script: 'export default () => 0' }, { x: 250, y: 200 });
+    const id = await umbracoAutomateApi.automations.create(uniqueName('Canvas Code Editor'), automateServiceAccountWorkspace.id, {
+      trigger: manualTrigger(),
+      steps: [script],
+      connections: [automationConnection('trigger', script)]
+    });
+    const scriptId = umbracoAutomateApi.automations.stepByAlias(await umbracoAutomateApi.automations.getById(id), 'script').id;
+
+    // Act — select the step, open its settings and type in the editor. Space is the canvas's
+    // pan key, and Backspace deletes the selected node.
+    await umbracoUi.goToBackOffice();
+    await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+    await umbracoAutomateUi.automate.waitForCanvas();
+    await umbracoAutomateUi.automate.selectCanvasNode(scriptId);
+    await umbracoAutomateUi.automate.openStepSettings(scriptId);
+    await umbracoAutomateUi.automate.typeInCodeEditor('script', 'export default () => 12');
+    await umbracoAutomateUi.automate.pressInCodeEditor('Backspace');
+    await umbracoAutomateUi.automate.submitNodeSettings();
+    await umbracoAutomateUi.automate.clickSave();
+
+    // Assert — both keys edited the script, and the step is still there.
+    await expect
+      .poll(async () => umbracoAutomateApi.automations.stepByAlias(await umbracoAutomateApi.automations.getById(id), 'script').settings.script)
+      .toBe('export default () => 1');
+    await expect(umbracoAutomateUi.automate.canvasNode(scriptId)).toHaveCount(1);
+  });
+
   test("adding to an Approval's rejected output keeps the approved step connected", async ({
     automateServiceAccountWorkspace,
     umbracoUi,

@@ -632,6 +632,32 @@ export class AutomateUiHelper {
     await this.clickInModal(this.bindingSwitchHost(key));
   }
 
+  /* The Monaco editor of a code-editor field (Run Script's Script, Send Email's Body, …). */
+  codeEditor(key: string): Locator {
+    return this.settingsField(key).locator('.monaco-editor');
+  }
+
+  /**
+   * Replaces a code-editor field's text by typing it, key by key, as a person would.
+   *
+   * `fill()` is no use here: Monaco has no `<input>` to fill, and typing is the point when a
+   * spec checks that keys like Space reach the editor.
+   */
+  async typeInCodeEditor(key: string, text: string) {
+    const editor = this.codeEditor(key);
+    await editor.waitFor({ state: 'visible' });
+    await this.waitForStopMoving(this.nodeSettingsModal);
+    await this.clickInModal(editor.locator('.view-lines'));
+    await expect(editor).toHaveClass(/\bfocused\b/);
+    await this.page.keyboard.press('ControlOrMeta+A');
+    await this.page.keyboard.type(text);
+  }
+
+  /* Presses one key (e.g. `Backspace`) in the code editor `typeInCodeEditor` left focused. */
+  async pressInCodeEditor(keyName: string) {
+    await this.page.keyboard.press(keyName);
+  }
+
   /* The expression box a field shows in binding mode. */
   bindingExpressionInput(key: string): Locator {
     return this.bindableEditor(key).locator('ua-binding-text-box input');
@@ -915,6 +941,13 @@ export class AutomateUiHelper {
    */
   canvasNode(stepId: string): Locator {
     return this.page.locator(`[data-testid="rf__node-${stepId}"]`);
+  }
+
+  /* Selects a node with a single click on its type label, away from its Settings/Delete buttons
+   * (which stop the click, so they never select it). */
+  async selectCanvasNode(stepId: string) {
+    await this.canvasNode(stepId).locator('.ua-node__type').click({ force: true });
+    await expect(this.canvasNode(stepId)).toHaveClass(/\bselected\b/);
   }
 
   get triggerNode(): Locator {
