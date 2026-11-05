@@ -45,7 +45,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: `PublishElementActionTests.cs` green.
   depends-on: T2, T4. parallel-group: B
 
-- [ ] **T9** - story: STORY-6 (AC1–AC8). `UnpublishElementAction` with its settings and output, copying `UnpublishContentAction`. Icon `icon-globe`, `Umb.Element.Unpublish`, `ICmsAction`, no outcomes. Checks `Trashed` before calling `IElementPublishingService.UnpublishAsync`. Empty Cultures means all cultures: pass `null` for an invariant element and `{"*"}` for a variant one, because CMS 18.1.0 refuses the other two combinations (`CannotPublishInvariantWhenVariant`, `CannotPublishVariantWhenNotVariant`). The run log names the element, not only its key.
+- [x] **T9** - story: STORY-6 (AC1–AC8). `UnpublishElementAction` with its settings and output, copying `UnpublishContentAction`. Icon `icon-globe`, `Umb.Element.Unpublish`, `ICmsAction`, no outcomes. Checks `Trashed` before calling `IElementPublishingService.UnpublishAsync`. Empty Cultures means all cultures: pass `null` for an invariant element and `{"*"}` for a variant one, because CMS 18.1.0 refuses the other two combinations (`CannotPublishInvariantWhenVariant`, `CannotPublishVariantWhenNotVariant`). The run log names the element, not only its key.
   Acceptance: `UnpublishElementActionTests.cs` green.
   depends-on: T2, T4. parallel-group: B
 
