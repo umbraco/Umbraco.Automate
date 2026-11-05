@@ -300,6 +300,12 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.Property<string>("InputData")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("IterationIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("IterationTotal")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("LogEntries")
                         .HasColumnType("TEXT");
 

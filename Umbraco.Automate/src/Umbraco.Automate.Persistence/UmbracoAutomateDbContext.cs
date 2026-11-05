@@ -167,6 +167,8 @@ public class UmbracoAutomateDbContext : DbContext
             entity.Property(e => e.OutputData);
             entity.Property(e => e.LogEntries);
             entity.Property(e => e.BranchOutcome);
+            entity.Property(e => e.IterationIndex);
+            entity.Property(e => e.IterationTotal);
             entity.Property(e => e.Error);
             entity.Property(e => e.RetryCount).IsRequired().HasDefaultValue(0);
             entity.Property(e => e.DurationTicks);
