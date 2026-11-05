@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -7,6 +8,11 @@ namespace Umbraco.Automate.Web.Api.Management.Common.Json;
 /// JSON converter that ensures DateTime values are serialized as UTC with explicit timezone indicator.
 /// This prevents timezone interpretation issues in JavaScript clients by always including the "Z" suffix.
 /// </summary>
+/// <remarks>
+/// Both converters format and parse with the invariant culture. The Management API runs with the
+/// backoffice user's culture, and in a custom format string ':' is that culture's time separator,
+/// which is '.' for Danish, so a culture-sensitive format writes dates browsers can't parse.
+/// </remarks>
 public class UtcDateTimeJsonConverter : JsonConverter<DateTime>
 {
     /// <inheritdoc />
@@ -18,7 +24,7 @@ public class UtcDateTimeJsonConverter : JsonConverter<DateTime>
             return default;
         }
 
-        if (DateTime.TryParse(dateTimeString, out var dateTime))
+        if (DateTime.TryParse(dateTimeString, CultureInfo.InvariantCulture, out var dateTime))
         {
             return dateTime.ToUniversalTime();
         }
@@ -30,7 +36,7 @@ public class UtcDateTimeJsonConverter : JsonConverter<DateTime>
     public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
     {
         var utcDateTime = value.Kind == DateTimeKind.Utc ? value : value.ToUniversalTime();
-        writer.WriteStringValue(utcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+        writer.WriteStringValue(utcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture));
     }
 }
 
@@ -48,7 +54,7 @@ public class UtcNullableDateTimeJsonConverter : JsonConverter<DateTime?>
             return null;
         }
 
-        if (DateTime.TryParse(dateTimeString, out var dateTime))
+        if (DateTime.TryParse(dateTimeString, CultureInfo.InvariantCulture, out var dateTime))
         {
             return dateTime.ToUniversalTime();
         }
@@ -66,6 +72,6 @@ public class UtcNullableDateTimeJsonConverter : JsonConverter<DateTime?>
         }
 
         var utcDateTime = value.Value.Kind == DateTimeKind.Utc ? value.Value : value.Value.ToUniversalTime();
-        writer.WriteStringValue(utcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+        writer.WriteStringValue(utcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture));
     }
 }
