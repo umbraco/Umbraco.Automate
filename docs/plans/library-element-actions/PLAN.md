@@ -8,7 +8,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
 
 ## Setup
 
-- [ ] **T1** - story: n/a. Create `v18/feature/library-element-actions` off `v18/dev` and commit this plan folder and the pending spec files `bdd-specs` wrote.
+- [x] **T1** - story: n/a. Create `v18/feature/library-element-actions` off `v18/dev` and commit this plan folder and the pending spec files `bdd-specs` wrote.
   Acceptance: the branch builds with the guarded spec files left out; `dotnet test Umbraco.Automate/Umbraco.Automate.slnx` passes; the frontend build passes; Playwright lists the new `test.fixme` tests as skipped.
   depends-on: none
 
