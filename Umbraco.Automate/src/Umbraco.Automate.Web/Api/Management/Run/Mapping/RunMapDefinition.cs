@@ -62,6 +62,8 @@ public class RunMapDefinition : IMapDefinition
         target.RetryCount = source.RetryCount;
         target.DurationMs = source.Duration?.TotalMilliseconds;
         target.BranchOutcome = source.BranchOutcome;
+        target.IterationIndex = source.IterationIndex;
+        target.IterationTotal = source.IterationTotal;
         target.LogEntries = context.MapEnumerable<ActionLogEntry, StepRunLogEntryResponseModel>(source.LogEntries);
     }
 
