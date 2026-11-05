@@ -1,6 +1,3 @@
-// STORY-2. Pending until T5: delete the LIBRARY_ELEMENT_ACTIONS guard and the Skip, then make it compile and pass.
-
-#if LIBRARY_ELEMENT_ACTIONS
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -76,7 +73,7 @@ public class GetElementActionTests
     #region Happy path
 
     // STORY-2 AC1: Found
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_PublishedElement_TakesTheSuccessOutcome()
     {
         var elementKey = Guid.NewGuid();
@@ -89,7 +86,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC2: Output
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_PublishedElement_ReturnsTheProjectedOutput()
     {
         var elementKey = Guid.NewGuid();
@@ -122,7 +119,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC3: Culture given
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_CultureGiven_ReturnsThatCulturesProperties()
     {
         var elementKey = Guid.NewGuid();
@@ -139,7 +136,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC4: Blank culture, variant element
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_BlankCultureOnVariantElement_UsesTheFirstCulture()
     {
         var elementKey = Guid.NewGuid();
@@ -151,7 +148,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC5: Blank culture, invariant element
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_BlankCultureOnInvariantElement_ReturnsTheInvariantProperties()
     {
         var elementKey = Guid.NewGuid();
@@ -166,7 +163,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC6: Run log
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_PublishedElement_LogsOneLineNamingTheElement()
     {
         var elementKey = Guid.NewGuid();
@@ -184,7 +181,7 @@ public class GetElementActionTests
     #region Sad path
 
     // STORY-2 AC7: Not a GUID
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_ElementKeyNotAGuid_FailsWithValidationError()
     {
         var result = await _action.ExecuteAsync(CreateContext("abc"), CancellationToken.None);
@@ -193,7 +190,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC8: Missing
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerReportsElementNotFound_TakesTheNotFoundOutcome()
     {
         var elementKey = Guid.NewGuid();
@@ -210,7 +207,7 @@ public class GetElementActionTests
     // A root-start-node account passes the authorizer for a trashed element, and the published
     // element cache drops trashed elements, so the read comes back empty. (IPublishedElement has
     // no Trashed flag at CMS 18.1.0; the cache is the only signal.)
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_ElementNotInPublishedCache_TakesTheNotFoundOutcome()
     {
         var elementKey = Guid.NewGuid();
@@ -223,7 +220,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC10: Permission refused
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizationDenied_FailsWithPermissionError()
     {
         var elementKey = Guid.NewGuid();
@@ -237,7 +234,7 @@ public class GetElementActionTests
     }
 
     // STORY-2 AC10: Permission refused (the permission checked is Umb.Element.Read)
-    [Fact(Skip = "Pending: T5")]
+    [Fact]
     public async Task ExecuteAsync_ChecksTheElementReadPermission()
     {
         var elementKey = Guid.NewGuid();
@@ -310,4 +307,3 @@ public class GetElementActionTests
             Settings = new GetElementSettings { ElementKey = elementKey, Culture = culture },
         };
 }
-#endif
