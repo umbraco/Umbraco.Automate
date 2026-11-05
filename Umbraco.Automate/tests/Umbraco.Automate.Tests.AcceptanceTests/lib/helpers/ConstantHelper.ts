@@ -34,6 +34,7 @@ export class ConstantHelper {
     approvalDashboard: 'ua-approval-dashboard',
     approvalDecisionModal: 'ua-approval-decision-modal',
     edgeFilterModal: 'ua-edge-filter-modal',
+    automationCanvas: 'ua-automation-canvas',
     connectionTypePickerModal: 'ua-connection-type-picker-modal',
     oauthEditor: 'umb-automate-property-editor-ui-oauth',
     /* CMS pickers the settings form opens (not Automate's own). */

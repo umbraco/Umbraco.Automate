@@ -962,6 +962,20 @@ export class AutomateUiHelper {
     await this.triggerNode.waitFor({ state: 'visible', timeout });
   }
 
+  get automationCanvas(): Locator {
+    return this.page.locator(ConstantHelper.elements.automationCanvas);
+  }
+
+  /* Removes the canvas element from the page and puts it back in the same place, as moving it would. */
+  async reattachCanvas() {
+    await this.automationCanvas.evaluate((canvas) => {
+      const parent = canvas.parentNode!;
+      const next = canvas.nextSibling;
+      canvas.remove();
+      parent.insertBefore(canvas, next);
+    });
+  }
+
   /* The "Add action" button on a node, optionally for one branch ("Add action — rejected"). */
   addActionButton(stepId: string, branch?: string): Locator {
     const label = branch ? `Add action — ${branch}` : 'Add action';
