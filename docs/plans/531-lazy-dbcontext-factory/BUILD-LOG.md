@@ -11,3 +11,4 @@
   - **AC4:** OAuth cleanup ran at boot + 3 minutes. OpenIddict logged "found its database connection string", with no cleanup error.
   - No "no such table", ERR or FTL lines anywhere in the log.
   - **Demo setup:** the API user, workspace and automation were created through the Management API from the logged-in backoffice session, because a fresh install has no API user for the workspace's service account.
+- **T6** (no code): drafted the follow-up issue "Engine: A stuck-run recovery error stops the whole site" (`WorkflowHostLifecycle.cs:46`) for Rick to approve before filing. It's listed in the PR's "Left out".
