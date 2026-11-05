@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Configuration;
@@ -131,28 +132,36 @@ internal sealed class ConfigurationReferenceResolver : IConfigurationReferenceRe
             return bool.TryParse(value, out var boolValue) ? boolValue : throw CannotConvert(key, "boolean");
         }
 
+        // Configuration values are invariant text, so numbers are always parsed with the invariant
+        // culture, whatever the server's culture is.
         if (underlyingType == typeof(int))
         {
-            return int.TryParse(value, out var intValue) ? intValue : throw CannotConvert(key, "integer");
+            return int.TryParse(value, CultureInfo.InvariantCulture, out var intValue)
+                ? intValue
+                : throw CannotConvert(key, "integer");
         }
 
         if (underlyingType == typeof(long))
         {
-            return long.TryParse(value, out var longValue)
+            return long.TryParse(value, CultureInfo.InvariantCulture, out var longValue)
                 ? longValue
                 : throw CannotConvert(key, "long integer");
         }
 
+        // Decimal numbers use NumberStyles.Float, as the .NET configuration binder does, so no
+        // group separators are accepted. With the server culture, a da-DK server read "0.5" as 5
+        // ('.' is its group separator). Allowing invariant grouping would read "0,5" as 5 too, so
+        // that value has to fail loudly instead of being misread.
         if (underlyingType == typeof(double))
         {
-            return double.TryParse(value, out var doubleValue)
+            return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue)
                 ? doubleValue
                 : throw CannotConvert(key, "double");
         }
 
         if (underlyingType == typeof(decimal))
         {
-            return decimal.TryParse(value, out var decimalValue)
+            return decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue)
                 ? decimalValue
                 : throw CannotConvert(key, "decimal");
         }
