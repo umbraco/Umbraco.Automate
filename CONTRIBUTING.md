@@ -55,7 +55,7 @@ All long-term branches are **version-prefixed** with `vN`, where `N` is the CMS 
 | v18         | STS  | `v18/dev` / `v18/main`    | Features + bug fixes  |
 | v17         | LTS  | `v17/dev` / `v17/main`    | Features + bug fixes  |
 
-A new CMS major ships via the `/post-release-cleanup` skill, which creates `v(N+1)/dev` and `v(N+1)/main` and updates the GitHub default branch.
+A new CMS major ships via the `/release-cleanup` skill, which creates `v(N+1)/dev` and `v(N+1)/main` and updates the GitHub default branch.
 
 ### Recommended Naming Conventions
 
@@ -143,9 +143,11 @@ Each product is versioned and released independently using Nerdbank.GitVersionin
 1. Create release branch from the version line's dev: `vN/release/YYYY.MM.N`
 2. Update `version.json` for each product
 3. Generate changelogs
-4. Push release branch
-5. CI builds and publishes packages
-6. Merge back into `vN/main` and `vN/dev` after testing (via the `/post-release-cleanup` skill)
+4. Push release branch. CI builds, tests and packs, but a push never publishes.
+5. Publish with the `/release-publish` skill, or queue the pipeline in Azure DevOps with **Publish packages to** set:
+    - `prerelease`: MyGet prereleases feed, no approval (to test first)
+    - `release`: NuGet.org after approval in the `Umbraco Automate Release` environment, then a `<Product>@<version>` tag per product and a GitHub release named `YYYY.MM.N` from the date it was published (so it can differ from the branch name)
+6. Merge back into `vN/main` and `vN/dev` after testing (via the `/release-cleanup` skill)
 
 ## Coding Standards
 
