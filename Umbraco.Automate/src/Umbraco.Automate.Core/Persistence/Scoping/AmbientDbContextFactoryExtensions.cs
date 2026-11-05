@@ -101,6 +101,11 @@ internal static class AmbientDbContextFactoryExtensions
     /// resolving wrapper, so callers do not get the #531 fix. The caller must have registered the
     /// DbContext with <c>AddUmbracoDbContext</c> first.
     /// </summary>
+    /// <remarks>
+    /// Do not change the declaring type (<c>Umbraco.Automate.Extensions.AmbientDbContextFactoryExtensions</c>),
+    /// its namespace, the method name or its signature before it is removed in v19: released
+    /// Umbraco.Automate.OpenIddict 18.1.x binds to them.
+    /// </remarks>
     [Obsolete("Used by Umbraco.Automate.OpenIddict 18.1.x and earlier, which call it through InternalsVisibleTo. Use AddAutomatePooledDbContext instead. Scheduled for removal in Umbraco.Automate 19.")]
     internal static IServiceCollection EnlistDbContextFactoryInAmbientScope<TDbContext>(
         this IServiceCollection services,
