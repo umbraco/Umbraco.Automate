@@ -116,8 +116,10 @@ public sealed class UpdateMediaPropertyAction : ActionBase<UpdateMediaPropertySe
             return authorization.ToFailedActionResult();
         }
 
+        // A service account with a root start node is authorised for the recycle bin too, so a
+        // trashed item gets this far. Treat it as missing, as every other account already does.
         var media = _mediaService.GetById(mediaKey);
-        if (media is null)
+        if (media is null || media.Trashed)
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Media {MediaKey} not found.",
