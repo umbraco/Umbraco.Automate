@@ -54,7 +54,6 @@ async function runToCompletion(umbracoAutomateApi: any, automationId: string): P
   return run.stepRuns.map((stepRun: any) => aliasById.get(stepRun.stepId)) as string[];
 }
 
-const elementActions = actions;
 
 /** trigger → `actionAlias` alone, for actions with no outcomes (Publish and Unpublish Element). Published. */
 async function seedPublishedStep(
@@ -195,7 +194,7 @@ test.describe('Library elements in the recycle bin', () => {
     const id = await seedPublished(
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
-      elementActions.getElement,
+      actions.getElement,
       { elementKey: element.id },
       outcomes.notFound
     );
@@ -219,7 +218,7 @@ test.describe('Library elements in the recycle bin', () => {
     const id = await seedPublished(
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
-      elementActions.getElementProperty,
+      actions.getElementProperty,
       { elementKey: element.id, propertyAlias: LibraryApiHelper.propertyAlias },
       outcomes.notFound
     );
@@ -243,7 +242,7 @@ test.describe('Library elements in the recycle bin', () => {
     const id = await seedPublished(
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
-      elementActions.updateElementProperty,
+      actions.updateElementProperty,
       { elementKey: element.id, propertyAlias: LibraryApiHelper.propertyAlias, value: 'never written' },
       outcomes.notFound
     );
@@ -267,7 +266,7 @@ test.describe('Library elements in the recycle bin', () => {
     const { id, stepId } = await seedPublishedStep(
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
-      elementActions.publishElement,
+      actions.publishElement,
       { elementKey: element.id }
     );
     await library.trash(element.id);
@@ -291,7 +290,7 @@ test.describe('Library elements in the recycle bin', () => {
     const { id, stepId } = await seedPublishedStep(
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
-      elementActions.publishElement,
+      actions.publishElement,
       { elementKey: element.id }
     );
     await library.trash(element.id);
@@ -316,7 +315,7 @@ test.describe('Library elements in the recycle bin', () => {
     const { id, stepId } = await seedPublishedStep(
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
-      elementActions.unpublishElement,
+      actions.unpublishElement,
       { elementKey: element.id }
     );
     await library.trash(element.id);
@@ -340,7 +339,7 @@ test.describe('Library elements in the recycle bin', () => {
     const id = await seedPublished(
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
-      elementActions.createElement,
+      actions.createElement,
       { folderKey: reviews.id, elementType: elementType.id, name: uniqueName('Never Created') },
       outcomes.parentNotFound
     );
@@ -366,7 +365,7 @@ test.describe('Library elements in the recycle bin', () => {
     const id = await seedPublished(
       umbracoAutomateApi,
       workspace.id,
-      elementActions.createElement,
+      actions.createElement,
       { folderKey: reviews.id, elementType: elementType.id, name: uniqueName('Never Created') },
       outcomes.parentNotFound
     );

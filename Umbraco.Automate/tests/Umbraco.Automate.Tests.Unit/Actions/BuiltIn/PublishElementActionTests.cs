@@ -154,7 +154,7 @@ public class PublishElementActionTests
         context.LogEntries[0].Message.ShouldContain($"'{ElementName}' ({key})");
     }
 
-    // STORY-5 AC3: Element picker
+    // STORY-8 AC3: Element picker
     [Fact]
     public void ElementKeyField_UsesTheElementPicker()
     {

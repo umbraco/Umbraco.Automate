@@ -22,7 +22,7 @@ public sealed class CreateElementSettings
 
     /// <summary>
     /// Gets or sets the element type to create, as a content-type GUID produced by the
-    /// <c>DocumentTypePicker</c> property editor. Capped at a single selection and limited to
+    /// <c>ua-document-type-picker</c> editor UI (<c>Constants.EditorUiAliases.DocumentTypePicker</c>). Capped at a single selection and limited to
     /// element types.
     /// </summary>
     [Field(

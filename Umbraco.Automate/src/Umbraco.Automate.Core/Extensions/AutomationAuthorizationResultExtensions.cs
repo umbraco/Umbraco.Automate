@@ -30,4 +30,30 @@ public static class AutomationAuthorizationResultExtensions
         IReadOnlyList<string> permissions,
         CancellationToken cancellationToken)
         => authorizer.AuthorizeContentAsync(contentKey, AutomationActionAuthorizerExtensions.ToSet(permissions), cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account against the Library element <paramref name="elementKey"/>
+    /// for the given permission letters, without converting the outcome to an
+    /// <see cref="ActionResult"/>, so the caller can inspect
+    /// <see cref="AutomationAuthorizationResult.IsNotFound"/>.
+    /// </summary>
+    public static Task<AutomationAuthorizationResult> AuthorizeElementAsync(
+        this IAutomationActionAuthorizer authorizer,
+        Guid elementKey,
+        IReadOnlyList<string> permissions,
+        CancellationToken cancellationToken)
+        => authorizer.AuthorizeElementAsync(elementKey, AutomationActionAuthorizerExtensions.ToSet(permissions), cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account against a target Library folder (or the Library root when
+    /// <paramref name="folderKey"/> is <c>null</c>) for the given permission letters, without
+    /// converting the outcome to an <see cref="ActionResult"/>, so the caller can inspect
+    /// <see cref="AutomationAuthorizationResult.IsNotFound"/>.
+    /// </summary>
+    public static Task<AutomationAuthorizationResult> AuthorizeElementParentAsync(
+        this IAutomationActionAuthorizer authorizer,
+        Guid? folderKey,
+        IReadOnlyList<string> permissions,
+        CancellationToken cancellationToken)
+        => authorizer.AuthorizeElementParentAsync(folderKey, AutomationActionAuthorizerExtensions.ToSet(permissions), cancellationToken);
 }

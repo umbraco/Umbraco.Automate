@@ -15,6 +15,7 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.Navigation;
@@ -405,6 +406,7 @@ public class BuiltInActionOutcomeTests
                 Mock.Of<IBackOfficeSecurityAccessor>(),
                 Mock.Of<IUmbracoContextFactory>(),
                 Mock.Of<IAutomationActionAuthorizer>(),
+                Mock.Of<ICoreScopeProvider>(),
                 Mock.Of<ILogger<CreateElementAction>>()),
             "UpdateElementPropertyAction" => new UpdateElementPropertyAction(
                 infrastructure,

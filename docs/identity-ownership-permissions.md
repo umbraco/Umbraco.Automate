@@ -450,9 +450,9 @@ use the element members of `IAutomationActionAuthorizer`:
 | `AuthorizeElementAsync(user, elementKey, permissions, ct)` | An element, as an explicit user (dispatch-time, before the ambient accessor is set) |
 | `AuthorizeElementParentAsync(folderKey, permissions, ct)` | A target folder, or the Library root when `folderKey` is `null` |
 
-Two extension methods in `AutomationActionAuthorizerExtensions` wrap these and
-return a failed `ActionResult` on denial (or `null` on success):
-`AuthorizeElementOrFailAsync` and `AuthorizeElementParentOrFailAsync`.
+An extension method in `AutomationActionAuthorizerExtensions`,
+`AuthorizeElementOrFailAsync`, wraps `AuthorizeElementAsync` and returns a failed
+`ActionResult` on denial (or `null` on success).
 
 - **Elements** go through `IElementPermissionService`. The Library actions
   declare these permission verbs: `Umb.Element.Read` (Get Element, Get Element

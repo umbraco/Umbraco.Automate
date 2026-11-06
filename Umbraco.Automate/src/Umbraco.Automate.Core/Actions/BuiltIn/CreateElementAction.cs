@@ -6,6 +6,7 @@ using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.ContentEditing;
+using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
@@ -51,6 +52,7 @@ public sealed class CreateElementAction : ActionBase<CreateElementSettings, Crea
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
     private readonly IAutomationActionAuthorizer _authorizer;
+    private readonly ICoreScopeProvider _scopeProvider;
     private readonly ILogger<CreateElementAction> _logger;
 
     /// <summary>
@@ -66,6 +68,7 @@ public sealed class CreateElementAction : ActionBase<CreateElementSettings, Crea
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
         IUmbracoContextFactory umbracoContextFactory,
         IAutomationActionAuthorizer authorizer,
+        ICoreScopeProvider scopeProvider,
         ILogger<CreateElementAction> logger)
         : base(infrastructure)
     {
@@ -77,6 +80,7 @@ public sealed class CreateElementAction : ActionBase<CreateElementSettings, Crea
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
         _umbracoContextFactory = umbracoContextFactory;
         _authorizer = authorizer;
+        _scopeProvider = scopeProvider;
         _logger = logger;
     }
 
@@ -127,7 +131,7 @@ public sealed class CreateElementAction : ActionBase<CreateElementSettings, Crea
         // as a permission problem.
         var authorization = await _authorizer.AuthorizeElementParentAsync(
             folderKey,
-            AutomationActionAuthorizerExtensions.ToSet(RequiredPermissions),
+            RequiredPermissions,
             cancellationToken);
         if (authorization.IsNotFound)
         {
@@ -190,6 +194,10 @@ public sealed class CreateElementAction : ActionBase<CreateElementSettings, Crea
         // Required when running from the outbox dispatcher, which has no HTTP request scope.
         using var contextRef = _umbracoContextFactory.EnsureUmbracoContext();
 
+        // The create and the follow-up save run in one scope: the CMS services' own scopes nest
+        // into it, and nothing is committed (or its notifications published) unless both succeed.
+        using var scope = _scopeProvider.CreateCoreScope();
+
         // The name goes in alone so the CMS still applies its Library and folder filters. Property
         // values are applied afterwards in the same JSON format as Create Content: passing them to
         // CreateAsync would run them through each editor's backoffice-format conversion.
@@ -213,16 +221,19 @@ public sealed class CreateElementAction : ActionBase<CreateElementSettings, Crea
                 var saveResult = _elementService.Save(element, userId);
                 if (!saveResult.Success)
                 {
+                    var failedLocation = folderName is null ? "at the Library root" : $"in folder '{folderName}'";
                     context.LogError(
-                        $"{ActionLogFormat.Item(element.Name, element.Key)} was created without its property values because saving them failed");
+                        $"Library element '{element.Name}' was not created {failedLocation} because saving its property values failed");
 
                     return ActionResult.Failed(
                         new InvalidOperationException(
-                            $"Library element '{element.Name}' ({element.Key}) was created, but saving its property values failed: {saveResult.Result}"),
+                            $"Library element '{element.Name}' was not created because saving its property values failed: {saveResult.Result}"),
                         MapSaveErrorCategory(saveResult.Result));
                 }
             }
         }
+
+        scope.Complete();
 
         var location = folderName is null ? "at the Library root" : $"in folder '{folderName}'";
         var inCulture = culture is null ? string.Empty : $" in {culture}";

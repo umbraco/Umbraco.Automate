@@ -22,7 +22,6 @@ import {
  * identity, so every spec uses the tier-2 `automateServiceAccountWorkspace`.
  */
 const { actions, outcomes, outcomeLabels, outcomeDescriptions } = ConstantHelper;
-const elementActions = actions;
 
 type Seeded = { id: string; branchingId: string };
 
@@ -172,7 +171,7 @@ test.describe('Built-in content and media outcomes', () => {
       umbracoAutomateApi
     }) => {
       // Arrange
-      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.getElement, {
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.getElement, {
         elementKey: randomUUID()
       });
 
@@ -191,7 +190,7 @@ test.describe('Built-in content and media outcomes', () => {
       umbracoAutomateApi
     }) => {
       // Arrange
-      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.getElementProperty, {
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.getElementProperty, {
         elementKey: randomUUID(),
         propertyAlias: LibraryApiHelper.propertyAlias
       });
@@ -214,7 +213,7 @@ test.describe('Built-in content and media outcomes', () => {
       const { id } = await seedBranching(
         umbracoAutomateApi,
         automateServiceAccountWorkspace.id,
-        elementActions.getElementProperty,
+        actions.getElementProperty,
         { elementKey: element.id, propertyAlias: 'rating' },
         outcomes.propertyNotFound
       );
@@ -236,7 +235,7 @@ test.describe('Built-in content and media outcomes', () => {
     }) => {
       // Arrange: an element whose property holds "old".
       const element = await library.element('G2 review rating', { text: 'old' });
-      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.updateElementProperty, {
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.updateElementProperty, {
         elementKey: element.id,
         propertyAlias: LibraryApiHelper.propertyAlias,
         value: 'new'
@@ -255,7 +254,7 @@ test.describe('Built-in content and media outcomes', () => {
       umbracoAutomateApi
     }) => {
       // Arrange
-      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.updateElementProperty, {
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.updateElementProperty, {
         elementKey: randomUUID(),
         propertyAlias: LibraryApiHelper.propertyAlias,
         value: 'never written'
@@ -279,7 +278,7 @@ test.describe('Built-in content and media outcomes', () => {
       const { id } = await seedBranching(
         umbracoAutomateApi,
         automateServiceAccountWorkspace.id,
-        elementActions.updateElementProperty,
+        actions.updateElementProperty,
         { elementKey: element.id, propertyAlias: 'rating', value: 'never written' },
         outcomes.propertyNotFound
       );
@@ -306,7 +305,7 @@ test.describe('Built-in content and media outcomes', () => {
       const { id } = await seedBranching(
         umbracoAutomateApi,
         automateServiceAccountWorkspace.id,
-        elementActions.createElement,
+        actions.createElement,
         {
           folderKey: reviews.id,
           elementType: elementType.id,
@@ -337,7 +336,7 @@ test.describe('Built-in content and media outcomes', () => {
       const { id } = await seedBranching(
         umbracoAutomateApi,
         automateServiceAccountWorkspace.id,
-        elementActions.createElement,
+        actions.createElement,
         {
           folderKey: reviews.id,
           elementType: elementType.id,
@@ -365,7 +364,7 @@ test.describe('Built-in content and media outcomes', () => {
       const { id } = await seedBranching(
         umbracoAutomateApi,
         automateServiceAccountWorkspace.id,
-        elementActions.createElement,
+        actions.createElement,
         {
           folderKey: randomUUID(),
           elementType: elementType.id,
@@ -392,7 +391,7 @@ test.describe('Built-in content and media outcomes', () => {
       const { id } = await seedBranching(
         umbracoAutomateApi,
         automateServiceAccountWorkspace.id,
-        elementActions.createElement,
+        actions.createElement,
         {
           folderKey: reviews.id,
           elementType: randomUUID(),
@@ -488,7 +487,7 @@ test.describe('Built-in content and media outcomes', () => {
       const { id, branchingId } = await seedBranching(
         umbracoAutomateApi,
         automateServiceAccountWorkspace.id,
-        elementActions.createElement,
+        actions.createElement,
         {
           folderKey: randomUUID(),
           elementType: randomUUID(),

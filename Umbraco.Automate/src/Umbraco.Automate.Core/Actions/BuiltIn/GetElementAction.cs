@@ -94,7 +94,7 @@ public sealed class GetElementAction : ActionBase<GetElementSettings, GetElement
 
         // Node-level authorisation. A key the CMS reports as not existing is not a permission
         // problem, so it routes to the notFound outcome, as an unpublished element does.
-        var authorization = await _authorizer.AuthorizeElementAsync(elementKey, AutomationActionAuthorizerExtensions.ToSet(RequiredPermissions), cancellationToken);
+        var authorization = await _authorizer.AuthorizeElementAsync(elementKey, RequiredPermissions, cancellationToken);
         if (authorization.IsNotFound)
         {
             context.LogWarning($"Library element {elementKey} was not found");

@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -9,6 +10,7 @@ using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.ContentEditing;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.ContentEditing.Validation;
+using Umbraco.Cms.Core.Scoping;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Services.OperationStatus;
@@ -31,6 +33,8 @@ public class CreateElementActionTests
     private readonly Mock<IBackOfficeSecurityAccessor> _securityAccessor = new();
     private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
     private readonly Mock<IAutomationActionAuthorizer> _authorizer = new();
+    private readonly Mock<ICoreScopeProvider> _scopeProvider = new();
+    private readonly Mock<ICoreScope> _scope = new();
     private readonly CreateElementAction _action;
 
     public CreateElementActionTests()
@@ -45,6 +49,17 @@ public class CreateElementActionTests
         _authorizer
             .Setup(a => a.AuthorizeElementParentAsync(It.IsAny<Guid?>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(AutomationAuthorizationResult.Success);
+
+        _scopeProvider
+            .Setup(p => p.CreateCoreScope(
+                It.IsAny<IsolationLevel>(),
+                It.IsAny<RepositoryCacheMode>(),
+                It.IsAny<IEventDispatcher?>(),
+                It.IsAny<IScopedNotificationPublisher?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>()))
+            .Returns(_scope.Object);
 
         _userIdKeyResolver.Setup(x => x.GetAsync(It.IsAny<Guid>())).ReturnsAsync(UserId);
         _elementService
@@ -61,6 +76,7 @@ public class CreateElementActionTests
             _securityAccessor.Object,
             _contextFactory.Object,
             _authorizer.Object,
+            _scopeProvider.Object,
             Mock.Of<ILogger<CreateElementAction>>());
     }
 
@@ -333,11 +349,11 @@ public class CreateElementActionTests
 
     // STORY-7 AC4: Property values
     [Fact]
-    public async Task ExecuteAsync_SaveFails_LogsTheElementWasCreatedWithoutItsValues()
+    public async Task ExecuteAsync_SaveFails_LogsTheElementWasNotCreated()
     {
         var folderKey = SetupFolder();
         var type = SetupElementType(ContentVariation.Nothing);
-        var created = SetupCreate(type);
+        SetupCreate(type);
         SetupSave(OperationResultType.FailedCannot);
         var settings = Settings(folderKey, type.Key);
         settings.PropertiesJson = """{"customSchema": "x"}""";
@@ -346,7 +362,52 @@ public class CreateElementActionTests
         await _action.ExecuteAsync(context, CancellationToken.None);
 
         context.LogEntries.ShouldContain(e =>
-            e.Level == ActionLogLevel.Error && e.Message.Contains($"'{ElementName}' ({created.Key})") && e.Message.Contains("without its property values"));
+            e.Level == ActionLogLevel.Error && e.Message == $"Library element '{ElementName}' was not created in folder '{FolderName}' because saving its property values failed");
+    }
+
+    // STORY-7 AC4: Property values
+    // The create and the property save share one scope, so a failed save leaves no half-built element.
+    [Fact]
+    public async Task ExecuteAsync_CreateAndSaveSucceed_CompletesTheScope()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"customSchema": "x"}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _scope.Verify(s => s.Complete(), Times.Once);
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_PropertySaveFails_DoesNotCompleteTheScope()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        SetupSave(OperationResultType.FailedCannot);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"customSchema": "x"}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _scope.Verify(s => s.Complete(), Times.Never);
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_NoPropertyValues_CompletesTheScope()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+
+        await _action.ExecuteAsync(CreateContext(Settings(folderKey, type.Key)), CancellationToken.None);
+
+        _scope.Verify(s => s.Complete(), Times.Once);
     }
 
     // STORY-7 AC4: Property values

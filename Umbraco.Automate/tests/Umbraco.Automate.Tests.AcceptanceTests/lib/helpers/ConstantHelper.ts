@@ -135,11 +135,8 @@ export class ConstantHelper {
    * properties (GetElementSettings, CreateElementSettings, ...). */
   public static readonly elementSettings = {
     element: 'elementKey',
-    propertyAlias: 'propertyAlias',
-    value: 'value',
     folder: 'folderKey',
-    elementType: 'elementType',
-    name: 'name'
+    elementType: 'elementType'
   };
 
   /* The step picker's group headlines. The action attributes set them in code (`Group = "Library"`),

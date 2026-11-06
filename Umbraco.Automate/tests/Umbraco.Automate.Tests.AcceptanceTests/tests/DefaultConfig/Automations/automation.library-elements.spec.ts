@@ -33,9 +33,16 @@ import {
 const STEP_ALIAS = 'target';
 
 /** The CMS verb alias a folder permission without Create fails on ('Umb.Element.Create'). */
-const createElementPermission = CmsConstantHelper.userGroupElementPermissionsSettings[1][2];
-
-const libraryUserGroup = () => LibraryApiHelper.userGroup();
+const CREATE_ELEMENT_VERB = 'Umb.Element.Create';
+const createElementPermission = (() => {
+  const found = Object.values(CmsConstantHelper.userGroupElementPermissionsSettings)
+    .flat()
+    .find((value) => value === CREATE_ELEMENT_VERB);
+  if (found === undefined) {
+    throw new Error(`The CMS test helpers define no '${CREATE_ELEMENT_VERB}' element permission.`);
+  }
+  return found;
+})();
 
 const { pickerGroups, requiresSectionAccess } = ConstantHelper;
 const elementActions = {
@@ -409,7 +416,7 @@ test.describe('Folder permissions', () => {
     const reviews = await library.folder('Reviews');
     const elementType = await library.elementType();
     const workspace = await library.workspaceFor(
-      libraryUserGroup()
+      LibraryApiHelper.userGroup()
         .addPermissions()
         .addElementPermission()
         .withElementId(reviews.id)

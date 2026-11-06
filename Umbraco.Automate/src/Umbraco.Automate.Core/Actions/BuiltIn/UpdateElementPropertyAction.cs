@@ -98,7 +98,7 @@ public sealed class UpdateElementPropertyAction : ActionBase<UpdateElementProper
 
         // A key the CMS reports as not existing (e.g. deleted) is not a permission problem, so it
         // routes to the notFound outcome.
-        var authorization = await _authorizer.AuthorizeElementAsync(elementKey, AutomationActionAuthorizerExtensions.ToSet(RequiredPermissions), cancellationToken);
+        var authorization = await _authorizer.AuthorizeElementAsync(elementKey, RequiredPermissions, cancellationToken);
         if (authorization.IsNotFound)
         {
             context.LogWarning($"Library element {elementKey} was not found, so nothing was updated");
