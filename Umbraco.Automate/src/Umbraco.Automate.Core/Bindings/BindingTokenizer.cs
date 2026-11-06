@@ -43,6 +43,30 @@ internal static class BindingTokenizer
     }
 
     /// <summary>
+    /// Gets whether <paramref name="alias"/> is shaped like a filter name: a letter or underscore,
+    /// then letters, digits, <c>_</c>, <c>.</c> or <c>-</c>. <see cref="Tokenize"/> splits on every
+    /// <c>|</c>, so text after a pipe inside a filter argument comes back as a filter alias; this
+    /// tells a mistyped name, which is safe to show, from argument text, which may not be.
+    /// </summary>
+    internal static bool IsWellFormedFilterAlias(string alias)
+    {
+        if (alias.Length is 0 or > 100 || !(char.IsAsciiLetter(alias[0]) || alias[0] == '_'))
+        {
+            return false;
+        }
+
+        foreach (var c in alias)
+        {
+            if (!(char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '-'))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Finds all <c>${ ... }</c> bindings in a template string and returns
     /// the raw binding content and its position.
     /// </summary>

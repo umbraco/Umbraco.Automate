@@ -10,10 +10,12 @@ using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Bindings.Filters;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
+using Umbraco.Automate.Core.ControlFlow.BuiltIn;
 using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Dispatch;
 using Umbraco.Automate.Core.Dispatch.Authorization;
@@ -107,9 +109,9 @@ internal sealed class ActionRoutingHarness : IAsyncDisposable
 
         services.AddSingleton(actions);
         services.AddSingleton(triggers);
-        services.AddSingleton(new ControlFlowCollection(Array.Empty<IControlFlow>));
+        services.AddSingleton(new ControlFlowCollection(() => [new IfControlFlow(new ControlFlowInfrastructure(modelResolver))]));
         services.AddSingleton(new ActionMiddlewareCollection(Array.Empty<IActionMiddleware>));
-        services.AddSingleton(new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
+        services.AddSingleton(new BindingEvaluator(new BindingFilterCollection(() => [new LowercaseFilter()])));
         services.AddSingleton<ForEachCollectionCache>();
         services.AddSingleton<StepOutputHydrationCache>();
         services.AddSingleton<SettingsBindingResolver>();
@@ -181,10 +183,10 @@ internal sealed class ActionRoutingHarness : IAsyncDisposable
             var run = (await _runRepository.GetPagedByAutomationAsync(automation.Id)).Items.FirstOrDefault();
             var instanceId = run is null ? null : (await _runRepository.GetAsync(run.Id))?.WorkflowInstanceId;
             if (!string.IsNullOrEmpty(instanceId)
-                && await _persistence.GetWorkflowInstance(instanceId) is { Status: WorkflowStatus.Complete or WorkflowStatus.Terminated })
+                && await _persistence.GetWorkflowInstance(instanceId) is { Status: WorkflowStatus.Complete or WorkflowStatus.Terminated } instance)
             {
                 var completed = (await _runRepository.GetAsync(run!.Id))!;
-                return new ActionRoutingRun(completed.StepRuns.ToList(), _recorder.Latest);
+                return new ActionRoutingRun(completed.StepRuns.ToList(), _recorder.Latest, instance.Status);
             }
 
             await Task.Delay(100);
@@ -231,7 +233,8 @@ internal sealed class ActionRoutingHarness : IAsyncDisposable
 /// <summary>What a finished run looked like: persisted step runs, and the step runs as the engine last saved them.</summary>
 internal sealed record ActionRoutingRun(
     IReadOnlyList<StepRun> StepRuns,
-    IReadOnlyDictionary<Guid, StepRun> SavedStepRuns)
+    IReadOnlyDictionary<Guid, StepRun> SavedStepRuns,
+    WorkflowStatus WorkflowStatus)
 {
     public IReadOnlyList<StepRun> For(Guid stepId) => StepRuns.Where(s => s.StepId == stepId).ToList();
 
