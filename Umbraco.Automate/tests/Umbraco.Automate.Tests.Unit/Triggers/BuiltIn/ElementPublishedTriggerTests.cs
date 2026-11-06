@@ -1,6 +1,3 @@
-// STORY-9, STORY-10. Pending until T18: delete the LIBRARY_ELEMENT_TRIGGERS guard and the Skip, then make it compile and pass.
-
-#if LIBRARY_ELEMENT_TRIGGERS
 using Json.Schema;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Settings;
@@ -23,13 +20,13 @@ public class ElementPublishedTriggerTests
     #region Happy path
 
     // STORY-9 AC5: Published
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_OnePublishedElement_ProducesOneEvent()
         => _trigger.MapEvent(new ElementPublishedNotification(CreateElement(Guid.NewGuid()), new EventMessages()))
             .ShouldHaveSingleItem();
 
     // STORY-9 AC5: Published (R17: once per element)
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_TwoPublishedElements_ProducesOneEventPerElement()
     {
         var notification = new ElementPublishedNotification(
@@ -40,7 +37,7 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC5: Published
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_PublishedElement_OutputHasTheElementKey()
     {
         var key = Guid.NewGuid();
@@ -49,17 +46,17 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC5: Published
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_PublishedElement_EventCarriesTheTriggerAlias()
         => MapSingle(CreateElement(Guid.NewGuid())).TriggerAlias.ShouldBe("umbracoAutomate.elementPublished");
 
     // STORY-9 AC2 / SPEC "Output (per element)"
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_PublishedElement_OutputHasTheElementName()
         => MapSingle(CreateElement(Guid.NewGuid())).Output.ElementName.ShouldBe(ElementName);
 
     // STORY-9 AC2 / SPEC "Output (per element)"
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_PublishedElement_OutputHasTheElementTypeKey()
     {
         var typeKey = Guid.NewGuid();
@@ -68,12 +65,12 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC2 / SPEC "Output (per element)"
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_PublishedElement_OutputHasTheElementTypeAlias()
         => MapSingle(CreateElement(Guid.NewGuid())).Output.ContentTypeAlias.ShouldBe(ElementTypeAlias);
 
     // SPEC "Output (per element)": same as Saved minus isNew
-    [Theory(Skip = "Pending: T18")]
+    [Theory]
     [InlineData("elementKey")]
     [InlineData("elementName")]
     [InlineData("contentTypeKey")]
@@ -83,12 +80,12 @@ public class ElementPublishedTriggerTests
         => _trigger.GetOutputSchema()!.GetKeyword<PropertiesKeyword>()!.Properties.Keys.ShouldContain(propertyName);
 
     // SPEC "Output (per element)": only Saved has isNew
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void OutputSchema_HasNoIsNew()
         => _trigger.GetOutputSchema()!.GetKeyword<PropertiesKeyword>()!.Properties.Keys.ShouldNotContain("isNew");
 
     // STORY-9 AC8: Type filter matches (R20)
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void CanHandle_MatchingElementType_ReturnsTrue()
     {
         var typeKey = Guid.NewGuid();
@@ -98,15 +95,14 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-10 AC3: Empty filter
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void CanHandle_NoSettings_ReturnsTrue()
         => ((ITrigger)_trigger).CanHandle(new ElementPublishedTriggerOutput { ElementKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() }, null)
             .ShouldBeTrue();
 
-    // STORY-9 AC9: Invariant cultures (R23). The CMS's culture map holds the "*" marker for an
-    // invariant element. AC9 says ["*"]; this spec follows the content contract (null) as R23 asks.
-    // Decide before T18; see ElementSavedTriggerTests.
-    [Fact(Skip = "Pending: T18")]
+    // STORY-9 AC9: Invariant cultures (R23). The CMS reports "*" for an invariant element;
+    // ContentCultureHelpers turns it into null, as for content (resolved in the decision log).
+    [Fact]
     public void MapEvent_InvariantElement_CulturesIsNullAsForContent()
     {
         var key = Guid.NewGuid();
@@ -120,7 +116,7 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC10: Variant cultures (R23)
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_VariantElementPublishedInOneCulture_CulturesIsThatCulture()
     {
         var key = Guid.NewGuid();
@@ -138,7 +134,7 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC10: Variant cultures (R23). No entry in the notification: the shared change-tracking fallback.
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_VariantElementMissingFromNotification_CulturesFallBackToChangedCultures()
     {
         var element = CreateElement(
@@ -150,7 +146,7 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC5 (dedupe): keyed on the published version
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_IdempotencyKey_IsAliasElementKeyAndPublishedVersion()
     {
         var key = Guid.NewGuid();
@@ -160,7 +156,7 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC5 (dedupe): a duplicate notification for the same publish collapses to one run
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_SamePublishTwice_SameIdempotencyKey()
     {
         var key = Guid.NewGuid();
@@ -170,7 +166,7 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC5 (dedupe): rapid successive publishes are separate runs
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_SuccessivePublishes_DistinctIdempotencyKeys()
     {
         var key = Guid.NewGuid();
@@ -180,7 +176,7 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-9 AC17 (R21): the output carries the marker the dispatch authorizer checks for Read.
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void Output_IsElementScoped_WithTheElementKey()
     {
         var key = Guid.NewGuid();
@@ -190,63 +186,63 @@ public class ElementPublishedTriggerTests
     }
 
     // STORY-10 AC1: Library group
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void HasTheAlias()
         => _trigger.Alias.ShouldBe("umbracoAutomate.elementPublished");
 
     // STORY-10 AC1: Library group
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void HasTheName()
         => _trigger.Name.ShouldBe("Element Published");
 
     // STORY-10 AC1: Library group
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void IsInTheLibraryGroup()
         => _trigger.Group.ShouldBe("Library");
 
     // SPEC "Triggers" table
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void HasTheGlobeIcon()
         => _trigger.Icon.ShouldBe("icon-globe");
 
     // STORY-10 AC5: No Library section
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void RequiresTheLibrarySection()
         => _trigger.RequiredSections.ShouldBe([Umbraco.Cms.Core.Constants.Applications.Library]);
 
     // SPEC "Output (per element)"
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void HasTheOutputType()
         => _trigger.OutputType.ShouldBe(typeof(ElementPublishedTriggerOutput));
 
     // STORY-10 AC2: Element types only
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void HasTheSettingsType()
         => _trigger.SettingsType.ShouldBe(typeof(ElementPublishedTriggerSettings));
 
     // STORY-10 AC2: Element types only
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void ElementTypesField_UsesTheDocumentTypePicker()
         => ElementTypesField().EditorUiAlias.ShouldBe(Umbraco.Automate.Core.Constants.EditorUiAliases.DocumentTypePicker);
 
     // STORY-10 AC2: Element types only
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void ElementTypesField_OnlyPicksElementTypes()
         => ElementTypesField().EditorConfig.ShouldContain("\"onlyPickElementTypes\", \"value\": true");
 
     // STORY-10 AC3: Empty filter
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void ElementTypesField_IsOptional()
         => _trigger.GetSettingsSchema()!.Fields.Single(f => f.PropertyName == "ElementTypes").IsRequired.ShouldBeFalse();
 
     // STORY-10 AC4: Loop default
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void Settings_LoopSettingDefaultsToSkipOnCycle()
         => new ElementPublishedTriggerSettings().OnAutomationOriginatedEvent
             .ShouldBe(nameof(AutomationOriginatedEventBehavior.SkipOnCycle));
 
     // STORY-10 AC4: Loop default (R22)
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void Settings_DefaultBehaviourIsSkipOnCycle()
         => ((IAutomationOriginatedEventBehavior)new ElementPublishedTriggerSettings()).OnAutomationOriginated
             .ShouldBe(AutomationOriginatedEventBehavior.SkipOnCycle);
@@ -256,7 +252,7 @@ public class ElementPublishedTriggerTests
     #region Sad path
 
     // STORY-9 AC11: Type filter doesn't match (R20)
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void CanHandle_NonMatchingElementType_ReturnsFalse()
     {
         var output = new ElementPublishedTriggerOutput { ElementKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() };
@@ -265,12 +261,12 @@ public class ElementPublishedTriggerTests
     }
 
     // R17: nothing published, nothing to start
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void MapEvent_EmptyNotification_ProducesNoEvents()
         => _trigger.MapEvent(new ElementPublishedNotification(Array.Empty<IElement>(), new EventMessages())).ShouldBeEmpty();
 
     // Defensive, as for content: a wrong output type must not suppress automations.
-    [Fact(Skip = "Pending: T18")]
+    [Fact]
     public void CanHandle_MismatchedOutputType_ReturnsTrue()
         => ((ITrigger)_trigger).CanHandle(new { }, new ElementPublishedTriggerSettings()).ShouldBeTrue();
 
@@ -314,4 +310,3 @@ public class ElementPublishedTriggerTests
         return element.Object;
     }
 }
-#endif
