@@ -112,6 +112,51 @@ public class AnalyticsRunQueryTests
         }
     }
 
+    public class GivenAnEvenNumberOfFinishedRuns : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenAnEvenNumberOfFinishedRuns()
+        {
+            Automation automation = _db.AddAutomation(Content);
+            foreach (var seconds in new[] { 1, 2, 3, 10 })
+            {
+                _db.AddRun(automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(seconds));
+            }
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task AveragesTheTwoMiddleRunTimes()
+        {
+            long? median = await _db.Repository.GetMedianRunDurationMsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            median.ShouldBe(2500);
+        }
+    }
+
+    public class GivenARunThatStartedExactlyWhenTheWindowEnds : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenARunThatStartedExactlyWhenTheWindowEnds()
+        {
+            Automation automation = _db.AddAutomation(Content);
+            _db.AddRun(automation, AutomationRunStatus.Completed, WindowEndUtc, TimeSpan.FromSeconds(1));
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task LeavesItOut()
+        {
+            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            groups.ShouldBeEmpty();
+        }
+    }
+
     public class GivenRunsSuspendedLastYear : IDisposable
     {
         private readonly AnalyticsDatabase _db = new();

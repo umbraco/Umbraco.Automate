@@ -1,6 +1,4 @@
 // Story AN-5: docs/plans/analytics/STORIES.md
-// Compiled out until T3 adds the step-run query. The T3 builder removes the #if/#endif lines.
-#if AUTOMATE_ANALYTICS
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Runs;
@@ -16,6 +14,8 @@ public class AnalyticsActionQueryTests
 {
     private const string HttpRequest = "umbracoAutomate.httpRequest";
     private const string SendEmail = "umbracoAutomate.sendEmail";
+    private static readonly Guid Content = Guid.NewGuid();
+    private static readonly Guid Commerce = Guid.NewGuid();
     private static readonly DateTime OnSecondOctober = new(2026, 10, 2, 9, 0, 0, DateTimeKind.Utc);
 
     public class GivenStepRunsOfTwoActions : IDisposable
@@ -41,7 +41,7 @@ public class AnalyticsActionQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task ReturnsOneRowPerAction()
         {
             var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -49,7 +49,7 @@ public class AnalyticsActionQueryTests
             rows.Select(r => r.ActionAlias).ShouldBe([HttpRequest, SendEmail], ignoreOrder: true);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task LeavesSkippedStepsOutOfRuns()
         {
             var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -57,7 +57,7 @@ public class AnalyticsActionQueryTests
             rows.Single(r => r.ActionAlias == SendEmail).Runs.ShouldBe(4);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsCompletedFailedAndRejected()
         {
             var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -66,7 +66,7 @@ public class AnalyticsActionQueryTests
             (http.Completed, http.Failed, http.Rejected).ShouldBe((2, 4, 1));
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task AddsUpRetries()
         {
             var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -74,7 +74,7 @@ public class AnalyticsActionQueryTests
             rows.Single(r => r.ActionAlias == HttpRequest).Retries.ShouldBe(5);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task AveragesTheRunTimeOfFinishedSteps()
         {
             var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -82,7 +82,7 @@ public class AnalyticsActionQueryTests
             rows.Single(r => r.ActionAlias == SendEmail).AvgDurationTicks.ShouldBe(TimeSpan.FromSeconds(1).Ticks);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsFailuresPerErrorCategory()
         {
             var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -93,6 +93,85 @@ public class AnalyticsActionQueryTests
                     [StepRunErrorCategory.Authentication] = 3,
                     [StepRunErrorCategory.Timeout] = 1,
                 });
+        }
+    }
+
+    public class GivenStepRunsInTwoWorkspaces : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenStepRunsInTwoWorkspaces()
+        {
+            AutomationRun contentRun = _db.AddRun(_db.AddAutomation(Content), AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+            _db.AddStepRun(contentRun, HttpRequest, StepRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+
+            AutomationRun commerceRun = _db.AddRun(_db.AddAutomation(Commerce), AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+            _db.AddStepRun(commerceRun, SendEmail, StepRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+            _db.AddStepRun(commerceRun, SendEmail, StepRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task ReturnsOnlyTheActionsOfTheGivenWorkspace()
+        {
+            var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Content });
+
+            rows.Select(r => r.ActionAlias).ShouldBe([HttpRequest]);
+        }
+
+        [Fact]
+        public async Task CountsTheStepRunsOfTheOtherWorkspace()
+        {
+            var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce });
+
+            rows.Single(r => r.ActionAlias == SendEmail).Runs.ShouldBe(2);
+        }
+    }
+
+    public class GivenAnAutomationWithStepRunsThatMovedWorkspace : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenAnAutomationWithStepRunsThatMovedWorkspace()
+        {
+            Automation automation = _db.AddAutomation(Content);
+            AutomationRun run = _db.AddRun(automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+            _db.AddStepRun(run, HttpRequest, StepRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+            _db.MoveAutomation(automation, Commerce);
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task CountsItsStepRunsInItsCurrentWorkspace()
+        {
+            var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce });
+
+            rows.Single().Runs.ShouldBe(1);
+        }
+    }
+
+    public class GivenStepsThatNeverFinished : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenStepsThatNeverFinished()
+        {
+            AutomationRun run = _db.AddRun(_db.AddAutomation(Guid.NewGuid()), AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(5));
+            _db.AddStepRun(run, HttpRequest, StepRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+            _db.AddStepRun(run, HttpRequest, StepRunStatus.Cancelled, OnSecondOctober, TimeSpan.FromHours(1));
+            _db.AddStepRun(run, HttpRequest, StepRunStatus.Running, OnSecondOctober, TimeSpan.FromHours(1));
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task AveragesOnlyTheFinishedSteps()
+        {
+            var rows = await _db.Repository.GetActionAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            rows.Single().AvgDurationTicks.ShouldBe(TimeSpan.FromSeconds(1).Ticks);
         }
     }
 
@@ -109,7 +188,7 @@ public class AnalyticsActionQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsItOnTheDayTheStepStarted()
         {
             var rows = await _db.Repository.GetActionAggregatesAsync(
@@ -121,4 +200,3 @@ public class AnalyticsActionQueryTests
         }
     }
 }
-#endif

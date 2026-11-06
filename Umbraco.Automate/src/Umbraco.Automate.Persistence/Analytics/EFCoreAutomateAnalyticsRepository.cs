@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Analytics;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Persistence.Runs;
@@ -25,6 +26,15 @@ internal sealed class EFCoreAutomateAnalyticsRepository : IAutomateAnalyticsRepo
         (int)AutomationRunStatus.Cancelled,
         (int)AutomationRunStatus.Failed,
     ];
+
+    private static readonly int StepCompleted = (int)StepRunStatus.Completed;
+    private static readonly int StepFailed = (int)StepRunStatus.Failed;
+    private static readonly int StepRejected = (int)StepRunStatus.Rejected;
+    private static readonly int StepSkipped = (int)StepRunStatus.Skipped;
+
+    // A cancelled step never finished (its run was killed while it waited), so it counts as a run
+    // but not towards the failure rate or the average duration.
+    private static readonly int[] StepFinishedStatuses = [StepCompleted, StepFailed, StepRejected];
 
     private readonly IDbContextFactory<UmbracoAutomateDbContext> _dbContextFactory;
 
@@ -148,6 +158,63 @@ internal sealed class EFCoreAutomateAnalyticsRepository : IAutomateAnalyticsRepo
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ActionAggregate>> GetActionAggregatesAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        IReadOnlySet<Guid>? workspaceIds,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var aggregates = await StepsStartedInWindow(db, workspaceIds, fromUtc, toUtc)
+            .GroupBy(s => s.ActionAlias)
+            .Select(g => new
+            {
+                ActionAlias = g.Key,
+                Runs = g.Count(),
+                Completed = g.Count(s => s.Status == StepCompleted),
+                Failed = g.Count(s => s.Status == StepFailed),
+                Rejected = g.Count(s => s.Status == StepRejected),
+                Retries = g.Sum(s => s.RetryCount),
+                AvgDurationTicks = g
+                    .Where(s => StepFinishedStatuses.Contains(s.Status) && s.DurationTicks != null)
+                    .Average(s => (double?)s.DurationTicks),
+            })
+            .ToListAsync(cancellationToken);
+
+        if (aggregates.Count == 0)
+        {
+            return [];
+        }
+
+        // A failure with no recorded category counts as Unknown.
+        var failures = await StepsStartedInWindow(db, workspaceIds, fromUtc, toUtc)
+            .Where(s => s.Status == StepFailed)
+            .GroupBy(s => new { s.ActionAlias, s.ErrorCategory })
+            .Select(g => new { g.Key.ActionAlias, g.Key.ErrorCategory, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var failuresByAction = failures
+            .GroupBy(f => f.ActionAlias)
+            .ToDictionary(
+                g => g.Key,
+                g => g
+                    .GroupBy(f => (StepRunErrorCategory)(f.ErrorCategory ?? (int)StepRunErrorCategory.Unknown))
+                    .ToDictionary(c => c.Key, c => c.Sum(f => f.Count)));
+
+        return aggregates
+            .Select(a => new ActionAggregate(
+                a.ActionAlias,
+                a.Runs,
+                a.Completed,
+                a.Failed,
+                a.Rejected,
+                a.Retries,
+                a.AvgDurationTicks,
+                failuresByAction.GetValueOrDefault(a.ActionAlias) ?? new Dictionary<StepRunErrorCategory, int>()))
+            .ToList();
+    }
+
     private static IQueryable<AutomationRunEntity> StartedInWindow(
         UmbracoAutomateDbContext db,
         IReadOnlySet<Guid>? workspaceIds,
@@ -156,8 +223,32 @@ internal sealed class EFCoreAutomateAnalyticsRepository : IAutomateAnalyticsRepo
         => ScopedRuns(db, workspaceIds)
             .Where(r => r.StartedUtc != null && r.StartedUtc >= fromUtc && r.StartedUtc < toUtc);
 
-    // Scopes by the automation's current workspace (join), as GetRunCountsByStatusAsync does, so
-    // figures agree with the runs list. Null means all workspaces and skips the join.
+    // Scopes step runs like ScopedRuns, through step run -> run -> automation. Null skips both joins.
+    private static IQueryable<StepRunEntity> StepsStartedInWindow(
+        UmbracoAutomateDbContext db,
+        IReadOnlySet<Guid>? workspaceIds,
+        DateTime fromUtc,
+        DateTime toUtc)
+    {
+        IQueryable<StepRunEntity> steps = db.StepRuns
+            .Where(s => s.StartedUtc != null && s.StartedUtc >= fromUtc && s.StartedUtc < toUtc && s.Status != StepSkipped);
+
+        if (workspaceIds is null)
+        {
+            return steps;
+        }
+
+        return from s in steps
+               join r in db.AutomationRuns on s.RunId equals r.Id
+               join a in db.Automations on r.AutomationId equals a.Id
+               where workspaceIds.Contains(a.WorkspaceId)
+               select s;
+    }
+
+    // Scopes by the automation's current workspace (join) so figures agree with the runs list. Null
+    // means all workspaces and skips the join, which is safe because
+    // AutomationService.DeleteAutomationAsync deletes a run's rows before the automation, so no
+    // run is ever orphaned.
     private static IQueryable<AutomationRunEntity> ScopedRuns(UmbracoAutomateDbContext db, IReadOnlySet<Guid>? workspaceIds)
     {
         if (workspaceIds is null)
