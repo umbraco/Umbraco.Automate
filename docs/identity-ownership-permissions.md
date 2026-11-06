@@ -289,8 +289,8 @@ different point in the lifecycle:
 |-------|-------------|-------------|
 | **Section access** | `RequiredSections = ["content", ...]` | Catalogue endpoint (picker filter) → publish-time validation → trigger dispatch → per-action runtime middleware |
 | **Dispatch authorisation** | `ITriggerDispatchAuthorizer` implementations | Trigger dispatch — runs after the section guard, before the run is started. Built-in handles CMS content/media nodes; provider packages plug in their own (e.g. Umbraco Commerce store membership) |
-| **Node access (action)** | n/a (resolved from the action's target node at runtime) | Inside each content/media action via `IAutomationActionAuthorizer` |
-| **Permission verb** | `RequiredPermissions = [ActionPublish.ActionLetter, ...]` (content actions only) | Same as node access — fed into `IContentPermissionService.AuthorizeAccessAsync` |
+| **Node access (action)** | n/a (resolved from the action's target node at runtime) | Inside each content/media/Library element action via `IAutomationActionAuthorizer` |
+| **Permission verb** | `RequiredPermissions = [ActionPublish.ActionLetter, ...]` (content and Library actions) | Same as node access — fed into `IContentPermissionService` or `IElementPermissionService` / `IElementContainerPermissionService` `.AuthorizeAccessAsync` |
 
 ### Section access — `RequiredSections`
 
@@ -390,8 +390,8 @@ is checked once per item.
 
 Section access is necessary but not sufficient. A workspace with the Content
 section can still legitimately be scoped to a subset of nodes via the service
-account's start node and granular permissions. Content and media actions enforce
-this at runtime by calling `IAutomationActionAuthorizer`:
+account's start node and granular permissions. Content, media and Library
+element actions enforce this at runtime by calling `IAutomationActionAuthorizer`:
 
 ```csharp
 public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -435,8 +435,51 @@ is allowed into the bin, so the authorizer returns success. Treat a trashed item
 (or a trashed parent, when creating) as missing, as the built-in actions do.
 
 The authorizer wraps Umbraco's `IContentPermissionService` /
-`IMediaPermissionService`, so behaviour matches the backoffice's own
-access-control enforcement.
+`IMediaPermissionService` (and `IElementPermissionService` /
+`IElementContainerPermissionService` for the Library, below), so behaviour
+matches the backoffice's own access-control enforcement.
+
+#### Library elements and folders
+
+The Library actions (group "Library", `RequiredSections = [Constants.Applications.Library]`)
+use the element members of `IAutomationActionAuthorizer`:
+
+| Member | Checks |
+|--------|--------|
+| `AuthorizeElementAsync(elementKey, permissions, ct)` | An element, as the ambient service account |
+| `AuthorizeElementAsync(user, elementKey, permissions, ct)` | An element, as an explicit user (dispatch-time, before the ambient accessor is set) |
+| `AuthorizeElementParentAsync(folderKey, permissions, ct)` | A target folder, or the Library root when `folderKey` is `null` |
+
+Two extension methods in `AutomationActionAuthorizerExtensions` wrap these and
+return a failed `ActionResult` on denial (or `null` on success):
+`AuthorizeElementOrFailAsync` and `AuthorizeElementParentOrFailAsync`.
+
+- **Elements** go through `IElementPermissionService`. The Library actions
+  declare these permission verbs: `Umb.Element.Read` (Get Element, Get Element
+  Property), `Umb.Element.Create` (Create Element), `Umb.Element.Update`
+  (Update Element Property), `Umb.Element.Publish` and `Umb.Element.Unpublish`.
+- **Folders** go through `IElementContainerPermissionService`, not the element
+  service, because the element lookup resolves element keys only. With no
+  folder, the check is `IElementPermissionService.AuthorizeRootAccessAsync` on
+  the Library root.
+- **Fail-closed defaults.** The three element members have default interface
+  implementations that deny access, so an existing implementation of the
+  interface keeps compiling and cannot grant Library access by accident. The
+  defaults are marked `TODO (V19)` for removal. `AutomationActionAuthorizer`
+  implements all three.
+
+**Trashed elements and folders.** Same rule as content and media. The recycle
+bin path prefix is `-1,-22,`. An account confined to a start node cannot see
+the bin, so the CMS reports a trashed element or folder as missing path
+access. The authorizer turns that into `AutomationAuthorizationResult.NotFound`,
+the same as a deleted one. An account with a root start node is let in. Update, Publish and Unpublish
+Element then check `Trashed` after loading the element, and Create Element checks
+the folder's `Trashed`. Get Element and Get Element Property read the published
+cache, which drops trashed elements. What each action does with "not found":
+
+- **Get Element, Get Element Property, Update Element Property** return the `notFound` outcome.
+- **Create Element** returns `parentNotFound` when the folder is missing or trashed.
+- **Publish Element, Unpublish Element** fail the step (no outcomes).
 
 ### Third-party step types
 

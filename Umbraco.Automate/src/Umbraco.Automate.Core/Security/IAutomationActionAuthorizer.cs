@@ -4,8 +4,9 @@ namespace Umbraco.Automate.Core.Security;
 
 /// <summary>
 /// Authorises a user — typically the workspace service account — against CMS content and
-/// media nodes. Wraps Umbraco's <c>IContentPermissionService</c> /
-/// <c>IMediaPermissionService</c>; the action-pipeline overloads resolve the service-account
+/// media nodes and Library elements. Wraps Umbraco's <c>IContentPermissionService</c> /
+/// <c>IMediaPermissionService</c> / <c>IElementPermissionService</c> /
+/// <c>IElementContainerPermissionService</c>; the action-pipeline overloads resolve the service-account
 /// identity from the ambient backoffice security accessor set by
 /// <c>BackOfficeIdentityMiddleware</c>, while the explicit-user overloads are used by
 /// dispatch-time authorisation before any action middleware runs.
