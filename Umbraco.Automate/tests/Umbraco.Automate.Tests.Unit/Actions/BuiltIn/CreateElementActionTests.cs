@@ -1,5 +1,3 @@
-// STORY-7. Pending until T10: delete the LIBRARY_ELEMENT_ACTIONS guard and the Skip, then make it compile and pass.
-#if LIBRARY_ELEMENT_ACTIONS
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -9,6 +7,7 @@ using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.ContentEditing;
+using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models.ContentEditing.Validation;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -22,9 +21,12 @@ public class CreateElementActionTests
 {
     private const string ElementName = "Acme – AggregateRating";
     private const string FolderName = "Reviews";
+    private const int UserId = 42;
 
     private readonly Mock<IElementEditingService> _editingService = new();
     private readonly Mock<IElementContainerService> _containerService = new();
+    private readonly Mock<IElementService> _elementService = new();
+    private readonly Mock<IUserIdKeyResolver> _userIdKeyResolver = new();
     private readonly Mock<IContentTypeService> _contentTypeService = new();
     private readonly Mock<IBackOfficeSecurityAccessor> _securityAccessor = new();
     private readonly Mock<IUmbracoContextFactory> _contextFactory = new();
@@ -44,10 +46,17 @@ public class CreateElementActionTests
             .Setup(a => a.AuthorizeElementParentAsync(It.IsAny<Guid?>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(AutomationAuthorizationResult.Success);
 
+        _userIdKeyResolver.Setup(x => x.GetAsync(It.IsAny<Guid>())).ReturnsAsync(UserId);
+        _elementService
+            .Setup(x => x.Save(It.IsAny<IElement>(), It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()))
+            .Returns(new OperationResult(OperationResultType.Success, new EventMessages()));
+
         _action = new CreateElementAction(
             new ActionInfrastructure(Mock.Of<IEditableModelResolver>()),
             _editingService.Object,
             _containerService.Object,
+            _elementService.Object,
+            _userIdKeyResolver.Object,
             _contentTypeService.Object,
             _securityAccessor.Object,
             _contextFactory.Object,
@@ -58,7 +67,7 @@ public class CreateElementActionTests
     #region Happy path
 
     // STORY-7 AC1: In a folder
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_InFolder_CreatesInTheFolder()
     {
         var folderKey = SetupFolder();
@@ -71,7 +80,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC1: In a folder
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_InFolder_CreatesOfTheElementType()
     {
         var folderKey = SetupFolder();
@@ -84,7 +93,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC1: In a folder
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_InFolder_CreatesWithTheName()
     {
         var folderKey = SetupFolder();
@@ -99,7 +108,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC1: In a folder
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_InFolder_Succeeds()
     {
         var folderKey = SetupFolder();
@@ -113,7 +122,7 @@ public class CreateElementActionTests
 
     // STORY-7 AC1: In a folder
     // No outcome on the result routes the step through its default exit, "success".
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_InFolder_TakesTheDefaultOutcome()
     {
         var folderKey = SetupFolder();
@@ -126,7 +135,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC2: Output
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_Created_OutputsTheElementKey()
     {
         var folderKey = SetupFolder();
@@ -139,7 +148,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC2: Output
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_Created_OutputsTheName()
     {
         var folderKey = SetupFolder();
@@ -152,7 +161,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC2: Output
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_Created_OutputsTheContentTypeKey()
     {
         var folderKey = SetupFolder();
@@ -165,7 +174,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC2: Output
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_Created_OutputsTheContentTypeAlias()
     {
         var folderKey = SetupFolder();
@@ -178,7 +187,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC2: Output
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_Created_OutputsTheFolderKey()
     {
         var folderKey = SetupFolder();
@@ -191,7 +200,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC3: At the root
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_FolderEmpty_CreatesAtTheLibraryRoot()
     {
         var type = SetupElementType(ContentVariation.Nothing);
@@ -204,7 +213,7 @@ public class CreateElementActionTests
 
     // STORY-7 AC3: At the root
     // The root is not a folder: it is checked as root access, never looked up as a key (R7).
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_FolderEmpty_ChecksRootAccess()
     {
         var type = SetupElementType(ContentVariation.Nothing);
@@ -218,7 +227,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC3: At the root
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_FolderEmpty_OutputsNoFolderKey()
     {
         var type = SetupElementType(ContentVariation.Nothing);
@@ -230,27 +239,134 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC4: Property values
-    [Fact(Skip = "Pending: T10")]
-    public async Task ExecuteAsync_PropertyValuesGiven_PassesTheValueToTheCms()
+    [Fact]
+    public async Task ExecuteAsync_PropertyValuesGiven_SetsTheValueOnTheCreatedElement()
     {
         var folderKey = SetupFolder();
         var type = SetupElementType(ContentVariation.Nothing);
-        SetupCreate(type);
+        var created = SetupCreate(type);
         var settings = Settings(folderKey, type.Key);
         settings.PropertiesJson = """{"customSchema": "{\"@type\":\"AggregateRating\"}"}""";
 
         await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
 
-        _editingService.Verify(
-            x => x.CreateAsync(
-                It.Is<ElementCreateModel>(m => m.Properties.Any(p =>
-                    p.Alias == "customSchema" && (string?)p.Value == """{"@type":"AggregateRating"}""" && p.Culture == null)),
-                It.IsAny<Guid>()),
-            Times.Once);
+        created.GetValue("customSchema").ShouldBe("""{"@type":"AggregateRating"}""");
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_PropertyValuesGiven_SavesTheElementOnce()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        var created = SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"customSchema": "x"}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _elementService.Verify(x => x.Save(created, UserId, null), Times.Once);
+    }
+
+    // STORY-7 AC4: Property values
+    // Values would go through each editor's backoffice-format conversion, so they stay out of the create model.
+    [Fact]
+    public async Task ExecuteAsync_PropertyValuesGiven_CreateModelHasNoPropertyValues()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"customSchema": "x"}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _editingService.Verify(x => x.CreateAsync(It.Is<ElementCreateModel>(m => !m.Properties.Any()), It.IsAny<Guid>()), Times.Once);
+    }
+
+    // STORY-7 AC4: Property values
+    // Create Content passes an array or object value on as its raw JSON text.
+    [Fact]
+    public async Task ExecuteAsync_ArrayValueGiven_SetsTheRawJsonOnTheElement()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        var created = SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"tags": ["a","b"]}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        created.GetValue("tags").ShouldBe("""["a","b"]""");
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_PropertiesJsonIsEmpty_DoesNotSave()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = "  ";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _elementService.Verify(x => x.Save(It.IsAny<IElement>(), It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()), Times.Never);
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_SaveCancelled_FailsWithCancelledCategory()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        SetupSave(OperationResultType.FailedCancelledByEvent);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"customSchema": "x"}""";
+
+        var result = await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Cancelled);
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_SaveFails_LogsTheElementWasCreatedWithoutItsValues()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        var created = SetupCreate(type);
+        SetupSave(OperationResultType.FailedCannot);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"customSchema": "x"}""";
+        var context = CreateContext(settings);
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.ShouldContain(e =>
+            e.Level == ActionLogLevel.Error && e.Message.Contains($"'{ElementName}' ({created.Key})") && e.Message.Contains("without its property values"));
+    }
+
+    // STORY-7 AC4: Property values
+    // Create Content matches aliases ignoring case; the CMS needs the property type's real alias.
+    [Fact]
+    public async Task ExecuteAsync_PropertyAliasDiffersInCase_SetsThePropertyUnderItsRealAlias()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        var created = SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"CustomSchema": "x"}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        created.GetValue("customSchema").ShouldBe("x");
     }
 
     // STORY-7 AC5: Culture
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_VariantTypeWithCulture_NamesTheCulture()
     {
         var folderKey = SetupFolder();
@@ -269,40 +385,36 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC5: Culture
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_VariantTypeWithCulture_SetsVariantPropertiesInTheCulture()
     {
         var folderKey = SetupFolder();
         var type = SetupElementType(ContentVariation.Culture);
-        SetupCreate(type);
+        var created = SetupCreate(type);
         var settings = Settings(folderKey, type.Key);
         settings.Culture = "da-DK";
         settings.PropertiesJson = """{"title": "Bedømmelse"}""";
 
         await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
 
-        _editingService.Verify(
-            x => x.CreateAsync(
-                It.Is<ElementCreateModel>(m => m.Properties.Any(p => p.Alias == "title" && p.Culture == "da-DK")),
-                It.IsAny<Guid>()),
-            Times.Once);
+        created.GetValue("title", "da-DK").ShouldBe("Bedømmelse");
     }
 
     // STORY-7 AC6: Bound folder
     // Bindings resolve before the action runs, so the action only ever sees the resolved key
     // (covered by ExecuteAsync_InFolder_CreatesInTheFolder). The field has to accept a binding.
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public void FolderKeyField_SupportsBindings()
         => FolderKeyField().SupportsBindings.ShouldBeTrue();
 
     // STORY-7 AC7: Audit entry
     // AuditTrailMiddleware writes the audit entry for every ICmsAction that succeeds.
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public void Action_IsACmsAction()
         => _action.ShouldBeAssignableTo<ICmsAction>();
 
     // STORY-7 AC8: Run log
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_Created_WritesOneRunLogLine()
     {
         var folderKey = SetupFolder();
@@ -316,7 +428,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC8: Run log
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_Created_RunLogNamesTheNewElement()
     {
         var folderKey = SetupFolder();
@@ -334,7 +446,7 @@ public class CreateElementActionTests
     #region Sad path
 
     // STORY-7 AC9: Folder not a GUID
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_FolderIsNotAGuid_FailsWithValidationError()
     {
         var settings = new CreateElementSettings
@@ -350,7 +462,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC10: Folder missing
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_AuthorizerReportsFolderNotFound_TakesParentNotFoundOutcome()
     {
         var folderKey = SetupAuthorizerFolderNotFound();
@@ -361,7 +473,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC10: Folder missing
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_FolderDoesNotExist_TakesParentNotFoundOutcome()
     {
         var folderKey = Guid.NewGuid();
@@ -374,7 +486,7 @@ public class CreateElementActionTests
 
     // STORY-7 AC10: Folder missing
     // The folder can go between the check and the create; the CMS then reports ParentNotFound.
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_CmsReportsParentNotFound_TakesParentNotFoundOutcome()
     {
         var folderKey = SetupFolder();
@@ -390,7 +502,7 @@ public class CreateElementActionTests
     // A root Library start node passes the authorizer for a folder in the recycle bin, and
     // IElementEditingService.CreateAsync at 18.1.0 doesn't check Trashed on the folder, so the
     // action has to.
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_FolderInRecycleBin_TakesParentNotFoundOutcome()
     {
         var folderKey = SetupFolder(trashed: true);
@@ -403,7 +515,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC11: Folder trashed, root account
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_FolderInRecycleBin_DoesNotCreate()
     {
         var folderKey = SetupFolder(trashed: true);
@@ -417,7 +529,7 @@ public class CreateElementActionTests
 
     // STORY-7 AC12: Folder trashed, scoped account
     // A folder start node can't see the bin, so the authorizer reports the trashed folder as not found.
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_ScopedAccountAndFolderInRecycleBin_TakesParentNotFoundOutcome()
     {
         var folderKey = SetupFolder(trashed: true);
@@ -433,12 +545,12 @@ public class CreateElementActionTests
     // STORY-7 AC13: Bound folder empty
     // The settings binder fails the step before the action runs when a field marked
     // BindingMustResolve resolves to empty, so nothing reaches the root.
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public void FolderKeyField_BindingMustResolve()
         => FolderKeyField().BindingMustResolve.ShouldBeTrue();
 
     // STORY-7 AC14: Element type missing
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_ElementTypeDoesNotExist_TakesElementTypeNotFoundOutcome()
     {
         var folderKey = SetupFolder();
@@ -451,7 +563,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC14: Element type missing
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_CmsReportsContentTypeNotFound_TakesElementTypeNotFoundOutcome()
     {
         var folderKey = SetupFolder();
@@ -466,7 +578,7 @@ public class CreateElementActionTests
     // STORY-7 AC15: Not allowed in the Library
     // CreateAsync reports NotAllowed for a type that isn't "Allow in Library" (ElementEditingService
     // TryGetAndValidateContentType), the same status it uses for a folder that refuses the type.
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_TypeNotAllowedInLibrary_FailsWithValidationError()
     {
         var folderKey = SetupFolder();
@@ -479,7 +591,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC15: Not allowed in the Library
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_TypeNotAllowedInLibrary_ErrorNamesTheType()
     {
         var folderKey = SetupFolder();
@@ -492,7 +604,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC16: Not allowed in the folder
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_TypeNotAllowedInFolder_FailsWithValidationError()
     {
         var folderKey = SetupFolder();
@@ -505,7 +617,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC16: Not allowed in the folder
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_TypeNotAllowedInFolder_ErrorNamesTheType()
     {
         var folderKey = SetupFolder();
@@ -518,7 +630,7 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC16: Not allowed in the folder
-    [Fact(Skip = "Pending: T10")]
+    [Fact]
     public async Task ExecuteAsync_TypeNotAllowedInFolder_ErrorNamesTheFolder()
     {
         var folderKey = SetupFolder();
@@ -531,9 +643,9 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC17: Invalid property values
-    // CreateAsync saves the element anyway and returns a *successful* attempt whose status is
-    // PropertyValidationError, with the failing aliases in the validation result.
-    [Fact(Skip = "Pending: T10")]
+    // Nothing is sent to CreateAsync but the name, so a PropertyValidationError status only
+    // means mandatory properties aren't set yet; the draft is saved all the same.
+    [Fact]
     public async Task ExecuteAsync_PropertyValidationError_StillSucceeds()
     {
         var folderKey = SetupFolder();
@@ -546,8 +658,8 @@ public class CreateElementActionTests
     }
 
     // STORY-7 AC17: Invalid property values
-    [Fact(Skip = "Pending: T10")]
-    public async Task ExecuteAsync_PropertyValidationError_LogsAWarningNamingTheProperty()
+    [Fact]
+    public async Task ExecuteAsync_PropertyValidationError_LogsNoWarning()
     {
         var folderKey = SetupFolder();
         var type = SetupElementType(ContentVariation.Nothing);
@@ -556,7 +668,297 @@ public class CreateElementActionTests
 
         await _action.ExecuteAsync(context, CancellationToken.None);
 
-        context.LogEntries.ShouldContain(e => e.Level == ActionLogLevel.Warning && e.Message.Contains("customSchema"));
+        context.LogEntries.ShouldNotContain(e => e.Level == ActionLogLevel.Warning);
+    }
+
+    // STORY-7 AC17: Invalid property values
+    // The element is saved as a draft holding the value, as Create Content does.
+    [Fact]
+    public async Task ExecuteAsync_ValueThatWouldFailValidation_IsSetOnTheElement()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        var created = SetupCreate(type, ContentEditingOperationStatus.PropertyValidationError, InvalidCustomSchema());
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"customSchema": "not json"}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        created.GetValue("customSchema").ShouldBe("not json");
+    }
+
+    // Create Content parity: Authorization
+    // A denied folder is not a missing one: it fails rather than taking parentNotFound.
+    [Fact]
+    public async Task ExecuteAsync_FolderAuthorizationDenied_FailsWithAuthenticationError()
+    {
+        var folderKey = SetupFolderAuthorizationDenied();
+
+        var result = await _action.ExecuteAsync(CreateContext(Settings(folderKey, Guid.NewGuid())), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    // Create Content parity: Authorization
+    [Fact]
+    public async Task ExecuteAsync_FolderAuthorizationDenied_DoesNotCreate()
+    {
+        var folderKey = SetupFolderAuthorizationDenied();
+
+        await _action.ExecuteAsync(CreateContext(Settings(folderKey, Guid.NewGuid())), CancellationToken.None);
+
+        _editingService.Verify(x => x.CreateAsync(It.IsAny<ElementCreateModel>(), It.IsAny<Guid>()), Times.Never);
+    }
+
+    // STORY-1 AC8: Root access
+    [Fact]
+    public async Task ExecuteAsync_NoFolderAndRootDenied_FailsWithAuthenticationError()
+    {
+        _authorizer
+            .Setup(a => a.AuthorizeElementParentAsync(null, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Service account is confined to a start node."));
+
+        var result = await _action.ExecuteAsync(CreateContext(Settings(folderKey: null, Guid.NewGuid())), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    // STORY-7 AC5: Culture
+    [Fact]
+    public async Task ExecuteAsync_VariantTypeWithoutCulture_FailsWithValidationError()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Culture);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.Culture = "  ";
+
+        var result = await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    // Create Content parity: Name required
+    [Fact]
+    public async Task ExecuteAsync_NameIsBlank_FailsWithValidationError()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.Name = " ";
+
+        var result = await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    // R1: Element type required
+    [Fact]
+    public async Task ExecuteAsync_ElementTypeIsBlank_FailsWithValidationError()
+    {
+        var settings = Settings(SetupFolder(), Guid.NewGuid());
+        settings.ElementType = "";
+
+        var result = await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    // R1: Element type required
+    [Fact]
+    public async Task ExecuteAsync_ElementTypeIsNotAGuid_FailsWithValidationError()
+    {
+        var settings = Settings(SetupFolder(), Guid.NewGuid());
+        settings.ElementType = "not-a-guid";
+
+        var result = await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    // R1: Element type required
+    // The picker stores its value comma-separated, with a trailing comma when one is chosen.
+    [Fact]
+    public async Task ExecuteAsync_ElementTypeHasTrailingComma_UsesTheKey()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.ElementType = $"{type.Key},";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _editingService.Verify(x => x.CreateAsync(It.Is<ElementCreateModel>(m => m.ContentTypeKey == type.Key), It.IsAny<Guid>()), Times.Once);
+    }
+
+    // R1: Element type required
+    [Fact]
+    public async Task ExecuteAsync_ElementTypeHasSeveralKeys_UsesTheFirst()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.ElementType = $"{type.Key},{Guid.NewGuid()}";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _editingService.Verify(x => x.CreateAsync(It.Is<ElementCreateModel>(m => m.ContentTypeKey == type.Key), It.IsAny<Guid>()), Times.Once);
+    }
+
+    // Create Content parity: Not an element type
+    [Fact]
+    public async Task ExecuteAsync_ContentTypeIsNotAnElementType_FailsWithValidationError()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing, isElement: false);
+        SetupCreate(type);
+
+        var result = await _action.ExecuteAsync(CreateContext(Settings(folderKey, type.Key)), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+    }
+
+    // Create Content parity: Not an element type
+    [Fact]
+    public async Task ExecuteAsync_ContentTypeIsNotAnElementType_ErrorSaysSo()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing, isElement: false);
+        SetupCreate(type);
+
+        var result = await _action.ExecuteAsync(CreateContext(Settings(folderKey, type.Key)), CancellationToken.None);
+
+        result.Exception!.Message.ShouldContain("not an element type");
+    }
+
+    // Create Content parity: Not an element type
+    [Fact]
+    public async Task ExecuteAsync_ContentTypeIsNotAnElementType_DoesNotCreate()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing, isElement: false);
+        SetupCreate(type);
+
+        await _action.ExecuteAsync(CreateContext(Settings(folderKey, type.Key)), CancellationToken.None);
+
+        _editingService.Verify(x => x.CreateAsync(It.IsAny<ElementCreateModel>(), It.IsAny<Guid>()), Times.Never);
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_PropertiesJsonIsMalformed_LogsAWarning()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = "{not json";
+        var context = CreateContext(settings);
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.ShouldContain(e => e.Level == ActionLogLevel.Warning && e.Message.Contains("not a valid JSON object"));
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_PropertiesJsonIsMalformed_StillCreates()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = "{not json";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _editingService.Verify(x => x.CreateAsync(It.IsAny<ElementCreateModel>(), It.IsAny<Guid>()), Times.Once);
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_UnknownPropertyAlias_LogsAWarning()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"doesNotExist": "x"}""";
+        var context = CreateContext(settings);
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.ShouldContain(e => e.Level == ActionLogLevel.Warning && e.Message.Contains("doesNotExist"));
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_UnknownPropertyAlias_IsSkipped()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = """{"doesNotExist": "x"}""";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _elementService.Verify(x => x.Save(It.IsAny<IElement>(), It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()), Times.Never);
+    }
+
+    // STORY-7 AC4: Property values
+    [Fact]
+    public async Task ExecuteAsync_PropertiesJsonIsMalformed_DoesNotSaveAgain()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreate(type);
+        var settings = Settings(folderKey, type.Key);
+        settings.PropertiesJson = "{not json";
+
+        await _action.ExecuteAsync(CreateContext(settings), CancellationToken.None);
+
+        _elementService.Verify(x => x.Save(It.IsAny<IElement>(), It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()), Times.Never);
+    }
+
+    // Create Content parity: Cancelled by a notification handler
+    [Fact]
+    public async Task ExecuteAsync_CancelledByNotification_FailsWithCancelledCategory()
+    {
+        var folderKey = SetupFolder();
+        var type = SetupElementType(ContentVariation.Nothing);
+        SetupCreateFails(ContentEditingOperationStatus.CancelledByNotification);
+
+        var result = await _action.ExecuteAsync(CreateContext(Settings(folderKey, type.Key)), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Cancelled);
+    }
+
+    #endregion
+
+    #region Settings
+
+    // STORY-8 AC6
+    [Fact]
+    public void FolderKeyField_UsesTheElementKeyPicker()
+        => FolderKeyField().EditorUiAlias.ShouldBe(Umbraco.Automate.Core.Constants.EditorUiAliases.ElementKeyPicker);
+
+    // STORY-8 AC6
+    [Fact]
+    public void FolderKeyField_PicksFoldersOnly()
+        => FolderKeyField().EditorConfig.ShouldContain("\"folderOnly\", \"value\": true");
+
+    // STORY-8 AC8
+    [Fact]
+    public void ElementTypeField_OnlyPicksElementTypes()
+    {
+        var field = typeof(CreateElementSettings).GetProperty(nameof(CreateElementSettings.ElementType))!
+            .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
+
+        field.EditorConfig.ShouldContain("\"onlyPickElementTypes\", \"value\": true");
     }
 
     #endregion
@@ -564,6 +966,15 @@ public class CreateElementActionTests
     private static FieldAttribute FolderKeyField()
         => typeof(CreateElementSettings).GetProperty(nameof(CreateElementSettings.FolderKey))!
             .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
+
+    private Guid SetupFolderAuthorizationDenied()
+    {
+        var folderKey = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeElementParentAsync(folderKey, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+        return folderKey;
+    }
 
     private Guid SetupAuthorizerFolderNotFound()
     {
@@ -593,7 +1004,7 @@ public class CreateElementActionTests
     /// A real element type with an invariant "customSchema" property, plus a culture-variant
     /// "title" property when <paramref name="variations"/> includes culture.
     /// </summary>
-    private ContentType SetupElementType(ContentVariation variations, string alias = "schemaSnippet", bool allowedInLibrary = true)
+    private ContentType SetupElementType(ContentVariation variations, string alias = "schemaSnippet", bool allowedInLibrary = true, bool isElement = true)
     {
         var shortStringHelper = new Mock<IShortStringHelper>();
         shortStringHelper
@@ -605,7 +1016,7 @@ public class CreateElementActionTests
             Alias = alias,
             Key = Guid.NewGuid(),
             Variations = variations,
-            IsElement = true,
+            IsElement = isElement,
             AllowedInLibrary = allowedInLibrary,
         };
         type.AddPropertyType(new PropertyType(
@@ -613,6 +1024,12 @@ public class CreateElementActionTests
             Constants.PropertyEditors.Aliases.TextBox,
             ValueStorageType.Nvarchar,
             "customSchema"));
+
+        type.AddPropertyType(new PropertyType(
+            shortStringHelper.Object,
+            Constants.PropertyEditors.Aliases.TextBox,
+            ValueStorageType.Nvarchar,
+            "tags"));
 
         if (variations.HasFlag(ContentVariation.Culture))
         {
@@ -647,6 +1064,11 @@ public class CreateElementActionTests
                 new ElementCreateResult { Content = created, ValidationResult = validationResult ?? new ContentValidationResult() }));
         return created;
     }
+
+    private void SetupSave(OperationResultType status)
+        => _elementService
+            .Setup(x => x.Save(It.IsAny<IElement>(), It.IsAny<int?>(), It.IsAny<ContentScheduleCollection?>()))
+            .Returns(new OperationResult(status, new EventMessages()));
 
     private void SetupCreateFails(ContentEditingOperationStatus status)
         => _editingService
@@ -698,4 +1120,3 @@ public class CreateElementActionTests
             },
         };
 }
-#endif
