@@ -768,6 +768,25 @@ public class BindingEvaluatorTests
     public void Evaluate_FormatDateOnANonIsoString_LeavesItUnchanged(string value)
         => _evaluator.Evaluate("${ trigger.value | formatDate:yyyy }", TriggerValue(value)).ShouldBe(value);
 
+    // A format that doesn't fit the value (a time format on a date with no time, or the other
+    // way round) leaves the value unchanged instead of throwing FormatException and failing
+    // the step.
+    [Theory]
+    [InlineData("${ trigger.value | formatDate:HH }", "2026-11-04", "2026-11-04")]
+    [InlineData("${ trigger.value | formatDate:yyyy-MM-dd HH:mm }", "2026-11-04", "2026-11-04")]
+    public void Evaluate_FormatDateWithAFormatThatDoesNotFitTheValue_LeavesItUnchanged(string expression, string value, string expected)
+        => _evaluator.Evaluate(expression, TriggerValue(value)).ShouldBe(expected);
+
+    [Fact]
+    public void Evaluate_FormatDateWithADateFormatOnATypedTime_LeavesItUnchanged()
+        => _evaluator.Evaluate(
+                "${ trigger.value | formatDate:yyyy }",
+                new Dictionary<string, object?>
+                {
+                    ["trigger"] = new Dictionary<string, object?> { ["value"] = new TimeOnly(10, 30) },
+                })
+            .ShouldBe("10:30:00.0000000");
+
     private static Dictionary<string, object?> TriggerValue(string value)
         => new()
         {
