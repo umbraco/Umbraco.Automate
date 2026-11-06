@@ -74,6 +74,8 @@
 
 - **T16** `f4e3b78c` (06-11-2026): element support in trigger dispatch. An internal `IElementScopedTriggerOutput`, and a `NodeScopedTriggerDispatchAuthorizer` case checking Umb.Element.Read for the workspace's service account. `ContentCultureHelpers` takes `IPublishableContentBase` (no behaviour change). Reviewer PASS on the first round. Unit tests: 2611 passed (17 element dispatch specs). No real output uses the marker until T17–T19.
 
+- **T17** `27d72386` (06-11-2026): Element Saved and Element Batch Saved triggers, with settings and output. Moves, trash and restore are skipped via `WasPropertyDirty("ParentId")`/`("Trashed")` on an existing element. The reviewer checked the names and timing against CMS 18.1.0: the repository remembers dirty state before the Saved notification, and the handler runs at scope exit. Reviewer PASS on the first round. Unit tests: 2691 passed (80 element saved specs). Carried to T20: restore a **published** element (it raises two Saved notifications, both should be skipped), and note that an element type with a property aliased `parentId` or `trashed` makes an ordinary edit read as a move.
+
 ## UmbracoDocs draft (for Rick)
 
 > AI-assisted draft — pending review. Not published. Rick opens the UmbracoDocs PR.
