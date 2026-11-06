@@ -41,3 +41,9 @@
   - It runs on `--urls https://127.0.0.1:44311`, because a Forms test site from another worktree took 44300. The acceptance `.env` points at 44311.
   - **On LocalDB,** `-g "Element|Library"` across both specs passed 20/20 in one run.
   - **Reviewer suggestion, not done:** a site-level test of a trashed element (not folder) for a folder-scoped account. The unit tests and the AC12 folder case already exercise that path.
+- **T14** `760891f7` (06-11-2026): folder permissions and publishing through to the page, on the LocalDB demo site (44311). Two review rounds.
+  - **Folder permissions:** at 18.1 the CMS stores a folder's granular permission through `ElementPermissionMapper` (keyed on the folder's key). The deepest explicit set on the path replaces the group defaults, so a "Reviews" set without Create refuses it. Automate's step fails with "…lacks the required permissions (Umb.Element.Create) on library folder '<key>'". No control run with Create granted was needed: the reviewer showed the test fails if Automate stops checking the folder.
+  - **Round 1 FAIL:** the page test never rendered the page before the run, so it couldn't catch a stale page. The element picker converter is `PropertyCacheLevel.Elements`.
+  - **Round 2 PASS:** the page renders a unique old value first; after Update + Publish Element, a fresh request shows the new value.
+  - **R14 is answered:** publishing an element refreshes pages that already rendered it, and no cache refresh code is needed. (BRIEF unknown; recorded in DECISION-LOG.)
+  - Acceptance: `automation.library-elements.spec.ts` 15/15 with no reruns.
