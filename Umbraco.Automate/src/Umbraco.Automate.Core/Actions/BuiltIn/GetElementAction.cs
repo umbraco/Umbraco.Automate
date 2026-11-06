@@ -133,8 +133,6 @@ public sealed class GetElementAction : ActionBase<GetElementSettings, GetElement
         // they were not given. There is none on the automation thread. See EnterVariationContext.
         using var variationScope = _variationContextAccessor.EnterVariationContext(culture);
 
-        context.LogInfo($"Read Library element {ActionLogFormat.Item(ResolveName(element, culture), elementKey)}");
-
         return Success(Project(element, culture, creatorKey, writerKey));
     }
 

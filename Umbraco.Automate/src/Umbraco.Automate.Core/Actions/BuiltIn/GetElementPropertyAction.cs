@@ -162,8 +162,6 @@ public sealed class GetElementPropertyAction : ActionBase<GetElementPropertySett
 
         var value = _normaliser.ReadProperty(element, settings.PropertyAlias, culture);
 
-        context.LogInfo($"Read property '{settings.PropertyAlias}' from Library element {ActionLogFormat.Item(ResolveName(element, culture), elementKey)}");
-
         return Success(new GetElementPropertyOutput
         {
             ElementKey = elementKey,
@@ -185,9 +183,4 @@ public sealed class GetElementPropertyAction : ActionBase<GetElementPropertySett
             ? requested
             : element.Cultures.Keys.FirstOrDefault();
     }
-
-    private static string? ResolveName(IPublishedElement element, string? culture)
-        => culture is not null && element.Cultures.TryGetValue(culture, out var info)
-            ? info.Name
-            : element.Name;
 }

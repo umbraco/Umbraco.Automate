@@ -73,6 +73,20 @@ public class GetElementPropertyActionTests
         (result.Status, result.Outcome).ShouldBe((ActionResultStatus.Success, null));
     }
 
+    // R16
+    [Fact]
+    public async Task ExecuteAsync_PropertyHasAValue_WritesNoSuccessLogLine()
+    {
+        var elementKey = Guid.NewGuid();
+        var element = MockPublishedElementWithProperty(elementKey, "customSchema");
+        _normaliser.Setup(x => x.ReadProperty(element.Object, "customSchema", null)).Returns(SchemaText);
+        var context = CreateContext(elementKey.ToString(), "customSchema");
+
+        await _action.ExecuteAsync(context, CancellationToken.None);
+
+        context.LogEntries.Where(e => e.Level == ActionLogLevel.Info).ShouldBeEmpty();
+    }
+
     // STORY-3 AC2: Output
     [Fact]
     public async Task ExecuteAsync_PropertyHasAValue_ReturnsTheProjectedOutput()

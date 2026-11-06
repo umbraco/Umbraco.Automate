@@ -164,7 +164,7 @@ public class GetElementActionTests
 
     // STORY-2 AC6: Run log
     [Fact]
-    public async Task ExecuteAsync_PublishedElement_LogsOneLineNamingTheElement()
+    public async Task ExecuteAsync_PublishedElement_WritesNoSuccessLogLine()
     {
         var elementKey = Guid.NewGuid();
         SetupCache(MockPublishedElement(elementKey));
@@ -172,8 +172,7 @@ public class GetElementActionTests
 
         await _action.ExecuteAsync(context, CancellationToken.None);
 
-        context.LogEntries.Select(e => e.Message.Contains(ActionLogFormat.Item(ElementName, elementKey)))
-            .ShouldBe([true]);
+        context.LogEntries.Where(e => e.Level == ActionLogLevel.Info).ShouldBeEmpty();
     }
 
     #endregion
