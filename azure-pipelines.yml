@@ -272,30 +272,52 @@ stages:
                 #                marketplace JSON)                -> no acceptance
                 #   tests        the .NET unit, integration and common test projects
                 #                                                 -> no acceptance (Build runs them)
-                #   specs        tests/...AcceptanceTests/ tests/, lib/ and umbraco.config.ts
+                #   specs        tests/...AcceptanceTests/ tests/ and umbraco.config.ts
                 #                                                 -> acceptance, CHANGED SPECS only
-                #   acceptance   the rest of tests/...AcceptanceTests/ (package*.json,
+                #   acceptance   the rest of tests/...AcceptanceTests/ (lib/, package*.json,
                 #                playwright.config.ts, tsconfig.json, postinstall.js, ...)
                 #                                                 -> acceptance, whole suite
-                #   shared       anything else: product code, the frontend, the demo-site
+                #   smoke        server-side C# the backoffice doesn't call directly: the core
+                #                Umbraco.Automate/src/ projects except Umbraco.Automate.Web (the
+                #                Management API) and Umbraco.Automate.Web.StaticAssets (the
+                #                frontend), and the OpenIddict and Slack src/ projects except
+                #                OpenIddict's Client/ frontend
+                #                                                 -> acceptance, @smoke tests only
+                #   shared       anything else: the Management API, the frontends, the demo-site
                 #                scripts and templates, pipeline YAML, Directory.*.props,
                 #                global.json, version.json, NuGet config, ...
                 #                                                 -> acceptance, whole suite
                 # A PR touching only none/tests files skips the suite. Pushes, and anything
                 # unexpected (not a PR merge commit, empty diff), run the whole suite. The
                 # acceptance job's condition skips only on an explicit 'false', so a missing
-                # variable runs the suite rather than silently skipping it.
+                # variable runs the suite rather than silently skipping it. To run the whole
+                # suite for a trimmed PR, queue the pipeline by hand on its branch: a manual
+                # build is not a PR merge commit, so it gets the whole suite.
                 #
-                # acceptanceChangedOnly is true only when acceptance runs because of `specs` files
-                # and nothing else. The matrix step then picks one leg running Playwright's
-                # --only-changed, which runs the changed spec files plus any spec that imports a
-                # changed file. That import graph is why `specs` is limited to TypeScript the specs
-                # import: package.json, the Playwright config or the npm install scripts are not
-                # imported by any spec (playwright.config.ts only by auth.setup.ts), so
-                # --only-changed would run next to nothing for them, and they run the whole suite.
+                # acceptanceScope says how much of the suite runs: full, changed or smoke.
+                #
+                # It is `changed` only when acceptance runs because of `specs` files and nothing
+                # else. The matrix step then picks one leg running Playwright's --only-changed,
+                # which runs the changed spec files plus any spec that imports a changed file.
+                # That import graph is why `specs` is limited to the spec files themselves and
+                # umbraco.config.ts. package.json, the Playwright config and the npm install scripts
+                # are not imported by any spec (playwright.config.ts only by auth.setup.ts), so
+                # --only-changed would run next to nothing for them. lib/ is the opposite: every
+                # spec imports lib/index, which pulls in the helpers, so --only-changed would pick
+                # the whole suite and run it on the one unsharded leg. Both run the sharded whole
+                # suite instead.
+                #
+                # It is `smoke` only when `smoke` files are the only acceptance-relevant change.
+                # The .NET unit and integration tests in Build cover that code's behaviour; what
+                # acceptance adds is proof that the demo site still builds, migrates LocalDB,
+                # boots and serves the backoffice and the Management API, which the @smoke tests
+                # cover. A change there that breaks a backoffice flow (an action's settings model
+                # drives its config form, for example) is caught by the whole-suite run on the
+                # vN/dev push after merge. specs + smoke together run the whole suite: Playwright
+                # ANDs --grep with --only-changed, so no single leg would cover both.
                 - bash: |
                       runAcceptance=true
-                      acceptanceChangedOnly=false
+                      acceptanceScope=full
                       acc=Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
                       if [ "$(Build.Reason)" = "PullRequest" ] && git rev-parse -q --verify HEAD^2 >/dev/null; then
                         # --no-renames lists a moved file's old path too, so moving code out of src/
@@ -305,56 +327,77 @@ stages:
                           runAcceptance=false
                           # Set by any area that needs the whole suite, not just changed specs.
                           fullAcceptance=false
+                          specsAcceptance=false
+                          smokeAcceptance=false
                           while IFS= read -r file; do
                             case "$file" in
                               *.md|docs/*|.claude/*|.github/*|.githooks/*|assets/*|templates/*|LICENSE|commitlint.config.js|.git-blame-ignore-revs|.prettierrc|.prettierignore|.mcp.json|.worktreeinclude|*/changelog.config.json|*/umbraco-marketplace*.json|scripts/generate-changelog*|scripts/generate-release-manifest*|scripts/list-commit-options.js|scripts/setup-git-hooks*|.azure-pipelines/scripts/validate-changelogs.ps1)
                                 area=none ;;
                               Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/*|Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/*|Umbraco.Automate/tests/Directory.*|Umbraco.Automate.OpenIddict/tests/*|Umbraco.Automate.Slack/tests/*)
                                 area=tests ;;
-                              "$acc"/tests/*|"$acc"/lib/*|"$acc"/umbraco.config.ts)
+                              "$acc"/tests/*|"$acc"/umbraco.config.ts)
                                 area=specs ;;
                               "$acc"/*)
                                 area=acceptance ;;
+                              # Before the smoke patterns below, which would otherwise match them.
+                              Umbraco.Automate/src/Umbraco.Automate.Web/*|Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/*|Umbraco.Automate.OpenIddict/src/*/Client/*)
+                                area=shared ;;
+                              Umbraco.Automate/src/*|Umbraco.Automate.OpenIddict/src/*|Umbraco.Automate.Slack/src/*)
+                                area=smoke ;;
                               *)
                                 area=shared ;;
                             esac
                             echo "$area: $file"
                             case "$area" in
-                              specs) runAcceptance=true ;;
+                              specs) runAcceptance=true; specsAcceptance=true ;;
+                              smoke) runAcceptance=true; smokeAcceptance=true ;;
                               acceptance|shared) runAcceptance=true; fullAcceptance=true ;;
                             esac
                           done <<< "$changed"
-                          if [ "$runAcceptance" = true ] && [ "$fullAcceptance" = false ]; then
-                            acceptanceChangedOnly=true
+                          if [ "$fullAcceptance" = false ]; then
+                            if [ "$specsAcceptance" = true ] && [ "$smokeAcceptance" = false ]; then
+                              acceptanceScope=changed
+                            elif [ "$smokeAcceptance" = true ] && [ "$specsAcceptance" = false ]; then
+                              acceptanceScope=smoke
+                            fi
                           fi
                         fi
                       else
                         echo "Not a PR merge commit: running the whole acceptance suite."
                       fi
-                      echo "Acceptance tests: $runAcceptance (changed specs only: $acceptanceChangedOnly)"
+                      echo "Acceptance tests: $runAcceptance (scope: $acceptanceScope)"
                       echo "##vso[task.setvariable variable=runAcceptance;isOutput=true]$runAcceptance"
-                      echo "##vso[task.setvariable variable=acceptanceChangedOnly;isOutput=true]$acceptanceChangedOnly"
+                      echo "##vso[task.setvariable variable=acceptanceScope;isOutput=true]$acceptanceScope"
                   name: changes
                   displayName: Detect whether acceptance tests run
 
-                # STANDARD: four shards of the whole suite. CHANGED (a PR whose only
-                # acceptance-relevant changes are specs - see acceptanceChangedOnly above): ONE
-                # unsharded leg running --only-changed against the PR's target branch tip. A
-                # handful of specs don't need four agents each paying the build, scaffold and
-                # LocalDB first boot. HEAD~1 rather than HEAD^1, because npm runs the script through
-                # cmd.exe on Windows, where ^ is the escape character; on the PR merge commit both
-                # name the same first parent, which the acceptance job's full-history checkout has.
-                # --pass-with-no-tests keeps a PR that only deletes specs green.
+                # STANDARD: four shards of the whole suite.
+                #
+                # CHANGED (acceptanceScope `changed`, see above): ONE unsharded leg running
+                # --only-changed against the PR's target branch tip. A handful of specs don't need
+                # four agents each paying the build, scaffold and LocalDB first boot. HEAD~1 rather
+                # than HEAD^1, because npm runs the script through cmd.exe on Windows, where ^ is
+                # the escape character; on the PR merge commit both name the same first parent,
+                # which the acceptance job's full-history checkout has. --pass-with-no-tests keeps
+                # a PR that only deletes specs green.
+                #
+                # SMOKE (acceptanceScope `smoke`, see above): ONE unsharded leg running the
+                # @smoke-tagged tests. auth.setup.ts still runs: --grep filters only the
+                # DefaultConfig project, not the setup project it depends on.
                 #
                 # Each leg carries its own testCommand (incl. any --shard) and a `leg` name for
                 # step titles and artifact names; the run step just executes testCommand. There
                 # is no release-type matrix or force-full parameter here: every non-PR build
-                # leaves acceptanceChangedOnly false and gets STANDARD.
+                # leaves acceptanceScope at `full` and gets STANDARD.
                 - bash: |
                       STANDARD='{"Shard 1 of 4":{"leg":"Shard 1 of 4","testCommand":"npm run test -- --shard=1/4"},"Shard 2 of 4":{"leg":"Shard 2 of 4","testCommand":"npm run test -- --shard=2/4"},"Shard 3 of 4":{"leg":"Shard 3 of 4","testCommand":"npm run test -- --shard=3/4"},"Shard 4 of 4":{"leg":"Shard 4 of 4","testCommand":"npm run test -- --shard=4/4"}}'
                       CHANGED='{"Changed specs":{"leg":"Changed specs","testCommand":"npm run test -- --only-changed=HEAD~1 --pass-with-no-tests"}}'
+                      SMOKE='{"Smoke":{"leg":"Smoke","testCommand":"npm run test -- --grep @smoke"}}'
                       matrix="$STANDARD"
-                      if [ "$(changes.acceptanceChangedOnly)" = "true" ]; then matrix="$CHANGED"; fi
+                      case "$(changes.acceptanceScope)" in
+                        changed) matrix="$CHANGED" ;;
+                        smoke) matrix="$SMOKE" ;;
+                      esac
                       echo "Acceptance matrix: $matrix"
                       echo "##vso[task.setvariable variable=acceptanceMatrix;isOutput=true]$matrix"
                   name: acceptance
@@ -365,7 +408,7 @@ stages:
             dependsOn: Changes
             condition: and(succeeded(), ne(dependencies.Changes.outputs['changes.runAcceptance'], 'false'))
             # Computed by the Changes job: four shards of the whole suite, or one leg running
-            # just the changed specs. Each shard gets its own demo site and LocalDB. The
+            # just the changed specs or just the @smoke tests. Each shard gets its own demo site and LocalDB. The
             # specs share site data and the suite runs one worker, so shards cannot share a
             # site; splitting across agents is what makes them run concurrently. Playwright
             # splits by test (fullyParallel in playwright.config.ts, --shard in each leg's
