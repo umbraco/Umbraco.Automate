@@ -55,6 +55,12 @@ export class ConstantHelper {
     findContent: 'umbracoAutomate.findContent',
     getContent: 'umbracoAutomate.getContent',
     getContentProperty: 'umbracoAutomate.getContentProperty',
+    getElement: 'umbracoAutomate.getElement',
+    getElementProperty: 'umbracoAutomate.getElementProperty',
+    createElement: 'umbracoAutomate.createElement',
+    updateElementProperty: 'umbracoAutomate.updateElementProperty',
+    publishElement: 'umbracoAutomate.publishElement',
+    unpublishElement: 'umbracoAutomate.unpublishElement',
     getMedia: 'umbracoAutomate.getMedia',
     getMediaProperty: 'umbracoAutomate.getMediaProperty',
     updateContentProperty: 'umbracoAutomate.updateContentProperty',
@@ -82,6 +88,8 @@ export class ConstantHelper {
     success: 'success',
     notFound: 'notFound',
     parentNotFound: 'parentNotFound',
+    propertyNotFound: 'propertyNotFound',
+    elementTypeNotFound: 'elementTypeNotFound',
     anyResult: '__any__'
   };
 
@@ -94,6 +102,9 @@ export class ConstantHelper {
     notFound: 'Not found',
     propertyNotFound: 'Property not found',
     updated: 'Updated',
+    created: 'Created',
+    folderNotFound: 'Folder not found',
+    elementTypeNotFound: 'Element type not found',
     anyResult: 'Any result',
     missing: 'Missing outcome',
     exitTaken: 'Exit taken',
@@ -119,6 +130,24 @@ export class ConstantHelper {
     body: 'body',
     done: 'done'
   };
+
+  /* Settings keys of the Library element actions: the camelCase of each settings class's
+   * properties (GetElementSettings, CreateElementSettings, ...). */
+  public static readonly elementSettings = {
+    element: 'elementKey',
+    propertyAlias: 'propertyAlias',
+    value: 'value',
+    folder: 'folderKey',
+    elementType: 'elementType',
+    name: 'name'
+  };
+
+  /* The step picker's group headlines. The action attributes set them in code (`Group = "Library"`),
+   * so they are not translations. Groups sort by name, which puts Library between Content and Media. */
+  public static readonly pickerGroups = { content: 'Content', library: 'Library', media: 'Media' };
+
+  /* The publish error for an action whose section the service account lacks (AutomationService). */
+  public static readonly requiresSectionAccess = /requires section access/;
 
   /* Extension aliases. The CMS renders workspace and entity actions with
    * `data-mark="workspace-action:<alias>"` / `"entity-action:<alias>"`, which getByTestId reaches —

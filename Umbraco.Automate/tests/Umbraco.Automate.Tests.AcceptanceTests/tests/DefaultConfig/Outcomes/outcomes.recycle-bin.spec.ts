@@ -1,12 +1,5 @@
 import { expect } from '@playwright/test';
-import {
-  ApiHelpers as UmbracoApiHelpers,
-  ConstantHelper as CmsConstantHelper,
-  ElementBuilder,
-  UserGroupBuilder
-} from '@umbraco-cms/acceptance-test-helpers';
-import { test, ApiHelpers, ConstantHelper, automationConnection, automationStep, manualTrigger, uniqueName } from '../../../lib/index';
-import type { TestWorkspace } from '../../../lib/index';
+import { test, ConstantHelper, LibraryApiHelper, automationConnection, automationStep, manualTrigger, uniqueName } from '../../../lib/index';
 import { CmsContentApiHelper } from '../../../lib/helpers/CmsContentApiHelper';
 
 /**
@@ -61,150 +54,7 @@ async function runToCompletion(umbracoAutomateApi: any, automationId: string): P
   return run.stepRuns.map((stepRun: any) => aliasById.get(stepRun.stepId)) as string[];
 }
 
-// TODO(T11): move these aliases to ConstantHelper.actions. The settings keys used below
-// (`elementKey`, `folderKey`, `elementType`) copy the content actions' and are unconfirmed until
-// the settings classes exist.
-const elementActions = {
-  getElement: 'umbracoAutomate.getElement',
-  getElementProperty: 'umbracoAutomate.getElementProperty',
-  createElement: 'umbracoAutomate.createElement',
-  updateElementProperty: 'umbracoAutomate.updateElementProperty',
-  publishElement: 'umbracoAutomate.publishElement',
-  unpublishElement: 'umbracoAutomate.unpublishElement'
-};
-
-/**
- * Library elements, folders, element types and folder-scoped workspaces a test creates, removed
- * again afterwards, live or in the Library recycle bin. Every element type has one Textstring
- * property (`propertyAlias`).
- *
- * TODO(T11): move to lib/helpers as the Library counterpart of CmsContentApiHelper, and register
- * it as a fixture in testExtension.ts (automation.library-elements.spec.ts has the same class).
- */
-class LibraryItems {
-  static readonly propertyAlias = 'textstring';
-
-  private readonly api: UmbracoApiHelpers;
-  private readonly automate: ApiHelpers;
-  private readonly elementIds: string[] = [];
-  private readonly folderIds: string[] = [];
-  private readonly elementTypeNames: string[] = [];
-  private readonly userGroupIds: string[] = [];
-  private readonly serviceAccountKeys: string[] = [];
-  private readonly workspaceIds: string[] = [];
-
-  constructor(api: UmbracoApiHelpers, automate: ApiHelpers) {
-    this.api = api;
-    this.automate = automate;
-  }
-
-  async elementType(namePrefix: string = 'Schema snippet'): Promise<{ id: string; name: string }> {
-    const dataType = await this.api.dataType.getByName('Textstring');
-    const name = uniqueName(namePrefix);
-    const id = await this.api.documentType.createDefaultElementType(name, 'Content', 'Textstring', dataType.id);
-    this.elementTypeNames.push(name);
-    return { id, name };
-  }
-
-  async folder(namePrefix: string, parentId?: string): Promise<{ id: string; name: string }> {
-    const name = uniqueName(namePrefix);
-    const id = await this.api.element.createDefaultElementFolder(name, parentId);
-    this.folderIds.push(id);
-    return { id, name };
-  }
-
-  /** An element at the Library root holding text in its property. Published when asked. */
-  async element(namePrefix: string, options: { publish?: boolean } = {}): Promise<{ id: string; name: string }> {
-    const name = uniqueName(namePrefix);
-    const typeId = (await this.elementType()).id;
-    const id = await this.api.element.create(
-      new ElementBuilder()
-        .withDocumentTypeId(typeId)
-        .addVariant()
-        .withName(name)
-        .done()
-        .addValue()
-        .withAlias(LibraryItems.propertyAlias)
-        .withValue('text')
-        .done()
-        .build()
-    );
-    this.elementIds.push(id);
-    if (options.publish) {
-      await this.api.element.publish(id);
-      await expect.poll(async () => await this.api.element.isElementPublished(id)).toBe(true);
-    }
-    return { id, name };
-  }
-
-  /** Moves an element, or a folder, to the Library recycle bin. `cleanUp()` still removes it from there. */
-  async trash(id: string, isFolder: boolean = false) {
-    const status = await this.api.element.moveToRecycleBin(id, isFolder);
-    if (status >= 300) {
-      throw new Error(`Moving ${isFolder ? 'folder' : 'element'} ${id} to the recycle bin failed (${status}).`);
-    }
-  }
-
-  /** A workspace whose service account has the Library section with `startNodeId` as its Library start node. */
-  async workspaceStartingAt(startNodeId: string): Promise<TestWorkspace> {
-    const group = new UserGroupBuilder()
-      .withName(uniqueName('Automate Library Scoped Group'))
-      .addSection(CmsConstantHelper.sectionAliases.library)
-      .withElementRootAccess(false)
-      .withElementStartNodeId(startNodeId)
-      .addFallbackPermission()
-      .withReadElementPermission(true)
-      .withCreateElementPermission(true)
-      .withUpdateElementPermission(true)
-      .withPublishElementPermission(true)
-      .withUnpublishElementPermission(true)
-      .withReadElementContainerPermission(true)
-      .done()
-      .build();
-    const userGroupId = await this.api.userGroup.create(group);
-    this.userGroupIds.push(userGroupId);
-    const serviceAccountKey = await this.automate.serviceAccounts.create(uniqueName('Library Scoped Service Account'), group.name);
-    this.serviceAccountKeys.push(serviceAccountKey);
-    const workspace = await this.automate.workspaces.createForTest('Library Scoped Workspace', {
-      serviceAccountKey,
-      userGroups: [userGroupId]
-    });
-    this.workspaceIds.push(workspace.id);
-    return workspace;
-  }
-
-  async cleanUp() {
-    for (const id of this.workspaceIds) {
-      await this.automate.workspaces.cleanUp(id);
-    }
-    for (const key of this.serviceAccountKeys) {
-      await this.automate.serviceAccounts.deleteById(key);
-    }
-    for (const id of this.userGroupIds) {
-      await this.api.userGroup.delete(id);
-    }
-    const recycleBin = `${this.api.baseUrl}/umbraco/management/api/v1/recycle-bin/element`;
-    for (const id of this.elementIds) {
-      await this.api.element.delete(id);
-      await this.api.delete(`${recycleBin}/${id}`);
-    }
-    for (const id of [...this.folderIds].reverse()) {
-      await this.api.element.deleteFolder(id);
-      await this.api.delete(`${recycleBin}/folder/${id}`);
-    }
-    for (const name of this.elementTypeNames) {
-      await this.api.documentType.ensureNameNotExists(name);
-    }
-  }
-}
-
-const libraryTest = test.extend<{ library: LibraryItems }>({
-  library: async ({ umbracoApi, umbracoAutomateApi }, use) => {
-    const library = new LibraryItems(umbracoApi, umbracoAutomateApi);
-    await use(library);
-    await library.cleanUp();
-  }
-});
+const elementActions = actions;
 
 /** trigger → `actionAlias` alone, for actions with no outcomes (Publish and Unpublish Element). Published. */
 async function seedPublishedStep(
@@ -335,9 +185,9 @@ test.describe('Content and media in the recycle bin', () => {
  * also runs for an account whose Library start node is a folder (STORY-7 AC12), the one element
  * criterion that names that account.
  */
-libraryTest.describe('Library elements in the recycle bin', () => {
+test.describe('Library elements in the recycle bin', () => {
   // STORY-2 AC9
-  libraryTest.fixme('Get Element takes the notFound path for a trashed element', async ({
+  test.fixme('Get Element takes the notFound path for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -361,7 +211,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-3 AC7
-  libraryTest.fixme('Get Element Property takes the notFound path for a trashed element', async ({
+  test.fixme('Get Element Property takes the notFound path for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -372,7 +222,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
       elementActions.getElementProperty,
-      { elementKey: element.id, propertyAlias: LibraryItems.propertyAlias },
+      { elementKey: element.id, propertyAlias: LibraryApiHelper.propertyAlias },
       outcomes.notFound
     );
     await library.trash(element.id);
@@ -385,7 +235,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-4 AC14
-  libraryTest.fixme('Update Element Property takes the notFound path for a trashed element', async ({
+  test.fixme('Update Element Property takes the notFound path for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -396,7 +246,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
       umbracoAutomateApi,
       automateServiceAccountWorkspace.id,
       elementActions.updateElementProperty,
-      { elementKey: element.id, propertyAlias: LibraryItems.propertyAlias, value: 'never written' },
+      { elementKey: element.id, propertyAlias: LibraryApiHelper.propertyAlias, value: 'never written' },
       outcomes.notFound
     );
     await library.trash(element.id);
@@ -409,7 +259,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-5 AC9
-  libraryTest.fixme('Publish Element fails the step for a trashed element', async ({
+  test.fixme('Publish Element fails the step for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -432,7 +282,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-5 AC9
-  libraryTest.fixme('Publish Element leaves a trashed element unpublished', async ({
+  test.fixme('Publish Element leaves a trashed element unpublished', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     umbracoApi,
@@ -456,7 +306,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-6 AC7
-  libraryTest.fixme('Unpublish Element fails the step for a trashed element', async ({
+  test.fixme('Unpublish Element fails the step for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -481,7 +331,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-7 AC11
-  libraryTest.fixme('Create Element takes the parentNotFound path under a trashed folder', async ({
+  test.fixme('Create Element takes the parentNotFound path under a trashed folder', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -506,7 +356,7 @@ libraryTest.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-7 AC12
-  libraryTest.fixme('Create Element takes the parentNotFound path under a trashed folder for a folder-scoped account', async ({
+  test.fixme('Create Element takes the parentNotFound path under a trashed folder for a folder-scoped account', async ({
     umbracoAutomateApi,
     library
   }) => {

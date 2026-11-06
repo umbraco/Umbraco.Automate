@@ -282,6 +282,25 @@ export class AutomateUiHelper {
   }
 
   /**
+   * The group headlines in the action picker, in the order shown. A group's headline is a `uui-box`
+   * property, not an attribute, so it is read in the page.
+   */
+  async pickerGroupHeadlines(): Promise<string[]> {
+    return await this.nodePickerModal
+      .locator('uui-box')
+      .evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement & { headline: string }).headline));
+  }
+
+  /** The names of the actions listed in the picker's `index`th group. */
+  async pickerGroupItemNames(index: number): Promise<(string | null)[]> {
+    return await this.nodePickerModal
+      .locator('uui-box')
+      .nth(index)
+      .locator('uui-ref-node')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('name')));
+  }
+
+  /**
    * Narrows the action picker with its search box.
    *
    * Waits for the list first: the catalogue loads asynchronously, and a query typed while it is

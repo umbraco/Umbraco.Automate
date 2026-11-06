@@ -292,9 +292,7 @@ public class BuiltInActionOutcomeTests
             Mock.Of<IVariationContextAccessor>(),
             Mock.Of<ILogger<GetContentAction>>());
 
-#if LIBRARY_ELEMENT_ACTIONS
-    // STORY-8 and the element outcome keys. Pending until T11: delete this LIBRARY_ELEMENT_ACTIONS
-    // guard and the Skips, then make it compile and pass.
+    // STORY-8 and the element outcome keys.
 
     #region Given each Library element action
 
@@ -320,13 +318,13 @@ public class BuiltInActionOutcomeTests
     #region Happy path
 
     // STORY-8 AC10: Section declared
-    [Theory(Skip = "Pending: T11")]
+    [Theory]
     [MemberData(nameof(ElementActionTypes))]
     public void RequiredSections_ElementAction_IsTheLibrarySection(string actionType)
         => CreateElementAction(actionType).RequiredSections.ShouldBe([Umbraco.Cms.Core.Constants.Applications.Library]);
 
     // STORY-2 AC1, STORY-3 AC1, STORY-4 AC2, STORY-7 AC1: Found / Value present / Outcome / In a folder (success is the default exit)
-    [Theory(Skip = "Pending: T11")]
+    [Theory]
     [MemberData(nameof(ElementActionOutcomeKeys))]
     public void GetOutcomes_ElementAction_DefaultIsSuccess(string actionType, string[] expectedKeys)
     {
@@ -336,13 +334,13 @@ public class BuiltInActionOutcomeTests
     }
 
     // STORY-2 AC8, STORY-3 AC6 and AC8, STORY-4 AC12 and AC16, STORY-7 AC10 and AC14: the outcome keys those criteria take
-    [Theory(Skip = "Pending: T11")]
+    [Theory]
     [MemberData(nameof(ElementActionOutcomeKeys))]
     public void GetOutcomes_ElementAction_KeysAreSuccessThenExistingConstants(string actionType, string[] expectedKeys)
         => CreateElementAction(actionType).GetOutcomes().Select(o => o.Key).ShouldBe(expectedKeys);
 
     // STORY-8 AC9: Exits on the canvas (every label is a localization term)
-    [Theory(Skip = "Pending: T11")]
+    [Theory]
     [MemberData(nameof(ElementActionOutcomeKeys))]
     public void GetOutcomes_ElementAction_AllLabelsAreLocalizationKeys(string actionType, string[] expectedKeys)
     {
@@ -352,19 +350,19 @@ public class BuiltInActionOutcomeTests
     }
 
     // STORY-8 AC9: Exits on the canvas (Created, Folder not found, Element type not found)
-    [Fact(Skip = "Pending: T11")]
+    [Fact]
     public void GetOutcomes_CreateElement_LabelsAreCreatedFolderNotFoundAndElementTypeNotFound()
         => CreateElementAction("CreateElementAction").GetOutcomes().Select(o => o.Label)
             .ShouldBe(["#uaOutcomes_created", "#uaOutcomes_folderNotFound", "#uaOutcomes_elementTypeNotFound"]);
 
     // STORY-3 AC1: Value present (the success exit carries the property-found description, as for content)
-    [Fact(Skip = "Pending: T11")]
+    [Fact]
     public void GetOutcomes_GetElementProperty_SuccessDescriptionIsThePropertyFoundTerm()
         => CreateElementAction("GetElementPropertyAction").GetOutcomes().Single(o => o.Key == "success")
             .Description.ShouldBe("#uaOutcomes_propertyFoundDescription");
 
     // STORY-5 AC8, STORY-6 AC6: a missing element fails the step, so Publish and Unpublish declare no exits
-    [Theory(Skip = "Pending: T11")]
+    [Theory]
     [InlineData("PublishElementAction")]
     [InlineData("UnpublishElementAction")]
     public void GetOutcomes_PublishingElementAction_DeclaresNone(string actionType)
@@ -374,8 +372,6 @@ public class BuiltInActionOutcomeTests
 
     #endregion
 
-    // Constructor arguments mirror each element action's content counterpart with the element
-    // services swapped in (ARCHITECTURE "What changes"). Fix them to match the real constructors.
     private static IAction CreateElementAction(string actionType)
     {
         var infrastructure = new ActionInfrastructure(Mock.Of<IEditableModelResolver>());
@@ -402,8 +398,10 @@ public class BuiltInActionOutcomeTests
             "CreateElementAction" => new CreateElementAction(
                 infrastructure,
                 Mock.Of<IElementEditingService>(),
-                Mock.Of<IContentTypeService>(),
+                Mock.Of<IElementContainerService>(),
+                Mock.Of<IElementService>(),
                 Mock.Of<IUserIdKeyResolver>(),
+                Mock.Of<IContentTypeService>(),
                 Mock.Of<IBackOfficeSecurityAccessor>(),
                 Mock.Of<IUmbracoContextFactory>(),
                 Mock.Of<IAutomationActionAuthorizer>(),
@@ -435,5 +433,4 @@ public class BuiltInActionOutcomeTests
             _ => throw new ArgumentOutOfRangeException(nameof(actionType), actionType, null),
         };
     }
-#endif
 }

@@ -1,16 +1,13 @@
 // STORY-1, STORY-5, STORY-8: library element actions (docs/plans/library-element-actions)
 import { randomUUID } from 'crypto';
 import { expect } from '@playwright/test';
+import { ConstantHelper as CmsConstantHelper, UserGroupBuilder } from '@umbraco-cms/acceptance-test-helpers';
 import {
-  ApiHelpers as UmbracoApiHelpers,
-  ConstantHelper as CmsConstantHelper,
-  ElementBuilder,
-  UserGroupBuilder
-} from '@umbraco-cms/acceptance-test-helpers';
-import {
-  test as base,
+  test,
   ApiHelpers,
   AutomateUiHelper,
+  ConstantHelper,
+  LibraryApiHelper,
   UiHelpers,
   automationConnection,
   automationStep,
@@ -19,13 +16,11 @@ import {
   uniqueName,
   uniqueSuffix
 } from '../../../lib/index';
-import type { TestWorkspace } from '../../../lib/index';
 
 /**
- * Pending until T11–T14 (docs/plans/library-element-actions/PLAN.md). Every test is `test.fixme`,
- * so the suite stays green until the six element actions exist. Each describe says which task
- * turns it on: T11 "Step picker" and "Section access", T12 "Element picker" and "Create Element
- * settings", T14 "Folder permissions" and "Publish reaches the page".
+ * Step picker and Section access run (T11). The rest are `test.fixme` until the task each
+ * describe names turns it on: T12 "Element picker" and "Create Element settings", T14 "Folder
+ * permissions" and "Publish reaches the page".
  *
  * `test.fixme` here means "pending implementation", not a known product gap.
  *
@@ -38,252 +33,20 @@ import type { TestWorkspace } from '../../../lib/index';
  * keys. Per this suite's CLAUDE.md, nothing asserts on a localised label.
  */
 
-// TODO(T11): move these aliases to ConstantHelper.actions.
-const elementActions = {
-  getElement: 'umbracoAutomate.getElement',
-  getElementProperty: 'umbracoAutomate.getElementProperty',
-  createElement: 'umbracoAutomate.createElement',
-  updateElementProperty: 'umbracoAutomate.updateElementProperty',
-  publishElement: 'umbracoAutomate.publishElement',
-  unpublishElement: 'umbracoAutomate.unpublishElement'
-};
-
-// TODO(T11): confirm against the built settings classes. They copy the content actions' keys
-// (`contentKey` → `elementKey`, `parentKey` → `folderKey`, `contentType` → `elementType`).
-const settingKeys = {
-  element: 'elementKey',
-  folder: 'folderKey',
-  elementType: 'elementType'
-};
-
-// TODO(T11): move to ConstantHelper. The step picker's group headlines, which the action
-// attributes set in code (`Group = "Library"`), not translations.
-const pickerGroups = { content: 'Content', library: 'Library', media: 'Media' };
-
-// TODO(T11): move to ConstantHelper (the publish refusal from AutomationService's section check).
-const requiresSectionAccess = /requires section access/;
-
 const STEP_ALIAS = 'target';
 
-/**
- * Library elements, folders, element types, pages and service-account workspaces a test creates,
- * removed again by `cleanUp()`.
- *
- * TODO(T11): move to lib/helpers as the Library counterpart of CmsContentApiHelper, and register
- * it as a fixture in testExtension.ts.
- */
-class LibraryItems {
-  /** The one property every element type here has: the Textstring data type's alias. */
-  static readonly propertyAlias = 'textstring';
+const libraryUserGroup = () => LibraryApiHelper.userGroup();
 
-  private readonly api: UmbracoApiHelpers;
-  private readonly automate: ApiHelpers;
-  private defaultElementTypeId: string | null = null;
-  private readonly elementIds: string[] = [];
-  private readonly folderIds: string[] = [];
-  private readonly documentIds: string[] = [];
-  private readonly documentTypeNames: string[] = [];
-  private readonly templateNames: string[] = [];
-  private readonly dataTypeNames: string[] = [];
-  private readonly userGroupIds: string[] = [];
-  private readonly serviceAccountKeys: string[] = [];
-  private readonly workspaceIds: string[] = [];
-
-  constructor(api: UmbracoApiHelpers, automate: ApiHelpers) {
-    this.api = api;
-    this.automate = automate;
-  }
-
-  /** An element type allowed in the Library, with one Textstring property. */
-  async elementType(namePrefix: string = 'Schema snippet'): Promise<{ id: string; name: string }> {
-    const dataType = await this.api.dataType.getByName('Textstring');
-    const name = uniqueName(namePrefix);
-    const id = await this.api.documentType.createDefaultElementType(name, 'Content', 'Textstring', dataType.id);
-    this.documentTypeNames.push(name);
-    return { id, name };
-  }
-
-  /** A document type that is not an element type, for "element types only" checks. */
-  async pageType(namePrefix: string = 'Not an element type'): Promise<{ id: string; name: string }> {
-    const name = uniqueName(namePrefix);
-    const id = await this.api.documentType.createDefaultDocumentType(name);
-    this.documentTypeNames.push(name);
-    return { id, name };
-  }
-
-  async folder(namePrefix: string = 'Reviews', parentId?: string): Promise<{ id: string; name: string }> {
-    const name = uniqueName(namePrefix);
-    const id = await this.api.element.createDefaultElementFolder(name, parentId);
-    this.folderIds.push(id);
-    return { id, name };
-  }
-
-  /** An element holding `text` in its property, at the root or in `folderId`. Published when asked. */
-  async element(
-    namePrefix: string,
-    options: { typeId?: string; folderId?: string; text?: string; publish?: boolean } = {}
-  ): Promise<{ id: string; name: string }> {
-    const name = uniqueName(namePrefix);
-    const typeId = options.typeId ?? (await this.defaultTypeId());
-    const builder = new ElementBuilder().withDocumentTypeId(typeId);
-    if (options.folderId) {
-      builder.withParentId(options.folderId);
-    }
-    const id = await this.api.element.create(
-      builder
-        .addVariant()
-        .withName(name)
-        .done()
-        .addValue()
-        .withAlias(LibraryItems.propertyAlias)
-        .withValue(options.text ?? 'text')
-        .done()
-        .build()
-    );
-    this.elementIds.push(id);
-
-    if (options.publish) {
-      await this.api.element.publish(id);
-      await expect.poll(async () => await this.api.element.isElementPublished(id)).toBe(true);
-    }
-
-    return { id, name };
-  }
-
-  /**
-   * A workspace whose service account is in a new user group built from `group`, so a spec
-   * controls its sections, Library start node and element permissions.
-   */
-  async workspaceFor(group: UserGroupBuilder): Promise<TestWorkspace> {
-    const payload = group.build();
-    const userGroupId = await this.api.userGroup.create(payload);
-    this.userGroupIds.push(userGroupId);
-    const serviceAccountKey = await this.automate.serviceAccounts.create(uniqueName('Library Service Account'), payload.name);
-    this.serviceAccountKeys.push(serviceAccountKey);
-    const workspace = await this.automate.workspaces.createForTest('Library Workspace', {
-      serviceAccountKey,
-      userGroups: [userGroupId]
-    });
-    this.workspaceIds.push(workspace.id);
-    return workspace;
-  }
-
-  /**
-   * A published page whose element picker picks `elementId`, rendered by a template that prints
-   * each picked element's Textstring value. Returns the page's URL.
-   *
-   * The plan names `createTemplateWithDisplayingElementPickerExtensionMethods`, but that template
-   * prints each element's name and identity, never a property value, so it could not show a value
-   * Update Element Property wrote. `createTemplateWithDisplayingValue` wraps the same loop around
-   * `element.Value(...)` instead. TODO(T14): settle which template to keep.
-   */
-  async pageShowing(elementId: string): Promise<string> {
-    const propertyName = 'Element';
-    const pickerName = uniqueName('Automate Element Picker');
-    const pickerId = await this.api.dataType.createDefaultElementPickerDataType(pickerName);
-    this.dataTypeNames.push(pickerName);
-
-    const templateName = uniqueName('Automate Element Page');
-    const templateId = await this.api.template.createTemplateWithDisplayingValue(
-      templateName,
-      '\n@using Umbraco.Cms.Core.Models.PublishedContent' +
-        '\n@{' +
-        '\n\tvar elements = Model.Value<IEnumerable<IPublishedElement>>("element");' +
-        '\n}' +
-        '\n@if (elements != null)' +
-        '\n{' +
-        '\n\tforeach (var element in elements)' +
-        '\n\t{' +
-        `\n\t\t<p>@element.Value("${LibraryItems.propertyAlias}")</p>` +
-        '\n\t}' +
-        '\n}'
-    );
-    this.templateNames.push(templateName);
-
-    const pageTypeName = uniqueName('Automate Element Page Type');
-    const pageTypeId = await this.api.documentType.createDocumentTypeWithPropertyEditorAndAllowedTemplate(
-      pageTypeName,
-      pickerId,
-      propertyName,
-      templateId
-    );
-    this.documentTypeNames.push(pageTypeName);
-
-    const pageId = await this.api.document.createDocumentWithElementPickers(uniqueName('Element Page'), pageTypeId, propertyName, [
-      elementId
-    ]);
-    this.documentIds.push(pageId);
-    await this.api.document.publish(pageId);
-    await this.api.document.waitUntilDocumentIsPublished(pageId);
-    return await this.api.document.getDocumentUrl(pageId);
-  }
-
-  /** Removes everything this helper created. Failures are ignored: a spec may already have removed it. */
-  async cleanUp() {
-    for (const id of this.workspaceIds) {
-      await this.automate.workspaces.cleanUp(id);
-    }
-    for (const key of this.serviceAccountKeys) {
-      await this.automate.serviceAccounts.deleteById(key);
-    }
-    for (const id of this.userGroupIds) {
-      await this.api.userGroup.delete(id);
-    }
-
-    const recycleBin = `${this.api.baseUrl}/umbraco/management/api/v1/recycle-bin/element`;
-    for (const id of this.documentIds) {
-      await this.api.document.delete(id);
-    }
-    for (const id of this.elementIds) {
-      await this.api.element.delete(id);
-      await this.api.delete(`${recycleBin}/${id}`);
-    }
-    for (const id of [...this.folderIds].reverse()) {
-      await this.api.element.deleteFolder(id);
-      await this.api.delete(`${recycleBin}/folder/${id}`);
-    }
-    for (const name of this.documentTypeNames) {
-      await this.api.documentType.ensureNameNotExists(name);
-    }
-    for (const name of this.templateNames) {
-      await this.api.template.ensureNameNotExists(name);
-    }
-    for (const name of this.dataTypeNames) {
-      await this.api.dataType.ensureNameNotExists(name);
-    }
-  }
-
-  private async defaultTypeId(): Promise<string> {
-    if (this.defaultElementTypeId === null) {
-      this.defaultElementTypeId = (await this.elementType()).id;
-    }
-    return this.defaultElementTypeId;
-  }
-}
-
-const test = base.extend<{ library: LibraryItems }>({
-  library: async ({ umbracoApi, umbracoAutomateApi }, use) => {
-    const library = new LibraryItems(umbracoApi, umbracoAutomateApi);
-    await use(library);
-    await library.cleanUp();
-  }
-});
-
-/** A user group with the Library section, element root access and every element permission it needs. */
-function libraryUserGroup(): UserGroupBuilder {
-  return new UserGroupBuilder()
-    .withName(uniqueName('Automate Library Group'))
-    .addSection(CmsConstantHelper.sectionAliases.library)
-    .withElementRootAccess(true)
-    .addFallbackPermission()
-    .withReadElementPermission(true)
-    .withCreateElementPermission(true)
-    .withUpdateElementPermission(true)
-    .withPublishElementPermission(true)
-    .withUnpublishElementPermission(true)
-    .withReadElementContainerPermission(true)
-    .done();
-}
+const { pickerGroups, requiresSectionAccess } = ConstantHelper;
+const elementActions = {
+  getElement: ConstantHelper.actions.getElement,
+  getElementProperty: ConstantHelper.actions.getElementProperty,
+  createElement: ConstantHelper.actions.createElement,
+  updateElementProperty: ConstantHelper.actions.updateElementProperty,
+  publishElement: ConstantHelper.actions.publishElement,
+  unpublishElement: ConstantHelper.actions.unpublishElement
+};
+const settingKeys = ConstantHelper.elementSettings;
 
 // Each test builds a service-account workspace, Library items and an automation before it opens
 // a settings panel or runs, which on a loaded machine comes close to the 30s local default.
@@ -342,14 +105,13 @@ function treePickerItem(ui: UiHelpers, name: string) {
   return ui.automate.documentPickerModal.locator(`uui-menu-item[label="${name}"]`);
 }
 
-// Pending until T11 (docs/plans/library-element-actions/PLAN.md).
 test.describe('Step picker', () => {
   test.beforeEach(async ({ umbracoUi }) => {
     await umbracoUi.goToBackOffice();
   });
 
   // STORY-8 AC1
-  test.fixme('lists the six element actions in a Library group between Content and Media', async ({
+  test('lists the six element actions in a Library group between Content and Media', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi
@@ -366,26 +128,19 @@ test.describe('Step picker', () => {
     await umbracoAutomateUi.automate.addActionButton(AutomateUiHelper.triggerNodeId).click({ force: true });
     await expect(umbracoAutomateUi.automate.pickerItem(expected[0])).toBeVisible();
 
-    // Assert: the groups run Content, Library, Media, and Library holds exactly the six actions.
-    // TODO(T11): move the group locator to AutomateUiHelper. A group's headline is a `uui-box`
-    // property, not an attribute, so it is read in the page.
-    const groups = umbracoAutomateUi.automate.nodePickerModal.locator('uui-box');
-    const headlines = await groups.evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement & { headline: string }).headline));
+    // Assert: Library comes after Content and right before Media, and holds exactly the six actions.
+    const headlines = await umbracoAutomateUi.automate.pickerGroupHeadlines();
     const libraryIndex = headlines.indexOf(pickerGroups.library);
-    expect(headlines.slice(libraryIndex - 1, libraryIndex + 2)).toEqual([
-      pickerGroups.content,
-      pickerGroups.library,
-      pickerGroups.media
-    ]);
-    const listed = await groups
-      .nth(libraryIndex)
-      .locator('uui-ref-node')
-      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('name')));
+    // Groups sort by name, so Core sits between Content and Library; Library is still right before Media.
+    expect(headlines.indexOf(pickerGroups.content)).toBeGreaterThanOrEqual(0);
+    expect(headlines.indexOf(pickerGroups.content)).toBeLessThan(libraryIndex);
+    expect(headlines[libraryIndex + 1]).toBe(pickerGroups.media);
+    const listed = await umbracoAutomateUi.automate.pickerGroupItemNames(libraryIndex);
     expect(listed).toEqual(expected);
   });
 
   // STORY-8 AC2
-  test.fixme('lists the six element actions when searching for "element"', async ({
+  test('lists the six element actions when searching for "element"', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi
@@ -409,10 +164,9 @@ test.describe('Step picker', () => {
   });
 });
 
-// Pending until T11 (docs/plans/library-element-actions/PLAN.md).
 test.describe('Section access', () => {
   // STORY-8 AC13
-  test.fixme('refuses to publish an Update Element Property step without the Library section', async ({
+  test('refuses to publish an Update Element Property step without the Library section', async ({
     umbracoAutomateApi,
     library
   }) => {
@@ -427,7 +181,7 @@ test.describe('Section access', () => {
       umbracoAutomateApi,
       workspace.id,
       elementActions.updateElementProperty,
-      { [settingKeys.element]: randomUUID(), propertyAlias: LibraryItems.propertyAlias, value: 'never written' },
+      { [settingKeys.element]: randomUUID(), propertyAlias: LibraryApiHelper.propertyAlias, value: 'never written' },
       manualTrigger()
     );
 
@@ -455,7 +209,7 @@ test.describe('Element picker', () => {
     // Arrange: content-saved trigger → Update Element Property, Element empty, and an element to pick.
     const element = await library.element('G2 review rating');
     const seeded = await seedStep(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.updateElementProperty, {
-      propertyAlias: LibraryItems.propertyAlias,
+      propertyAlias: LibraryApiHelper.propertyAlias,
       value: 'new'
     });
     await openStep(umbracoAutomateUi, seeded);
@@ -481,7 +235,7 @@ test.describe('Element picker', () => {
     const element = await library.element('G2 review rating');
     const seeded = await seedStep(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.updateElementProperty, {
       [settingKeys.element]: element.id,
-      propertyAlias: LibraryItems.propertyAlias,
+      propertyAlias: LibraryApiHelper.propertyAlias,
       value: 'new'
     });
 
@@ -502,7 +256,7 @@ test.describe('Element picker', () => {
     // Arrange: content-saved trigger in scope → Update Element Property.
     const expression = '${ trigger.contentKey }';
     const seeded = await seedStep(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.updateElementProperty, {
-      propertyAlias: LibraryItems.propertyAlias,
+      propertyAlias: LibraryApiHelper.propertyAlias,
       value: 'new'
     });
     await openStep(umbracoAutomateUi, seeded);
@@ -525,7 +279,7 @@ test.describe('Element picker', () => {
   }) => {
     // Arrange: Update Element Property with Element empty.
     const seeded = await seedStep(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.updateElementProperty, {
-      propertyAlias: LibraryItems.propertyAlias,
+      propertyAlias: LibraryApiHelper.propertyAlias,
       value: 'new'
     });
     await openStep(umbracoAutomateUi, seeded);
@@ -700,7 +454,7 @@ test.describe('Publish reaches the page', () => {
     const update = automationStep(
       elementActions.updateElementProperty,
       'update',
-      { [settingKeys.element]: element.id, propertyAlias: LibraryItems.propertyAlias, value: newValue },
+      { [settingKeys.element]: element.id, propertyAlias: LibraryApiHelper.propertyAlias, value: newValue },
       { x: 250, y: 200 }
     );
     const publish = automationStep(elementActions.publishElement, 'publish', { [settingKeys.element]: element.id }, { x: 250, y: 380 });
