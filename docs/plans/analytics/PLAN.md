@@ -45,7 +45,7 @@
   Acceptance: `Analytics/AnalyticsSummaryTests` green in `Umbraco.Automate.Tests.Unit`, with the repository mocked.
   depends-on: T4. parallel-group: B
 
-- [ ] **T6** - story: AN-4 (AC1 to AC3), AN-5 (AC1 to AC6). Add the automations and actions methods to the same service, with `AutomationAnalyticsRow` and `ActionAnalyticsRow`:
+- [x] **T6** - story: AN-4 (AC1 to AC3), AN-5 (AC1 to AC6). Add the automations and actions methods to the same service, with `AutomationAnalyticsRow` and `ActionAnalyticsRow`:
   - rates per R4 and R8, averages per R5
   - workspace names looked up through `IWorkspaceService` for the ids T2 returns
   - the most common error per R9 (most failures, lower enum value on a tie, null with none)
