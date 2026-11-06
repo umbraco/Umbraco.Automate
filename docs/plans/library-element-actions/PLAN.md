@@ -69,7 +69,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: those tests pass against a running demo site.
   depends-on: T11. parallel-group: C
 
-- [ ] **T13** - **wire: element outcomes and the recycle bin on a running site.** story: STORY-2 (AC8, AC9), STORY-3 (AC6–AC8), STORY-4 (AC1, AC12, AC14, AC16), STORY-5 (AC9), STORY-6 (AC7), STORY-7 (AC1, AC10–AC12, AC14). Turn on the element sections of `outcomes.built-in.spec.ts` and `outcomes.recycle-bin.spec.ts`, using the helpers' `createDefaultElementFolder`, `createDefaultElementWithParent` and `moveToRecycleBin`. Run the trashed cases for a root-start-node account and a folder-start-node account, as #514 does for content.
+- [x] **T13** - **wire: element outcomes and the recycle bin on a running site.** story: STORY-2 (AC8, AC9), STORY-3 (AC6–AC8), STORY-4 (AC1, AC12, AC14, AC16), STORY-5 (AC9), STORY-6 (AC7), STORY-7 (AC1, AC10–AC12, AC14). Turn on the element sections of `outcomes.built-in.spec.ts` and `outcomes.recycle-bin.spec.ts`, using the helpers' `createDefaultElementFolder`, `createDefaultElementWithParent` and `moveToRecycleBin`. Run the trashed cases for a root-start-node account and a folder-start-node account, as #514 does for content.
   Acceptance: those tests pass against a running demo site.
   depends-on: T11. parallel-group: C
 

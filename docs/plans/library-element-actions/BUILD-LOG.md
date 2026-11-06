@@ -35,3 +35,9 @@
     - [update-element-property.png](./screenshots/update-element-property.png). Click path: Automation › a workspace with a service account › an automation › Update Element Property step › Settings.
     - [create-element.png](./screenshots/create-element.png), shown with the Element Type "required" error after saving empty. Click path: the same, with a Create Element step.
   - **Compared with the mockups:** same fields and order. The picked element shows no icon where the mockup had one; the test element type has no icon.
+- **T13** `fce62501` (06-11-2026): element outcomes and the recycle bin on a real site. Reviewer PASS on the first round.
+  - **On SQLite:** each run stalled a different handful of tests, content and element alike, on `SQLite Error 5: 'database is locked'`, even straight after a restart.
+  - **Demo setup changed to match CI:** the worktree site now runs on SQL Server LocalDB, through env vars only, the same ones `azure-pipelines.yml` sets (`CONNECTIONSTRINGS__UMBRACODBDSN=Server=(localdb)\MSSQLLocalDB;Database=AutomateLibraryElementsWt;…`, provider `Microsoft.Data.SqlClient`, `UMBRACO__CMS__GLOBAL__INSTALLMISSINGDATABASE=true`), giving a fresh unattended install.
+  - It runs on `--urls https://127.0.0.1:44311`, because a Forms test site from another worktree took 44300. The acceptance `.env` points at 44311.
+  - **On LocalDB,** `-g "Element|Library"` across both specs passed 20/20 in one run.
+  - **Reviewer suggestion, not done:** a site-level test of a trashed element (not folder) for a folder-scoped account. The unit tests and the AC12 folder case already exercise that path.
