@@ -40,14 +40,28 @@ internal sealed class WorkflowHostLifecycle : BackgroundService
             return;
         }
 
-        // Fail runs the previous process left in flight, and terminate their instances, before
-        // the host starts — otherwise the engine resumes them and re-executes the interrupted step
-        // behind a run already reported as failed.
-        await _stuckRunRecovery.RecoverStuckRunsAsync(stoppingToken);
+        try
+        {
+            // Fail runs the previous process left in flight, and terminate their instances, before
+            // the host starts — otherwise the engine resumes them and re-executes the interrupted step
+            // behind a run already reported as failed.
+            await _stuckRunRecovery.RecoverStuckRunsAsync(stoppingToken);
 
-        // Re-register workflow definitions for in-flight instances before starting the host,
-        // so WorkflowCore's poller can resume them without "not registered" errors.
-        await _definitionRecovery.RecoverAsync(stoppingToken);
+            // Re-register workflow definitions for in-flight instances before starting the host,
+            // so WorkflowCore's poller can resume them without "not registered" errors.
+            await _definitionRecovery.RecoverAsync(stoppingToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
+        {
+            // An exception escaping a BackgroundService stops the whole host, taking the site down.
+            // Leave the engine off instead: starting it after a failed recovery would resume
+            // interrupted steps behind runs already reported as failed.
+            _logger.LogError(
+                ex,
+                "Automate startup recovery failed; the WorkflowCore host will not start. " +
+                "Resolve the cause and restart.");
+            return;
+        }
 
         _logger.LogInformation("Starting WorkflowCore host");
         _workflowHost.Start();
