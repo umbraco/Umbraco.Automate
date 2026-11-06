@@ -152,6 +152,11 @@ public class UmbracoAutomateDbContext : DbContext
             entity.HasIndex(e => e.AutomationId);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => new { e.AutomationId, e.StartedUtc });
+
+            // Covers the analytics queries. The include list is read by the SQL Server provider only;
+            // SQLite ignores it and keeps the plain index.
+            entity.HasIndex(e => e.StartedUtc)
+                .IncludeProperties(e => new { e.AutomationId, e.Status, e.DurationMs });
         });
 
         modelBuilder.Entity<StepRunEntity>(entity =>
@@ -172,6 +177,10 @@ public class UmbracoAutomateDbContext : DbContext
 
             entity.HasIndex(e => e.RunId);
             entity.HasIndex(e => new { e.RunId, e.StepId });
+
+            // Covers the analytics queries. SQL Server only reads the include list (see the run index).
+            entity.HasIndex(e => e.StartedUtc)
+                .IncludeProperties(e => new { e.RunId, e.ActionAlias, e.Status, e.RetryCount, e.DurationTicks, e.ErrorCategory });
         });
 
         // WorkflowCore persistence tables

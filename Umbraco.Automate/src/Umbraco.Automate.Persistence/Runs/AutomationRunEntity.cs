@@ -21,6 +21,11 @@ internal sealed class AutomationRunEntity
 
     public DateTime? CompletedUtc { get; set; }
 
+    /// <summary>
+    /// Whole milliseconds from <see cref="StartedUtc"/> to <see cref="CompletedUtc"/>; null until the run has both.
+    /// </summary>
+    public long? DurationMs { get; set; }
+
     public string? TriggerData { get; set; }
 
     public required string InitiatedBy { get; set; }

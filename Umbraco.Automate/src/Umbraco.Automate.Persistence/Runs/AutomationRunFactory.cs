@@ -40,6 +40,7 @@ internal static class AutomationRunFactory
             Status = (int)run.Status,
             StartedUtc = run.StartedUtc,
             CompletedUtc = run.CompletedUtc,
+            DurationMs = CalculateDurationMs(run),
             TriggerData = run.TriggerData,
             InitiatedBy = run.InitiatedBy,
             CorrelationId = run.CorrelationId,
@@ -53,7 +54,13 @@ internal static class AutomationRunFactory
         entity.Status = (int)run.Status;
         entity.StartedUtc = run.StartedUtc;
         entity.CompletedUtc = run.CompletedUtc;
+        entity.DurationMs = CalculateDurationMs(run);
         entity.Error = run.Error;
         entity.WorkflowInstanceId = run.WorkflowInstanceId;
     }
+
+    private static long? CalculateDurationMs(AutomationRun run)
+        => run.StartedUtc.HasValue && run.CompletedUtc.HasValue
+            ? (long)(run.CompletedUtc.Value - run.StartedUtc.Value).TotalMilliseconds
+            : null;
 }

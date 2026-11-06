@@ -187,6 +187,8 @@ internal sealed class EFCoreStuckRunRecovery : IStuckRunRecovery
                         .SetProperty(sr => sr.Error, InterruptedError),
                     cancellationToken);
 
+            // DurationMs is deliberately left null for interrupted runs: their elapsed time includes
+            // downtime, so it would skew run-time analytics.
             recoveredRuns = await db.AutomationRuns
                 .Where(r => stuckRunIds.Contains(r.Id)
                     && NonTerminalStatuses.Contains(r.Status)
