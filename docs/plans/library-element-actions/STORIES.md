@@ -240,7 +240,7 @@ Out of scope: publishing the new element (a Publish Element step does that).
 - **AC14: Element type missing.** Given an element type key that doesn't exist, when Create Element runs, then the step takes the `elementTypeNotFound` outcome.
 - **AC15: Not allowed in the Library.** Given an element type without "Allow in Library", when Create Element runs, then the step fails with a validation error naming the type.
 - **AC16: Not allowed in the folder.** Given folder "Reviews" that only allows "Schema snippet", when Create Element runs with type "Promo banner", then the step fails with a validation error naming the type and the folder.
-- **AC17: Invalid property values.** Given a value that fails the `customSchema` property's validation, when Create Element runs, then the element is saved as a draft and the run log has a warning naming `customSchema`.
+- **AC17: Invalid property values.** Given a value that would fail the `customSchema` property's validation, when Create Element runs, then the element is saved as a draft holding that value, as Create Content does.
 
 ## STORY-8: Find the Library steps and pick an element
 

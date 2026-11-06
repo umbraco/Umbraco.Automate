@@ -49,7 +49,7 @@ Field labels and descriptions follow the content action they copy, with "content
 - **R7** Create Element with no folder creates at the Library root, and needs root access, as Create Content does at the content root.
 - **R8** Create Element with an element type key that doesn't resolve takes `elementTypeNotFound`.
 - **R9** Create Element with an element type that isn't "Allow in Library", or isn't allowed in that folder, fails the step with a validation error naming the type and the folder.
-- **R10** Create Element with property values that fail validation still saves the element as a draft, as the backoffice does, and writes a run log warning naming the properties.
+- **R10** Create Element takes Property Values in the same JSON format as Create Content and Update Element Property, and sets them the same way, so a value that would fail validation is still saved in the draft, as Create Content does. Values aren't validated on the way in.
 - **R11** Update Element Property on a property alias the element type doesn't have takes `propertyNotFound` and writes nothing.
 - **R12** Update Element Property changes only the one property, in the given culture and segment, and leaves the element's other values and its published version as they were.
 - **R13** Culture works as in the content actions: blank on an invariant element is ignored, and blank on a culture-variant element means the element's first culture, for reads and for Update.

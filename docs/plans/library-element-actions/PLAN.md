@@ -49,7 +49,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: `UnpublishElementActionTests.cs` green.
   depends-on: T2, T4. parallel-group: B
 
-- [ ] **T10** - story: STORY-7 (AC1–AC17). `CreateElementAction` with its settings and output, copying `CreateContentAction`'s settings shape:
+- [x] **T10** - story: STORY-7 (AC1–AC17). `CreateElementAction` with its settings and output, copying `CreateContentAction`'s settings shape:
   - Icon `icon-add`, `Umb.Element.Create`, `ICmsAction`.
   - Folder uses `ElementKeyPicker` with `folderOnly`, `SupportsBindings` and `BindingMustResolve`. Element Type uses `Umb.PropertyEditorUi.DocumentTypePicker` with `onlyPickElementTypes`.
   - Authorizes with `AuthorizeElementParentOrFailAsync`. Loads the folder through `IElementContainerService` and checks `Trashed`, because `CreateAsync` doesn't refuse a trashed folder (ARCHITECTURE). A missing or trashed folder takes `parentNotFound`, and an element type that doesn't resolve takes `elementTypeNotFound`.
