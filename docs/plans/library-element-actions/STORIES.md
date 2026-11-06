@@ -1,6 +1,6 @@
 # Stories: Library element actions
 
-**8 stories, 99 criteria.** `PLAN.md` and the spec files use these story ids, so never renumber them.
+**10 stories, 125 criteria.** `PLAN.md` and the spec files use these story ids, so never renumber them.
 
 **Access**
 
@@ -21,6 +21,11 @@
 **Backoffice**
 
 - [STORY-8](#story-8-find-the-library-steps-and-pick-an-element) Find the Library steps and pick an element, 13 criteria
+
+**Triggers**
+
+- [STORY-9](#story-9-start-an-automation-when-a-library-element-changes) Start an automation when a Library element changes, 21 criteria
+- [STORY-10](#story-10-find-and-set-up-the-element-triggers) Find and set up the element triggers, 5 criteria
 
 <details>
 <summary>Ready and Done</summary>
@@ -268,3 +273,59 @@ Specs: `automation.library-elements.spec.ts` ("Step picker", "Element picker", "
 - **AC11: Element empty.** Given Update Element Property's settings with Element empty, when the author saves, then the Element field shows "This field is required".
 - **AC12: Element type empty.** Given Create Element's settings with Element Type empty, when the author saves, then the Element Type field shows "This field is required".
 - **AC13: No Library section.** Given a workspace whose service account lacks the Library section, when the author publishes an automation with an Update Element Property step, then publishing is refused with the "requires section access" error.
+
+## STORY-9: Start an automation when a Library element changes
+
+As an **automation author**,
+I want an automation to start when an editor saves, publishes or unpublishes a Library element,
+so that I can react to a shared snippet changing, as I can to content changing.
+
+Specs: `Umbraco.Automate.Tests.Unit/Triggers/BuiltIn/Element*TriggerTests.cs`, `Dispatch/Authorization/NodeScopedTriggerDispatchAuthorizerTests.cs` (element cases), `automation.library-element-triggers.spec.ts` ("Runs").
+
+Out of scope: Trashed and Deleted triggers; a folder filter; property values in the output (BRIEF).
+
+**Happy path**
+
+- **AC1: Saved starts a run.** Given a published automation with an Element Saved trigger, when an editor saves element "G2 review rating", then one run starts whose trigger output has that element's `elementKey`.
+- **AC2: Output.** Given the same run, when its trigger output is read, then it holds `elementKey`, `elementName`, `contentTypeKey`, `contentTypeAlias`, `cultures` and `isNew`.
+- **AC3: New element.** Given an Element Saved trigger, when an editor creates and saves a new element, then `isNew` is true.
+- **AC4: Edited element.** Given an Element Saved trigger, when an editor saves an existing element again, then `isNew` is false.
+- **AC5: Published.** Given a published automation with an Element Published trigger, when an editor publishes an element, then one run starts with that element's key.
+- **AC6: Unpublished.** Given a published automation with an Element Unpublished trigger, when an editor unpublishes an element, then one run starts with that element's key.
+- **AC7: Batch.** Given an Element Batch Saved trigger, when three elements are saved in one bulk save, then one run starts whose `items` hold the three elements.
+- **AC8: Type filter matches.** Given Element Types set to "Schema Snippet", when an element of that type is saved, then the trigger fires.
+- **AC9: Invariant cultures.** Given an invariant element, when it's published, then `cultures` is null, as Content Published reports it.
+- **AC10: Variant cultures.** Given an element published in en-US only, when it's published, then `cultures` is `["en-US"]`.
+
+**Sad path and edge cases**
+
+- **AC11: Type filter doesn't match.** Given Element Types set to "Schema Snippet", when an element of another type is saved, then no run starts.
+- **AC12: Batch with one matching type.** Given an Element Batch Saved trigger filtered to "Schema Snippet", when a snippet and an element of another type are saved together, then one run starts with both elements in `items`, as Content Batch Saved does.
+- **AC13: Moved to another folder.** Given an Element Saved trigger, when an editor moves an element to another Library folder, then no run starts.
+- **AC14: Sent to the recycle bin.** Given an Element Saved trigger, when an editor moves an element to the recycle bin, then no run starts.
+- **AC15: Restored.** Given an Element Saved trigger, when an editor restores an element from the recycle bin, then no run starts.
+- **AC16: Restore unpublishes.** Given an Element Unpublished trigger and a published element in the recycle bin, when an editor restores it, then one run starts for it.
+- **AC17: No Read on the folder.** Given a workspace whose service account has a permission set on folder "Reviews" without Read, when an element in "Reviews" is saved, then no run starts in that workspace.
+- **AC18: Outside the start node.** Given a service account whose Library start node is folder "Campaigns", when an element in "Reviews" is saved, then no run starts in that workspace.
+- **AC19: Batch leaves out unreadable elements.** Given the account from AC17 and an Element Batch Saved trigger, when an element in "Reviews" and one in "Campaigns" are saved together, then the run's `items` hold only the "Campaigns" element.
+- **AC20: Batch with nothing readable.** Given the same account, when only elements in "Reviews" are saved together, then no run starts.
+- **AC21: No loop.** Given an automation with an Element Saved trigger whose step runs Update Element Property on the same element, and the default "Skip if this would loop", when an editor saves the element, then exactly one run starts.
+
+## STORY-10: Find and set up the element triggers
+
+As an **automation author**,
+I want the element triggers in a Library group with an element type filter,
+so that I set them up the way I set up the content triggers.
+
+Specs: `automation.library-element-triggers.spec.ts` ("Trigger picker", "Trigger settings"), `Element*TriggerTests.cs` (settings attributes).
+
+**Happy path**
+
+- **AC1: Library group.** Given the trigger picker is open, when the author scrolls to Library, then it lists Element Saved, Element Published, Element Unpublished and Element Batch Saved.
+- **AC2: Element types only.** Given an element trigger's settings are open, when the author clicks Choose on Element Types, then only element types can be picked.
+- **AC3: Empty filter.** Given an element trigger's settings with Element Types empty, when the author saves, then the trigger saves.
+- **AC4: Loop default.** Given a new element trigger, when its settings open, then "When triggered by another automation" is "Skip if this would loop".
+
+**Sad path**
+
+- **AC5: No Library section.** Given a workspace whose service account lacks the Library section, when the author publishes an automation with an Element Saved trigger, then publishing is refused with the "requires section access" error.

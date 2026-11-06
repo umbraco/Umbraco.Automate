@@ -1,0 +1,84 @@
+<!doctype html>
+<!--
+  Trigger picker (Automate's node-picker modal, trigger mode) with the new "Library" group.
+  Same component as step-picker.html: catalogue/modals/node-picker/node-picker-modal.element.ts.
+  Groups sort by name, so Library lands between Core and Media; Content shown dimmed above it.
+  Starter: modal-sidebar.html.
+-->
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Mockup: Trigger picker with the Library group</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@umbraco-ui/uui@2/dist/themes/light.css">
+	<link rel="stylesheet" href="_mockup.css">
+	<script type="module" src="_mockup.js"></script>
+	<style>
+		.main > uui-box { margin-bottom: var(--uui-size-space-4); }
+		.unchanged { opacity: .55; }
+	</style>
+</head>
+<body class="uui-font uui-text">
+	<header class="app-header">
+		<span class="logo">Umbraco</span>
+		<uui-tab-group class="sections">
+			<uui-tab label="Content">Content</uui-tab>
+			<uui-tab label="Media">Media</uui-tab>
+			<uui-tab label="Library">Library</uui-tab>
+			<uui-tab label="Automate" active>Automate</uui-tab>
+			<uui-tab label="Settings">Settings</uui-tab>
+		</uui-tab-group>
+		<div class="apps">
+			<uui-button look="primary" compact label="User"><uui-avatar name="Rick Butterfield"></uui-avatar></uui-button>
+		</div>
+	</header>
+	<div class="section">
+		<nav class="section-sidebar"><h3>Automate</h3></nav>
+		<main class="section-main"></main>
+	</div>
+
+	<div class="modal-backdrop"></div>
+	<aside class="modal-sidebar">
+		<div class="body-layout">
+			<div class="header">
+				<h3 class="headline">Select Trigger</h3>
+			</div>
+
+			<div class="main">
+				<!-- Replace from here -->
+				<uui-input placeholder="Search..." label="Search" style="width:100%; margin-bottom: var(--uui-size-space-5)">
+					<uui-icon slot="prepend" name="icon-search" style="margin-left:9px"></uui-icon>
+				</uui-input>
+
+				<uui-box headline="Content" class="unchanged">
+					<uui-ref-list>
+						<uui-ref-node name="Content Published" detail="Fires when content is published."><uui-icon slot="icon" name="icon-document"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Content Saved" detail="Fires when content is saved (created or updated)."><uui-icon slot="icon" name="icon-save"></uui-icon></uui-ref-node>
+					</uui-ref-list>
+				</uui-box>
+
+				<uui-box headline="Library">
+					<uui-ref-list>
+							<uui-ref-node name="Element Batch Saved" detail="Fires once when one or more Library elements are saved, with all elements as a collection."><uui-icon slot="icon" name="icon-plugin"></uui-icon></uui-ref-node>
+							<uui-ref-node name="Element Published" detail="Fires when a Library element is published."><uui-icon slot="icon" name="icon-globe"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Element Saved" detail="Fires when a Library element is saved (created or updated)."><uui-icon slot="icon" name="icon-save"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Element Unpublished" detail="Fires when a Library element is unpublished."><uui-icon slot="icon" name="icon-globe"></uui-icon></uui-ref-node>
+					</uui-ref-list>
+				</uui-box>
+
+				<uui-box headline="Media" class="unchanged">
+					<uui-ref-list>
+						<uui-ref-node name="Media Saved" detail="Fires when media is saved."><uui-icon slot="icon" name="icon-picture"></uui-icon></uui-ref-node>
+					</uui-ref-list>
+				</uui-box>
+				<!-- Replace to here -->
+			</div>
+
+			<div class="footer">
+				<div class="actions">
+					<uui-button label="Close">Close</uui-button>
+				</div>
+			</div>
+		</div>
+	</aside>
+</body>
+</html>

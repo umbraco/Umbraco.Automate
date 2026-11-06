@@ -1,6 +1,6 @@
 # Plan: Library element actions
 
-**15 tasks in 5 areas.** Build on a new branch `v18/feature/library-element-actions` off `v18/dev`. Each task is one reviewable, committable unit. Pending specs are listed under each story in [STORIES.md](./STORIES.md).
+**21 tasks in 6 areas.** Build on a new branch `v18/feature/library-element-actions` off `v18/dev`. Each task is one reviewable, committable unit. Pending specs are listed under each story in [STORIES.md](./STORIES.md).
 
 Pending C# specs sit inside `#if LIBRARY_ELEMENT_ACTIONS … #endif`, because they use types that don't exist yet, and each test is `[Fact(Skip = "Pending: T<n>")]`. The task that adds the types deletes the guard and the `Skip`, then makes the file compile and pass. Pending acceptance specs are `test.fixme`, as in `bindable-settings`.
 
@@ -82,3 +82,31 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
 - [x] **T15** - story: STORY-1. Update `docs/identity-ownership-permissions.md` with the element and folder members on the authorizer, the folder service, and the trashed-element rule. Add a Library row to the provider table in `docs/functional-overview.md`. Draft the UmbracoDocs change for the built-in actions page in BUILD-LOG. **Human gate:** Rick opens the UmbracoDocs PR.
   Acceptance: the docs name every member T2 added; the links resolve.
   depends-on: T2, T11
+
+## Triggers
+
+Added when the triggers were folded into #574 (DECISION-LOG, 06-11-2026). Same pending-spec convention as above: C# specs sit behind `#if LIBRARY_ELEMENT_TRIGGERS`, acceptance specs are `test.fixme`.
+
+- [ ] **T16** - story: STORY-9 (AC17–AC20). Dispatch for elements (ARCHITECTURE "Trigger decisions"): add an internal `Dispatch/Authorization/IElementScopedTriggerOutput` (`Guid? GetElementKey()`), and one case in `NodeScopedTriggerDispatchAuthorizer.AuthorizeNodeAsync` calling `AuthorizeElementAsync(user, key, {ActionElementBrowse.ActionLetter}, ct)`. Widen `Triggers/BuiltIn/ContentCultureHelpers` from `IContent` to `IPublishableContentBase` with no behaviour change for content.
+  Acceptance: element cases in `NodeScopedTriggerDispatchAuthorizerTests.cs` (single allowed/denied, batch narrowed, batch all denied) go green; existing content trigger tests stay green.
+  depends-on: T15. parallel-group: D
+
+- [ ] **T17** - story: STORY-9 (AC1–AC4, AC7, AC8, AC11–AC15), STORY-10 (AC4). `ElementSavedTrigger` and `ElementBatchSavedTrigger` with `ElementSavedTriggerSettings` / `ElementSavedTriggerOutput`, copying the content Saved pair: `[Trigger]` group "Library", `RequiredSections = [Library]`, icons per SPEC, Element Types via `Constants.EditorUiAliases.DocumentTypePicker` with `onlyPickElementTypes`, the loop setting. The output implements `IElementScopedTriggerOutput`. Skip saves of an existing element that moved it, trashed it or restored it (not new, and `WasPropertyDirty("ParentId")` or `("Trashed")` on the saved element; ARCHITECTURE guess, with the moving-notification fallback). A new element's ParentId reads as dirty, so new elements always fire.
+  Acceptance: `ElementSavedTriggerTests.cs` and `ElementBatchSavedTriggerTests.cs` green. The move/trash/restore guess is proved on a real site in T20; if it fails there, T20 switches to the fallback.
+  depends-on: T16. parallel-group: E
+
+- [ ] **T18** - story: STORY-9 (AC5, AC9, AC10). `ElementPublishedTrigger` with settings and output, copying Content Published, reporting cultures through `ContentCultureHelpers`. No batch variant (Rick's call: element publishes never batch).
+  Acceptance: `ElementPublishedTriggerTests.cs` green.
+  depends-on: T16. parallel-group: E
+
+- [ ] **T19** - story: STORY-9 (AC6, AC16). `ElementUnpublishedTrigger` with settings and output, copying Content Unpublished. No batch variant. A restore that unpublishes fires it (Rick's call).
+  Acceptance: `ElementUnpublishedTriggerTests.cs` green.
+  depends-on: T16. parallel-group: E
+
+- [ ] **T20** - **wire: the element triggers on a running site.** story: STORY-9 (AC1, AC5, AC6, AC13–AC17, AC21), STORY-10 (AC1–AC3, AC5). Turn on `automation.library-element-triggers.spec.ts` against the LocalDB demo site: the trigger picker's Library group (four triggers), the settings form, an editor's save/publish/unpublish (through the CMS Management API) starting a run, move/trash/restore not starting Element Saved, restore firing Element Unpublished, a folder permission without Read stopping dispatch, and no loop with Update Element Property. Add element trigger aliases and helpers to `ConstantHelper` / `LibraryApiHelper`. Screenshot the trigger picker and Element Saved settings into `screenshots/`.
+  Acceptance: the spec passes against the running demo site.
+  depends-on: T17, T18, T19
+
+- [ ] **T21** - story: STORY-9. Docs: `docs/identity-ownership-permissions.md` (element triggers at dispatch: Read on the element, batch narrowing, trashed hidden from scoped accounts), `docs/functional-overview.md` (Library row lists the six triggers), and the UmbracoDocs draft in BUILD-LOG (triggers page; note that restoring a published element fires Element Unpublished).
+  Acceptance: the docs name every trigger and match the code.
+  depends-on: T20

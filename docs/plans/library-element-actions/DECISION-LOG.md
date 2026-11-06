@@ -61,3 +61,31 @@
   - **Changed:** Get Element and Get Element Property no longer write a success run-log line, matching Get Content. SPEC R16 and STORY-2 AC6 were updated.
 - **Follow-up for both unpublish actions, not this feature:** `CannotUnpublishWhenReferenced` falls through to Unknown. With the CMS's `DisableUnpublishWhenReferenced` on, a Library element that pages pick is exactly what gets refused, so Validation would describe it better.
 - **T7: no variation context on writes.** `IElement.GetValue`/`SetValue` key values on nullable culture and segment and don't read the variation context, so the #205 "Parameter 'key2'" problem (published-cache reads) can't happen here. That matches Update Content Property.
+
+## 06-11-2026 · feature-explore (triggers folded in)
+- **Library element triggers join #574.** Rick asked whether there were element triggers. There weren't, so a separate brief was started and then folded into this feature at his request. Its separate plan folder (`library-element-triggers`, never committed) was deleted.
+- **Driver: parity with content and media.** No single customer scenario.
+- **Rick's scope:**
+  - three events, the content set: Saved, Published and Unpublished, each with a batch variant;
+  - the content triggers' two settings (an Element Types filter, and skip on cycle by default);
+  - the content triggers' small output, with no property values;
+  - no folder filter;
+  - v18 only.
+- **Trashed and Deleted triggers** (which media has) are left out for now.
+- **The brief's action unknowns are answered and removed.** The answers are in the feature-plan and feature-build entries above: the element access path, the page cache, the picker in settings, the trashed checks.
+
+## 06-11-2026 · feature-design (triggers)
+- **Six triggers named Element Saved / Published / Unpublished and Element Batch …**, not "Library Element …", to match the actions in the same Library group.
+- **Dispatch reuses `NodeScopedTriggerDispatchAuthorizer`** with a new internal `IElementScopedTriggerOutput` marker and one case calling #574's `AuthorizeElementAsync` with Read. A separate element dispatch authorizer was rejected: the existing one already narrows batches.
+- **Rick: Element Saved skips moves, trashing and restoring**, matching Content Saved. Found while designing: CMS 18.1.0 raises `ElementSavedNotification` for element moves, trash and restore, where content moves skip the Saved notification.
+- **Rick: Element Unpublished fires when a restore unpublishes an element**, because the CMS really does unpublish it. The docs will say so.
+- **Loop protection is generic**, through `AutomationOriginMiddleware`. The element actions are covered with no extra work.
+- **`ContentCultureHelpers` widens to `IPublishableContentBase`** rather than gaining element copies.
+- **Rick approved the two trigger mockups** (trigger picker, Element Saved settings) as drawn.
+
+## 06-11-2026 · feature-plan (triggers)
+- **Rick dropped Element Batch Published and Element Batch Unpublished.** Writing the specs showed that CMS 18.1.0 raises one Published or Unpublished notification per element. Content and elements share `PublishableContentServiceBase`, and content only gets a many-item notification for re-published descendants, which elements don't have. So those two would always carry one item. **Checked whether to raise a CMS issue: no.** Elements behave exactly as content does; content Batch Published only batches descendants. Element Batch Saved stays: a bulk save does raise one notification for many elements.
+- **Matched the content triggers on three points the first trigger spec draft got wrong (parity is the driver):**
+  - an invariant element's `cultures` is null, not `["*"]` (R23, STORY-9 AC9);
+  - a filtered batch fires with all its items when any matches (R20, STORY-9 AC12);
+  - the move check skips only existing elements, because a new element's ParentId reads as dirty (ARCHITECTURE guess, T17).

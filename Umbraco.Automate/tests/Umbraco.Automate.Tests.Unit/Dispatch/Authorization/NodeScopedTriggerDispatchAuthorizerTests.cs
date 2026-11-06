@@ -351,4 +351,278 @@ public class NodeScopedTriggerDispatchAuthorizerTests
             ServiceAccount = user ?? Mock.Of<IUser>(),
             Automation = new AutomationBuilder().WithTrigger("any").Build(),
         };
+
+#if LIBRARY_ELEMENT_TRIGGERS
+    // STORY-9 (AC17-AC20), R21. Pending until T16: delete the LIBRARY_ELEMENT_TRIGGERS guard and the Skip, then make it compile and pass.
+    // These use a stand-in output (ElementOutput below) so they compile at T16, before the element
+    // trigger outputs exist; each Element*TriggerTests file checks its real output carries the marker.
+
+    #region Element outputs: happy path
+
+    // R21: an element the service account can read starts the run
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementOutputAllowed_IsAuthorized()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.Authorized.ShouldBeTrue();
+    }
+
+    // STORY-9 AC17: the check is Read on the element (folder permissions included, inside the authorizer)
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementOutput_AsksForElementRead()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        _nodeAuthorizer.Verify(
+            a => a.AuthorizeElementAsync(
+                It.IsAny<IUser>(),
+                output.ElementKey.Value,
+                It.Is<IReadOnlySet<string>>(p => p.SetEquals(new[] { Umbraco.Cms.Core.Actions.ActionElementBrowse.ActionLetter })),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // R21: the check runs as the workspace's service account, not an ambient user
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementOutput_ChecksTheServiceAccount()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        var user = Mock.Of<IUser>();
+        AllowElement(output.ElementKey.Value);
+
+        await _sut.AuthorizeAsync(BuildContext(output, user), CancellationToken.None);
+
+        _nodeAuthorizer.Verify(
+            a => a.AuthorizeElementAsync(user, output.ElementKey.Value, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // R21: an element key is never looked up as a document
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementOutput_DoesNotCheckContent()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        _nodeAuthorizer.Verify(
+            a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    // R21: a single allowed element is dispatched as it is
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_SingleElementOutputAllowed_LeavesOutputUnchanged()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(output), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeNull();
+    }
+
+    // IElementScopedTriggerOutput contract: a null key means "not bound to one element", as for content
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementOutputWithoutKey_IsAuthorized()
+    {
+        var result = await _sut.AuthorizeAsync(BuildContext(new ElementOutput { ElementKey = null }), CancellationToken.None);
+
+        result.Authorized.ShouldBeTrue();
+    }
+
+    // R21: every element in the batch readable, nothing removed
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchAllItemsAllowed_LeavesOutputUnchanged()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        AllowElement(reviewsKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeNull();
+    }
+
+    // STORY-9 AC19: Batch leaves out unreadable elements
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_IsAuthorized()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeTrue();
+    }
+
+    // STORY-9 AC19: Batch leaves out unreadable elements
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_KeepsOnlyReadableElements()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeOfType<BatchTriggerOutput<ElementOutput>>()
+            .Items.Select(i => i.ElementKey).ShouldBe([campaignsKey]);
+    }
+
+    // STORY-9 AC19: Batch leaves out unreadable elements
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_RecomputesCount()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeOfType<BatchTriggerOutput<ElementOutput>>().Count.ShouldBe(1);
+    }
+
+    #endregion
+
+    #region Element outputs: sad path
+
+    // STORY-9 AC17: No Read on the folder
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementOutputWithoutRead_IsDenied()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        DenyElement(output.ElementKey.Value, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC18: Outside the start node. The authorizer's reason reaches the dispatcher log.
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementOutsideStartNode_PropagatesFailureReason()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        DenyElement(output.ElementKey.Value, "Outside Library start node.");
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.FailureReason.ShouldBe("Outside Library start node.");
+    }
+
+    // STORY-9 AC17: single output denied, nothing dispatched
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_SingleElementOutputDenied_IsDenied()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        DenyElement(output.ElementKey.Value, "Outside Library start node.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(output), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeFalse();
+    }
+
+    // R21: an element in the recycle bin is hidden from an account whose Library start node is a
+    // folder. The authorizer reports NotFound there (STORY-1 AC10); dispatch must still deny.
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_TrashedElementForScopedAccount_IsDenied()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        _nodeAuthorizer
+            .Setup(a => a.AuthorizeElementAsync(It.IsAny<IUser>(), output.ElementKey.Value, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound("Element not found."));
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC20: Batch with nothing readable
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchNoItemsReadable_IsDenied()
+    {
+        var (batch, firstKey, secondKey) = BuildMixedElementBatch();
+        DenyElement(firstKey, "Missing Umb.Element.Read on folder Reviews.");
+        DenyElement(secondKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC20: Batch with nothing readable. The plain contract agrees with the narrowing one.
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAsync_ElementBatchNoItemsReadable_IsDenied()
+    {
+        var (batch, firstKey, secondKey) = BuildMixedElementBatch();
+        DenyElement(firstKey, "Missing Umb.Element.Read on folder Reviews.");
+        DenyElement(secondKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC19: narrowing for one workspace must not leak into another's run
+    [Fact(Skip = "Pending: T16")]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_DoesNotMutateOriginalBatch()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        batch.Items.Count.ShouldBe(2);
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Stand-in for the element trigger outputs (T17-T19), which implement the same internal marker.
+    /// </summary>
+    private sealed class ElementOutput : IElementScopedTriggerOutput
+    {
+        public Guid? ElementKey { get; init; }
+
+        public Guid? GetElementKey() => ElementKey;
+    }
+
+    private static (BatchTriggerOutput<ElementOutput> Batch, Guid CampaignsKey, Guid ReviewsKey) BuildMixedElementBatch()
+    {
+        var campaignsKey = Guid.NewGuid();
+        var reviewsKey = Guid.NewGuid();
+        var batch = new BatchTriggerOutput<ElementOutput>
+        {
+            Items =
+            [
+                new ElementOutput { ElementKey = campaignsKey },
+                new ElementOutput { ElementKey = reviewsKey },
+            ],
+            Count = 2,
+        };
+
+        return (batch, campaignsKey, reviewsKey);
+    }
+
+    private void AllowElement(Guid key)
+        => _nodeAuthorizer
+            .Setup(a => a.AuthorizeElementAsync(It.IsAny<IUser>(), key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
+    private void DenyElement(Guid key, string reason)
+        => _nodeAuthorizer
+            .Setup(a => a.AuthorizeElementAsync(It.IsAny<IUser>(), key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail(reason));
+#endif
 }

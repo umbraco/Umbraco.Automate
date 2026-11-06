@@ -39,6 +39,21 @@ All six: group **Library**, section **Library** (`Constants.Applications.Library
 
 Field labels and descriptions follow the content action they copy, with "content item" read as "Library element".
 
+## Triggers
+
+All four: group **Library**, section **Library**, each the counterpart of a content trigger. The per-element triggers start one run per element; Element Batch Saved starts one run with every element in a bulk save as a collection (`items`). There's no batch Published or Unpublished: CMS 18.1.0 raises one notification per element for those (content only batches re-published descendants, and elements have none), so they would always carry one item (Rick's call).
+
+| Trigger | Alias | Counterpart | Icon |
+|---|---|---|---|
+| **Element Saved** | `umbracoAutomate.elementSaved` | Content Saved | `icon-save` |
+| **Element Published** | `umbracoAutomate.elementPublished` | Content Published | `icon-globe` |
+| **Element Unpublished** | `umbracoAutomate.elementUnpublished` | Content Unpublished | `icon-globe` |
+| **Element Batch Saved** | `umbracoAutomate.elementBatchSaved` | Content Batch Saved | `icon-plugin` |
+
+- **Settings (all four):** **Element Types** (element type picker, optional, "Only fire for these element types. Leave blank to match all."), and in the Advanced group **When triggered by another automation** (Always run / Skip if this would loop / Skip entirely, default Skip if this would loop). Same wording as the content triggers.
+- **Output (per element):** `elementKey`, `elementName`, `contentTypeKey`, `contentTypeAlias`, `cultures`, and for Saved also `isNew`. Same shape as the content trigger outputs, in element terms. Element Batch Saved outputs `items`, a list of those.
+- Descriptions follow the content trigger they copy, with "content" read as "a Library element".
+
 ## Rules
 - **R1** An Element or Folder value that isn't a GUID once bindings resolve fails the step with a validation error.
 - **R2** If the workspace's service account lacks the Library section, publishing an automation that uses one of these actions is refused with the existing "requires section access" error, a run fails the step, and the permission drift health check lists it. All existing section checks, nothing new.
@@ -56,6 +71,16 @@ Field labels and descriptions follow the content action they copy, with "content
 - **R14** After Publish Element succeeds, the published element cache returns the new values. Pages that pick the element show them on their next render.
 - **R15** The four write actions add an audit entry under the service account, as the content write actions do.
 - **R16** Each write action (Create, Update, Publish, Unpublish) writes one run log line naming the element (name and key), and Update says which culture and segment it wrote. The two Get actions write no success line, like Get Content (Rick's call on #574).
+
+**Trigger rules**
+- **R17** Saving, publishing or unpublishing a Library element in the backoffice, or through any CMS service, starts every published automation that uses the matching trigger, once per element for the per-element triggers and once per bulk save for Element Batch Saved.
+- **R18** **Element Saved** doesn't fire when the save only moved the element to another folder, sent it to the recycle bin or restored it, matching Content Saved. The CMS raises a Saved notification for these moves on elements but not on content.
+- **R19** **Element Unpublished** fires when restoring a published element from the recycle bin unpublishes it. The CMS really does unpublish it there; the docs say so.
+- **R20** With **Element Types** set, a trigger fires only for elements of those types. Element Batch Saved starts with the whole batch when any element matches, and doesn't start when none match, as Content Batch Saved does.
+- **R21** A trigger fires only for elements the workspace's service account can read: the Library section, its Library start node, and Read permission including permissions set on a Library folder. A batch trigger leaves out the elements the account can't read, and doesn't start when none are left. An element in the recycle bin is hidden from an account whose Library start node is a folder.
+- **R22** An element change made by an automation step (Create, Update, Publish or Unpublish Element) follows **When triggered by another automation**, as content changes do. With the default, an automation that changes an element can't start itself again through these triggers.
+- **R23** `cultures` lists the cultures saved, published or unpublished in that operation, as the content triggers report them: null for an invariant element.
+- **R24** `isNew` is true when the save created the element, as Content Saved works it out (the create and update dates match).
 
 ## Step picker
 Opens from "Add a step" on the automation canvas.
@@ -98,6 +123,32 @@ Opens the same way.
 | Folder empty | Allowed; the element goes in the Library root |
 | Element Type Choose | Lists element types only |
 | Save with Element Type empty | "This field is required", as pictured |
+
+## Trigger picker
+Opens from the automation's trigger node when choosing or changing the trigger.
+
+![Trigger picker with the Library group](./mockups/trigger-picker.png)
+
+[Mockup source](./mockups/trigger-picker.html)
+
+| When | The screen |
+|---|---|
+| Typing in search | Element triggers match on name and description, like the rest |
+| Section missing | Listed as usual; publishing the automation is refused (R2) |
+
+The Library group sorts between Core and Media, as the step picker's does.
+
+## Element trigger settings
+Opens when the author picks one of the four triggers or clicks the trigger node. All four show the same two fields.
+
+![Element Saved trigger settings](./mockups/element-saved-trigger.png)
+
+[Mockup source](./mockups/element-saved-trigger.html)
+
+| When | The screen |
+|---|---|
+| Element Types Choose | Lists element types; page types are greyed out, as in Create Element |
+| Element Types empty | Allowed; the trigger fires for every element type |
 
 ## Targets
 - None beyond the content actions: each step does one permission check, one load and one CMS call, the same as its content counterpart. The one agreed exception is Create Element with Property Values, which saves twice (`CreateAsync`, then `IElementService.Save`) so values use Create Content's format (DECISION-LOG, T10).
