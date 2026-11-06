@@ -12,12 +12,12 @@ Six new built-in actions, each a copy of its content counterpart pointed at the 
 - **The authorizer wraps `IElementPermissionService` for elements and `IElementContainerPermissionService` for the Create Element folder.** Both have the same statuses and start-node rules as the content service, so access matches what the backoffice allows, folder permissions included. The folder can't go through `IElementPermissionService`: it looks keys up as elements only (`ElementPermissionService.cs:44`, `GetAllPaths([Element], …)`), so a folder key comes back `NotFound`. The container service looks up `ElementContainer` paths (`ElementContainerPermissionService.cs:40`), the same at 18.1.0 and the current 18.x.
 - **Trashed elements are missing.** Every action that loads an `IElement` checks `Trashed` after loading it, as #514 made the rule (the two Get actions read the published cache, which drops trashed elements) (`docs/identity-ownership-permissions.md`). The authorizer also gets the same "hidden in the recycle bin" check for scoped accounts, using the element bin path `-1,-22,`.
 - **Update Element Property saves through `IElementService.Save`**, like Update Content Property, not `IElementEditingService.UpdateAsync`. `UpdateAsync` takes the whole set of property values and names, so writing one value through it means rebuilding everything else from the loaded element.
-- **Create Element goes through `IElementEditingService.CreateAsync`**, unlike Create Content. `IElementService` has no create method, and the editing service already refuses an element type that isn't "Allow in Library" or that the folder doesn't allow (`ElementEditingService.cs:111`, `:120`, `:238`). That's the #528 check without copying it. Both come back as the same `NotAllowed` status, so the action looks up the type and folder names for the error message. The editing service doesn't refuse a trashed folder on create (it only checks the folder exists, `:254`; the `InTrash` check at `:357` is for move and restore), so the action loads the folder through `IElementContainerService` and checks `Trashed` itself.
+- **Create Element goes through `IElementEditingService.CreateAsync`**, unlike Create Content. `IElementService` has no create method, and the editing service already refuses an element type that isn't "Allow in Library" or that the folder doesn't allow (`ElementEditingService.cs:111`, `:120`, `:238`). That's the #528 check without copying it. Both come back as the same `NotAllowed` status, so the action looks up the type and folder names for the error message. The editing service doesn't refuse a trashed folder on create (it only checks the folder exists, `:254`; the `InTrash` check at `:357` is for move and restore), so the action loads the folder through `IElementContainerService` and checks `Trashed` itself. Property Values don't go through `CreateAsync`, whose editors expect the backoffice format. The action creates the element with its name only, then sets the values and saves through `IElementService.Save`, so values use Create Content's format (Rick's call, T10). Both writes sit in one `ICoreScopeProvider` scope, so a failed second save rolls back the create.
 - **Publish and Unpublish go through `IElementPublishingService`**, like the content actions use `IContentPublishingService`.
 - **Get Element and Get Element Property read the published element cache** (`IPublishedElementCache`), like the content Get actions read the published content cache. The cache drops trashed elements (`ElementCacheService.cs:331`).
 - **`IContentValueNormaliser` gets overloads that take `IPublishedElement`**, so element properties come out in the same shape as content properties. Default implementations hand an `IPublishedContent` to the existing method and throw for anything else.
-- **A new `ua-element-key-picker` property editor UI** wraps the CMS's `umb-input-element` and stores a single key as a string, the same job `ua-media-key-picker` does for media. The CMS's own element picker stores an array, which the settings form can't bind. The existing bindable editor wraps it, so the binding switch works with no extra code.
-- **Element Type uses the CMS's document type picker** with `onlyPickElementTypes`, the way Create Content uses it for document types. It can't filter to "Allow in Library" types; the CMS refuses the rest when the step runs.
+- **A new `ua-element-key-picker` property editor UI** stores a single key as a string, the same job `ua-media-key-picker` does for media. The CMS's own element picker stores an array, which the settings form can't bind. It opens the CMS's element and folder picker modals itself rather than wrapping `umb-input-element`, because that input opens its picker through a modal route the step settings panel has no router for (found in T12). It shows a key that no longer resolves as "Not found" with Remove. The existing bindable editor wraps it, so the binding switch works with no extra code.
+- **Element Type uses a new `ua-document-type-picker` (`Umb.Automate.DocumentTypePicker`)**, which wraps the CMS's `umb-input-document-type` with `onlyPickElementTypes` and adds the required check the CMS picker lacks (found in T12). It can't filter to "Allow in Library" types; the CMS refuses the rest when the step runs. Page types show greyed out, as in the CMS.
 
 ## What changes
 
@@ -31,7 +31,7 @@ Actions/BuiltIn/
 ├── GetElementPropertyAction.cs
 ├── GetElementPropertySettings.cs
 ├── GetElementPropertyOutput.cs
-├── CreateElementAction.cs              # IElementEditingService.CreateAsync
+├── CreateElementAction.cs              # IElementEditingService.CreateAsync, then IElementService.Save, in one scope
 ├── CreateElementSettings.cs
 ├── CreateElementOutput.cs
 ├── UpdateElementPropertyAction.cs      # IElementService.Save
@@ -46,20 +46,25 @@ Actions/BuiltIn/
 Security/
 ├── IAutomationActionAuthorizer.cs      # + AuthorizeElementAsync (×2), AuthorizeElementParentAsync
 ├── AutomationActionAuthorizer.cs       # wraps IElementPermissionService + IElementContainerPermissionService
-└── AutomationActionAuthorizerExtensions.cs  # + AuthorizeElementOrFailAsync, AuthorizeElementParentOrFailAsync
+└── AutomationActionAuthorizerExtensions.cs  # + AuthorizeElementOrFailAsync
+Extensions/
+└── AutomationAuthorizationResultExtensions.cs  # + AuthorizeElementAsync / AuthorizeElementParentAsync taking IReadOnlyList<string>
 Cms/
 ├── IContentValueNormaliser.cs          # + IPublishedElement overloads
 └── ContentValueNormaliser.cs
-Constants.cs                            # + ElementKeyPicker UI alias
+Constants.cs                            # + ElementKeyPicker and DocumentTypePicker UI aliases
 ```
 
 **Backoffice: `Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Client/src/`**
 
 ```text
 core/components/element-key-picker/
-├── element-key-picker.element.ts       # wraps umb-input-element, stores one key as a string
+├── element-key-picker.element.ts       # opens the CMS element/folder picker modals, stores one key as a string
 └── manifests.ts                        # Umb.Automate.ElementKeyPicker
-core/manifests.ts                       # registers it
+core/components/document-type-picker/
+├── document-type-picker.element.ts     # wraps umb-input-document-type, adds the required check
+└── manifests.ts                        # Umb.Automate.DocumentTypePicker
+core/manifests.ts                       # registers both
 lang/en.ts                              # + uaOutcomes_folderNotFound, uaOutcomes_elementTypeNotFound
 ```
 
@@ -68,7 +73,8 @@ lang/en.ts                              # + uaOutcomes_folderNotFound, uaOutcome
 ```text
 Umbraco.Automate/tests/
 ├── Umbraco.Automate.Tests.Unit/Actions/BuiltIn/   # one *ActionTests.cs per action
-├── Umbraco.Automate.Tests.Unit/Security/AutomationActionAuthorizerTests.cs  # element cases
+├── Umbraco.Automate.Tests.Unit/Security/AutomationActionAuthorizerElementTests.cs  # element and folder access
+├── Umbraco.Automate.Tests.Unit/Cms/ContentValueNormaliserTests.cs   # element values in content shape
 └── Umbraco.Automate.Tests.AcceptanceTests/tests/DefaultConfig/
     ├── Outcomes/outcomes.built-in.spec.ts         # element outcomes
     ├── Outcomes/outcomes.recycle-bin.spec.ts      # trashed element, root and scoped accounts

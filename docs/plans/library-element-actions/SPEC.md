@@ -100,4 +100,4 @@ Opens the same way.
 | Save with Element Type empty | "This field is required", as pictured |
 
 ## Targets
-- None beyond the content actions: each step does one permission check, one load and one CMS call, the same as its content counterpart.
+- None beyond the content actions: each step does one permission check, one load and one CMS call, the same as its content counterpart. The one agreed exception is Create Element with Property Values, which saves twice (`CreateAsync`, then `IElementService.Save`) so values use Create Content's format (DECISION-LOG, T10).

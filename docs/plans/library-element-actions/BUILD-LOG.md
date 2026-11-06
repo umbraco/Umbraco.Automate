@@ -52,6 +52,25 @@
   - **Round 2:** the repo docs passed; the draft still needed the linked workspaces.md updated, and said `cultures` was "empty" where it's null. The orchestrator fixed both in the draft (it's outside the repo).
   - **Repo changes:** `identity-ownership-permissions.md` gained a Library elements and folders section naming every T2 member. `functional-overview.md` got a Library row. The `IAutomationActionAuthorizer` summary names both element services.
   - **Human gate:** the UmbracoDocs draft is below, for Rick to open as a PR.
+- **Finish** (06-11-2026):
+  - **Full .NET suite:** 2586 unit + 272 integration passed.
+  - **Full acceptance suite on the LocalDB demo site (44311):** 194 passed in one run.
+  - **Whole-feature review round 1 FAIL:** a dead public `AuthorizeElementParentOrFailAsync`, and a SPEC target Create Element no longer meets.
+  - **Refactor `8dff1ac9`:**
+    - the dead method removed;
+    - public element authorize overloads taking `IReadOnlyList<string>`;
+    - Create Element's two writes in one scope (CMS 18.1.0 scope nesting checked), with a "not created" failure message;
+    - test tidy.
+    - SPEC Targets and ARCHITECTURE updated to match.
+  - **Round 2 PASS.**
+  - **After the refactor:** unit tests 2593 passed. The element acceptance specs (`automation.library-elements`, `outcomes.built-in`, `outcomes.recycle-bin`) passed 46/46 on the restarted site.
+  - **Follow-ups, not this PR:**
+    - a shared helper for the per-action private copies;
+    - the culture-from-type rule in the three Update actions (T7);
+    - Create Content's Content Type required gap (T12);
+    - `CannotUnpublishWhenReferenced` → Unknown;
+    - `docs/engineering-spec.md:648` names the wrong namespace for the authorizer extensions (predates this feature);
+    - a spec pinning that Create Element's scope opens before `CreateAsync`.
 
 ## UmbracoDocs draft (for Rick)
 
