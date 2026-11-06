@@ -31,7 +31,7 @@ Tests: 18 new specs. Core has 2,391 unit and 286 integration tests passing; Open
 - **Release step, not in this PR:** OpenIddict now calls `AddAutomatePooledDbContext`. The release that ships this must raise OpenIddict's `Umbraco.Automate.Core` floor (`Directory.Packages.props`, today `[18.5.1, 18.999.999)`) to that Core version (plan T8). It isn't raised here, because nightly Core builds sit below the next minor.
 - **Left out:**
   - The v17 port (plan T7), which follows this PR. It needs the same shim for released OpenIddict 17.x.
-  - A follow-up issue, drafted but not filed: "Engine: A stuck-run recovery error stops the whole site" (`WorkflowHostLifecycle` lets the exception escape).
+  - #569, "Engine: A stuck-run recovery error stops the whole site" (`WorkflowHostLifecycle` lets the exception escape).
   - Sharing the connection-string lookup between the factory, the options delegate and `ResolveProviderName` (`DatabaseConnectionInfo.TryResolve`), which was a review suggestion.
 - **Behaviour on a configured site is unchanged:** a site that has its connection string at boot uses EF Core's pooled factory exactly as before, apart from one flag check per create.
 - **No public API change** in either package. Everything new is internal.
