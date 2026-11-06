@@ -59,7 +59,7 @@
 
 ## Management API
 
-- [ ] **T8** - story: AN-6 (AC1 to AC3, AC6), AN-7 (AC9 to AC12). Add `Umbraco.Automate.Web/Api/Management/Metrics/Controllers/AnalyticsMetricsController.cs` under route `metrics/analytics`, with `GET summary`, `GET automations` and `GET actions` taking SPEC's query. It scopes through the base helper and maps the service's validation failures to 400 `ProblemDetails`. Add the response models `Models/AnalyticsSummaryResponseModel.cs`, `AnalyticsAutomationsResponseModel.cs` and `AnalyticsActionsResponseModel.cs` in SPEC's exact shapes, with `topErrorCategory` as the enum name.
+- [x] **T8** - story: AN-6 (AC1 to AC3, AC6), AN-7 (AC9 to AC12). Add `Umbraco.Automate.Web/Api/Management/Metrics/Controllers/AnalyticsMetricsController.cs` under route `metrics/analytics`, with `GET summary`, `GET automations` and `GET actions` taking SPEC's query. It scopes through the base helper and maps the service's validation failures to 400 `ProblemDetails`. Add the response models `Models/AnalyticsSummaryResponseModel.cs`, `AnalyticsAutomationsResponseModel.cs` and `AnalyticsActionsResponseModel.cs` in SPEC's exact shapes, with `topErrorCategory` as the enum name.
   Acceptance: `Analytics/AnalyticsMetricsControllerTests` green in `Umbraco.Automate.Tests.Unit`.
   depends-on: T6, T7
 
