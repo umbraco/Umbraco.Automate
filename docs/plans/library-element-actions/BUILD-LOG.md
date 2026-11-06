@@ -17,3 +17,9 @@
   - Unit tests: 2563 passed (67 Create Element specs). Frontend build passes (new `folderNotFound`/`elementTypeNotFound` labels).
   - Carried to the whole-feature review: putting `CreateAsync` and the second `Save` in one scope, so a failed save doesn't leave an element with only its name.
   - Site check in T11.
+- **T11** `81794915` (06-11-2026): the six actions on the running demo site (44300, restarted with T2–T10 and a fresh frontend build). Reviewer PASS on the first round.
+  - Unit tests: 2585 passed (element cases in `BuiltInActionOutcomeTests` active). `tsc` clean.
+  - Acceptance, `automation.library-elements.spec.ts` + `outcomes.built-in.spec.ts`: 13 passed, 20 `fixme` (T12–T14). The step picker lists a Library group with exactly the six actions, searching "element" lists all six, publishing an Update Element Property step with a Content-only service account is refused with "requires section access", and Create Element draws Created (default), Folder not found and Element type not found.
+  - Unchanged Find Content / Get Media tests timed out a few times in fixture setup and passed on rerun.
+  - The step picker sorts groups by name, so it reads Content, Control Flow, Core, Library, Media. The approved mockup drew Library right after Content (Rick to confirm, see DECISION-LOG).
+  - Screenshot: [step-picker.png](./screenshots/step-picker.png), cropped to the picker. Click path: Automation › any workspace with a service account › an automation › Add action on the trigger › search "element". No "before" shot was taken before the task started; the picker only gained a group.
