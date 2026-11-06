@@ -66,8 +66,10 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         CancellationToken cancellationToken,
         IReadOnlyList<Guid>? originChain = null)
     {
-        // Startup recovery failed, so the WorkflowCore host never started: a run created now
-        // would sit in Running with nothing to execute it.
+        // Startup recovery failed on this node, so its WorkflowCore host never started. The refusal
+        // is deliberate and per node: on a multi-node setup another healthy node could have run
+        // this, but this node can't tell, and on a single node a run created now would sit in
+        // Running with nothing to execute it. A clear error beats a run that may never execute.
         if (_readinessSignal.EngineStartFailed)
         {
             throw new AutomationEngineNotRunningException();
