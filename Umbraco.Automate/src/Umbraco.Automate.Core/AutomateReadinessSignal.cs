@@ -7,6 +7,7 @@ namespace Umbraco.Automate.Core;
 public sealed class AutomateReadinessSignal
 {
     private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private volatile bool _engineStartFailed;
 
     /// <summary>
     /// Gets whether the database is ready.
@@ -32,6 +33,18 @@ public sealed class AutomateReadinessSignal
     /// </summary>
     public void SignalFailed(Exception migrationFailure)
         => _tcs.TrySetException(new AutomateNotReadyException(migrationFailure));
+
+    /// <summary>
+    /// Gets whether the WorkflowCore host was left stopped because startup recovery failed after
+    /// migrations succeeded. The database stays usable (<see cref="IsReady"/> is <c>true</c>),
+    /// but no workflow can run on this node until the cause is fixed and the site restarted.
+    /// </summary>
+    internal bool EngineStartFailed => _engineStartFailed;
+
+    /// <summary>
+    /// Signals that startup recovery failed, so the WorkflowCore host will not start on this node.
+    /// </summary>
+    internal void SignalEngineStartFailed() => _engineStartFailed = true;
 
     /// <summary>
     /// Waits until the database is ready, or until the cancellation token is triggered.

@@ -31,6 +31,7 @@ public class WorkflowPersistenceProviderTests : IDisposable
     {
         TypeNameHandling = TypeNameHandling.All,
         ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+        DateParseHandling = DateParseHandling.None,
     };
 
     private readonly EfCoreTestFixture _fixture;
@@ -136,6 +137,32 @@ public class WorkflowPersistenceProviderTests : IDisposable
         rp.PersistenceData.ShouldBeOfType<IteratorPersistenceData>().Index.ShouldBe(4);
         rp.ContextItem.ShouldBe(new ForEachIterationContext(null, 5, containerStepId));
         rp.ExtensionAttributes["attr-key"].ShouldBe("attr-value");
+    }
+
+    // Inline trigger and step outputs must come back exactly as they went in. If Newtonsoft
+    // parses ISO-looking strings into DateTime, a date with a UTC offset becomes server local
+    // time and loses its offset, so bindings inside steps disagree with the trigger edge (#559).
+    [Theory]
+    [InlineData("2026-11-04T10:00:00+05:00")]
+    [InlineData("2026-11-04T10:00:00-03:30")]
+    [InlineData("2026-11-04T10:00:00Z")]
+    [InlineData("2026-11-04T10:00:00")]
+    public async Task RoundTrip_KeepsDateStringsInWorkflowDataAsWritten(string raw)
+    {
+        var stepId = Guid.NewGuid();
+        var workflow = NewWorkflow();
+        workflow.Data = new AutomationWorkflowData
+        {
+            RunId = Guid.NewGuid(),
+            TriggerOutput = new Dictionary<string, object?> { ["date"] = raw },
+            StepOutputs = { [stepId] = new Dictionary<string, object?> { ["date"] = raw } },
+        };
+
+        await _provider.CreateNewWorkflow(workflow, CancellationToken.None);
+        var loaded = (AutomationWorkflowData)(await _provider.GetWorkflowInstance(workflow.Id, CancellationToken.None)).Data;
+
+        loaded.TriggerOutput["date"].ShouldBe(raw);
+        loaded.StepOutputs[stepId]["date"].ShouldBe(raw);
     }
 
     [Fact]

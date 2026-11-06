@@ -14,18 +14,24 @@ internal sealed class FormatDateFilter : IBindingFilter
     {
         var format = args.Length == 0 ? "O" : args[0];
 
-        return value switch
+        // Data read with System.Text.Json (trigger output at the trigger edge, webhook
+        // bodies, HTTP responses) carries dates as ISO 8601 strings.
+        var date = value is string s && TryParseIsoDate(s, out var parsed) ? parsed : value;
+        if (date is not (DateTime or DateTimeOffset or DateOnly or TimeOnly))
         {
-            DateTime dt => dt.ToString(format, CultureInfo.InvariantCulture),
-            DateTimeOffset dto => dto.ToString(format, CultureInfo.InvariantCulture),
-            DateOnly d => d.ToString(format, CultureInfo.InvariantCulture),
-            TimeOnly t => t.ToString(format, CultureInfo.InvariantCulture),
+            return value;
+        }
 
-            // Data read with System.Text.Json (trigger output at the trigger edge, webhook
-            // bodies, HTTP responses) carries dates as ISO 8601 strings.
-            string s when TryParseIsoDate(s, out var date) => Apply(date, args),
-            _ => value,
-        };
+        try
+        {
+            return ((IFormattable)date).ToString(format, CultureInfo.InvariantCulture);
+        }
+        catch (FormatException)
+        {
+            // The format doesn't fit the value, e.g. HH on a date with no time. Leave the value
+            // as it was, the same as for a value that isn't a date, rather than failing the step.
+            return value;
+        }
     }
 
     /// <summary>

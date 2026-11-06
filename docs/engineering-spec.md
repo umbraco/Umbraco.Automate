@@ -754,12 +754,13 @@ internal static IUmbracoBuilder AddUmbracoAutomateCore(this IUmbracoBuilder buil
 
 ```
 
-**Persistence registration.** `AddUmbracoAutomatePersistence` registers the repositories, the WorkflowCore persistence provider and the startup migrations. It calls `AddUmbracoAutomateDbContext` for the database itself, which does two things:
+**Persistence registration.** `AddUmbracoAutomatePersistence` registers the repositories, the WorkflowCore persistence provider and the startup migrations. It calls `AddUmbracoAutomateDbContext` for the database itself, which registers through the shared `AddAutomatePooledDbContext` helper. OpenIddict's `OpenIddictDbContext` uses the same helper. The helper does three things:
 
-- Registers the pooled `UmbracoAutomateDbContext` factory with `AutomatePooledDbContextOptions.Configure`. That resolves the connection string at run time through `DatabaseConnectionInfo.Resolve`. If nothing is configured, it falls back to a placeholder connection and logs a warning instead of throwing.
-- Enlists the factory in the ambient Umbraco scope (`EnlistDbContextFactoryInAmbientScope`), so that when Automate shares the CMS database its reads and writes join the CMS transaction.
+- Registers the pooled factory. Its options resolve the connection string at run time through `DatabaseConnectionInfo.Resolve`. If nothing is configured yet, they fall back to a placeholder connection and log a warning instead of throwing.
+- Wraps that factory in `ResolvingPooledDbContextFactory`. While the pool is on the placeholder, it looks for the connection string on each create. Once one resolves, for example after the backoffice installer writes it, it builds a real pool and uses that from then on, with no process restart (#531).
+- Enlists the factory in the ambient Umbraco scope, so that when Automate shares the CMS database its reads and writes join the CMS transaction.
 
-The code is the reference, in `Umbraco.Automate/src/Umbraco.Automate.Persistence/Configuration/UmbracoBuilderExtensions.cs`. It isn't copied here so this spec doesn't drift from it.
+The code is the reference, in `Umbraco.Automate/src/Umbraco.Automate.Core/Persistence/Scoping/AmbientDbContextFactoryExtensions.cs` and `Umbraco.Automate/src/Umbraco.Automate.Persistence/Configuration/UmbracoBuilderExtensions.cs`. It isn't copied here so this spec doesn't drift from it.
 
 ```csharp
 // Registers WorkflowCore with Umbraco's connection string as default

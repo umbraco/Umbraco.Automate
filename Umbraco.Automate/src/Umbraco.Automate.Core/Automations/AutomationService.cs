@@ -52,6 +52,7 @@ internal sealed class AutomationService : IAutomationService
     private readonly ISensitiveSettingsStripper _sensitiveStripper;
     private readonly ISectionAccessChecker _sectionAccessChecker;
     private readonly IConfigurationReferenceResolver _configurationReferenceResolver;
+    private readonly BindingEvaluator _bindingEvaluator;
 
     public AutomationService(
         IAutomationRepository automationRepository,
@@ -67,7 +68,8 @@ internal sealed class AutomationService : IAutomationService
         ControlFlowCollection controlFlows,
         ISensitiveSettingsStripper sensitiveStripper,
         ISectionAccessChecker sectionAccessChecker,
-        IConfigurationReferenceResolver configurationReferenceResolver)
+        IConfigurationReferenceResolver configurationReferenceResolver,
+        BindingEvaluator bindingEvaluator)
     {
         _automationRepository = automationRepository;
         _runRepository = runRepository;
@@ -83,6 +85,7 @@ internal sealed class AutomationService : IAutomationService
         _sensitiveStripper = sensitiveStripper;
         _sectionAccessChecker = sectionAccessChecker;
         _configurationReferenceResolver = configurationReferenceResolver;
+        _bindingEvaluator = bindingEvaluator;
     }
 
     public Task<Automation?> GetAutomationAsync(Guid id, CancellationToken cancellationToken = default)
@@ -214,6 +217,7 @@ internal sealed class AutomationService : IAutomationService
 
         AddDisallowedConnectionErrors(automation, workspace, errors);
         AddDanglingStepReferenceErrors(automation, errors);
+        AddUnknownBindingFilterErrors(automation, errors);
         await AddDanglingOutcomeErrorsAsync(automation, errors, cancellationToken);
         await AddStepPublishSettingsErrorsAsync(automation, errors, cancellationToken);
 
@@ -282,6 +286,79 @@ internal sealed class AutomationService : IAutomationService
                 errors.Add($"A connection filter has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
             }
         }
+    }
+
+    /// <summary>
+    /// Flags <c>${ }</c> bindings that pipe a value through a filter alias no registered binding
+    /// filter declares, typically a typo. At run time such a binding fails the step, or the run for
+    /// a connection filter, so publish rejects it first, naming the step, the field and the alias.
+    /// The scan covers settings fields marked <c>SupportsBindings</c> (action and control-flow steps
+    /// alike, including the property-initializer defaults the run also resolves), input mappings,
+    /// and connection filters, including those on edges from the trigger. A field without
+    /// <c>SupportsBindings</c>, such as a script, never goes through the binding evaluator and can
+    /// hold <c>${ a | b }</c> for its own reasons, so it is skipped. Within a scanned field every
+    /// string value is checked, which is slightly wider than what the run evaluates (for example a
+    /// Switch case's name, or values nested deeper than one row in an action's settings).
+    /// </summary>
+    private void AddUnknownBindingFilterErrors(Automation automation, List<string> errors)
+    {
+        foreach (var step in automation.Steps)
+        {
+            var label = string.IsNullOrEmpty(step.Alias) ? $"Step '{step.Name}'" : $"Step '{step.Name}' ({step.Alias})";
+
+            foreach (var (fieldLabel, value) in GetBindableSettingValues(step))
+            {
+                foreach (var alias in UnknownBindingFilterScanner.FindUnknownFilterAliases(value, _bindingEvaluator))
+                {
+                    errors.Add($"{label}: Field '{fieldLabel}' {UnknownBindingFilterScanner.Describe(alias)}");
+                }
+            }
+
+            foreach (var (input, expression) in step.InputMappings)
+            {
+                foreach (var alias in UnknownBindingFilterScanner.FindUnknownFilterAliases(expression, _bindingEvaluator))
+                {
+                    errors.Add($"{label}: Input '{input}' {UnknownBindingFilterScanner.Describe(alias)}");
+                }
+            }
+        }
+
+        errors.AddRange(UnknownBindingFilterScanner.GetConnectionFilterErrors(automation, _bindingEvaluator));
+    }
+
+    /// <summary>
+    /// Returns the label and value of every settings field marked <c>SupportsBindings</c> on the
+    /// step's settings type. The saved settings are deserialized the way the run resolves them, so
+    /// a default the author never changed is checked too. A step whose type or settings can't be
+    /// resolved yields nothing; the other publish checks report those.
+    /// </summary>
+    private List<(string FieldLabel, object? Value)> GetBindableSettingValues(StepConfiguration step)
+    {
+        var stepType = (IStepType?)_actions.GetByAlias(step.ActionAlias) ?? _controlFlows.GetByAlias(step.ActionAlias);
+        if (stepType?.SettingsType is not { } settingsType || stepType.GetSettingsSchema() is not { } schema)
+        {
+            return [];
+        }
+
+        object? settings;
+        try
+        {
+            settings = EditableModelResolver.DeserializeModel(settingsType, step.Settings);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException)
+        {
+            return [];
+        }
+
+        if (settings is null)
+        {
+            return [];
+        }
+
+        return schema.Fields
+            .Where(field => field.SupportsBindings && !string.IsNullOrEmpty(field.PropertyName))
+            .Select(field => (field.Label, settingsType.GetProperty(field.PropertyName)?.GetValue(settings)))
+            .ToList();
     }
 
     /// <summary>
