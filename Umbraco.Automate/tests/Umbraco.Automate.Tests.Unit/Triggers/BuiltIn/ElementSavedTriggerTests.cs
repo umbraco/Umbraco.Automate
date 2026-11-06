@@ -1,6 +1,3 @@
-// STORY-9, STORY-10. Pending until T17: delete the LIBRARY_ELEMENT_TRIGGERS guard and the Skip, then make it compile and pass.
-
-#if LIBRARY_ELEMENT_TRIGGERS
 using Json.Schema;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Settings;
@@ -25,7 +22,7 @@ public class ElementSavedTriggerTests
     #region Happy path
 
     // STORY-9 AC1: Saved starts a run
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_OneSavedElement_ProducesOneEvent()
     {
         var notification = new ElementSavedNotification(CreateElement(Guid.NewGuid()), new EventMessages());
@@ -34,7 +31,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC1: Saved starts a run
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_TwoSavedElements_ProducesOneEventPerElement()
     {
         var notification = new ElementSavedNotification(
@@ -45,7 +42,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC1: Saved starts a run
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SavedElement_OutputHasTheElementKey()
     {
         var key = Guid.NewGuid();
@@ -54,17 +51,17 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC1: Saved starts a run
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SavedElement_EventCarriesTheTriggerAlias()
         => MapSingle(CreateElement(Guid.NewGuid())).TriggerAlias.ShouldBe("umbracoAutomate.elementSaved");
 
     // STORY-9 AC2: Output
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SavedElement_OutputHasTheElementName()
         => MapSingle(CreateElement(Guid.NewGuid())).Output.ElementName.ShouldBe(ElementName);
 
     // STORY-9 AC2: Output
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SavedElement_OutputHasTheElementTypeKey()
     {
         var typeKey = Guid.NewGuid();
@@ -73,12 +70,12 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC2: Output
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SavedElement_OutputHasTheElementTypeAlias()
         => MapSingle(CreateElement(Guid.NewGuid())).Output.ContentTypeAlias.ShouldBe(ElementTypeAlias);
 
     // STORY-9 AC2: Output
-    [Theory(Skip = "Pending: T17")]
+    [Theory]
     [InlineData("elementKey")]
     [InlineData("elementName")]
     [InlineData("contentTypeKey")]
@@ -89,14 +86,14 @@ public class ElementSavedTriggerTests
         => _trigger.GetOutputSchema()!.GetKeyword<PropertiesKeyword>()!.Properties.Keys.ShouldContain(propertyName);
 
     // STORY-9 AC3: New element (R24)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_NewElement_IsNewIsTrue()
         => MapSingle(CreateElement(Guid.NewGuid(), isNew: true)).Output.IsNew.ShouldBeTrue();
 
     // STORY-9 AC3: New element (R18, R24). A new element's ParentId is set in its constructor
     // through the change-tracking setter (ContentBase.cs:35, TreeEntityBase.cs:75 at 18.1.0), so
     // the first save remembers ParentId as dirty. The move check must not swallow a create.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_NewElementWithParentIdDirty_StillProducesAnEvent()
     {
         var notification = new ElementSavedNotification(
@@ -107,12 +104,12 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC4: Edited element (R24)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_EditedElement_IsNewIsFalse()
         => MapSingle(CreateElement(Guid.NewGuid(), isNew: false)).Output.IsNew.ShouldBeFalse();
 
     // STORY-9 AC4: Edited element. An edit that only changed property values isn't a move.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_EditedElementWithOnlyValuesDirty_ProducesAnEvent()
     {
         var notification = new ElementSavedNotification(
@@ -123,7 +120,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC8: Type filter matches (R20)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void CanHandle_MatchingElementType_ReturnsTrue()
     {
         var typeKey = Guid.NewGuid();
@@ -134,7 +131,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC8: Type filter matches. The picker stores several types as a CSV.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void CanHandle_ElementTypeAmongSeveral_ReturnsTrue()
     {
         var typeKey = Guid.NewGuid();
@@ -145,7 +142,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-10 AC3: Empty filter
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void CanHandle_NoSettings_ReturnsTrue()
     {
         var output = new ElementSavedTriggerOutput { ElementKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() };
@@ -154,7 +151,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-10 AC3: Empty filter
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void CanHandle_EmptyElementTypes_ReturnsTrue()
     {
         var output = new ElementSavedTriggerOutput { ElementKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() };
@@ -163,11 +160,9 @@ public class ElementSavedTriggerTests
         ((ITrigger)_trigger).CanHandle(output, settings).ShouldBeTrue();
     }
 
-    // STORY-9 AC9: Invariant cultures (R23). AC9 says ["*"], but R23 says "as the content triggers
-    // report them", and ContentCultureHelpers turns the CMS's "*" marker into null for invariant
-    // content (ContentCultureHelpers.cs:23-24; ContentSavedTriggerTests.MapEvent_InvariantContent_CulturesIsNull).
-    // This spec follows the shared helper. Decide before T17 and fix STORIES or this test.
-    [Fact(Skip = "Pending: T17")]
+    // STORY-9 AC9: Invariant cultures (R23). The CMS reports "*" for an invariant element;
+    // ContentCultureHelpers turns it into null, as for content (resolved in the decision log).
+    [Fact]
     public void MapEvent_InvariantElement_CulturesIsNullAsForContent()
     {
         var key = Guid.NewGuid();
@@ -180,7 +175,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC10: Variant cultures (R23)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_VariantElement_CulturesComeFromTheNotification()
     {
         var key = Guid.NewGuid();
@@ -197,7 +192,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC10: Variant cultures (R23). No entry in the notification: the shared change-tracking fallback.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_VariantElementMissingFromNotification_CulturesFallBackToChangedCultures()
     {
         var element = CreateElement(
@@ -209,7 +204,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC1 (dedupe): a duplicate notification for the same save collapses to one run.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_IdempotencyKey_StartsWithAliasAndElementKey()
     {
         var key = Guid.NewGuid();
@@ -218,7 +213,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC1 (dedupe): a duplicate notification for the same save collapses to one run.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SameSaveTwice_SameIdempotencyKey()
     {
         var key = Guid.NewGuid();
@@ -228,7 +223,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC1 (dedupe): draft saves reuse the VersionId, so UpdateDate keeps sequential saves apart.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SequentialSavesOfTheSameVersion_DistinctIdempotencyKeys()
     {
         var key = Guid.NewGuid();
@@ -239,7 +234,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC17 (R21): the output carries the marker the dispatch authorizer checks for Read.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void Output_IsElementScoped_WithTheElementKey()
     {
         var key = Guid.NewGuid();
@@ -249,68 +244,68 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-10 AC1: Library group
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void HasTheAlias()
         => _trigger.Alias.ShouldBe("umbracoAutomate.elementSaved");
 
     // STORY-10 AC1: Library group
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void HasTheName()
         => _trigger.Name.ShouldBe("Element Saved");
 
     // STORY-10 AC1: Library group
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void IsInTheLibraryGroup()
         => _trigger.Group.ShouldBe("Library");
 
     // SPEC "Triggers" table
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void HasTheSaveIcon()
         => _trigger.Icon.ShouldBe("icon-save");
 
     // STORY-10 AC5: No Library section
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void RequiresTheLibrarySection()
         => _trigger.RequiredSections.ShouldBe([Umbraco.Cms.Core.Constants.Applications.Library]);
 
     // STORY-9 AC2: Output
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void HasTheOutputType()
         => _trigger.OutputType.ShouldBe(typeof(ElementSavedTriggerOutput));
 
     // STORY-10 AC2: Element types only
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void HasTheSettingsType()
         => _trigger.SettingsType.ShouldBe(typeof(ElementSavedTriggerSettings));
 
     // STORY-10 AC2: Element types only
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void SettingsSchema_HasElementTypes()
         => _trigger.GetSettingsSchema()!.Fields.ShouldContain(f => f.PropertyName == "ElementTypes");
 
     // STORY-10 AC2: Element types only
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void ElementTypesField_UsesTheDocumentTypePicker()
         => ElementTypesField().EditorUiAlias.ShouldBe(Umbraco.Automate.Core.Constants.EditorUiAliases.DocumentTypePicker);
 
     // STORY-10 AC2: Element types only
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void ElementTypesField_OnlyPicksElementTypes()
         => ElementTypesField().EditorConfig.ShouldContain("\"onlyPickElementTypes\", \"value\": true");
 
     // STORY-10 AC3: Empty filter
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void ElementTypesField_IsOptional()
         => _trigger.GetSettingsSchema()!.Fields.Single(f => f.PropertyName == "ElementTypes").IsRequired.ShouldBeFalse();
 
     // STORY-10 AC4: Loop default
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void Settings_LoopSettingDefaultsToSkipOnCycle()
         => new ElementSavedTriggerSettings().OnAutomationOriginatedEvent
             .ShouldBe(nameof(AutomationOriginatedEventBehavior.SkipOnCycle));
 
     // STORY-10 AC4: Loop default (R22)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void Settings_DefaultBehaviourIsSkipOnCycle()
         => ((IAutomationOriginatedEventBehavior)new ElementSavedTriggerSettings()).OnAutomationOriginated
             .ShouldBe(AutomationOriginatedEventBehavior.SkipOnCycle);
@@ -320,7 +315,7 @@ public class ElementSavedTriggerTests
     #region Sad path
 
     // STORY-9 AC11: Type filter doesn't match (R20)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void CanHandle_NonMatchingElementType_ReturnsFalse()
     {
         var output = new ElementSavedTriggerOutput { ElementKey = Guid.NewGuid(), ContentTypeKey = Guid.NewGuid() };
@@ -330,7 +325,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC11: Type filter doesn't match. An element with no type can't match a set filter.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void CanHandle_FilterSetAndNoElementType_ReturnsFalse()
     {
         var output = new ElementSavedTriggerOutput { ElementKey = Guid.NewGuid(), ContentTypeKey = null };
@@ -340,7 +335,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC13: Moved to another folder (R18)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SaveThatOnlyMovedTheElement_ProducesNoEvent()
     {
         var notification = new ElementSavedNotification(
@@ -351,7 +346,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC14: Sent to the recycle bin (R18)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SaveThatTrashedTheElement_ProducesNoEvent()
     {
         var notification = new ElementSavedNotification(
@@ -362,7 +357,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC14: Sent to the recycle bin (R18). Trashed alone is enough to skip.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SaveWithOnlyTrashedDirty_ProducesNoEvent()
     {
         var notification = new ElementSavedNotification(
@@ -373,7 +368,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC15: Restored (R18)
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_SaveThatRestoredTheElement_ProducesNoEvent()
     {
         var notification = new ElementSavedNotification(
@@ -384,7 +379,7 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC13: Moved to another folder (R18). Only the moved element is left out.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_MovedAndEditedElementsSavedTogether_ProducesEventOnlyForTheEdit()
     {
         var editedKey = Guid.NewGuid();
@@ -403,17 +398,17 @@ public class ElementSavedTriggerTests
     }
 
     // STORY-9 AC1: nothing saved, nothing to start
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void MapEvent_EmptyNotification_ProducesNoEvents()
         => _trigger.MapEvent(new ElementSavedNotification(Array.Empty<IElement>(), new EventMessages())).ShouldBeEmpty();
 
     // Defensive, as for content: a wrong output type must not suppress automations.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void CanHandle_MismatchedOutputType_ReturnsTrue()
         => ((ITrigger)_trigger).CanHandle(new { }, new ElementSavedTriggerSettings()).ShouldBeTrue();
 
     // STORY-10 AC4: Loop default. An unreadable stored value falls back to the default.
-    [Fact(Skip = "Pending: T17")]
+    [Fact]
     public void Settings_UnknownLoopValue_FallsBackToSkipOnCycle()
         => ((IAutomationOriginatedEventBehavior)new ElementSavedTriggerSettings { OnAutomationOriginatedEvent = "nonsense" })
             .OnAutomationOriginated.ShouldBe(AutomationOriginatedEventBehavior.SkipOnCycle);
@@ -469,4 +464,3 @@ public class ElementSavedTriggerTests
         return element.Object;
     }
 }
-#endif
