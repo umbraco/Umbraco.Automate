@@ -184,7 +184,7 @@ export class LibraryApiHelper {
    * The plan names `createTemplateWithDisplayingElementPickerExtensionMethods`, but that template
    * prints each element's name and identity, never a property value, so it could not show a value
    * Update Element Property wrote. `createTemplateWithDisplayingValue` wraps the same loop around
-   * `element.Value(...)` instead. TODO(T14): settle which template to keep.
+   * `element.Value(...)` instead.
    */
   async pageShowing(elementId: string): Promise<string> {
     const propertyName = 'Element';

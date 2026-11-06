@@ -18,11 +18,8 @@ import {
 } from '../../../lib/index';
 
 /**
- * Step picker and Section access run (T11). The rest are `test.fixme` until the task each
- * describe names turns it on: T12 "Element picker" and "Create Element settings", T14 "Folder
- * permissions" and "Publish reaches the page".
- *
- * `test.fixme` here means "pending implementation", not a known product gap.
+ * Step picker and Section access run (T11), Folder permissions and Publish reaches the page
+ * (T14).
  *
  * The Library data comes from the CMS helpers (`umbracoApi.element`, `umbracoApi.documentType`,
  * `UserGroupBuilder`) through the `library` fixture below, which removes everything afterwards,
@@ -34,6 +31,9 @@ import {
  */
 
 const STEP_ALIAS = 'target';
+
+/** The CMS verb alias a folder permission without Create fails on ('Umb.Element.Create'). */
+const createElementPermission = CmsConstantHelper.userGroupElementPermissionsSettings[1][2];
 
 const libraryUserGroup = () => LibraryApiHelper.userGroup();
 
@@ -395,19 +395,17 @@ test.describe('Create Element settings', () => {
   });
 });
 
-// Pending until T14 (docs/plans/library-element-actions/PLAN.md).
 test.describe('Folder permissions', () => {
   // STORY-1 AC14
-  test.fixme('fails Create Element in a folder whose permissions leave out Create', async ({
+  test('fails Create Element in a folder whose permissions leave out Create', async ({
     umbracoAutomateApi,
     library
   }) => {
     // Arrange: a service account with Create by default, and a granular permission on "Reviews"
     // that grants Read and Update but not Create.
-    // TODO(T14): the CMS helper's element permission builder sends `ElementPermissionPresentationModel`
-    // with the folder's key, which is the model the server maps (ElementPermissionMapper). The
-    // backoffice's folder UI sends `ElementContainerPermissionPresentationModel` instead; confirm the
-    // builder's form takes effect on a folder at 18.1, or send that shape.
+    // The CMS helper's element permission builder sends `ElementPermissionPresentationModel` with the
+    // folder's key, which is the only model the 18.1 server maps (ElementPermissionMapper), so it
+    // is stored as the folder's permission and the run's failure below proves it took effect.
     const reviews = await library.folder('Reviews');
     const elementType = await library.elementType();
     const workspace = await library.workspaceFor(
@@ -438,24 +436,30 @@ test.describe('Folder permissions', () => {
     const run = await umbracoAutomateApi.automations.getRun(runId);
     const stepRun = umbracoAutomateApi.automations.stepRunOf(run, seeded.stepId);
     expect(stepRun.status).toBe('Failed');
-    expect(stepRun.error).toBeTruthy();
+    expect(stepRun.error).toContain(createElementPermission);
+    expect(stepRun.error).toContain(`library folder '${reviews.id}'`);
   });
 });
 
-// Pending until T14 (docs/plans/library-element-actions/PLAN.md).
 test.describe('Publish reaches the page', () => {
   // STORY-5 AC4
-  test.fixme('shows the value written and published by the automation on the page', async ({
+  test('shows the value written and published by the automation on the page', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     umbracoUi,
     library
   }) => {
-    // Arrange: a published element holding "old", a published page picking it, and
+    // Arrange: a published element holding a unique old value, a published page picking it, and
     // Manual trigger → Update Element Property → Publish Element.
+    const oldValue = `old-${uniqueSuffix()}`;
     const newValue = `new-${uniqueSuffix()}`;
-    const element = await library.element('G2 review rating', { text: 'old', publish: true });
+    const element = await library.element('G2 review rating', { text: oldValue, publish: true });
     const pageUrl = await library.pageShowing(element.id);
+    // Arrange guard, not a second outcome: the element picker converter caches at the Elements
+    // level, so render the page once first. Only a page that already rendered the old value can
+    // show whether publishing the element refreshes it.
+    await umbracoUi.contentRender.navigateToRenderedContentPage(pageUrl);
+    await umbracoUi.contentRender.doesContentRenderValueContainText(oldValue);
     const update = automationStep(
       elementActions.updateElementProperty,
       'update',
@@ -473,7 +477,7 @@ test.describe('Publish reaches the page', () => {
     await umbracoAutomateApi.automations.publishAndRunUntil(id, 'Completed');
 
     // Assert: the page's next render shows the new value.
-    // If it still shows "old", stop and ask Rick before adding a cache refresh (PLAN T14).
+    // If it still shows the old value, stop and ask Rick before adding a cache refresh (PLAN T14).
     await umbracoUi.contentRender.navigateToRenderedContentPage(pageUrl);
     await umbracoUi.contentRender.doesContentRenderValueContainText(newValue);
   });
