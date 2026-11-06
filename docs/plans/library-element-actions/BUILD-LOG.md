@@ -76,6 +76,8 @@
 
 - **T17** `27d72386` (06-11-2026): Element Saved and Element Batch Saved triggers, with settings and output. Moves, trash and restore are skipped via `WasPropertyDirty("ParentId")`/`("Trashed")` on an existing element. The reviewer checked the names and timing against CMS 18.1.0: the repository remembers dirty state before the Saved notification, and the handler runs at scope exit. Reviewer PASS on the first round. Unit tests: 2691 passed (80 element saved specs). Carried to T20: restore a **published** element (it raises two Saved notifications, both should be skipped), and note that an element type with a property aliased `parentId` or `trashed` makes an ordinary edit read as a move.
 
+- **T18** `a4ef4eec` (06-11-2026): Element Published trigger, with its own settings and output (one settings class per trigger, as for content). Cultures through `ContentCultureHelpers`, null for an invariant element. The reviewer confirmed at CMS 18.1.0 that `PublishedVersionId` is set before the notification, so two publishes get different idempotency keys, and that Publish Element raises the notification, so loop protection applies. Reviewer PASS on the first round; its one suggestion (a stale spec comment) fixed before commit. Unit tests: 2728 passed (37 element published specs).
+
 ## UmbracoDocs draft (for Rick)
 
 > AI-assisted draft — pending review. Not published. Rick opens the UmbracoDocs PR.

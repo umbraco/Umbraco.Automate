@@ -95,7 +95,7 @@ Added when the triggers were folded into #574 (DECISION-LOG, 06-11-2026). Same p
   Acceptance: `ElementSavedTriggerTests.cs` and `ElementBatchSavedTriggerTests.cs` green. The move/trash/restore guess is proved on a real site in T20; if it fails there, T20 switches to the fallback.
   depends-on: T16. parallel-group: E
 
-- [ ] **T18** - story: STORY-9 (AC5, AC9, AC10). `ElementPublishedTrigger` with settings and output, copying Content Published, reporting cultures through `ContentCultureHelpers`. No batch variant (Rick's call: element publishes never batch).
+- [x] **T18** - story: STORY-9 (AC5, AC9, AC10). `ElementPublishedTrigger` with settings and output, copying Content Published, reporting cultures through `ContentCultureHelpers`. No batch variant (Rick's call: element publishes never batch).
   Acceptance: `ElementPublishedTriggerTests.cs` green.
   depends-on: T16. parallel-group: E
 
