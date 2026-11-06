@@ -12,6 +12,7 @@ public class WorkflowHostLifecycleTests
     private readonly Mock<IWorkflowHost> _workflowHost = new();
     private readonly Mock<IStuckRunRecovery> _stuckRunRecovery = new();
     private readonly Mock<IPersistenceProvider> _persistence = new();
+    private readonly AutomateReadinessSignal _readinessSignal = new();
 
     [Fact]
     public async Task ExecuteAsync_CompletesWithoutThrowing_WhenStuckRunRecoveryFails()
@@ -47,6 +48,16 @@ public class WorkflowHostLifecycleTests
         await RunLifecycleAsync();
 
         _workflowHost.Verify(h => h.Start(), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SignalsEngineStartFailed_WhenRecoveryFails()
+    {
+        FailStuckRunRecovery();
+
+        await RunLifecycleAsync();
+
+        _readinessSignal.EngineStartFailed.ShouldBeTrue();
     }
 
     [Fact]
@@ -96,8 +107,7 @@ public class WorkflowHostLifecycleTests
 
     private WorkflowHostLifecycle CreateLifecycle()
     {
-        var readinessSignal = new AutomateReadinessSignal();
-        readinessSignal.Signal();
+        _readinessSignal.Signal();
 
         var definitionRecovery = new WorkflowDefinitionRecovery(
             _persistence.Object,
@@ -110,7 +120,7 @@ public class WorkflowHostLifecycleTests
             _workflowHost.Object,
             _stuckRunRecovery.Object,
             definitionRecovery,
-            readinessSignal,
+            _readinessSignal,
             NullLogger<WorkflowHostLifecycle>.Instance);
     }
 }

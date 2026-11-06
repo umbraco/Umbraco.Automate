@@ -55,7 +55,9 @@ internal sealed class WorkflowHostLifecycle : BackgroundService
         {
             // An exception escaping a BackgroundService stops the whole host, taking the site down.
             // Leave the engine off instead: starting it after a failed recovery would resume
-            // interrupted steps behind runs already reported as failed.
+            // interrupted steps behind runs already reported as failed. Signalling it keeps the
+            // outbox from claiming work and new runs from being created that nothing would execute.
+            _readinessSignal.SignalEngineStartFailed();
             _logger.LogError(
                 ex,
                 "Automate startup recovery failed; the WorkflowCore host will not start. " +
