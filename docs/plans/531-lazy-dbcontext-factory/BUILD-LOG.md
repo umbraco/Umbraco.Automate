@@ -14,3 +14,9 @@
 - **T6** (no code): filed as #569; drafted the follow-up issue "Engine: A stuck-run recovery error stops the whole site" (`WorkflowHostLifecycle.cs:46`) for Rick to approve before filing. It's listed in the PR's "Left out".
 - **Whole-feature review** round 1 FAIL (OpenIddict's Core floor wasn't tracked). `f170bce7` (refactor): one flag read on the hot path, a no-rename warning on the shim, tests renamed for the helper, a redundant test dropped. All suites green (Core 2,391 + 286, OpenIddict 132 + 15). Plan docs: T8 added, ARCHITECTURE.md brought up to date.
 - **T7** (v17 port): 16 commits cherry-picked with `-x`, no conflicts, plus one commit pointing the shim at OpenIddict 17.1.x. Tests on v17: Core 2,391 unit and 286 integration, OpenIddict 133 unit and 15 integration. Review PASS: released OpenIddict 17.1.5's compiled references (23 Core members, the shim included) all resolve against the built Core. v17's OpenIddict Core floor is `[17.5.1, 17.999.999)` today, and T8 raises it in the v17 release PR too.
+- **T7 smoke (v17)**: fresh demo from `install-demo-site.ps1` (CMS 17.6.0), with its connection string and unattended install removed, `UseNamedConnectionString: umbracoDbDSN`, SQLite, port 44392 (listener checked). All four S5 criteria hold in one process:
+  - **AC1:** both new warnings at boot. After Install: `RestartRuntimeStep`, 11 Automate migrations, then "found its database connection string". HTTP 200.
+  - **AC2:** login works.
+  - **AC3:** API user, workspace and automation (201), publish (200), trigger (202). The run reached Completed and logged "Hello from #531 v17 smoke".
+  - **AC4:** OpenIddict picked up the connection string when its cleanup job first ran, with no error.
+  - No "no such table", ERR or FTL lines.
