@@ -352,15 +352,13 @@ public class NodeScopedTriggerDispatchAuthorizerTests
             Automation = new AutomationBuilder().WithTrigger("any").Build(),
         };
 
-#if LIBRARY_ELEMENT_TRIGGERS
-    // STORY-9 (AC17-AC20), R21. Pending until T16: delete the LIBRARY_ELEMENT_TRIGGERS guard and the Skip, then make it compile and pass.
     // These use a stand-in output (ElementOutput below) so they compile at T16, before the element
     // trigger outputs exist; each Element*TriggerTests file checks its real output carries the marker.
 
     #region Element outputs: happy path
 
     // R21: an element the service account can read starts the run
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementOutputAllowed_IsAuthorized()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -372,7 +370,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC17: the check is Read on the element (folder permissions included, inside the authorizer)
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementOutput_AsksForElementRead()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -390,7 +388,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // R21: the check runs as the workspace's service account, not an ambient user
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementOutput_ChecksTheServiceAccount()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -405,7 +403,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // R21: an element key is never looked up as a document
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementOutput_DoesNotCheckContent()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -419,7 +417,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // R21: a single allowed element is dispatched as it is
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_SingleElementOutputAllowed_LeavesOutputUnchanged()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -431,7 +429,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // IElementScopedTriggerOutput contract: a null key means "not bound to one element", as for content
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementOutputWithoutKey_IsAuthorized()
     {
         var result = await _sut.AuthorizeAsync(BuildContext(new ElementOutput { ElementKey = null }), CancellationToken.None);
@@ -440,7 +438,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // R21: every element in the batch readable, nothing removed
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_ElementBatchAllItemsAllowed_LeavesOutputUnchanged()
     {
         var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
@@ -453,7 +451,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC19: Batch leaves out unreadable elements
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_IsAuthorized()
     {
         var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
@@ -466,7 +464,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC19: Batch leaves out unreadable elements
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_KeepsOnlyReadableElements()
     {
         var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
@@ -480,7 +478,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC19: Batch leaves out unreadable elements
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_RecomputesCount()
     {
         var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
@@ -497,7 +495,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     #region Element outputs: sad path
 
     // STORY-9 AC17: No Read on the folder
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementOutputWithoutRead_IsDenied()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -509,7 +507,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC18: Outside the start node. The authorizer's reason reaches the dispatcher log.
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementOutsideStartNode_PropagatesFailureReason()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -521,7 +519,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC17: single output denied, nothing dispatched
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_SingleElementOutputDenied_IsDenied()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -534,7 +532,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
 
     // R21: an element in the recycle bin is hidden from an account whose Library start node is a
     // folder. The authorizer reports NotFound there (STORY-1 AC10); dispatch must still deny.
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_TrashedElementForScopedAccount_IsDenied()
     {
         var output = new ElementOutput { ElementKey = Guid.NewGuid() };
@@ -548,7 +546,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC20: Batch with nothing readable
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_ElementBatchNoItemsReadable_IsDenied()
     {
         var (batch, firstKey, secondKey) = BuildMixedElementBatch();
@@ -561,7 +559,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC20: Batch with nothing readable. The plain contract agrees with the narrowing one.
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAsync_ElementBatchNoItemsReadable_IsDenied()
     {
         var (batch, firstKey, secondKey) = BuildMixedElementBatch();
@@ -574,7 +572,7 @@ public class NodeScopedTriggerDispatchAuthorizerTests
     }
 
     // STORY-9 AC19: narrowing for one workspace must not leak into another's run
-    [Fact(Skip = "Pending: T16")]
+    [Fact]
     public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_DoesNotMutateOriginalBatch()
     {
         var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
@@ -624,5 +622,4 @@ public class NodeScopedTriggerDispatchAuthorizerTests
         => _nodeAuthorizer
             .Setup(a => a.AuthorizeElementAsync(It.IsAny<IUser>(), key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(AutomationAuthorizationResult.Fail(reason));
-#endif
 }
