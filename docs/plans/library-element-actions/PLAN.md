@@ -107,6 +107,6 @@ Added when the triggers were folded into #574 (DECISION-LOG, 06-11-2026). Same p
   Acceptance: the spec passes against the running demo site.
   depends-on: T17, T18, T19
 
-- [ ] **T21** - story: STORY-9. Docs: `docs/identity-ownership-permissions.md` (element triggers at dispatch: Read on the element, batch narrowing, trashed hidden from scoped accounts), `docs/functional-overview.md` (Library row lists the six triggers), and the UmbracoDocs draft in BUILD-LOG (triggers page; note that restoring a published element fires Element Unpublished).
+- [x] **T21** - story: STORY-9. Docs: `docs/identity-ownership-permissions.md` (element triggers at dispatch: Read on the element, batch narrowing, trashed hidden from scoped accounts), `docs/functional-overview.md` (Library row lists the four triggers), and the UmbracoDocs draft in BUILD-LOG (triggers page; note that restoring a published element fires Element Unpublished).
   Acceptance: the docs name every trigger and match the code.
   depends-on: T20
