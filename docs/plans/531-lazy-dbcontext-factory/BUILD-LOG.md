@@ -11,5 +11,5 @@
   - **AC4:** OAuth cleanup ran at boot + 3 minutes. OpenIddict logged "found its database connection string", with no cleanup error.
   - No "no such table", ERR or FTL lines anywhere in the log.
   - **Demo setup:** the API user, workspace and automation were created through the Management API from the logged-in backoffice session, because a fresh install has no API user for the workspace's service account.
-- **T6** (no code): drafted the follow-up issue "Engine: A stuck-run recovery error stops the whole site" (`WorkflowHostLifecycle.cs:46`) for Rick to approve before filing. It's listed in the PR's "Left out".
+- **T6** (no code): filed as #569; drafted the follow-up issue "Engine: A stuck-run recovery error stops the whole site" (`WorkflowHostLifecycle.cs:46`) for Rick to approve before filing. It's listed in the PR's "Left out".
 - **Whole-feature review** round 1 FAIL (OpenIddict's Core floor wasn't tracked). `f170bce7` (refactor): one flag read on the hot path, a no-rename warning on the shim, tests renamed for the helper, a redundant test dropped. All suites green (Core 2,391 + 286, OpenIddict 132 + 15). Plan docs: T8 added, ARCHITECTURE.md brought up to date.
