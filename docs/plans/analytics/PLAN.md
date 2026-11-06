@@ -11,7 +11,7 @@
   Acceptance: `Analytics/RunDurationTests` (AN-2 AC6, AC7) green in `Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration`. Both migration projects report no pending model changes.
   depends-on: none
 
-- [ ] **T2** - story: AN-2 (AC1, AC4, AC5, AC8, AC12), AN-3 (AC2), AN-4 (AC1, AC2, AC7), AN-6 (AC1 to AC4). Create the internal `Umbraco.Automate.Core/Analytics/IAutomateAnalyticsRepository.cs` and `Umbraco.Automate.Persistence/Analytics/EFCoreAutomateAnalyticsRepository.cs`, with the run queries only:
+- [x] **T2** - story: AN-2 (AC1, AC4, AC5, AC8, AC12), AN-3 (AC2), AN-4 (AC1, AC2, AC7), AN-6 (AC1 to AC4). Create the internal `Umbraco.Automate.Core/Analytics/IAutomateAnalyticsRepository.cs` and `Umbraco.Automate.Persistence/Analytics/EFCoreAutomateAnalyticsRepository.cs`, with the run queries only:
   - run counts grouped by UTC quarter hour (`Year`, `Month`, `Day`, `Hour`, `Minute / 15`) and status, for a UTC window
   - the median `DurationMs` of finished runs (a count, then `OrderBy` and `Skip`/`Take`)
   - the number of Suspended runs right now
