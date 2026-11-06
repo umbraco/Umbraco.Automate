@@ -25,3 +25,4 @@
 - **T3: `EnlistDbContextFactoryInAmbientScope`'s real implementation is private behind `AddAutomatePooledDbContext`**, so a new context can't register without the fix.
 - **Whole-feature review:** findings 2, 4, 5 and 8 fixed in a `refactor:` commit. Finding 1 (OpenIddict's Core floor) added as T8 for the release PR. Finding 6: ARCHITECTURE.md now matches what was built. Finding 3 (a shared `TryResolve`) is left as a follow-up. Finding 7: the warning keeps "needs the application to restart", because a connection string added outside the installer is picked up, but Automate's migrations only run at startup.
 - **Rick, 06-11-2026: keep the `[Obsolete]` shim until v19** (option A of PR #568's only question).
+- **T7 (v17): the shim keeps "removed in Umbraco.Automate 19".** v18 keeps the same member until 19, so the date holds for the product, and CMS 17.6 uses the same style.
