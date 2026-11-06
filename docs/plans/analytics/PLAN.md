@@ -34,7 +34,7 @@
 
 ## Core
 
-- [ ] **T5** - story: AN-2 (AC1 to AC5, AC8, AC11, AC12), AN-3 (AC1 to AC5), AN-7 (AC6, AC8 to AC12). Add the public `IAutomateAnalyticsService` with the summary method, plus `AnalyticsQuery` and `AnalyticsSummary`, in `Umbraco.Automate.Core/Analytics/`. Its jobs:
+- [x] **T5** - story: AN-2 (AC1 to AC5, AC8, AC11, AC12), AN-3 (AC1 to AC5), AN-7 (AC6, AC8 to AC12). Add the public `IAutomateAnalyticsService` with the summary method, plus `AnalyticsQuery` and `AnalyticsSummary`, in `Umbraco.Automate.Core/Analytics/`. Its jobs:
   - validate the query (R10) and return an Attempt-style failure for each R10 case
   - turn local dates into a UTC window with `TimeZoneInfo.FindSystemTimeZoneById`
   - fold the quarter-hour groups into the user's days, every day included, zeros too
