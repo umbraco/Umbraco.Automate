@@ -625,6 +625,52 @@ export class AutomateUiHelper {
 
   /* --- Step settings: bindable fields -------------------------------------------------- */
 
+  /* --- Triggers ------------------------------------------------------------------------- */
+
+  get triggerSettingsModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.triggerSettingsModal);
+  }
+
+  /* One field of the open trigger settings form, by its settings key (`elementTypes`). */
+  triggerSettingsField(key: string): Locator {
+    return this.triggerSettingsModal.locator(`umb-property[alias="${key}"]`);
+  }
+
+  /* The empty-canvas placeholder the trigger node shows until a trigger is chosen. */
+  get triggerPlaceholder(): Locator {
+    return this.triggerNode.locator('button.ua-node--placeholder');
+  }
+
+  /* Opens the trigger picker (`ua-node-picker-modal` in trigger mode) from the empty trigger node. */
+  async openTriggerPicker() {
+    await this.triggerPlaceholder.click({ force: true });
+    await this.nodePickerModal.waitFor({ state: 'visible' });
+  }
+
+  async waitForTriggerSettingsForm() {
+    await this.triggerSettingsModal.waitFor({ state: 'visible' });
+    await this.triggerSettingsModal.locator('ua-settings-form').waitFor({ state: 'attached' });
+  }
+
+  /* Opens the settings of the trigger already on the canvas. */
+  async openTriggerSettings() {
+    await this.triggerNode.getByRole('button', { name: 'Settings', exact: true }).click({ force: true });
+    await this.waitForTriggerSettingsForm();
+  }
+
+  /* Opens the document type picker of a trigger settings field. */
+  async openTriggerDocumentTypePicker(key: string) {
+    await this.clickInModal(this.triggerSettingsField(key).locator('uui-button#btn-add'));
+    await this.documentPickerModal.waitFor({ state: 'visible' });
+  }
+
+  /* Saves the trigger settings modal. Closing it without saving rolls a freshly picked trigger back. */
+  async submitTriggerSettings() {
+    await this.waitForTriggerSettingsForm();
+    await this.clickInModal(this.triggerSettingsModal.locator('[slot="actions"] uui-button[look="primary"]'));
+    await this.triggerSettingsModal.waitFor({ state: 'detached' });
+  }
+
   /* One field of the open step settings form, by its settings key (`contentKey`). */
   settingsField(key: string): Locator {
     return this.nodeSettingsModal.locator(`umb-property[alias="${key}"]`);

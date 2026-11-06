@@ -3,7 +3,7 @@ export { AutomateUiHelper } from './AutomateUiHelper';
 export type { StubbedOutcome } from './AutomateUiHelper';
 export { AutomationApiHelper } from './AutomationApiHelper';
 export type { ApprovalOutcome, CreateAutomationOptions, RunLifecycleAction } from './AutomationApiHelper';
-export { automationConnection, automationStep, contentSavedTrigger, manualTrigger } from './AutomationBuilder';
+export { automationConnection, automationStep, contentSavedTrigger, elementTrigger, manualTrigger } from './AutomationBuilder';
 export type { AutomationConnection, AutomationStep } from './AutomationBuilder';
 export { CatalogueApiHelper } from './CatalogueApiHelper';
 export { CmsContentApiHelper } from './CmsContentApiHelper';

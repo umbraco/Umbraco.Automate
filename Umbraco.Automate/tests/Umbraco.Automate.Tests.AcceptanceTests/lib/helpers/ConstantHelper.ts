@@ -27,6 +27,7 @@ export class ConstantHelper {
     automationTree: 'umb-tree',
     nodePickerModal: 'ua-node-picker-modal',
     nodeSettingsModal: 'ua-node-settings-modal',
+    triggerSettingsModal: 'ua-trigger-settings-modal',
     bindingPickerModal: 'ua-binding-picker-modal',
     emailAddressInput: 'ua-input-email-address',
     runsTable: 'ua-runs-table',
@@ -45,7 +46,18 @@ export class ConstantHelper {
   /* Trigger and step type aliases, as the catalogue API reports them. */
   public static readonly triggers = {
     manual: 'umbracoAutomate.manual',
-    contentSaved: 'umbracoAutomate.contentSaved'
+    contentSaved: 'umbracoAutomate.contentSaved',
+    elementSaved: 'umbracoAutomate.elementSaved',
+    elementPublished: 'umbracoAutomate.elementPublished',
+    elementUnpublished: 'umbracoAutomate.elementUnpublished',
+    elementBatchSaved: 'umbracoAutomate.elementBatchSaved'
+  };
+
+  /* Settings keys of the Library element triggers: the camelCase of ElementSavedTriggerSettings'
+   * properties. */
+  public static readonly elementTriggerSettings = {
+    elementTypes: 'elementTypes',
+    onAutomationOriginatedEvent: 'onAutomationOriginatedEvent'
   };
 
   public static readonly actions = {

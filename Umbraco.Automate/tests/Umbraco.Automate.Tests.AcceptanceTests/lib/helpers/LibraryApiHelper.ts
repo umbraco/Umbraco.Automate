@@ -6,7 +6,8 @@ import {
   UserGroupBuilder
 } from '@umbraco-cms/acceptance-test-helpers';
 import type { ApiHelpers } from './ApiHelpers';
-import { uniqueName } from './TestData';
+import { ensureOk } from './ApiResponse';
+import { uniqueName, uniqueSuffix } from './TestData';
 import type { TestWorkspace } from './WorkspaceApiHelper';
 
 /**
@@ -23,6 +24,9 @@ export class LibraryApiHelper {
   static readonly propertyAlias = 'textstring';
 
   private readonly api: UmbracoApiHelpers;
+  private get managementApi() {
+    return `${this.api.baseUrl}/umbraco/management/api/v1`;
+  }
   private readonly automate: ApiHelpers;
   private defaultElementTypeId: string | null = null;
   private readonly elementIds: string[] = [];
@@ -94,6 +98,46 @@ export class LibraryApiHelper {
     }
 
     return { id, name };
+  }
+
+  /**
+   * Saves an element as an editor would: reads it, changes its Textstring value and PUTs it back
+   * through the CMS Management API.
+   */
+  async save(id: string, text: string = `saved-${uniqueSuffix()}`) {
+    const element = await this.api.element.get(id);
+    const value = element.values.find((v: any) => v.alias === LibraryApiHelper.propertyAlias);
+    if (!value) {
+      throw new Error(`Element ${id} has no "${LibraryApiHelper.propertyAlias}" value.`);
+    }
+    value.value = text;
+    await ensureOk(await this.api.element.update(id, element), `Saving element ${id}`);
+  }
+
+  /** Publishes an element as an editor would, and waits until it reads as published. */
+  async publish(id: string) {
+    const status = await this.api.element.publish(id);
+    if (status >= 300) {
+      throw new Error(`Publishing element ${id} failed (${status}).`);
+    }
+    await expect.poll(async () => await this.api.element.isElementPublished(id)).toBe(true);
+  }
+
+  /** Unpublishes an element through `PUT element/{id}/unpublish`. The CMS helpers have no unpublish. */
+  async unpublish(id: string) {
+    await ensureOk(await this.api.put(`${this.managementApi}/element/${id}/unpublish`, { cultures: null }), `Unpublishing element ${id}`);
+    await expect.poll(async () => await this.api.element.isElementPublished(id)).toBe(false);
+  }
+
+  /** Moves an element to a Library folder through `PUT element/{id}/move`. The CMS helpers move folders only. */
+  async move(id: string, folderId: string) {
+    await ensureOk(await this.api.put(`${this.managementApi}/element/${id}/move`, { target: { id: folderId } }), `Moving element ${id} to folder ${folderId}`);
+  }
+
+  /** Restores an element from the Library recycle bin through `PUT recycle-bin/element/{id}/restore`, to the root or `targetFolderId`. */
+  async restore(id: string, targetFolderId?: string) {
+    const target = targetFolderId ? { id: targetFolderId } : null;
+    await ensureOk(await this.api.put(`${this.managementApi}/recycle-bin/element/${id}/restore`, { target }), `Restoring element ${id}`);
   }
 
   /** The saved (draft) value of an element's Textstring property. */
