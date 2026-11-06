@@ -198,6 +198,32 @@ public class AnalyticsSummaryTests
         }
     }
 
+    public class GivenRunCleanupKeepsNinetyDays
+    {
+        [Fact]
+        public async Task RetainedFromIsTheDayAfterTheCutoffDay()
+        {
+            var summary = (await new AnalyticsServiceHarness { RetentionDays = 90 }.Build()
+                .GetSummaryAsync(Query())).Result!;
+
+            summary.RetainedFrom.ShouldBe(new DateOnly(2026, 8, 9));
+        }
+    }
+
+    public class GivenTheCleanupCutoffFallsOnAnotherLocalDay
+    {
+        [Fact]
+        public async Task RetainedFromIsTheDayAfterTheCutoffsLocalDay()
+        {
+            // Cutoff 2026-08-08 22:30 UTC is 2026-08-09 00:30 in Copenhagen (CEST), so the first whole day is the 10th.
+            var harness = new AnalyticsServiceHarness { RetentionDays = 90, Now = new DateTimeOffset(2026, 11, 6, 22, 30, 0, TimeSpan.Zero) };
+
+            var summary = (await harness.Build().GetSummaryAsync(Query(timeZone: "Europe/Copenhagen"))).Result!;
+
+            summary.RetainedFrom.ShouldBe(new DateOnly(2026, 8, 10));
+        }
+    }
+
     public class GivenRunCleanupIsDisabled
     {
         [Fact]

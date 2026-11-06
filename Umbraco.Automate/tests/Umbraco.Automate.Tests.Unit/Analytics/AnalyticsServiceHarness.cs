@@ -12,7 +12,7 @@ namespace Umbraco.Automate.Tests.Unit.Analytics;
 /// </summary>
 internal sealed class AnalyticsServiceHarness
 {
-    public static readonly DateTimeOffset Now = new(2026, 11, 6, 12, 0, 0, TimeSpan.Zero);
+    public DateTimeOffset Now { get; set; } = new(2026, 11, 6, 12, 0, 0, TimeSpan.Zero);
 
     public Mock<IAutomateAnalyticsRepository> Repository { get; } = new();
 

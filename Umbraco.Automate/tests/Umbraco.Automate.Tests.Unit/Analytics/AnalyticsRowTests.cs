@@ -1,6 +1,4 @@
 // Stories AN-4, AN-5: docs/plans/analytics/STORIES.md
-// Compiled out until T6 adds the row methods. The T6 builder removes the #if/#endif lines.
-#if AUTOMATE_ANALYTICS
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Analytics;
 using Umbraco.Automate.Core.Workspaces;
@@ -29,28 +27,28 @@ public class AnalyticsRowTests
                 .Setup(r => r.GetAutomationAggregatesAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync([new AutomationAggregate(AutomationA, "Sync new orders", Commerce, Runs: 10, Succeeded: 9, Failed: 1, Finished: 10, AvgDurationMs: 2000, LastStartedUtc: LastRun)]);
             harness.Workspaces
-                .Setup(w => w.GetWorkspaceAsync(Commerce, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Workspace { Id = Commerce, Name = "Commerce", Alias = "commerce" });
+                .Setup(w => w.GetAllWorkspacesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new Workspace { Id = Commerce, Name = "Commerce", Alias = "commerce" }]);
 
             _row = harness.Build().GetAutomationsAsync(Query()).GetAwaiter().GetResult().Result!.Items.Single();
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void CountsItsRuns() => _row.Runs.ShouldBe(10);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void CountsItsFailures() => _row.Failed.ShouldBe(1);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void WorksOutItsSuccessRate() => _row.SuccessRate.ShouldBe(0.9m);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void GivesItsAverageRunTime() => _row.AvgDurationMs.ShouldBe(2000);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void GivesItsLastRun() => _row.LastRunUtc.ShouldBe(LastRun);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void NamesItsWorkspace() => _row.WorkspaceName.ShouldBe("Commerce");
     }
 
@@ -79,16 +77,16 @@ public class AnalyticsRowTests
             _row = harness.Build().GetActionsAsync(Query()).GetAwaiter().GetResult().Result!.Items.Single();
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void WorksOutItsFailureRate() => _row.FailureRate.ShouldBe(0.2m);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void PassesItsRetriesThrough() => _row.Retries.ShouldBe(5);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void GivesItsAverageRunTimeInMilliseconds() => _row.AvgDurationMs.ShouldBe(2000);
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void NamesTheMostCommonError() => _row.TopErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
     }
 
@@ -116,7 +114,7 @@ public class AnalyticsRowTests
             _row = harness.Build().GetActionsAsync(Query()).GetAwaiter().GetResult().Result!.Items.Single();
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void TheLowerEnumValueWins() => _row.TopErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
     }
 
@@ -140,8 +138,147 @@ public class AnalyticsRowTests
             _row = harness.Build().GetActionsAsync(Query()).GetAwaiter().GetResult().Result!.Items.Single();
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public void HasNoMostCommonError() => _row.TopErrorCategory.ShouldBeNull();
     }
+
+    public class GivenAutomationsWithAComparisonInsideRetention
+    {
+        private readonly AnalyticsRows<AutomationAnalyticsRow> _rows;
+
+        public GivenAutomationsWithAComparisonInsideRetention()
+        {
+            var harness = new AnalyticsServiceHarness();
+            harness.Repository
+                .Setup(r => r.GetAutomationAggregatesAsync(new DateTime(2026, 10, 1, 0, 0, 0), new DateTime(2026, 11, 1, 0, 0, 0), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new AutomationAggregate(AutomationA, "Current", Commerce, Runs: 10, Succeeded: 10, Failed: 0, Finished: 10, AvgDurationMs: null, LastStartedUtc: LastRun)]);
+            harness.Repository
+                .Setup(r => r.GetAutomationAggregatesAsync(new DateTime(2026, 8, 31, 0, 0, 0), new DateTime(2026, 10, 1, 0, 0, 0), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new AutomationAggregate(AutomationA, "Previous", Commerce, Runs: 4, Succeeded: 4, Failed: 0, Finished: 4, AvgDurationMs: null, LastStartedUtc: LastRun)]);
+
+            _rows = harness.Build().GetAutomationsAsync(Query(compareFrom: "2026-08-31", compareTo: "2026-09-30")).GetAwaiter().GetResult().Result!;
+        }
+
+        [Fact]
+        public void TheComparisonRowsComeFromTheComparisonWindow() => _rows.CompareItems!.Single().Name.ShouldBe("Previous");
+    }
+
+    public class GivenAutomationsWithAComparisonBeforeRetention
+    {
+        [Fact]
+        public async Task TheComparisonRowsAreNull()
+        {
+            var harness = new AnalyticsServiceHarness();
+            harness.Repository
+                .Setup(r => r.GetAutomationAggregatesAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([]);
+
+            var rows = (await harness.Build()
+                .GetAutomationsAsync(Query(compareFrom: "2026-08-08", compareTo: "2026-09-07"))).Result!;
+
+            rows.CompareItems.ShouldBeNull();
+        }
+    }
+
+    public class GivenActionsWithAComparisonInsideRetention
+    {
+        private readonly AnalyticsRows<ActionAnalyticsRow> _rows;
+
+        public GivenActionsWithAComparisonInsideRetention()
+        {
+            var harness = new AnalyticsServiceHarness();
+            harness.Repository
+                .Setup(r => r.GetActionAggregatesAsync(new DateTime(2026, 10, 1, 0, 0, 0), new DateTime(2026, 11, 1, 0, 0, 0), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new ActionAggregate("current.action", Runs: 10, Completed: 10, Failed: 0, Rejected: 0, Retries: 0, AvgDurationTicks: null, FailuresByCategory: new Dictionary<StepRunErrorCategory, int>())]);
+            harness.Repository
+                .Setup(r => r.GetActionAggregatesAsync(new DateTime(2026, 8, 31, 0, 0, 0), new DateTime(2026, 10, 1, 0, 0, 0), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new ActionAggregate("previous.action", Runs: 4, Completed: 4, Failed: 0, Rejected: 0, Retries: 0, AvgDurationTicks: null, FailuresByCategory: new Dictionary<StepRunErrorCategory, int>())]);
+
+            _rows = harness.Build().GetActionsAsync(Query(compareFrom: "2026-08-31", compareTo: "2026-09-30")).GetAwaiter().GetResult().Result!;
+        }
+
+        [Fact]
+        public void TheComparisonRowsComeFromTheComparisonWindow() => _rows.CompareItems!.Single().ActionAlias.ShouldBe("previous.action");
+    }
+
+    public class GivenActionsWithAComparisonBeforeRetention
+    {
+        [Fact]
+        public async Task TheComparisonRowsAreNull()
+        {
+            var harness = new AnalyticsServiceHarness();
+            harness.Repository
+                .Setup(r => r.GetActionAggregatesAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([]);
+
+            var rows = (await harness.Build()
+                .GetActionsAsync(Query(compareFrom: "2026-08-08", compareTo: "2026-09-07"))).Result!;
+
+            rows.CompareItems.ShouldBeNull();
+        }
+    }
+
+    public class GivenAnAutomationWhoseWorkspaceIsGone
+    {
+        [Fact]
+        public async Task TheWorkspaceNameIsEmpty()
+        {
+            var harness = new AnalyticsServiceHarness();
+            harness.Repository
+                .Setup(r => r.GetAutomationAggregatesAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new AutomationAggregate(AutomationA, "Orphan", Guid.NewGuid(), Runs: 1, Succeeded: 1, Failed: 0, Finished: 1, AvgDurationMs: null, LastStartedUtc: LastRun)]);
+            harness.Workspaces
+                .Setup(w => w.GetAllWorkspacesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new Workspace { Id = Commerce, Name = "Commerce", Alias = "commerce" }]);
+
+            var rows = (await harness.Build().GetAutomationsAsync(Query())).Result!;
+
+            rows.Items.Single().WorkspaceName.ShouldBe(string.Empty);
+        }
+    }
+
+    public class GivenAnAutomationWithNothingFinished
+    {
+        [Fact]
+        public async Task TheSuccessRateIsNull()
+        {
+            var harness = new AnalyticsServiceHarness();
+            harness.Repository
+                .Setup(r => r.GetAutomationAggregatesAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync([new AutomationAggregate(AutomationA, "Busy", Commerce, Runs: 2, Succeeded: 0, Failed: 0, Finished: 0, AvgDurationMs: null, LastStartedUtc: LastRun)]);
+            harness.Workspaces
+                .Setup(w => w.GetAllWorkspacesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync([]);
+
+            var rows = (await harness.Build().GetAutomationsAsync(Query())).Result!;
+
+            rows.Items.Single().SuccessRate.ShouldBeNull();
+        }
+    }
+
+    public class GivenAnInvalidQueryForAutomations
+    {
+        [Fact]
+        public async Task TheRepositoryIsNeverCalled()
+        {
+            var harness = new AnalyticsServiceHarness();
+
+            await harness.Build().GetAutomationsAsync(Query(timeZone: "Not/AZone"));
+
+            harness.Repository.Invocations.ShouldBeEmpty();
+        }
+    }
+
+    public class GivenAnInvalidQueryForActions
+    {
+        [Fact]
+        public async Task TheRepositoryIsNeverCalled()
+        {
+            var harness = new AnalyticsServiceHarness();
+
+            await harness.Build().GetActionsAsync(Query(timeZone: "Not/AZone"));
+
+            harness.Repository.Invocations.ShouldBeEmpty();
+        }
+    }
 }
-#endif
