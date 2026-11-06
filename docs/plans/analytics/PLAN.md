@@ -21,7 +21,7 @@
   Acceptance: `Analytics/AnalyticsRunQueryTests` green against SQLite in `Umbraco.Automate.Tests.Integration`, including a deleted automation (AN-4 AC7) and an automation that moved workspace (AN-6 AC4).
   depends-on: T1
 
-- [ ] **T3** - story: AN-5 (AC1 to AC7). Add the step-run query to the same repository: per `ActionAlias`, for step runs whose own `StartedUtc` is in the UTC window, return runs (any status except Skipped), completed, failed, rejected, the sum of `RetryCount`, the average `DurationTicks` of finished step runs, and failed counts per `ErrorCategory`. It uses the same workspace-join rule as T2.
+- [x] **T3** - story: AN-5 (AC1 to AC7). Add the step-run query to the same repository: per `ActionAlias`, for step runs whose own `StartedUtc` is in the UTC window, return runs (any status except Skipped), completed, failed, rejected, the sum of `RetryCount`, the average `DurationTicks` of finished step runs, and failed counts per `ErrorCategory`. It uses the same workspace-join rule as T2.
   Acceptance: `Analytics/AnalyticsActionQueryTests` green against SQLite.
   depends-on: T2
 
