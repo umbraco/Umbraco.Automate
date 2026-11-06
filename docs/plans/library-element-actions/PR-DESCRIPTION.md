@@ -8,7 +8,7 @@
 > - The element picker opening the CMS element and folder picker modals itself.
 > - Create Element's create and property save in one transaction.
 > - Unpublish Element reporting the two invariant/variant mismatches as Validation.
-> - The culture-from-type bug Update Element Property shares with Update Content and Media Property goes to one follow-up for all three.
+> - The culture-from-type bug Update Element Property shares with Update Content and Media Property goes to one follow-up for all three (#575).
 >
 > Changed: Get Element and Get Element Property no longer write a success line to the run log, matching Get Content.
 
@@ -50,7 +50,7 @@ Create Element settings, saved with Element Type empty:
 - v18 only. CMS 17 has no element publishing service, so there's no port.
 - The acceptance specs were run against a demo site on SQL Server LocalDB, as CI uses. The local SQLite demo threw `database is locked` on content and element tests alike.
 - Publishing an element updates pages that already rendered it on their next request, so there's no cache-refresh code. Checked on one page with no output cache.
-- Follow-up issues are drafted, not filed: the culture rule in all three Update actions, Create Content's Content Type not enforcing "required", `CannotUnpublishWhenReferenced` reported as Unknown in both unpublish actions, and a shared helper for the per-action copies.
+- Follow-ups filed: #575 (the culture rule in all three Update Property actions), #576 (Create Content's Content Type doesn't enforce "required"), #577 (`CannotUnpublishWhenReferenced` reported as Unknown), #578 (a shared helper for the per-action copies).
 - The UmbracoDocs change for the actions page is drafted at the end of `BUILD-LOG.md`.
 
 ## Change outline
