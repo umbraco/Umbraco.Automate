@@ -1,56 +1,16 @@
 [Discussion #510](https://github.com/umbraco/Umbraco.Automate/discussions/510) | [Plan folder](https://github.com/umbraco/Umbraco.Automate/tree/e317db6bdb9040b75e3b6f2c3929781e88530958/docs/plans/library-element-actions)
 
-> [!IMPORTANT]
-> **7 choices were made without you.** Please check each one.
+> [!NOTE]
+> **Rick reviewed the 7 choices made during the build.** Kept as built:
 >
-> **1. Design: public authorize overloads for elements**\
-> Plan said: Nothing about extension overloads taking a list of permissions\
-> Built: [`AuthorizeElementAsync` / `AuthorizeElementParentAsync` taking `IReadOnlyList<string>`](https://github.com/umbraco/Umbraco.Automate/blob/e317db6bdb9040b75e3b6f2c3929781e88530958/Umbraco.Automate/src/Umbraco.Automate.Core/Extensions/AutomationAuthorizationResultExtensions.cs#L40), beside the content one, so a third-party element action can pass `RequiredPermissions` as the built-ins do
+> - Public `AuthorizeElementAsync` / `AuthorizeElementParentAsync` overloads taking a list of permissions.
+> - `ua-document-type-picker`, which adds the required check the CMS document type picker lacks.
+> - The element picker opening the CMS element and folder picker modals itself.
+> - Create Element's create and property save in one transaction.
+> - Unpublish Element reporting the two invariant/variant mismatches as Validation.
+> - The culture-from-type bug Update Element Property shares with Update Content and Media Property goes to one follow-up for all three.
 >
-> - **A. Keep them** *(recommended)*
-> - B. Remove them and keep the conversion internal
->
-> **2. Design: a new Automate document type picker**\
-> Plan said: Element Type uses the CMS's document type picker\
-> Built: [`ua-document-type-picker` (`Umb.Automate.DocumentTypePicker`)](https://github.com/umbraco/Umbraco.Automate/blob/e317db6bdb9040b75e3b6f2c3929781e88530958/Umbraco.Automate/src/Umbraco.Automate.Core/Constants.cs#L65), because the CMS picker ignores "required" and an empty Element Type saved
->
-> - **A. Keep the wrapper** *(recommended)*
-> - B. Use the CMS picker and let an empty Element Type fail when the step runs
->
-> **3. Design: the element picker opens the CMS modals itself**\
-> Plan said: `ua-element-key-picker` wraps `umb-input-element`\
-> Built: [it opens the CMS element and folder picker modals directly](https://github.com/umbraco/Umbraco.Automate/blob/e317db6bdb9040b75e3b6f2c3929781e88530958/Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/Client/src/core/components/element-key-picker/element-key-picker.element.ts#L5), because `umb-input-element` opens its picker through a modal route the step settings panel has no router for, so Choose did nothing
->
-> - **A. Keep it** *(recommended)*
-> - B. Wrap `umb-input-element` and add a router context to the settings panel
->
-> **4. Design: Create Element saves in one transaction**\
-> Plan said: Nothing about a scope around Create Element's two writes\
-> Built: [`CreateAsync` and the property-value `Save` share one `ICoreScopeProvider` scope](https://github.com/umbraco/Umbraco.Automate/blob/e317db6bdb9040b75e3b6f2c3929781e88530958/Umbraco.Automate/src/Umbraco.Automate.Core/Actions/BuiltIn/CreateElementAction.cs#L199), so a failed save rolls back the create instead of leaving an element with only its name
->
-> - **A. Keep the scope** *(recommended)*
-> - B. Drop it and accept a name-only element when the second save fails
->
-> **5. Behavior: Update Element Property copies a culture bug from the content action**\
-> Plan said: Culture works as in the content actions (R13)\
-> Built: [the culture is chosen from the element type's variation, as Update Content Property does](https://github.com/umbraco/Umbraco.Automate/blob/e317db6bdb9040b75e3b6f2c3929781e88530958/Umbraco.Automate/src/Umbraco.Automate.Core/Actions/BuiltIn/UpdateElementPropertyAction.cs#L157). On a culture-variant type, writing an invariant property throws. Update Content and Update Media Property have the same bug today.
->
-> - **A. Ship as is and fix all three in one follow-up** *(recommended)*
-> - B. Fix Update Element Property in this PR only
->
-> **6. Behavior: Unpublish Element maps two statuses to Validation**\
-> Plan said: Nothing about these two statuses\
-> Built: [`CannotPublishInvariantWhenVariant` and `CannotPublishVariantWhenNotVariant` fail as Validation](https://github.com/umbraco/Umbraco.Automate/blob/e317db6bdb9040b75e3b6f2c3929781e88530958/Umbraco.Automate/src/Umbraco.Automate.Core/Actions/BuiltIn/UnpublishElementAction.cs#L141), where Unpublish Content leaves them as Unknown. The action sends the right form itself, so only a non-default culture named on an invariant element reaches them.
->
-> - **A. Keep Validation** *(recommended)*
-> - B. Match Unpublish Content (Unknown)
->
-> **7. Behavior: the Get actions write a success line to the run log**\
-> Plan said: Each action writes one run log line naming the element (R16)\
-> Built: [Get Element and Get Element Property log a success line](https://github.com/umbraco/Umbraco.Automate/blob/e317db6bdb9040b75e3b6f2c3929781e88530958/Umbraco.Automate/src/Umbraco.Automate.Core/Actions/BuiltIn/GetElementAction.cs#L136). Get Content and Get Content Property don't, so the element and content read actions now differ.
->
-> - **A. Keep the line, as the spec asks** *(recommended)*
-> - B. Drop it to match Get Content
+> Changed: Get Element and Get Element Property no longer write a success line to the run log, matching Get Content.
 
 ## Why the change
 

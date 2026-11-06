@@ -55,7 +55,7 @@ Field labels and descriptions follow the content action they copy, with "content
 - **R13** Culture works as in the content actions: blank on an invariant element is ignored, and blank on a culture-variant element means the element's first culture, for reads and for Update.
 - **R14** After Publish Element succeeds, the published element cache returns the new values. Pages that pick the element show them on their next render.
 - **R15** The four write actions add an audit entry under the service account, as the content write actions do.
-- **R16** Each action writes one run log line naming the element (name and key), and Update says which culture and segment it wrote.
+- **R16** Each write action (Create, Update, Publish, Unpublish) writes one run log line naming the element (name and key), and Update says which culture and segment it wrote. The two Get actions write no success line, like Get Content (Rick's call on #574).
 
 ## Step picker
 Opens from "Add a step" on the automation canvas.

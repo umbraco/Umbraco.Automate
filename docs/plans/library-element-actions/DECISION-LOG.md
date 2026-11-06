@@ -55,5 +55,9 @@
   - **Public `AuthorizeElementAsync` / `AuthorizeElementParentAsync` extensions taking `IReadOnlyList<string>`** sit beside the content one. The element actions use them instead of the internal `ToSet`, so a third-party element action can do the same. This settles the overload T5 deferred.
   - **Create Element's two writes now share one scope.** Checked at CMS 18.1.0: nested scopes join the outer one, a failed child rolls the whole thing back, and save notifications and cache refreshes wait for the outermost scope to complete. A failed property save therefore leaves no element with only its name.
   - **Not done here:** one shared helper for the per-action private copies (`NormaliseCulture`, `DescribeUpdate`, the save-result and publish-status mappers, the acting-user key). The content and media actions keep the same copies, so it's a follow-up across all of them.
+- **Rick went through the seven "Your call" items on PR #574 (06-11-2026).**
+  - **Kept:** the public element authorize overloads; `ua-document-type-picker`; the element picker opening the CMS modals itself; Create Element's single scope; Unpublish Element's Validation mapping.
+  - **The culture-from-type bug** goes to one follow-up for all three Update Property actions, not this PR.
+  - **Changed:** Get Element and Get Element Property no longer write a success run-log line, matching Get Content. SPEC R16 and STORY-2 AC6 were updated.
 - **Follow-up for both unpublish actions, not this feature:** `CannotUnpublishWhenReferenced` falls through to Unknown. With the CMS's `DisableUnpublishWhenReferenced` on, a Library element that pages pick is exactly what gets refused, so Validation would describe it better.
 - **T7: no variation context on writes.** `IElement.GetValue`/`SetValue` key values on nullable culture and segment and don't read the variation context, so the #205 "Parameter 'key2'" problem (published-cache reads) can't happen here. That matches Update Content Property.

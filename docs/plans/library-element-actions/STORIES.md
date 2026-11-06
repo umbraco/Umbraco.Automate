@@ -95,7 +95,7 @@ Out of scope: URL, path, level and folder key in the output (SPEC).
 - **AC3: Culture given.** Given an element published in en-US and da-DK, when Get Element runs with Culture "da-DK", then `Properties` holds the da-DK values.
 - **AC4: Blank culture, variant element.** Given an element published in en-US and da-DK, when Get Element runs with Culture blank, then `Culture` is the element's first culture.
 - **AC5: Blank culture, invariant element.** Given an invariant element, when Get Element runs with Culture blank, then `Properties` holds its invariant values.
-- **AC6: Run log.** Given a published element, when Get Element runs, then the run log has one line naming the element's name and key.
+- **AC6: No success line in the run log.** Given a published element, when Get Element runs, then the run log has no success line, as with Get Content. (Changed on #574: Rick dropped the success line.)
 
 **Sad path**
 

@@ -90,7 +90,7 @@ docs/
 ```
 
 - **Audit log:** the four write actions are `ICmsAction`, so the existing middleware writes an audit entry, as for content.
-- **Run log:** each action writes one line naming the element, using `ActionLogFormat.Item`, as the content actions do.
+- **Run log:** the four write actions (Create, Update, Publish, Unpublish) write one line naming the element, using `ActionLogFormat.Item`, as the content write actions do. The two Get actions write no success line, matching Get Content and Get Content Property (Rick's call on #574).
 
 - **Section checks and the permission drift health check:** pick up `RequiredSections = [Library]` with no change.
 
