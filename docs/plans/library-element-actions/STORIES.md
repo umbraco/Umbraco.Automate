@@ -259,7 +259,7 @@ Specs: `automation.library-elements.spec.ts` ("Step picker", "Element picker", "
 - **AC5: Bind an element.** Given Update Element Property's settings with a trigger in scope, when the author turns on the binding switch and enters an expression, then the step saves the expression.
 - **AC6: Folders only.** Given Create Element's settings are open, when the author clicks Choose on Folder, then the picker lists Library folders and no elements.
 - **AC7: Folder can be empty.** Given Create Element's settings with Folder empty and the other required fields set, when the author saves, then the step saves.
-- **AC8: Element types only.** Given Create Element's settings are open, when the author clicks Choose on Element Type, then the picker lists element types only.
+- **AC8: Element types only.** Given Create Element's settings are open, when the author clicks Choose on Element Type, then only element types can be picked. Page types are listed greyed out, as the CMS picker shows them.
 - **AC9: Exits on the canvas.** Given a Create Element step on the canvas, when the canvas draws it, then it shows Created (default), Folder not found and Element type not found.
 - **AC10: Section declared.** Given the six element actions, when their required sections are read, then each is the Library section.
 

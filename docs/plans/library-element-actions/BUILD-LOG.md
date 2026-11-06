@@ -23,3 +23,15 @@
   - Unchanged Find Content / Get Media tests timed out a few times in fixture setup and passed on rerun.
   - The step picker sorts groups by name, so it reads Content, Control Flow, Core, Library, Media. The approved mockup drew Library right after Content (Rick to confirm, see DECISION-LOG).
   - Screenshot: [step-picker.png](./screenshots/step-picker.png), cropped to the picker. Click path: Automation › any workspace with a service account › an automation › Add action on the trigger › search "element". No "before" shot was taken before the task started; the picker only gained a group.
+- **T12** `7995c86e` (06-11-2026): the element picker in the step settings form. Two review rounds.
+  - **Product bugs the real backoffice showed:**
+    - Choose did nothing: `umb-input-element` needs a router context the settings panel lacks. `ua-element-key-picker` now opens the CMS element and folder picker modals itself.
+    - An empty Element Type saved: the CMS document type picker ignores "required". New `ua-document-type-picker`.
+  - **Round 1 FAIL:** a saved key that no longer resolved showed an endless loader with no Remove. The AC8 test title also contradicted its assertion.
+  - **Round 2 PASS:** "Not found" with Remove, plus a spec for it.
+  - Rick OK'd that the Element Type picker greys out page types rather than hiding them, as the CMS does. AC8 reworded.
+  - **Acceptance** (`automation.library-elements.spec.ts`, Element picker + Create Element settings): all 10 pass on the restarted site (C# alias change). Earlier failures were in fixture setup, from `SQLite Error 5: database is locked` on the local SQLite demo, which a site restart cleared; "reopened" needed one rerun.
+  - **Screenshots**, cropped to the settings panel:
+    - [update-element-property.png](./screenshots/update-element-property.png). Click path: Automation › a workspace with a service account › an automation › Update Element Property step › Settings.
+    - [create-element.png](./screenshots/create-element.png), shown with the Element Type "required" error after saving empty. Click path: the same, with a Create Element step.
+  - **Compared with the mockups:** same fields and order. The picked element shows no icon where the mockup had one; the test element type has no icon.

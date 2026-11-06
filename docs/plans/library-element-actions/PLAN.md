@@ -65,7 +65,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
   Acceptance: those acceptance tests pass against a running v18 demo site (a real catalogue request and a real refused publish).
   depends-on: T5, T6, T7, T8, T9, T10
 
-- [ ] **T12** - **wire: the element picker into the settings form.** story: STORY-8 (AC3–AC8, AC11, AC12). Turn on the "Element picker" and "Create Element settings" tests in `automation.library-elements.spec.ts`. Fix whatever the real backoffice shows up in T4's picker inside `ua-bindable-editor` (binding switch, required message, reopening a saved step).
+- [x] **T12** - **wire: the element picker into the settings form.** story: STORY-8 (AC3–AC8, AC11, AC12). Turn on the "Element picker" and "Create Element settings" tests in `automation.library-elements.spec.ts`. Fix whatever the real backoffice shows up in T4's picker inside `ua-bindable-editor` (binding switch, required message, reopening a saved step).
   Acceptance: those tests pass against a running demo site.
   depends-on: T11. parallel-group: C
 
