@@ -1,15 +1,5 @@
 Closes #531 · Closes #532 · [Plan folder](https://github.com/umbraco/Umbraco.Automate/tree/eb7077cc55a65335a6d69af799707b1ea01bf203/docs/plans/531-lazy-dbcontext-factory)
 
-> [!IMPORTANT]
-> **1 choice was made without you.** Please check it.
->
-> **1. Design: a compatibility shim for released OpenIddict**\
-> Plan said: no public API changes, so no `[Obsolete]` shims.\
-> Built: [an `[Obsolete]` internal `EnlistDbContextFactoryInAmbientScope` with its original signature](https://github.com/umbraco/Umbraco.Automate/blob/eb7077cc55a65335a6d69af799707b1ea01bf203/Umbraco.Automate/src/Umbraco.Automate.Core/Persistence/Scoping/AmbientDbContextFactoryExtensions.cs#L109), removed in v19. Released `Umbraco.Automate.OpenIddict@18.1.5` calls this internal method through `InternalsVisibleTo` and accepts any Core from 18.5.0. Without the shim, a site that upgrades Core but not OpenIddict fails at startup with `MissingMethodException`. With it, that site boots, but OpenIddict's half of #531 stays unfixed until OpenIddict is upgraded too.
->
-> - **A. Keep the shim until v19** *(recommended)*
-> - B. Drop it and call out the break in the release notes
-
 ## Why the change
 
 After the backoffice installer's in-process restart, Automate and OpenIddict kept using the in-memory placeholder database. The site went down right after you clicked Install, or backoffice login returned 500. Now they pick up the real connection string without a process restart.
@@ -28,6 +18,7 @@ Tests: 18 new specs. Core has 2,391 unit and 286 integration tests passing; Open
 
 ## Good to know
 
+- **Kept for compatibility (agreed with Rick):** [An `[Obsolete]` internal `EnlistDbContextFactoryInAmbientScope` with its original signature](https://github.com/umbraco/Umbraco.Automate/blob/eb7077cc55a65335a6d69af799707b1ea01bf203/Umbraco.Automate/src/Umbraco.Automate.Core/Persistence/Scoping/AmbientDbContextFactoryExtensions.cs#L109), removed in v19. Released `Umbraco.Automate.OpenIddict@18.1.5` calls this internal method and accepts any Core from 18.5.0, so a site that upgrades Core but not OpenIddict still boots. OpenIddict's half of #531 stays unfixed on that site until OpenIddict is upgraded too.
 - **Release step, not in this PR:** OpenIddict now calls `AddAutomatePooledDbContext`. The release that ships this must raise OpenIddict's `Umbraco.Automate.Core` floor (`Directory.Packages.props`, today `[18.5.1, 18.999.999)`) to that Core version (plan T8). It isn't raised here, because nightly Core builds sit below the next minor.
 - **Left out:**
   - The v17 port (plan T7), which follows this PR. It needs the same shim for released OpenIddict 17.x.
