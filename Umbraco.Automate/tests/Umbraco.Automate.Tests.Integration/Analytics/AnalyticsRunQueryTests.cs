@@ -1,6 +1,4 @@
 // Stories AN-2, AN-3, AN-4, AN-6: docs/plans/analytics/STORIES.md
-// Compiled out until T2 adds the analytics repository. The T2 builder removes the #if/#endif lines.
-#if AUTOMATE_ANALYTICS
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Runs;
 using static Umbraco.Automate.Tests.Integration.Analytics.AnalyticsDatabase;
@@ -35,7 +33,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsEveryRunThatStarted()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -43,7 +41,7 @@ public class AnalyticsRunQueryTests
             groups.Sum(g => g.Count).ShouldBe(8);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsTheFailedRuns()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -51,7 +49,7 @@ public class AnalyticsRunQueryTests
             groups.Where(g => g.Status == AutomationRunStatus.Failed).Sum(g => g.Count).ShouldBe(2);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task GroupsByQuarterHourAndStatus()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -81,7 +79,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task LeavesItOut()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -105,7 +103,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task ReturnsTheMedianRunTime()
         {
             long? median = await _db.Repository.GetMedianRunDurationMsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -127,7 +125,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsThemAsWaitingNow()
         {
             int waiting = await _db.Repository.GetSuspendedRunCountAsync(workspaceIds: null);
@@ -156,7 +154,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task ListsOnlyTheAutomationsThatRan()
         {
             var rows = await _db.Repository.GetAutomationAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -164,7 +162,7 @@ public class AnalyticsRunQueryTests
             rows.Select(r => r.AutomationId).ShouldBe([_a.Id, _b.Id], ignoreOrder: true);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task GivesEachAutomationItsFigures()
         {
             var rows = await _db.Repository.GetAutomationAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -174,7 +172,7 @@ public class AnalyticsRunQueryTests
                 (10, 9, 1, 10, 2000d, new DateTime(2026, 10, 6, 14, 2, 0, DateTimeKind.Utc)));
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task GivesEachAutomationItsWorkspace()
         {
             var rows = await _db.Repository.GetAutomationAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -197,7 +195,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task LeavesItsRunsOutOfTheAutomationRows()
         {
             var rows = await _db.Repository.GetAutomationAggregatesAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Content });
@@ -219,7 +217,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsOnlyTheGivenWorkspaces()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Content });
@@ -227,7 +225,7 @@ public class AnalyticsRunQueryTests
             groups.Sum(g => g.Count).ShouldBe(1);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsEveryWorkspaceWithNoScope()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
@@ -235,7 +233,7 @@ public class AnalyticsRunQueryTests
             groups.Sum(g => g.Count).ShouldBe(3);
         }
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsOneWorkspaceWhenAskedForIt()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce });
@@ -257,7 +255,7 @@ public class AnalyticsRunQueryTests
 
         public void Dispose() => _db.Dispose();
 
-        [Fact(Skip = "Pending")]
+        [Fact]
         public async Task CountsItsRunsInItsCurrentWorkspace()
         {
             var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce });
@@ -266,4 +264,3 @@ public class AnalyticsRunQueryTests
         }
     }
 }
-#endif

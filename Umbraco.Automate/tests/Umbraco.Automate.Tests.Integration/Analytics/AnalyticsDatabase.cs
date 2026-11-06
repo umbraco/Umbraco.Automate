@@ -1,6 +1,4 @@
 // Stories AN-2 to AN-6: docs/plans/analytics/STORIES.md
-// Compiled out until T2 adds the analytics repository. The T2 builder removes the #if/#endif lines.
-#if AUTOMATE_ANALYTICS
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Notifications.Channels;
@@ -78,6 +76,13 @@ internal sealed class AnalyticsDatabase : IDisposable
         }
 
         AutomationRun run = builder.Build();
+
+        // The builder always sets a start time; a run that never started is built by clearing it.
+        if (!startedUtc.HasValue)
+        {
+            run.StartedUtc = null;
+        }
+
         _runs.SaveAsync(run).GetAwaiter().GetResult();
         return run;
     }
@@ -93,6 +98,7 @@ internal sealed class AnalyticsDatabase : IDisposable
     {
         var stepRun = new StepRun
         {
+            Id = Guid.NewGuid(),
             RunId = run.Id,
             StepId = Guid.NewGuid(),
             ActionAlias = actionAlias,
@@ -103,7 +109,7 @@ internal sealed class AnalyticsDatabase : IDisposable
             RetryCount = retryCount,
             ErrorCategory = errorCategory,
         };
-        _runs.SaveStepRunAsync(stepRun).GetAwaiter().GetResult();
+        _runs.AddStepRunAsync(stepRun).GetAwaiter().GetResult();
     }
 
     public void Dispose() => _fixture.Dispose();
@@ -124,4 +130,3 @@ internal sealed class AnalyticsDatabase : IDisposable
                 new NotificationChannelCollection(Array.Empty<INotificationChannel>)));
     }
 }
-#endif
