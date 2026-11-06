@@ -45,6 +45,9 @@ public sealed class BindingEvaluator
     /// <param name="template">The template string containing bindings.</param>
     /// <param name="data">The run data to resolve paths against.</param>
     /// <returns>The evaluated string with all bindings resolved.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// A binding uses a filter alias that no registered filter declares.
+    /// </exception>
     public string Evaluate(string template, IReadOnlyDictionary<string, object?> data)
     {
         if (string.IsNullOrEmpty(template))
@@ -68,10 +71,14 @@ public sealed class BindingEvaluator
 
             foreach (var filter in token.Filters)
             {
-                if (_filters.TryGetValue(filter.Alias, out var filterImpl))
+                // An unknown alias is almost always a typo. Passing the value through unfiltered
+                // would let the run carry on with data the author never meant to send.
+                if (!_filters.TryGetValue(filter.Alias, out var filterImpl))
                 {
-                    value = filterImpl.Apply(value, filter.Args);
+                    throw new UnknownBindingFilterException(filter.Alias, token.Path);
                 }
+
+                value = filterImpl.Apply(value, filter.Args);
             }
 
             var replacement = Stringify(value);
@@ -82,12 +89,22 @@ public sealed class BindingEvaluator
     }
 
     /// <summary>
+    /// Gets whether a binding filter with this alias is registered, using the same
+    /// case-insensitive match that <see cref="Evaluate"/> applies, so publish validation and the
+    /// run agree on which filter names exist.
+    /// </summary>
+    internal bool IsKnownFilter(string alias) => _filters.ContainsKey(alias);
+
+    /// <summary>
     /// Evaluates a template that is expected to be a single unfiltered binding
     /// (e.g. <c>${ steps.x.matches }</c>) and returns the raw resolved value —
     /// useful for callers that need to inspect collection emptiness or types
     /// rather than a stringified form. Templates with surrounding text or filters
     /// fall back to the string-producing <see cref="Evaluate"/>.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// A binding uses a filter alias that no registered filter declares.
+    /// </exception>
     public object? EvaluateRaw(string template, IReadOnlyDictionary<string, object?> data)
     {
         if (string.IsNullOrEmpty(template))

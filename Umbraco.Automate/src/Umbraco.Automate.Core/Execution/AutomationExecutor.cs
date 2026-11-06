@@ -2,11 +2,14 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Conditions;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Diagnostics;
+using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 
 namespace Umbraco.Automate.Core.Execution;
@@ -25,8 +28,10 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly IRateLimitService _rateLimitService;
     private readonly ICircuitBreakerService _circuitBreaker;
     private readonly ConditionEvaluator _conditionEvaluator;
+    private readonly BindingEvaluator _bindingEvaluator;
     private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly AutomateMetrics _metrics;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutomationExecutor> _logger;
 
     public AutomationExecutor(
@@ -38,8 +43,10 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         IRateLimitService rateLimitService,
         ICircuitBreakerService circuitBreaker,
         ConditionEvaluator conditionEvaluator,
+        BindingEvaluator bindingEvaluator,
         IOptions<ExecutionOptions> executionOptions,
         AutomateMetrics metrics,
+        IEventAggregator eventAggregator,
         ILogger<AutomationExecutor> logger)
     {
         _workflowHost = workflowHost;
@@ -50,8 +57,10 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _rateLimitService = rateLimitService;
         _circuitBreaker = circuitBreaker;
         _conditionEvaluator = conditionEvaluator;
+        _bindingEvaluator = bindingEvaluator;
         _executionOptions = executionOptions;
         _metrics = metrics;
+        _eventAggregator = eventAggregator;
         _logger = logger;
     }
 
@@ -149,6 +158,14 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             ExecutionContext = executionContext,
         };
 
+        // A connection filter that uses an unknown binding filter fails the run before it starts.
+        // Filters on connections from the trigger are checked first, so they fail with a clear
+        // error instead of comparing the unfiltered value.
+        if (await FailRunOnUnknownConnectionFiltersAsync(automation, run, c => c.SourceStepId == Guid.Empty, cancellationToken))
+        {
+            return run.Id;
+        }
+
         // Trigger-edge filters can't be wired as ValueOutcomes (the trigger isn't a
         // WorkflowCore step), so evaluate them here against trigger data only.
         // If the entry edge's filter rejects the run, complete it without starting
@@ -165,6 +182,16 @@ internal sealed class AutomationExecutor : IAutomationExecutor
                 "Skipped run {RunId} for automation {AutomationName}: trigger-edge filter evaluated to false",
                 run.Id, automation.Name);
 
+            return run.Id;
+        }
+
+        // Filters on connections between steps run inside WorkflowCore outcome expressions after the
+        // source step has completed. An exception there cannot fail the run (WorkflowCore marks the
+        // workflow Complete once every pointer has ended, overriding a Terminate), so the connection
+        // would be skipped silently. The check is static, so it is made up front, but only after the
+        // trigger-edge filter: a run that filter skips stays a quiet skip, not a failure alert.
+        if (await FailRunOnUnknownConnectionFiltersAsync(automation, run, c => c.SourceStepId != Guid.Empty, cancellationToken))
+        {
             return run.Id;
         }
 
@@ -193,6 +220,58 @@ internal sealed class AutomationExecutor : IAutomationExecutor
             workflowId, instanceId, run.Id, workspace.ServiceAccountKey);
 
         return run.Id;
+    }
+
+    /// <summary>
+    /// Fails the run before it starts when a filter on one of the selected connections uses a binding
+    /// filter alias that does not exist. Returns whether the run was failed.
+    /// </summary>
+    private async Task<bool> FailRunOnUnknownConnectionFiltersAsync(
+        Automation automation,
+        AutomationRun run,
+        Func<StepConnection, bool> include,
+        CancellationToken cancellationToken)
+    {
+        var errors = UnknownBindingFilterScanner.GetConnectionFilterErrors(automation, _bindingEvaluator, include);
+        if (errors.Count == 0)
+        {
+            return false;
+        }
+
+        await FailRunBeforeStartAsync(automation, run, string.Join(" ", errors), cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Fails a run before any workflow exists for it. No step runs, so RunFinalizer never sees this
+    /// run: it is finalized here instead, and
+    /// <see cref="AutomationRunCompletedNotification"/> is published as RunFinalizer would, so
+    /// failure alerts and the circuit breaker still count it.
+    /// </summary>
+    private async Task FailRunBeforeStartAsync(
+        Automation automation,
+        AutomationRun run,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogError(
+            "Run {RunId} for automation {AutomationName} failed before it started: {Error}",
+            run.Id, automation.Name, error);
+
+        run.Status = AutomationRunStatus.Failed;
+        run.CompletedUtc = DateTime.UtcNow;
+        run.Error = error;
+        await _runRepository.SaveAsync(run, cancellationToken);
+
+        _metrics.RunFailed(automation.Alias);
+        if (run.StartedUtc.HasValue)
+        {
+            _metrics.RecordRunDuration((run.CompletedUtc.Value - run.StartedUtc.Value).TotalMilliseconds, automation.Alias);
+        }
+
+        await _eventAggregator.PublishAsync(
+            new AutomationRunCompletedNotification(run, new EventMessages()),
+            cancellationToken);
     }
 
     /// <summary>
