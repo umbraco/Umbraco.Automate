@@ -1,0 +1,15 @@
+# Build log
+
+- **T1** `ab4ccc0b`: added `ResolvingPooledDbContextFactory`, `PlaceholderConnectionState` and the shared `AddAutomatePooledDbContext` helper. Core and OpenIddict build. `AmbientDbContextFactoryCompositionTests` (8) and OpenIddict `PooledDbContextOptionsTests` pass. Review PASS: the flag is always set before the wrapper reads it, checked against EF Core 10.0.10's source.
+- **T2** `cf03bc57`: core registers through the shared helper. 14 S1-S3 specs active and green. Full suite green (2,391 unit, 286 integration). Review FAIL on six unused `using` lines; fixed in round 2, then PASS.
+- **T3** `67e5c66e`: OpenIddict registers through the shared helper. 4 S4 specs active and green. `Enlist` is private behind the helper, with an `[Obsolete]` exact-signature overload for released OpenIddict 18.1.x, covered by a test. OpenIddict suite green (132 unit, 15 integration), Core suite green (2,391 unit, 287 integration). Review FAIL (binary break for OpenIddict 18.1.5), fixed in round 2, then PASS. The signature was checked by reflection on the built DLL.
+- **T4** `1ed50232`: the engineering-spec persistence paragraph now covers the helper, the resolving factory and OpenIddict. Names checked against the code. Docs only, so it's reviewed in the whole-feature pass.
+- **T5** (smoke, no code): the brief's Repro on a fresh demo (`demos/v18-531/`, no connection strings, `UseNamedConnectionString: umbracoDbDSN`, SQLite, port 44391, listener checked as this worktree's). All four S5 criteria hold in one process:
+  - **AC1:** both new warnings logged at boot. Install completed: `RestartRuntimeStep`, 11 Automate migrations, then "Umbraco Automate found its database connection string and is now using it." The site stayed up (HTTP 200).
+  - **AC2:** backoffice login succeeded (it returned 500 before the fix).
+  - **AC3:** API user, workspace (201), Manual automation with a Log Message step (201), publish (200) and trigger (202). The run reached Completed and logged "Hello from #531 smoke".
+  - **AC4:** OAuth cleanup ran at boot + 3 minutes. OpenIddict logged "found its database connection string", with no cleanup error.
+  - No "no such table", ERR or FTL lines anywhere in the log.
+  - **Demo setup:** the API user, workspace and automation were created through the Management API from the logged-in backoffice session, because a fresh install has no API user for the workspace's service account.
+- **T6** (no code): filed as #569; drafted the follow-up issue "Engine: A stuck-run recovery error stops the whole site" (`WorkflowHostLifecycle.cs:46`) for Rick to approve before filing. It's listed in the PR's "Left out".
+- **Whole-feature review** round 1 FAIL (OpenIddict's Core floor wasn't tracked). `f170bce7` (refactor): one flag read on the hot path, a no-rename warning on the shim, tests renamed for the helper, a redundant test dropped. All suites green (Core 2,391 + 286, OpenIddict 132 + 15). Plan docs: T8 added, ARCHITECTURE.md brought up to date.
