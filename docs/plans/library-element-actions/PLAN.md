@@ -79,6 +79,6 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
 
 ## Docs
 
-- [ ] **T15** - story: STORY-1. Update `docs/identity-ownership-permissions.md` with the element and folder members on the authorizer, the folder service, and the trashed-element rule. Add a Library row to the provider table in `docs/functional-overview.md`. Draft the UmbracoDocs change for the built-in actions page in BUILD-LOG. **Human gate:** Rick opens the UmbracoDocs PR.
+- [x] **T15** - story: STORY-1. Update `docs/identity-ownership-permissions.md` with the element and folder members on the authorizer, the folder service, and the trashed-element rule. Add a Library row to the provider table in `docs/functional-overview.md`. Draft the UmbracoDocs change for the built-in actions page in BUILD-LOG. **Human gate:** Rick opens the UmbracoDocs PR.
   Acceptance: the docs name every member T2 added; the links resolve.
   depends-on: T2, T11

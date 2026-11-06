@@ -47,3 +47,66 @@
   - **Round 2 PASS:** the page renders a unique old value first; after Update + Publish Element, a fresh request shows the new value.
   - **R14 is answered:** publishing an element refreshes pages that already rendered it, and no cache refresh code is needed. (BRIEF unknown; recorded in DECISION-LOG.)
   - Acceptance: `automation.library-elements.spec.ts` 15/15 with no reruns.
+- **T15** `3f7b4003` (06-11-2026): docs. Three review rounds.
+  - **Round 1 FAIL:** a stale "content only" permission row, a trashed-rule sentence that was wrong for the Get actions, and Publish/Unpublish described as always a validation failure. The UmbracoDocs draft also had PascalCase outputs and didn't match the target page's structure.
+  - **Round 2:** the repo docs passed; the draft still needed the linked workspaces.md updated, and said `cultures` was "empty" where it's null. The orchestrator fixed both in the draft (it's outside the repo).
+  - **Repo changes:** `identity-ownership-permissions.md` gained a Library elements and folders section naming every T2 member. `functional-overview.md` got a Library row. The `IAutomationActionAuthorizer` summary names both element services.
+  - **Human gate:** the UmbracoDocs draft is below, for Rick to open as a PR.
+
+## UmbracoDocs draft (for Rick)
+
+> AI-assisted draft — pending review. Not published. Rick opens the UmbracoDocs PR.
+>
+> Probable target: `18/umbraco-automate/concepts/actions.md`, plus one edit to `18/umbraco-automate/concepts/workspaces.md`. Rick to confirm. Three changes, below. The page has no per-action output sections, so none are added. Outputs are mentioned in prose only, in camelCase as authors write bindings.
+
+#### Insertion 1: new `### Library` table
+
+Place it after the `### Media` table and before the line "Add-on packages contribute additional actions."
+
+##### Library
+
+| Action                       | Purpose                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| **Create Element**           | Create a Library element in a folder or at the Library root (draft save).                    |
+| **Get Element**              | Fetch a published Library element and expose its properties for downstream steps.            |
+| **Get Element Property**     | Read a single property value from a published Library element.                              |
+| **Update Element Property**  | Write a single property value on a Library element (draft save).                             |
+| **Publish Element**          | Publish a Library element.                                                                   |
+| **Unpublish Element**        | Unpublish a Library element.                                                                 |
+
+#### Insertion 2: new `## Library Elements` section
+
+Place it after the `## Create and Move Items` section and before `## Step Behaviour`.
+
+#### Library Elements
+
+The Library actions need Umbraco 18, because earlier versions have no Library. The service account of the workspace needs access to the **Library** section, and the permission for the action on the element or folder it works on:
+
+| Action                                           | Permission |
+| ------------------------------------------------ | ---------- |
+| **Get Element**, **Get Element Property**        | Read       |
+| **Create Element**                               | Create     |
+| **Update Element Property**                      | Update     |
+| **Publish Element**                              | Publish    |
+| **Unpublish Element**                            | Unpublish  |
+
+**Create Element** saves a new draft. Add a **Publish Element** step after it to publish the element. Leave **Folder** empty to create the element at the Library root. The permission is then checked on the Library root, which needs root access for the service account. See [Service-Account Permissions](workspaces.md#service-account-permissions). You can only create element types that have **Allow in Library** turned on.
+
+Set **Culture** when the element type varies by culture, for example `en-US`. Enter **Property Values** as a JSON object of property aliases and values, in the same format as **Create Content**. See [Create and Move Items](actions.md#create-and-move-items). The step outputs `elementKey`, `name`, `contentTypeKey`, `contentTypeAlias`, and `folderKey`. The **Folder not found** and **Element type not found** outcomes run when the folder or the element type no longer exists.
+
+**Get Element** outputs `elementKey`, `name`, `contentTypeAlias`, `contentTypeKey`, `culture`, `availableCultures`, `createDate`, `updateDate`, `creatorKey`, `writerKey`, and `properties`. **Get Element Property** outputs `elementKey`, `propertyAlias`, `culture`, `value`, and `hasValue`. **Update Element Property** outputs `elementKey`, `propertyAlias`, `culture`, `segment`, and `previousValue`. **Publish Element** and **Unpublish Element** output `elementKey` and `cultures`. `cultures` has no value (null) when **Unpublish Element** unpublished all cultures.
+
+Set **Culture** on the get and update actions for a variant element, and leave it empty for an invariant one. Set **Segment** on **Update Element Property** for a segmented element. For **Publish Element** and **Unpublish Element**, enter **Cultures** as comma-separated codes, for example `en-US,da-DK`. Leave it empty to publish an invariant element, or to unpublish all cultures.
+
+An element or folder that is missing or in the recycle bin is treated as not found. This applies to an account confined to a start node, and to an account with root access. The get and update actions, and **Create Element** for its folder, run their **Not found** or **Folder not found** outcome. **Get Element** and **Get Element Property** also run it when the element is not published. **Get Element Property** and **Update Element Property** run **Property not found** when the element type has no property with that alias. **Publish Element** and **Unpublish Element** have no outcomes, so the step fails.
+
+#### Change 3: `workspaces.md`, "Service-Account Permissions"
+
+Insertion 2 links here for root access, and this section still says the granular checks are for content only. Make these three edits in the layer table and the sentence under it.
+
+- **Start node / Browse permission** row, first cell: change `(content and media triggers and actions)` to `(content, media and Library triggers and actions)`.
+- **Granular permission** row:
+  - First cell: change `(content actions only)` to `(content and Library actions)`.
+  - Second cell: change `(Create, Publish, Update, Move)` to `(Create, Publish, Update, Move, and for Library elements Read and Unpublish)`.
+  - Third cell: append ` The Library actions check the same way on the element, or on the folder for **Create Element**.`
+- The sentence under the table: change "at the content or media root" to "at the content, media or Library root".
