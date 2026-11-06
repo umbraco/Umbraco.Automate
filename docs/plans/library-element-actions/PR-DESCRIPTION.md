@@ -1,17 +1,5 @@
 [Discussion #510](https://github.com/umbraco/Umbraco.Automate/discussions/510) | [Plan folder](https://github.com/umbraco/Umbraco.Automate/tree/24eef9f1a744577a769a6eaf4b9c79facabbdc1a/docs/plans/library-element-actions)
 
-> [!IMPORTANT]
-> **1 choice was made without you.** Please check it.
->
-> **1. Design: the new trigger types are public**
->
-> Plan said: one trigger per content trigger, "same settings and output shape". Nothing about visibility.
->
-> Built: the 4 triggers, their 3 settings classes and 3 output classes are `public sealed`, as `ContentSavedTrigger` and its settings and output are ([ElementSavedTrigger.cs:18](https://github.com/umbraco/Umbraco.Automate/blob/24eef9f1a744577a769a6eaf4b9c79facabbdc1a/Umbraco.Automate/src/Umbraco.Automate.Core/Triggers/BuiltIn/ElementSavedTrigger.cs#L18), [ElementSavedTriggerOutput.cs:10](https://github.com/umbraco/Umbraco.Automate/blob/24eef9f1a744577a769a6eaf4b9c79facabbdc1a/Umbraco.Automate/src/Umbraco.Automate.Core/Triggers/BuiltIn/ElementSavedTriggerOutput.cs#L10)). The dispatch marker, the move check and the output mapping are internal. Package validation is off, so a later rename needs an `[Obsolete]` path by hand.
->
-> - **a. Keep them public, matching the content triggers** *(recommended)*
-> - b. Make them internal until someone asks to bind to them in code
-
 > [!NOTE]
 > **Rick's earlier calls on this PR.**
 >
@@ -28,6 +16,7 @@
 >
 > On the triggers:
 >
+> - The 4 triggers, their settings and output classes are public, like `ContentSavedTrigger` and its settings and output, so third parties can bind to them.
 > - Element Saved skips moves, trash and restore, as Content Saved does. A property aliased `parentId` or `trashed` makes an edit to it look like a move; that's documented, not guarded.
 > - Element Unpublished fires when a restore unpublishes an element, and the docs say so.
 > - No Element Batch Published or Batch Unpublished: the CMS raises those one element at a time, so they'd always hold one item. Not a CMS bug; content works the same way.
