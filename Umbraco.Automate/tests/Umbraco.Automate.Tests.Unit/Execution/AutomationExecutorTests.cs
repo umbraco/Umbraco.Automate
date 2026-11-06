@@ -11,9 +11,12 @@ using Umbraco.Automate.Core.Diagnostics;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Execution.ControlFlow;
 using Umbraco.Automate.Core.Bindings;
+using Umbraco.Automate.Core.Bindings.Filters;
+using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Testing.Builders;
+using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -25,6 +28,7 @@ public class AutomationExecutorTests
     private readonly Mock<IWorkflowRegistry> _workflowRegistry = new();
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
     private readonly Mock<IWorkspaceService> _workspaceService = new();
+    private readonly Mock<IEventAggregator> _eventAggregator = new();
     private readonly Umbraco.Automate.Core.Configuration.ExecutionOptions _executionOptions = new();
     private readonly AutomationExecutor _executor;
 
@@ -40,7 +44,7 @@ public class AutomationExecutorTests
         var actions = CreateActionCollection(action.Object);
         var controlFlow = new ControlFlowCollection(Enumerable.Empty<IControlFlow>);
         var pipeline = new ActionMiddlewarePipeline(new ActionMiddlewareCollection(Array.Empty<IActionMiddleware>));
-        var evaluator = new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>));
+        var evaluator = new BindingEvaluator(new BindingFilterCollection(() => [new LowercaseFilter()]));
         var conditionEvaluator = new ConditionEvaluator(evaluator);
 
         var services = new ServiceCollection();
@@ -113,8 +117,10 @@ public class AutomationExecutorTests
             Mock.Of<IRateLimitService>(),
             circuitBreaker.Object,
             conditionEvaluator,
+            evaluator,
             Microsoft.Extensions.Options.Options.Create(_executionOptions),
             metrics,
+            _eventAggregator.Object,
             Mock.Of<ILogger<AutomationExecutor>>());
     }
 
@@ -555,6 +561,127 @@ public class AutomationExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TriggerEdgeFilterWithUnknownBindingFilter_DoesNotStartTheWorkflow()
+    {
+        var automation = CreateAutomationWithTriggerEdgeFilter("${ trigger.country | lowercse }", "dk");
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.IsAny<string>(),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TriggerEdgeFilterWithUnknownBindingFilter_FailsTheRun()
+    {
+        var automation = CreateAutomationWithTriggerEdgeFilter("${ trigger.country | lowercse }", "dk");
+        var saved = CaptureSavedRuns();
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        saved[^1].Status.ShouldBe(AutomationRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TriggerEdgeFilterWithUnknownBindingFilter_RecordsAnErrorNamingTheFilter()
+    {
+        var automation = CreateAutomationWithTriggerEdgeFilter("${ trigger.country | lowercse }", "dk");
+        var saved = CaptureSavedRuns();
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        saved[^1].Error.ShouldBe("The filter on the connection from the trigger to 'Step' uses the binding filter 'lowercse', which does not exist.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TriggerEdgeFilterWithUnknownBindingFilter_PublishesRunCompleted()
+    {
+        // Failure alerts and the circuit breaker both listen for this notification, so a run that
+        // fails before its workflow starts must still raise it.
+        var automation = CreateAutomationWithTriggerEdgeFilter("${ trigger.country | lowercse }", "dk");
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        _eventAggregator.Verify(p => p.PublishAsync(
+            It.Is<AutomationRunCompletedNotification>(n => n.Run.Status == AutomationRunStatus.Failed),
+            It.IsAny<CancellationToken>()));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StepConnectionFilterWithUnknownBindingFilter_DoesNotStartTheWorkflow()
+    {
+        // A filter between two steps runs after the source step has completed, where WorkflowCore
+        // can't fail the run, so it is checked before the workflow starts.
+        var automation = CreateAutomationWithStepConnectionFilter("${ trigger.country | lowercse }");
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.IsAny<string>(),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StepConnectionFilterWithUnknownBindingFilter_RecordsAnErrorNamingTheConnectionAndFilter()
+    {
+        var automation = CreateAutomationWithStepConnectionFilter("${ trigger.country | lowercse }");
+        var saved = CaptureSavedRuns();
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        saved[^1].Error.ShouldBe("The filter on the connection from 'First' to 'Second' uses the binding filter 'lowercse', which does not exist.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TriggerEdgeSkipsTheRun_UnknownFilterDownstream_StaysAQuietSkip()
+    {
+        // A run the trigger-edge filter skips never reaches the downstream connection, so it must
+        // not turn into a failure alert on every trigger fire.
+        StepConfiguration first = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("First");
+        StepConfiguration second = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Second");
+        var automation = new AutomationBuilder()
+            .AddStep(first)
+            .AddStep(second)
+            .WithConnection(Guid.Empty, first.Id, outcome: null, filter: MakeEqualsFilter("${ trigger.country }", "DK"))
+            .WithConnection(first.Id, second.Id, outcome: null, filter: MakeEqualsFilter("${ trigger.country | lowercse }", "dk"))
+            .Build();
+        var saved = CaptureSavedRuns();
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "SE" }, CancellationToken.None);
+
+        saved[^1].Status.ShouldBe(AutomationRunStatus.Completed);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_StepConnectionFilterWithKnownBindingFilter_StartsTheWorkflow()
+    {
+        var automation = CreateAutomationWithStepConnectionFilter("${ trigger.country | lowercase }");
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.IsAny<string>(),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TriggerEdgeFilterWithKnownBindingFilter_StartsTheWorkflow()
+    {
+        var automation = CreateAutomationWithTriggerEdgeFilter("${ trigger.country | lowercase }", "dk");
+
+        await _executor.ExecuteAsync(automation, "user", null, new Dictionary<string, object?> { ["country"] = "DK" }, CancellationToken.None);
+
+        _workflowHost.Verify(h => h.StartWorkflow(
+            It.IsAny<string>(),
+            It.IsAny<AutomationWorkflowData>(),
+            It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_LargeTriggerOutput_PutsOnlyAMarkerInTheWorkflowData()
     {
         // The payload must live once on the run record; the workflow data — re-serialized by
@@ -665,6 +792,27 @@ public class AutomationExecutorTests
                 },
             ],
         };
+
+    private static Automation CreateAutomationWithTriggerEdgeFilter(string left, string right)
+    {
+        StepConfiguration step = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Step");
+        return new AutomationBuilder()
+            .AddStep(step)
+            .WithConnection(Guid.Empty, step.Id, outcome: null, filter: MakeEqualsFilter(left, right))
+            .Build();
+    }
+
+    private static Automation CreateAutomationWithStepConnectionFilter(string left)
+    {
+        StepConfiguration first = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("First");
+        StepConfiguration second = new StepConfigurationBuilder().WithActionAlias("testAction").WithName("Second");
+        return new AutomationBuilder()
+            .AddStep(first)
+            .AddStep(second)
+            .WithTriggerConnection(first.Id)
+            .WithConnection(first.Id, second.Id, outcome: null, filter: MakeEqualsFilter(left, "dk"))
+            .Build();
+    }
 
     private static Automation CreateAutomation(string actionAlias) =>
         new AutomationBuilder()
