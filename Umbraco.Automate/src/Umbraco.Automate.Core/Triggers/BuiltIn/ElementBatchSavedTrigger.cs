@@ -26,14 +26,14 @@ public sealed class ElementBatchSavedTrigger
     /// <inheritdoc />
     public override IEnumerable<TriggerEvent> MapEvent(ElementSavedNotification notification)
     {
-        var entities = notification.SavedEntities.Where(ElementSavedTriggerOutput.IsContentSave).ToList();
+        var entities = notification.SavedEntities.Where(ElementSavedTrigger.IsEditSave).ToList();
         if (entities.Count == 0)
         {
             yield break;
         }
 
         var items = entities
-            .Select(element => ElementSavedTriggerOutput.From(element, notification.SavedCultures))
+            .Select(element => ElementSavedTrigger.ToOutput(element,notification.SavedCultures))
             .ToList();
 
         // Draft saves reuse the same VersionId per item; UpdateDate is what advances per save,

@@ -176,7 +176,7 @@ Outputs, in camelCase as authors write bindings:
 
 Things that differ from the content triggers:
 
-- **Element Saved** and **Element Batch Saved** don't fire when a save only moves an element to another folder, sends it to the recycle bin, or restores it.
+- **Element Saved** and **Element Batch Saved** don't fire when a save only moves an element to another folder, sends it to the recycle bin, or restores it. A property with the alias `parentId` or `trashed` on an element type makes edits to it look like a move, so avoid those aliases.
 - Restoring a published element from the recycle bin unpublishes it, and **Element Unpublished** fires. Restoring a folder fires it once for each published element inside. Restoring a published document unpublishes it without an event.
 
 A trigger only starts for elements the service account of the workspace can read. The account needs the **Library** section, a Library start node that covers the element, and the Read permission, including permissions set on a Library folder. **Element Batch Saved** leaves out the elements the account can't read, and doesn't start when none are left. An element in the recycle bin is hidden from an account whose Library start node is a folder. See [Service-Account Permissions](workspaces.md#service-account-permissions).

@@ -51,26 +51,4 @@ public sealed class ElementSavedTriggerOutput : IElementScopedTriggerOutput
     public string[]? Cultures { get; init; }
 
     Guid? IElementScopedTriggerOutput.GetElementKey() => ElementKey;
-
-    internal static ElementSavedTriggerOutput From(
-        IElement element,
-        IReadOnlyDictionary<Guid, IReadOnlyCollection<string>>? savedCultures)
-        => new()
-        {
-            ElementKey = element.Key,
-            ElementName = element.Name,
-            ContentTypeKey = element.ContentType?.Key,
-            ContentTypeAlias = element.ContentType?.Alias,
-            IsNew = element.CreateDate == element.UpdateDate,
-            Cultures = ContentCultureHelpers.GetSavedCultures(element, savedCultures),
-        };
-
-    /// <summary>
-    /// Whether the save is a content save rather than a move, trash or restore. The CMS raises
-    /// the Saved notification for those too, with ParentId and/or Trashed dirty. A new element's
-    /// ParentId is set through the change-tracking setter, so a create always counts as a save.
-    /// </summary>
-    internal static bool IsContentSave(IElement element)
-        => element.CreateDate == element.UpdateDate
-            || !(element.WasPropertyDirty("ParentId") || element.WasPropertyDirty("Trashed"));
 }

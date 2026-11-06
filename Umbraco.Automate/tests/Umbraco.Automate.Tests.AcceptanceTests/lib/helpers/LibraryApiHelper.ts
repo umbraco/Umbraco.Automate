@@ -283,7 +283,7 @@ export class LibraryApiHelper {
       await this.api.userGroup.delete(id);
     }
 
-    const recycleBin = `${this.api.baseUrl}/umbraco/management/api/v1/recycle-bin/element`;
+    const recycleBin = `${this.managementApi}/recycle-bin/element`;
     for (const id of this.documentIds) {
       await this.api.document.delete(id);
     }
