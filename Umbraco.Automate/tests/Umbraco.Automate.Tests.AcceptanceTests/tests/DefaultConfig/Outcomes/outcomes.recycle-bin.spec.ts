@@ -177,8 +177,6 @@ test.describe('Content and media in the recycle bin', () => {
 });
 
 /**
- * Pending until T13 (docs/plans/library-element-actions/PLAN.md).
- *
  * The same rule for Library elements (R5, R6): an element or folder in the Library recycle bin
  * counts as missing for every service account. `automateServiceAccountWorkspace` runs as
  * Administrators, which has root Library access, as the content cases above do. Create Element
@@ -187,7 +185,7 @@ test.describe('Content and media in the recycle bin', () => {
  */
 test.describe('Library elements in the recycle bin', () => {
   // STORY-2 AC9
-  test.fixme('Get Element takes the notFound path for a trashed element', async ({
+  test('Get Element takes the notFound path for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -211,7 +209,7 @@ test.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-3 AC7
-  test.fixme('Get Element Property takes the notFound path for a trashed element', async ({
+  test('Get Element Property takes the notFound path for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -235,7 +233,7 @@ test.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-4 AC14
-  test.fixme('Update Element Property takes the notFound path for a trashed element', async ({
+  test('Update Element Property takes the notFound path for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -259,7 +257,7 @@ test.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-5 AC9
-  test.fixme('Publish Element fails the step for a trashed element', async ({
+  test('Publish Element fails the step for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -282,7 +280,7 @@ test.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-5 AC9
-  test.fixme('Publish Element leaves a trashed element unpublished', async ({
+  test('Publish Element leaves a trashed element unpublished', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     umbracoApi,
@@ -306,7 +304,7 @@ test.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-6 AC7
-  test.fixme('Unpublish Element fails the step for a trashed element', async ({
+  test('Unpublish Element fails the step for a trashed element', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -331,7 +329,7 @@ test.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-7 AC11
-  test.fixme('Create Element takes the parentNotFound path under a trashed folder', async ({
+  test('Create Element takes the parentNotFound path under a trashed folder', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateApi,
     library
@@ -356,7 +354,7 @@ test.describe('Library elements in the recycle bin', () => {
   });
 
   // STORY-7 AC12
-  test.fixme('Create Element takes the parentNotFound path under a trashed folder for a folder-scoped account', async ({
+  test('Create Element takes the parentNotFound path under a trashed folder for a folder-scoped account', async ({
     umbracoAutomateApi,
     library
   }) => {

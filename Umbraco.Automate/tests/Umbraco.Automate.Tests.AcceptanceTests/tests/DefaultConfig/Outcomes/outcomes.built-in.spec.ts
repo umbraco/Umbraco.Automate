@@ -165,10 +165,9 @@ test.describe('Built-in content and media outcomes', () => {
     });
   });
 
-  // Pending until T13 (docs/plans/library-element-actions/PLAN.md).
   test.describe('Get Element', () => {
     // STORY-2 AC8
-    test.fixme('takes the notFound path for an element key that does not exist', async ({
+    test('takes the notFound path for an element key that does not exist', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi
     }) => {
@@ -185,10 +184,9 @@ test.describe('Built-in content and media outcomes', () => {
     });
   });
 
-  // Pending until T13 (docs/plans/library-element-actions/PLAN.md).
   test.describe('Get Element Property', () => {
     // STORY-3 AC6
-    test.fixme('takes the notFound path for an element key that does not exist', async ({
+    test('takes the notFound path for an element key that does not exist', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi
     }) => {
@@ -206,7 +204,7 @@ test.describe('Built-in content and media outcomes', () => {
     });
 
     // STORY-3 AC8
-    test.fixme('takes the propertyNotFound path for a property the element type does not have', async ({
+    test('takes the propertyNotFound path for a property the element type does not have', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi,
       library
@@ -229,10 +227,9 @@ test.describe('Built-in content and media outcomes', () => {
     });
   });
 
-  // Pending until T13 (docs/plans/library-element-actions/PLAN.md).
   test.describe('Update Element Property', () => {
     // STORY-4 AC1
-    test.fixme('writes the value to the element', async ({
+    test('writes the value to the element', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi,
       library
@@ -253,7 +250,7 @@ test.describe('Built-in content and media outcomes', () => {
     });
 
     // STORY-4 AC12
-    test.fixme('takes the notFound path for an element key that does not exist', async ({
+    test('takes the notFound path for an element key that does not exist', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi
     }) => {
@@ -272,7 +269,7 @@ test.describe('Built-in content and media outcomes', () => {
     });
 
     // STORY-4 AC16
-    test.fixme('takes the propertyNotFound path for a property the element type does not have', async ({
+    test('takes the propertyNotFound path for a property the element type does not have', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi,
       library
@@ -295,10 +292,9 @@ test.describe('Built-in content and media outcomes', () => {
     });
   });
 
-  // Pending until T13 (docs/plans/library-element-actions/PLAN.md).
   test.describe('Create Element', () => {
     // STORY-7 AC1
-    test.fixme('creates an element of the type and name in the folder', async ({
+    test('creates an element of the type and name in the folder', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi,
       library
@@ -329,7 +325,7 @@ test.describe('Built-in content and media outcomes', () => {
     });
 
     // STORY-7 AC1
-    test.fixme('takes the success path when the element is created', async ({
+    test('takes the success path when the element is created', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi,
       library
@@ -359,7 +355,7 @@ test.describe('Built-in content and media outcomes', () => {
     });
 
     // STORY-7 AC10
-    test.fixme('takes the parentNotFound path for a folder key that does not exist', async ({
+    test('takes the parentNotFound path for a folder key that does not exist', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi,
       library
@@ -386,7 +382,7 @@ test.describe('Built-in content and media outcomes', () => {
     });
 
     // STORY-7 AC14
-    test.fixme('takes the elementTypeNotFound path for an element type key that does not exist', async ({
+    test('takes the elementTypeNotFound path for an element type key that does not exist', async ({
       automateServiceAccountWorkspace,
       umbracoAutomateApi,
       library
