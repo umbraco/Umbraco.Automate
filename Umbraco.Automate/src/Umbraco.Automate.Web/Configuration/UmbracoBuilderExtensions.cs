@@ -20,6 +20,7 @@ using Umbraco.Automate.Web.Api.Management.Automation.Mapping;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Mapping;
 using Umbraco.Automate.Web.Api.Management.Common.Configuration;
 using Umbraco.Automate.Web.Api.Management.Common.Json;
+using Umbraco.Automate.Web.Api.Management.Metrics.Mapping;
 using Umbraco.Automate.Web.Api.Management.Run.Mapping;
 using Umbraco.Automate.Web.Api.Management.Connection.Mapping;
 using Umbraco.Automate.Web.Api.Management.Versioning.Mapping;
@@ -87,7 +88,8 @@ public static partial class UmbracoBuilderExtensions
             .Add<WorkspaceMapDefinition>()
             .Add<ConnectionMapDefinition>()
             .Add<WorkspaceGroupMapDefinition>()
-            .Add<VersioningMapDefinition>();
+            .Add<VersioningMapDefinition>()
+            .Add<AnalyticsMapDefinition>();
 
         return builder;
     }
