@@ -32,6 +32,9 @@
          Database.MigrateAsync — EF Core loads the migrations assembly by name at run time, so it has
          to be present in the test output. -->
     <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence.Sqlite\Umbraco.Automate.Persistence.Sqlite.csproj" />
+    <!-- Holds the SQL Server migrations, for the opt-in analytics speed test. Loaded by name at run
+         time, like the SQLite one. -->
+    <ProjectReference Include="..\..\src\Umbraco.Automate.Persistence.SqlServer\Umbraco.Automate.Persistence.SqlServer.csproj" />
     <ProjectReference Include="..\Umbraco.Automate.Tests.Common\Umbraco.Automate.Tests.Common.csproj" />
   </ItemGroup>
 

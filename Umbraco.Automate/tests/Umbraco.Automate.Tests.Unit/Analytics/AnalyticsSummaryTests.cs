@@ -28,9 +28,7 @@ public class AnalyticsSummaryTests
             harness.AddRuns(OnSecondOctober, AutomationRunStatus.Failed, 1);
             harness.AddRuns(OnSecondOctober, AutomationRunStatus.Running, 1);
             harness.AddRuns(OnSecondOctober, AutomationRunStatus.Suspended, 2);
-            harness.Repository
-                .Setup(r => r.GetMedianRunDurationMsAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), null, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(3000);
+            harness.MedianDurationMs = 3000;
             harness.Repository
                 .Setup(r => r.GetSuspendedRunCountAsync(null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(2);

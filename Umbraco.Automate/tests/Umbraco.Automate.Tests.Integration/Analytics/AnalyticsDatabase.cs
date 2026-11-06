@@ -28,12 +28,14 @@ internal sealed class AnalyticsDatabase : IDisposable
     private readonly EFCoreAutomationRepository _automations;
     private readonly EFCoreAutomationRunRepository _runs;
 
-    public AnalyticsDatabase()
+    public AnalyticsDatabase(int? maxSortedRows = null)
     {
         var factory = new TestDbContextFactory(_fixture.CreateContext);
         _automations = new EFCoreAutomationRepository(factory, CreateAutomationFactory());
         _runs = new EFCoreAutomationRunRepository(factory);
-        Repository = new EFCoreAutomateAnalyticsRepository(factory);
+        Repository = maxSortedRows is { } limit
+            ? new EFCoreAutomateAnalyticsRepository(factory, limit)
+            : new EFCoreAutomateAnalyticsRepository(factory);
     }
 
     public EFCoreAutomateAnalyticsRepository Repository { get; }

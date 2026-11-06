@@ -1,7 +1,5 @@
 // Story AN-1: docs/plans/analytics/STORIES.md
-// Compiled out until T4. The T4 builder removes the #if/#endif lines and writes the seeding.
-#if AUTOMATE_ANALYTICS
-using System.Diagnostics;
+using Xunit.Abstractions;
 
 namespace Umbraco.Automate.Tests.Integration.Analytics;
 
@@ -17,31 +15,49 @@ public class AnalyticsSpeedTests : IClassFixture<SeededSqlServerAnalyticsDatabas
 {
     private static readonly TimeSpan Target = TimeSpan.FromSeconds(2);
     private readonly SeededSqlServerAnalyticsDatabase _db;
+    private readonly ITestOutputHelper _output;
 
-    public AnalyticsSpeedTests(SeededSqlServerAnalyticsDatabase db) => _db = db;
+    public AnalyticsSpeedTests(SeededSqlServerAnalyticsDatabase db, ITestOutputHelper output)
+    {
+        _db = db;
+        _output = output;
+    }
 
-    [Fact(Skip = "Pending")]
+    [PerformanceFact]
     public async Task TheSummaryQueriesAnswerInUnderTwoSeconds()
     {
         TimeSpan took = await _db.TimeSecondCallAsync(_db.RunSummaryQueriesAsync);
 
+        _output.WriteLine($"Summary queries (all workspaces): {took.TotalMilliseconds:N0} ms");
         took.ShouldBeLessThan(Target);
     }
 
-    [Fact(Skip = "Pending")]
+    [PerformanceFact]
     public async Task TheAutomationQueriesAnswerInUnderTwoSeconds()
     {
         TimeSpan took = await _db.TimeSecondCallAsync(_db.RunAutomationQueriesAsync);
 
+        _output.WriteLine($"Automation queries (all workspaces): {took.TotalMilliseconds:N0} ms");
         took.ShouldBeLessThan(Target);
     }
 
-    [Fact(Skip = "Pending")]
+    [PerformanceFact]
     public async Task TheActionQueriesAnswerInUnderTwoSeconds()
     {
         TimeSpan took = await _db.TimeSecondCallAsync(_db.RunActionQueriesAsync);
 
+        _output.WriteLine($"Action queries (all workspaces): {took.TotalMilliseconds:N0} ms");
         took.ShouldBeLessThan(Target);
     }
+
+    [PerformanceFact]
+    public async Task OneWorkspaceTimingsAreReportedForReference()
+    {
+        TimeSpan summary = await _db.TimeSecondCallAsync(() => _db.RunSummaryQueriesAsync(_db.FirstWorkspaceScope));
+        TimeSpan automations = await _db.TimeSecondCallAsync(() => _db.RunAutomationQueriesAsync(_db.FirstWorkspaceScope));
+        TimeSpan actions = await _db.TimeSecondCallAsync(() => _db.RunActionQueriesAsync(_db.FirstWorkspaceScope));
+
+        _output.WriteLine(
+            $"One workspace: summary {summary.TotalMilliseconds:N0} ms, automations {automations.TotalMilliseconds:N0} ms, actions {actions.TotalMilliseconds:N0} ms");
+    }
 }
-#endif

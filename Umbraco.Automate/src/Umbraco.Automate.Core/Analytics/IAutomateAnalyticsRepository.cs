@@ -11,19 +11,12 @@ namespace Umbraco.Automate.Core.Analytics;
 internal interface IAutomateAnalyticsRepository
 {
     /// <summary>
-    /// Counts runs started in the window, grouped by UTC quarter hour and status.
+    /// Counts runs started in the window, grouped by UTC quarter hour and status, and gets the
+    /// median duration, in milliseconds, of finished runs started in the window that have a
+    /// recorded duration (<c>null</c> when there are none). One call, so the median's population
+    /// always matches the groups.
     /// </summary>
-    Task<IReadOnlyList<RunCountGroup>> GetRunCountGroupsAsync(
-        DateTime fromUtc,
-        DateTime toUtc,
-        IReadOnlySet<Guid>? workspaceIds,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Gets the median duration, in milliseconds, of finished runs started in the window that have a
-    /// recorded duration; <c>null</c> when there are none.
-    /// </summary>
-    Task<long?> GetMedianRunDurationMsAsync(
+    Task<RunSummaryAggregates> GetRunSummaryAggregatesAsync(
         DateTime fromUtc,
         DateTime toUtc,
         IReadOnlySet<Guid>? workspaceIds,

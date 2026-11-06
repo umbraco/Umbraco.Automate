@@ -24,12 +24,14 @@ internal sealed class AnalyticsServiceHarness
 
     public List<RunCountGroup> Groups { get; } = [];
 
+    public long? MedianDurationMs { get; set; }
+
     public AnalyticsServiceHarness()
     {
         Repository
-            .Setup(r => r.GetRunCountGroupsAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlySet<Guid>?>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetRunSummaryAggregatesAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<IReadOnlySet<Guid>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((DateTime from, DateTime to, IReadOnlySet<Guid>? _, CancellationToken _) =>
-                Groups.Where(g => g.QuarterStartUtc >= from && g.QuarterStartUtc < to).ToList());
+                new RunSummaryAggregates(Groups.Where(g => g.QuarterStartUtc >= from && g.QuarterStartUtc < to).ToList(), MedianDurationMs));
     }
 
     public void AddRuns(DateTime startedUtc, AutomationRunStatus status, int count = 1)

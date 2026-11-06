@@ -36,7 +36,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task CountsEveryRunThatStarted()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).Groups;
 
             groups.Sum(g => g.Count).ShouldBe(8);
         }
@@ -44,7 +44,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task CountsTheFailedRuns()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).Groups;
 
             groups.Where(g => g.Status == AutomationRunStatus.Failed).Sum(g => g.Count).ShouldBe(2);
         }
@@ -52,7 +52,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task GroupsByQuarterHourAndStatus()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).Groups;
 
             groups.Select(g => (g.QuarterStartUtc, g.Status, g.Count)).ShouldBe(
                 [
@@ -82,7 +82,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task LeavesItOut()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).Groups;
 
             groups.Sum(g => g.Count).ShouldBe(1);
         }
@@ -106,7 +106,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task ReturnsTheMedianRunTime()
         {
-            long? median = await _db.Repository.GetMedianRunDurationMsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            long? median = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).MedianDurationMs;
 
             median.ShouldBe(3000);
         }
@@ -130,9 +130,153 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task AveragesTheTwoMiddleRunTimes()
         {
-            long? median = await _db.Repository.GetMedianRunDurationMsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            long? median = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).MedianDurationMs;
 
             median.ShouldBe(2500);
+        }
+    }
+
+    public class GivenTheTwoMiddleRunTimesAreInDifferentBuckets : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenTheTwoMiddleRunTimesAreInDifferentBuckets()
+        {
+            Automation automation = _db.AddAutomation(Content);
+            foreach (var seconds in new[] { 1, 999, 1001, 2000 })
+            {
+                _db.AddRun(automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(seconds));
+            }
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task AveragesThem()
+        {
+            long? median = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).MedianDurationMs;
+
+            median.ShouldBe(1_000_000);
+        }
+    }
+
+    public class GivenMostRunsTakeAboutASecondAndAFewTakeDays : IDisposable
+    {
+        // A sort limit of 2 makes every level split its bucket again, down to single milliseconds.
+        private readonly AnalyticsDatabase _db = new(maxSortedRows: 2);
+
+        public GivenMostRunsTakeAboutASecondAndAFewTakeDays()
+        {
+            Automation automation = _db.AddAutomation(Content);
+            for (var i = 0; i < 10; i++)
+            {
+                _db.AddRun(automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromMilliseconds(1000 + (i * 37)));
+            }
+
+            for (var i = 1; i <= 3; i++)
+            {
+                _db.AddRun(automation, AutomationRunStatus.Failed, OnSecondOctober, TimeSpan.FromDays(i));
+            }
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task FindsTheExactMedianAmongTheSecondLongRuns()
+        {
+            // Thirteen runs: the seventh in order is the seventh of the ten short ones (1000 + 6 * 37).
+            long? median = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).MedianDurationMs;
+
+            median.ShouldBe(1222);
+        }
+    }
+
+    public class GivenFinishedRunsAndRunsWithNoDuration : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenFinishedRunsAndRunsWithNoDuration()
+        {
+            Automation automation = _db.AddAutomation(Content);
+            foreach (var seconds in new[] { 1, 2, 3 })
+            {
+                _db.AddRun(automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(seconds));
+            }
+
+            _db.AddRun(automation, AutomationRunStatus.Running, OnSecondOctober);
+            _db.AddRun(automation, AutomationRunStatus.Suspended, OnSecondOctober);
+            _db.AddRun(automation, AutomationRunStatus.Failed, OnSecondOctober);
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task LeavesRunsStillGoingAndInterruptedRunsOutOfTheMedian()
+        {
+            var summary = await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            summary.MedianDurationMs.ShouldBe(2000);
+        }
+
+        [Fact]
+        public async Task StillCountsThoseRunsInTheGroups()
+        {
+            var summary = await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            summary.Groups.Sum(g => g.Count).ShouldBe(6);
+        }
+    }
+
+    public class GivenNoFinishedRunsWithADuration : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+
+        public GivenNoFinishedRunsWithADuration()
+        {
+            Automation automation = _db.AddAutomation(Content);
+            _db.AddRun(automation, AutomationRunStatus.Running, OnSecondOctober);
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task HasNoMedian()
+        {
+            var summary = await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            summary.MedianDurationMs.ShouldBeNull();
+        }
+    }
+
+    public class GivenARunWithANegativeDuration : IDisposable
+    {
+        private readonly AnalyticsDatabase _db = new();
+        private readonly Automation _automation;
+
+        public GivenARunWithANegativeDuration()
+        {
+            _automation = _db.AddAutomation(Content);
+            _db.AddRun(_automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromMilliseconds(-5));
+            _db.AddRun(_automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(1));
+            _db.AddRun(_automation, AutomationRunStatus.Completed, OnSecondOctober, TimeSpan.FromSeconds(3));
+        }
+
+        public void Dispose() => _db.Dispose();
+
+        [Fact]
+        public async Task LeavesItOutOfTheMedian()
+        {
+            var summary = await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            summary.MedianDurationMs.ShouldBe(2000);
+        }
+
+        [Fact]
+        public async Task LeavesItOutOfTheAutomationsAverage()
+        {
+            var rows = await _db.Repository.GetAutomationAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+
+            rows.Single(r => r.AutomationId == _automation.Id).AvgDurationMs.ShouldBe(2000d);
         }
     }
 
@@ -151,7 +295,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task LeavesItOut()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).Groups;
 
             groups.ShouldBeEmpty();
         }
@@ -265,7 +409,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task CountsOnlyTheGivenWorkspaces()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Content });
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Content })).Groups;
 
             groups.Sum(g => g.Count).ShouldBe(1);
         }
@@ -273,7 +417,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task CountsEveryWorkspaceWithNoScope()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null);
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, workspaceIds: null)).Groups;
 
             groups.Sum(g => g.Count).ShouldBe(3);
         }
@@ -281,7 +425,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task CountsOneWorkspaceWhenAskedForIt()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce });
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce })).Groups;
 
             groups.Sum(g => g.Count).ShouldBe(2);
         }
@@ -303,7 +447,7 @@ public class AnalyticsRunQueryTests
         [Fact]
         public async Task CountsItsRunsInItsCurrentWorkspace()
         {
-            var groups = await _db.Repository.GetRunCountGroupsAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce });
+            var groups = (await _db.Repository.GetRunSummaryAggregatesAsync(WindowStartUtc, WindowEndUtc, new HashSet<Guid> { Commerce })).Groups;
 
             groups.Sum(g => g.Count).ShouldBe(1);
         }
