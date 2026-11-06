@@ -26,6 +26,7 @@ public class AutomationExecutorTests
     private readonly Mock<IAutomationRunRepository> _runRepo = new();
     private readonly Mock<IWorkspaceService> _workspaceService = new();
     private readonly Umbraco.Automate.Core.Configuration.ExecutionOptions _executionOptions = new();
+    private readonly Umbraco.Automate.Core.AutomateReadinessSignal _readinessSignal = new();
     private readonly AutomationExecutor _executor;
 
     private readonly Workspace _defaultWorkspace;
@@ -115,7 +116,31 @@ public class AutomationExecutorTests
             conditionEvaluator,
             Microsoft.Extensions.Options.Options.Create(_executionOptions),
             metrics,
+            _readinessSignal,
             Mock.Of<ILogger<AutomationExecutor>>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Throws_WhenEngineStartFailed()
+    {
+        _readinessSignal.SignalEngineStartFailed();
+        var automation = CreateAutomation("testAction");
+
+        await Should.ThrowAsync<AutomationEngineNotRunningException>(
+            () => _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotCreateRunRecord_WhenEngineStartFailed()
+    {
+        // A run record here would sit in Running forever: nothing on this node will execute it.
+        _readinessSignal.SignalEngineStartFailed();
+        var automation = CreateAutomation("testAction");
+
+        await Record.ExceptionAsync(
+            () => _executor.ExecuteAsync(automation, "user", null, null, CancellationToken.None));
+
+        _runRepo.Verify(r => r.SaveAsync(It.IsAny<AutomationRun>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

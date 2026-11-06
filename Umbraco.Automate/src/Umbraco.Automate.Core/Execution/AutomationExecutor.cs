@@ -27,6 +27,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly ConditionEvaluator _conditionEvaluator;
     private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly AutomateMetrics _metrics;
+    private readonly AutomateReadinessSignal _readinessSignal;
     private readonly ILogger<AutomationExecutor> _logger;
 
     public AutomationExecutor(
@@ -40,6 +41,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         ConditionEvaluator conditionEvaluator,
         IOptions<ExecutionOptions> executionOptions,
         AutomateMetrics metrics,
+        AutomateReadinessSignal readinessSignal,
         ILogger<AutomationExecutor> logger)
     {
         _workflowHost = workflowHost;
@@ -52,6 +54,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _conditionEvaluator = conditionEvaluator;
         _executionOptions = executionOptions;
         _metrics = metrics;
+        _readinessSignal = readinessSignal;
         _logger = logger;
     }
 
@@ -63,6 +66,13 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         CancellationToken cancellationToken,
         IReadOnlyList<Guid>? originChain = null)
     {
+        // Startup recovery failed, so the WorkflowCore host never started: a run created now
+        // would sit in Running with nothing to execute it.
+        if (_readinessSignal.EngineStartFailed)
+        {
+            throw new AutomationEngineNotRunningException();
+        }
+
         // Check rate limits before creating the run record.
         await _rateLimitService.CheckRateLimitAsync(automation.Id, cancellationToken);
 
