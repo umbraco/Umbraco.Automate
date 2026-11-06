@@ -100,12 +100,22 @@ public sealed class ReplayRunController : RunControllerBase
             triggerData = Core.Dispatch.JsonOptions.DeserializeToUnwrappedDictionary(run.TriggerData);
         }
 
-        await _executor.ExecuteAsync(
-            automation,
-            TriggerInitiatorType.Replay,
-            run.Id.ToString(),
-            triggerData,
-            cancellationToken);
+        try
+        {
+            await _executor.ExecuteAsync(
+                automation,
+                TriggerInitiatorType.Replay,
+                run.Id.ToString(),
+                triggerData,
+                cancellationToken);
+        }
+        catch (AutomationEngineNotRunningException ex)
+        {
+            return Conflict(new ProblemDetailsBuilder()
+                .WithTitle("Automation engine not running")
+                .WithDetail(ex.Message)
+                .Build());
+        }
 
         return Accepted();
     }

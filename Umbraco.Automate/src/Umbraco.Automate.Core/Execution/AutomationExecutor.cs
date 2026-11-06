@@ -31,6 +31,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
     private readonly BindingEvaluator _bindingEvaluator;
     private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly AutomateMetrics _metrics;
+    private readonly AutomateReadinessSignal _readinessSignal;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutomationExecutor> _logger;
 
@@ -46,6 +47,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         BindingEvaluator bindingEvaluator,
         IOptions<ExecutionOptions> executionOptions,
         AutomateMetrics metrics,
+        AutomateReadinessSignal readinessSignal,
         IEventAggregator eventAggregator,
         ILogger<AutomationExecutor> logger)
     {
@@ -60,6 +62,7 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         _bindingEvaluator = bindingEvaluator;
         _executionOptions = executionOptions;
         _metrics = metrics;
+        _readinessSignal = readinessSignal;
         _eventAggregator = eventAggregator;
         _logger = logger;
     }
@@ -72,6 +75,15 @@ internal sealed class AutomationExecutor : IAutomationExecutor
         CancellationToken cancellationToken,
         IReadOnlyList<Guid>? originChain = null)
     {
+        // Startup recovery failed on this node, so its WorkflowCore host never started. The refusal
+        // is deliberate and per node: on a multi-node setup another healthy node could have run
+        // this, but this node can't tell, and on a single node a run created now would sit in
+        // Running with nothing to execute it. A clear error beats a run that may never execute.
+        if (_readinessSignal.EngineStartFailed)
+        {
+            throw new AutomationEngineNotRunningException();
+        }
+
         // Check rate limits before creating the run record.
         await _rateLimitService.CheckRateLimitAsync(automation.Id, cancellationToken);
 
