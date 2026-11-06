@@ -93,18 +93,6 @@ async function elementActionNames(api: ApiHelpers): Promise<string[]> {
   return names.sort((a, b) => a.localeCompare(b));
 }
 
-// TODO(T12): move to AutomateUiHelper as `pickedElementRef(key, elementKey)`. `umb-input-element`
-// renders each pick as `umb-entity-item-ref` with the item's key as its id.
-function pickedElementRef(ui: UiHelpers, key: string, elementKey: string) {
-  return ui.automate.settingsField(key).locator(`umb-entity-item-ref[id="${elementKey}"]`);
-}
-
-// TODO(T12): move to AutomateUiHelper. `umb-input-element` opens the CMS tree picker modal, the one
-// `documentPickerModal` already finds, which lists tree items as `uui-menu-item`s by label.
-function treePickerItem(ui: UiHelpers, name: string) {
-  return ui.automate.documentPickerModal.locator(`uui-menu-item[label="${name}"]`);
-}
-
 test.describe('Step picker', () => {
   test.beforeEach(async ({ umbracoUi }) => {
     await umbracoUi.goToBackOffice();
@@ -193,14 +181,13 @@ test.describe('Section access', () => {
   });
 });
 
-// Pending until T12 (docs/plans/library-element-actions/PLAN.md).
 test.describe('Element picker', () => {
   test.beforeEach(async ({ umbracoUi }) => {
     await umbracoUi.goToBackOffice();
   });
 
   // STORY-8 AC3
-  test.fixme('stores a picked element as one GUID string', async ({
+  test('stores a picked element as one GUID string', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi,
@@ -215,8 +202,7 @@ test.describe('Element picker', () => {
     await openStep(umbracoAutomateUi, seeded);
 
     // Act: pick the element and save the step and automation.
-    // TODO(T12): add `pickElement` to AutomateUiHelper. `pickDocument` drives the same CMS tree picker modal.
-    await umbracoAutomateUi.automate.pickDocument(settingKeys.element, element.name);
+    await umbracoAutomateUi.automate.pickElement(settingKeys.element, element.name);
     await umbracoAutomateUi.automate.submitNodeSettings();
     await umbracoAutomateUi.automate.clickSave();
 
@@ -225,7 +211,7 @@ test.describe('Element picker', () => {
   });
 
   // STORY-8 AC4
-  test.fixme('shows the picked element when the settings are reopened', async ({
+  test('shows the picked element when the settings are reopened', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi,
@@ -244,11 +230,11 @@ test.describe('Element picker', () => {
 
     // Assert: picker mode, showing the element.
     await expect(umbracoAutomateUi.automate.bindingSwitch(settingKeys.element)).not.toBeChecked();
-    await expect(pickedElementRef(umbracoAutomateUi, settingKeys.element, element.id)).toBeVisible();
+    await expect(umbracoAutomateUi.automate.pickedElementRef(settingKeys.element, element.id)).toBeVisible();
   });
 
   // STORY-8 AC5
-  test.fixme('saves a binding expression typed with the switch on', async ({
+  test('saves a binding expression typed with the switch on', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi
@@ -272,7 +258,7 @@ test.describe('Element picker', () => {
   });
 
   // STORY-8 AC11
-  test.fixme('reports Element as required when saved empty', async ({
+  test('reports Element as required when saved empty', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi
@@ -291,16 +277,39 @@ test.describe('Element picker', () => {
     await expect.poll(async () => await umbracoAutomateUi.automate.isFieldMissing(settingKeys.element)).toBe(true);
     await expect(umbracoAutomateUi.automate.nodeSettingsModal).toBeVisible();
   });
+
+  test('lets a saved key that no longer resolves be removed', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateUi,
+    umbracoAutomateApi
+  }) => {
+    // Arrange: seed Element = a key no element has.
+    const missingKey = randomUUID();
+    const seeded = await seedStep(umbracoAutomateApi, automateServiceAccountWorkspace.id, elementActions.updateElementProperty, {
+      [settingKeys.element]: missingKey,
+      propertyAlias: LibraryApiHelper.propertyAlias,
+      value: 'new'
+    });
+
+    // Act: reopen the step; the picker shows a not-found row with Remove.
+    await openStep(umbracoAutomateUi, seeded);
+    await expect(umbracoAutomateUi.automate.elementNotFoundRef(settingKeys.element, missingKey)).toBeVisible();
+    await umbracoAutomateUi.automate.removeElementButton(settingKeys.element, missingKey).click();
+
+    // Assert: the row is gone and the field is empty again, so Element reports as required.
+    await expect(umbracoAutomateUi.automate.pickedElementRef(settingKeys.element, missingKey)).toHaveCount(0);
+    await umbracoAutomateUi.automate.attemptSaveNodeSettings();
+    await expect.poll(async () => await umbracoAutomateUi.automate.isFieldMissing(settingKeys.element)).toBe(true);
+  });
 });
 
-// Pending until T12 (docs/plans/library-element-actions/PLAN.md).
 test.describe('Create Element settings', () => {
   test.beforeEach(async ({ umbracoUi }) => {
     await umbracoUi.goToBackOffice();
   });
 
   // STORY-8 AC6
-  test.fixme('lists Library folders and no elements in the Folder picker', async ({
+  test('lists Library folders and no elements in the Folder picker', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi,
@@ -316,12 +325,12 @@ test.describe('Create Element settings', () => {
     await umbracoAutomateUi.automate.openDocumentPicker(settingKeys.folder);
 
     // Assert: the folder is listed and the element is not.
-    await expect(treePickerItem(umbracoAutomateUi, folder.name)).toBeVisible();
-    await expect(treePickerItem(umbracoAutomateUi, element.name)).toHaveCount(0);
+    await expect(umbracoAutomateUi.automate.treePickerItem(folder.name)).toBeVisible();
+    await expect(umbracoAutomateUi.automate.treePickerItem(element.name)).toHaveCount(0);
   });
 
   // STORY-8 AC7
-  test.fixme('saves with Folder empty', async ({
+  test('saves with Folder empty', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi,
@@ -343,7 +352,7 @@ test.describe('Create Element settings', () => {
   });
 
   // STORY-8 AC8
-  test.fixme('lists element types only in the Element Type picker', async ({
+  test('lets only element types be picked in the Element Type picker', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi,
@@ -356,16 +365,17 @@ test.describe('Create Element settings', () => {
     await openStep(umbracoAutomateUi, seeded);
 
     // Act: click Choose on Element Type.
-    // TODO(T12): confirm the CMS document type picker also renders its Choose button as `uui-button#btn-add`.
     await umbracoAutomateUi.automate.openDocumentPicker(settingKeys.elementType);
 
-    // Assert: the element type is listed and the page type is not.
-    await expect(treePickerItem(umbracoAutomateUi, elementType.name)).toBeVisible();
-    await expect(treePickerItem(umbracoAutomateUi, pageType.name)).toHaveCount(0);
+    // Assert: the element type can be picked. The CMS picker still lists the page type, but greyed
+    // out and not selectable, so it is the "disabled" state that keeps it out of the choice.
+    await expect(umbracoAutomateUi.automate.treePickerItem(elementType.name)).toBeVisible();
+    await expect(umbracoAutomateUi.automate.treePickerItem(elementType.name)).not.toHaveAttribute('disabled');
+    await expect(umbracoAutomateUi.automate.treePickerItem(pageType.name)).toHaveAttribute('disabled');
   });
 
   // STORY-8 AC12
-  test.fixme('reports Element Type as required when saved empty', async ({
+  test('reports Element Type as required when saved empty', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi
@@ -380,12 +390,7 @@ test.describe('Create Element settings', () => {
     await umbracoAutomateUi.automate.attemptSaveNodeSettings();
 
     // Assert: the field is marked invalid ("This field is required"), and the modal stays open.
-    // TODO(T12): Element Type is not bindable, so `isFieldMissing` (which reads `ua-bindable-editor`)
-    // does not reach it. Confirm `umb-property-layout[invalid]` is the CMS's marker and add a helper.
-    await expect(umbracoAutomateUi.automate.settingsField(settingKeys.elementType).locator('umb-property-layout')).toHaveAttribute(
-      'invalid',
-      ''
-    );
+    await expect(umbracoAutomateUi.automate.fieldLayout(settingKeys.elementType)).toHaveAttribute('invalid', '');
     await expect(umbracoAutomateUi.automate.nodeSettingsModal).toBeVisible();
   });
 });

@@ -29,7 +29,7 @@ public sealed class CreateElementSettings
         Label = "Element Type",
         Description = "The element type to create. Only types with \"Allow in Library\" turned on can be created.",
         SortOrder = 1,
-        EditorUiAlias = "Umb.PropertyEditorUi.DocumentTypePicker",
+        EditorUiAlias = Constants.EditorUiAliases.DocumentTypePicker,
         EditorConfig = """
             [
                 { "alias": "validationLimit", "value": { "min": 1, "max": 1 } },

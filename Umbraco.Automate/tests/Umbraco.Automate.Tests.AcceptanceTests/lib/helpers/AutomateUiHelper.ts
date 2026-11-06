@@ -707,6 +707,39 @@ export class AutomateUiHelper {
     return await this.bindableEditor(key).evaluate((el) => (el as HTMLElement & { validity: ValidityState }).validity.valueMissing);
   }
 
+  /* The card a Library element picker shows for the picked element or folder. `ua-element-key-picker`
+   * renders the pick as `umb-entity-item-ref` with the item's key as its id. It stays, in its error
+   * state, when the key no longer resolves. */
+  pickedElementRef(key: string, elementKey: string): Locator {
+    return this.settingsField(key).locator(`umb-entity-item-ref[id="${elementKey}"]`);
+  }
+
+  /* The error row the element picker shows when the saved key no longer resolves. */
+  elementNotFoundRef(key: string, elementKey: string): Locator {
+    return this.pickedElementRef(key, elementKey).locator('uui-ref-node[style*="danger"]');
+  }
+
+  /* The Remove button on the element picker's card. */
+  removeElementButton(key: string, elementKey: string): Locator {
+    return this.pickedElementRef(key, elementKey).locator('uui-action-bar uui-button');
+  }
+
+  /* An item listed in the open tree picker modal, by its name. */
+  treePickerItem(name: string): Locator {
+    return this.documentPickerModal.locator(`uui-menu-item[label="${name}"]`);
+  }
+
+  /* Picks a Library element or folder in a field's element picker. Same tree picker modal as `pickDocument`. */
+  async pickElement(key: string, elementName: string) {
+    await this.pickDocument(key, elementName);
+  }
+
+  /* Whether a field that is not wrapped in `ua-bindable-editor` is marked invalid. The CMS sets
+   * `invalid` on the field's `umb-property-layout` when validation fails. */
+  fieldLayout(key: string): Locator {
+    return this.settingsField(key).locator('umb-property-layout');
+  }
+
   get documentPickerModal(): Locator {
     return this.page.locator(ConstantHelper.elements.treePickerModal);
   }

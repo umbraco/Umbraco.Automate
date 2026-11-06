@@ -55,6 +55,14 @@ public static class Constants
         /// Must match the manifest alias in core/components/element-key-picker/manifests.ts.
         /// </summary>
         public const string ElementKeyPicker = "Umb.Automate.ElementKeyPicker";
+
+        /// <summary>
+        /// Editor for a field holding document type keys: the CMS document type picker, but one that
+        /// enforces a required field. Honours the <c>validationLimit</c> and
+        /// <c>onlyPickElementTypes</c> config. Must match the manifest alias in
+        /// core/components/document-type-picker/manifests.ts.
+        /// </summary>
+        public const string DocumentTypePicker = "Umb.Automate.DocumentTypePicker";
     }
 
     /// <summary>

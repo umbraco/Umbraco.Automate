@@ -961,6 +961,16 @@ public class CreateElementActionTests
         field.EditorConfig.ShouldContain("\"onlyPickElementTypes\", \"value\": true");
     }
 
+    // STORY-8 AC12: the CMS document type picker ignores a required field, so this one enforces it.
+    [Fact]
+    public void ElementTypeField_UsesTheDocumentTypePickerThatEnforcesRequired()
+    {
+        var field = typeof(CreateElementSettings).GetProperty(nameof(CreateElementSettings.ElementType))!
+            .GetCustomAttributes(typeof(FieldAttribute), false).Cast<FieldAttribute>().Single();
+
+        field.EditorUiAlias.ShouldBe(Umbraco.Automate.Core.Constants.EditorUiAliases.DocumentTypePicker);
+    }
+
     #endregion
 
     private static FieldAttribute FolderKeyField()
