@@ -78,6 +78,8 @@
 
 - **T18** `a4ef4eec` (06-11-2026): Element Published trigger, with its own settings and output (one settings class per trigger, as for content). Cultures through `ContentCultureHelpers`, null for an invariant element. The reviewer confirmed at CMS 18.1.0 that `PublishedVersionId` is set before the notification, so two publishes get different idempotency keys, and that Publish Element raises the notification, so loop protection applies. Reviewer PASS on the first round; its one suggestion (a stale spec comment) fixed before commit. Unit tests: 2728 passed (37 element published specs).
 
+- **T19** `d7c8d053` (06-11-2026): Element Unpublished trigger, mirroring T18. The reviewer confirmed at CMS 18.1.0: `PublishedVersionId` keeps the last live version after an unpublish, so keys don't collide; restore raises `ElementUnpublishedNotification` (`ElementEditingService.cs:409-418,463`); restoring a folder raises one per published element inside (`ElementContainerService.cs:316`); deleting a published element raises it, as for content (`PublishableContentServiceBase.cs:1778-1783`; `ElementService.cs:103` is the element-type delete, `DeleteOfTypes`). The dispatch check runs when the outbox message is handled, after the restore commits, so restored elements aren't hidden as trashed. Reviewer PASS on the first round. Unit tests: 2767 passed (39 element unpublished specs).
+
 ## UmbracoDocs draft (for Rick)
 
 > AI-assisted draft — pending review. Not published. Rick opens the UmbracoDocs PR.

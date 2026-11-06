@@ -99,7 +99,7 @@ Added when the triggers were folded into #574 (DECISION-LOG, 06-11-2026). Same p
   Acceptance: `ElementPublishedTriggerTests.cs` green.
   depends-on: T16. parallel-group: E
 
-- [ ] **T19** - story: STORY-9 (AC6, AC16). `ElementUnpublishedTrigger` with settings and output, copying Content Unpublished. No batch variant. A restore that unpublishes fires it (Rick's call).
+- [x] **T19** - story: STORY-9 (AC6, AC16). `ElementUnpublishedTrigger` with settings and output, copying Content Unpublished. No batch variant. A restore that unpublishes fires it (Rick's call).
   Acceptance: `ElementUnpublishedTriggerTests.cs` green.
   depends-on: T16. parallel-group: E
 

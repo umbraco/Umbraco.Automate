@@ -89,3 +89,4 @@
   - an invariant element's `cultures` is null, not `["*"]` (R23, STORY-9 AC9);
   - a filtered batch fires with all its items when any matches (R20, STORY-9 AC12);
   - the move check skips only existing elements, because a new element's ParentId reads as dirty (ARCHITECTURE guess, T17).
+- **06-11-2026, feature-build (T19):** SPEC R19 now says restoring a Library folder fires Element Unpublished once per published element inside, and that content restores raise no event. This follows from Rick's "fire, and document it" call; the CMS unpublishes each element (`ElementContainerService.cs:316` at 18.1.0).
