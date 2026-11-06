@@ -72,6 +72,8 @@
     - `docs/engineering-spec.md:648` names the wrong namespace for the authorizer extensions (predates this feature);
     - a spec pinning that Create Element's scope opens before `CreateAsync`.
 
+- **T16** `f4e3b78c` (06-11-2026): element support in trigger dispatch. An internal `IElementScopedTriggerOutput`, and a `NodeScopedTriggerDispatchAuthorizer` case checking Umb.Element.Read for the workspace's service account. `ContentCultureHelpers` takes `IPublishableContentBase` (no behaviour change). Reviewer PASS on the first round. Unit tests: 2611 passed (17 element dispatch specs). No real output uses the marker until T17–T19.
+
 ## UmbracoDocs draft (for Rick)
 
 > AI-assisted draft — pending review. Not published. Rick opens the UmbracoDocs PR.

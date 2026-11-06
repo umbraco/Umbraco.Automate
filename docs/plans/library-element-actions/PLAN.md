@@ -87,7 +87,7 @@ Order: the authorizer (T2) comes first because every action calls it. The six ac
 
 Added when the triggers were folded into #574 (DECISION-LOG, 06-11-2026). Same pending-spec convention as above: C# specs sit behind `#if LIBRARY_ELEMENT_TRIGGERS`, acceptance specs are `test.fixme`.
 
-- [ ] **T16** - story: STORY-9 (AC17–AC20). Dispatch for elements (ARCHITECTURE "Trigger decisions"): add an internal `Dispatch/Authorization/IElementScopedTriggerOutput` (`Guid? GetElementKey()`), and one case in `NodeScopedTriggerDispatchAuthorizer.AuthorizeNodeAsync` calling `AuthorizeElementAsync(user, key, {ActionElementBrowse.ActionLetter}, ct)`. Widen `Triggers/BuiltIn/ContentCultureHelpers` from `IContent` to `IPublishableContentBase` with no behaviour change for content.
+- [x] **T16** - story: STORY-9 (AC17–AC20). Dispatch for elements (ARCHITECTURE "Trigger decisions"): add an internal `Dispatch/Authorization/IElementScopedTriggerOutput` (`Guid? GetElementKey()`), and one case in `NodeScopedTriggerDispatchAuthorizer.AuthorizeNodeAsync` calling `AuthorizeElementAsync(user, key, {ActionElementBrowse.ActionLetter}, ct)`. Widen `Triggers/BuiltIn/ContentCultureHelpers` from `IContent` to `IPublishableContentBase` with no behaviour change for content.
   Acceptance: element cases in `NodeScopedTriggerDispatchAuthorizerTests.cs` (single allowed/denied, batch narrowed, batch all denied) go green; existing content trigger tests stay green.
   depends-on: T15. parallel-group: D
 
