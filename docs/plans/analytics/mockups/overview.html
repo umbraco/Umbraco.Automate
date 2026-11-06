@@ -1,0 +1,99 @@
+<!doctype html>
+<!--
+  Automate's Overview dashboard with its one change: a link to Analytics under the status cards.
+  Status cards copy section/dashboard/components/status-cards.element.ts and the activity list
+  activity-list.element.ts on v19/dev (817f160c).
+-->
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Mockup: Automate Overview with Analytics link</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@umbraco-ui/uui@2/dist/themes/light.css">
+	<link rel="stylesheet" href="_mockup.css">
+	<script type="module" src="_mockup.js"></script>
+	<style>
+		.overview { padding: var(--uui-size-layout-1); }
+		.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--uui-size-space-5); }
+		.card { display: flex; align-items: center; gap: var(--uui-size-space-4); padding: var(--uui-size-space-5); background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); }
+		.card-icon { font-size: var(--uui-size-8); }
+		.card-count { display: block; font-size: var(--uui-size-8); font-weight: 700; line-height: 1; }
+		.card-label { font-size: var(--uui-size-4); color: var(--uui-color-text-alt); }
+		/* The new line: subtle, inline, right under the cards. */
+		.analytics-link { display: flex; align-items: center; gap: var(--uui-size-space-2); margin-top: var(--uui-size-space-4); color: var(--uui-color-text-alt); font-size: 14px; }
+		.analytics-link a { color: var(--uui-color-interactive); font-weight: 600; text-decoration: none; }
+		.analytics-link a:hover { text-decoration: underline; }
+		.highlight { outline: 2px dashed var(--uui-color-selected); outline-offset: 6px; border-radius: 4px; }
+		.activity { margin-top: var(--uui-size-layout-1); }
+		.row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--uui-color-border); font-size: 14px; }
+		.row:last-child { border-bottom: 0; }
+		.muted { color: var(--uui-color-text-alt); }
+	</style>
+</head>
+<body class="uui-font uui-text">
+	<header class="app-header">
+		<span class="logo">Umbraco</span>
+		<uui-tab-group class="sections">
+			<uui-tab label="Content">Content</uui-tab>
+			<uui-tab label="Media">Media</uui-tab>
+			<uui-tab label="Settings">Settings</uui-tab>
+			<uui-tab label="Automate" active>Automate</uui-tab>
+			<uui-tab label="Users">Users</uui-tab>
+		</uui-tab-group>
+		<div class="apps">
+			<uui-button look="primary" compact label="Search"><uui-icon name="icon-search"></uui-icon></uui-button>
+			<uui-button look="primary" compact label="Help"><uui-icon name="icon-help-alt"></uui-icon></uui-button>
+			<uui-button look="primary" compact label="User"><uui-avatar name="Rick Butterfield"></uui-avatar></uui-button>
+		</div>
+	</header>
+
+	<div class="section">
+		<nav class="section-sidebar">
+			<h3>Automations</h3>
+			<uui-menu-item label="Commerce" has-children><uui-icon slot="icon" name="icon-folder"></uui-icon></uui-menu-item>
+			<uui-menu-item label="Content" has-children><uui-icon slot="icon" name="icon-folder"></uui-icon></uui-menu-item>
+			<uui-menu-item label="Marketing" has-children><uui-icon slot="icon" name="icon-folder"></uui-icon></uui-menu-item>
+			<h3>Monitoring</h3>
+			<uui-menu-item label="Analytics"><uui-icon slot="icon" name="icon-chart"></uui-icon></uui-menu-item>
+		</nav>
+
+		<main class="section-main">
+			<div class="body-layout">
+				<div class="header">
+					<div class="header-content" style="padding:0">
+						<uui-tab-group style="height:100%">
+							<uui-tab label="Overview" active>Overview</uui-tab>
+							<uui-tab label="Runs">Runs</uui-tab>
+							<uui-tab label="Approvals">Approvals</uui-tab>
+						</uui-tab-group>
+					</div>
+				</div>
+
+				<div class="main no-padding">
+					<!-- Replace from here -->
+					<div class="overview">
+						<div class="cards">
+							<div class="card"><uui-icon class="card-icon" name="icon-check" style="color:var(--uui-color-positive-standalone)"></uui-icon><div><span class="card-count">24</span><span class="card-label">Published</span></div></div>
+							<div class="card"><uui-icon class="card-icon" name="icon-edit" style="color:var(--uui-color-warning-standalone)"></uui-icon><div><span class="card-count">5</span><span class="card-label">Draft</span></div></div>
+							<div class="card"><uui-icon class="card-icon" name="icon-block" style="color:var(--uui-color-danger-standalone)"></uui-icon><div><span class="card-count">2</span><span class="card-label">Unpublished</span></div></div>
+							<div class="card"><uui-icon class="card-icon" name="icon-alert" style="color:var(--uui-color-danger-standalone)"></uui-icon><div><span class="card-count">552</span><span class="card-label">Failed Runs</span></div></div>
+							<div class="card"><uui-icon class="card-icon" name="icon-nodes" style="color:var(--uui-color-warning-standalone)"></uui-icon><div><span class="card-count">9</span><span class="card-label">In Progress</span></div></div>
+						</div>
+
+						<div class="analytics-link highlight">
+							<uui-icon name="icon-chart"></uui-icon>
+							<span>See how runs are trending, and which automations and actions fail most, in <a href="analytics.html">Analytics</a>.</span>
+						</div>
+
+						<uui-box headline="Recent activity" class="activity">
+							<div class="row"><span>Sync new orders to Business Central</span><span class="muted">Completed · 2 minutes ago</span></div>
+							<div class="row"><span>Notify editors when a product page is published</span><span class="muted">Completed · 5 minutes ago</span></div>
+							<div class="row"><span>Post new articles to Slack #marketing</span><span class="muted">Failed · 17 minutes ago</span></div>
+						</uui-box>
+					</div>
+					<!-- Replace to here -->
+				</div>
+			</div>
+		</main>
+	</div>
+</body>
+</html>
