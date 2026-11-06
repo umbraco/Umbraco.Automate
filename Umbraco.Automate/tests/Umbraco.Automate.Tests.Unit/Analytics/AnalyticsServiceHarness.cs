@@ -1,6 +1,4 @@
 // Stories AN-2 to AN-7: docs/plans/analytics/STORIES.md
-// Compiled out until T5 adds the analytics service. The T5 builder removes the #if/#endif lines.
-#if AUTOMATE_ANALYTICS
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Analytics;
 using Umbraco.Automate.Core.Runs;
@@ -19,6 +17,8 @@ internal sealed class AnalyticsServiceHarness
     public Mock<IAutomateAnalyticsRepository> Repository { get; } = new();
 
     public Mock<IWorkspaceService> Workspaces { get; } = new();
+
+    public bool Enabled { get; set; } = true;
 
     public int RetentionDays { get; set; } = 90;
 
@@ -42,7 +42,7 @@ internal sealed class AnalyticsServiceHarness
 
     public AutomateAnalyticsService Build()
     {
-        var policy = Mock.Of<IOptionsMonitor<RunCleanupPolicy>>(o => o.CurrentValue == new RunCleanupPolicy { RetentionDays = RetentionDays });
+        var policy = Mock.Of<IOptionsMonitor<RunCleanupPolicy>>(o => o.CurrentValue == new RunCleanupPolicy { Enabled = Enabled, RetentionDays = RetentionDays });
         return new AutomateAnalyticsService(Repository.Object, Workspaces.Object, policy, new FixedTimeProvider(Now));
     }
 
@@ -52,17 +52,17 @@ internal sealed class AnalyticsServiceHarness
         string? compareFrom = null,
         string? compareTo = null,
         string timeZone = "UTC")
-        => new(
-            DateOnly.Parse(from),
-            DateOnly.Parse(to),
-            compareFrom is null ? null : DateOnly.Parse(compareFrom),
-            compareTo is null ? null : DateOnly.Parse(compareTo),
-            timeZone,
-            WorkspaceIds: null);
+        => new()
+        {
+            From = DateOnly.Parse(from),
+            To = DateOnly.Parse(to),
+            CompareFrom = compareFrom is null ? null : DateOnly.Parse(compareFrom),
+            CompareTo = compareTo is null ? null : DateOnly.Parse(compareTo),
+            TimeZoneId = timeZone,
+        };
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
     }
 }
-#endif
