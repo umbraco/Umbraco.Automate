@@ -53,7 +53,7 @@
   Acceptance: the issue text is drafted, and it's listed in the PR's "Left out".
   depends-on: T5
 
-- [ ] **T7** - story: S1-S5. Port the merged v18 PR to `v17/dev` with `change-backport`. Same code on v17: core fallback at `UmbracoBuilderExtensions.cs:187`, OpenIddict at `:189`, CMS 17.3.4's `RestartAsync` identical. Run the same specs. Re-run T5's smoke on a v17 demo if one can be set up; otherwise the PR says it wasn't run.
+- [x] **T7** - story: S1-S5. Port the merged v18 PR to `v17/dev` with `change-backport`. Same code on v17: core fallback at `UmbracoBuilderExtensions.cs:187`, OpenIddict at `:189`, CMS 17.3.4's `RestartAsync` identical. Run the same specs. Re-run T5's smoke on a v17 demo if one can be set up; otherwise the PR says it wasn't run.
   Acceptance: a v17 PR is open with the specs and full suites green.
   depends-on: T5
 
