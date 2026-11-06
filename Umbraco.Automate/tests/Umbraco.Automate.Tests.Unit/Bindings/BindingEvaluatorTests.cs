@@ -365,6 +365,74 @@ public class BindingEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_UnknownFilter_Throws()
+    {
+        var act = () => _evaluator.Evaluate("${ trigger.contentName | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>();
+    }
+
+    [Fact]
+    public void Evaluate_UnknownFilter_MessageNamesTheFilterAndThePath()
+    {
+        var act = () => _evaluator.Evaluate("${ trigger.contentName | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>().Message
+            .ShouldBe("The binding filter 'uppercse' used on 'trigger.contentName' does not exist.");
+    }
+
+    [Fact]
+    public void Evaluate_UnknownFilter_MessageLeavesOutTheFilterArguments()
+    {
+        // Arguments can hold literal text from a sensitive field (e.g. a fallback secret), so the
+        // error that reaches the step run and the logs names the filter but never its arguments.
+        var act = () => _evaluator.Evaluate("${ trigger.empty | fallbak:sk_live_abc }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>().Message.ShouldNotContain("sk_live_abc");
+    }
+
+    [Fact]
+    public void Evaluate_PipeInsideAFilterArgument_DoesNotEchoTheArgumentText()
+    {
+        // The tokenizer splits on every '|', so the text after it comes back as a filter "alias".
+        var act = () => _evaluator.Evaluate("${ trigger.empty | fallback:a | top secret }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>().Message.ShouldNotContain("top secret");
+    }
+
+    [Fact]
+    public void Evaluate_UnknownFilterAfterAKnownOne_Throws()
+    {
+        var act = () => _evaluator.Evaluate("${ trigger.contentName | lowercase | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>();
+    }
+
+    [Fact]
+    public void Evaluate_KnownFilterInADifferentCase_IsApplied()
+    {
+        var result = _evaluator.Evaluate("${ trigger.contentName | UPPERCASE }", _data);
+
+        result.ShouldBe("HELLO WORLD");
+    }
+
+    [Fact]
+    public void EvaluateRaw_UnknownFilter_Throws()
+    {
+        var act = () => _evaluator.EvaluateRaw("${ trigger.cultures | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>();
+    }
+
+    [Fact]
+    public void IsKnownFilter_RegisteredAlias_ReturnsTrue()
+        => _evaluator.IsKnownFilter("truncate").ShouldBeTrue();
+
+    [Fact]
+    public void IsKnownFilter_UnregisteredAlias_ReturnsFalse()
+        => _evaluator.IsKnownFilter("uppercse").ShouldBeFalse();
+
+    [Fact]
     public void Evaluate_WithChainedFilters()
     {
         var result = _evaluator.Evaluate("${ trigger.body | stripHtml | truncate:10:... }", _data);

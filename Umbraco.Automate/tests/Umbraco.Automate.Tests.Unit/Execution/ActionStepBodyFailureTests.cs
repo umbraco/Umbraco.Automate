@@ -80,6 +80,28 @@ public class ActionStepBodyFailureTests
     }
 
     [Fact]
+    public async Task UnknownBindingFilterUnderRetry_ThrowsANonRetryableFailure()
+    {
+        var stepConfig = StepConfig(StepErrorBehavior.Retry);
+        stepConfig.InputMappings["name"] = "${ trigger.name | uppercse }";
+
+        await Should.ThrowAsync<NonRetryableStepFailureException>(() => CreateBody(stepConfig).RunAsync(CreateContext()));
+    }
+
+    [Fact]
+    public async Task UnknownBindingFilter_RecordsAFailedStepRunNamingTheFilter()
+    {
+        var stepConfig = StepConfig(StepErrorBehavior.Retry);
+        stepConfig.InputMappings["name"] = "${ trigger.name | uppercse }";
+
+        await Should.ThrowAsync<NonRetryableStepFailureException>(() => CreateBody(stepConfig).RunAsync(CreateContext()));
+
+        _runRepository.Verify(r => r.AddStepRunAsync(
+            It.Is<StepRun>(s => s.Status == StepRunStatus.Failed && s.Error!.Contains("'uppercse'")),
+            It.IsAny<CancellationToken>()));
+    }
+
+    [Fact]
     public async Task ApprovalResumedWithoutADecisionUnderRetry_ThrowsANonRetryableFailure()
     {
         var stepConfig = StepConfig(StepErrorBehavior.Retry);

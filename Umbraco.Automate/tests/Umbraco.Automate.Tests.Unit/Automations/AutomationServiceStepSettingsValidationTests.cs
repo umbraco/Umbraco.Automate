@@ -6,6 +6,7 @@ using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
@@ -100,7 +101,8 @@ public class AutomationServiceStepSettingsValidationTests
                 new WebhookAuthenticatorCollection(() => []),
                 new NotificationChannelCollection(() => [])),
             new SectionAccessChecker(),
-            configReferenceResolver);
+            configReferenceResolver,
+            new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
     }
 
     [Fact]

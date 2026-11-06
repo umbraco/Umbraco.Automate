@@ -26,6 +26,24 @@ public class ConditionEvaluatorTests
     }
 
     [Fact]
+    public void Condition_WithUnknownFilter_Throws()
+    {
+        // Control-flow conditions and connection filters must not silently compare the
+        // unfiltered value when a filter name is mistyped.
+        var set = BuildSingleCondition("${ trigger.name | lowercse }", ConditionOperator.Equals, "jane");
+
+        Should.Throw<UnknownBindingFilterException>(() => _evaluator.Evaluate(set, EmptyData));
+    }
+
+    [Fact]
+    public void IsEmptyCondition_WithUnknownFilter_Throws()
+    {
+        var set = BuildSingleCondition("${ trigger.name | lowercse }", ConditionOperator.IsEmpty, string.Empty);
+
+        Should.Throw<UnknownBindingFilterException>(() => _evaluator.Evaluate(set, EmptyData));
+    }
+
+    [Fact]
     public void Equals_CaseInsensitive()
     {
         var set = BuildSingleCondition("Hello", ConditionOperator.Equals, "hello");
