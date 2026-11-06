@@ -80,6 +80,11 @@ export function manualTrigger() {
   return { triggerAlias: ConstantHelper.triggers.manual, settings: {} };
 }
 
+/** A Library element trigger (`ConstantHelper.triggers.elementSaved`, ...), with the given settings. */
+export function elementTrigger(triggerAlias: string, settings: Record<string, unknown> = {}) {
+  return { triggerAlias, settings };
+}
+
 /** The Content Saved trigger, with no content type filter. Its output carries `contentKey` for steps to bind. */
 export function contentSavedTrigger() {
   return { triggerAlias: ConstantHelper.triggers.contentSaved, settings: {} };

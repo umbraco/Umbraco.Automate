@@ -1,0 +1,124 @@
+<!doctype html>
+<!--
+  Step settings panel for Create Element. Same layout as update-element-property.html.
+  Folder uses ua-element-key-picker in folder-only mode; Element Type uses the CMS's
+  Umb.PropertyEditorUi.DocumentTypePicker with onlyPickElementTypes. The Element Type field shows the
+  mistake moment: a required field saved empty. Starter: modal-form.html.
+-->
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Mockup: Create Element settings</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@umbraco-ui/uui@2/dist/themes/light.css">
+	<link rel="stylesheet" href="_mockup.css">
+	<script type="module" src="_mockup.js"></script>
+	<style>
+		.main > uui-box { margin-bottom: var(--uui-size-space-4); }
+		.switch { display: flex; align-items: center; gap: var(--uui-size-space-3); font-size: 13px; margin-bottom: var(--uui-size-space-3); }
+		.alias { color: var(--uui-color-text-alt); font-size: 12px; margin-top: 4px; }
+		code.json { display:block; white-space: pre; padding: 8px 10px; border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); font-size: 13px; background: var(--uui-color-surface); }
+	</style>
+</head>
+<body class="uui-font uui-text">
+	<header class="app-header">
+		<span class="logo">Umbraco</span>
+		<uui-tab-group class="sections">
+			<uui-tab label="Content">Content</uui-tab>
+			<uui-tab label="Media">Media</uui-tab>
+			<uui-tab label="Library">Library</uui-tab>
+			<uui-tab label="Automate" active>Automate</uui-tab>
+			<uui-tab label="Settings">Settings</uui-tab>
+		</uui-tab-group>
+		<div class="apps">
+			<uui-button look="primary" compact label="User"><uui-avatar name="Rick Butterfield"></uui-avatar></uui-button>
+		</div>
+	</header>
+	<div class="section">
+		<nav class="section-sidebar"><h3>Automate</h3></nav>
+		<main class="section-main"></main>
+	</div>
+
+	<div class="modal-backdrop"></div>
+	<aside class="modal-sidebar">
+		<div class="body-layout">
+			<div class="header">
+				<h3 class="headline">Create Element</h3>
+			</div>
+
+			<div class="main">
+				<!-- Replace from here -->
+				<uui-box class="group">
+					<div class="property">
+						<div><uui-label required>Name</uui-label></div>
+						<div>
+							<uui-input label="Name" value="Create review snippet"></uui-input>
+							<div class="alias">createReviewSnippet</div>
+						</div>
+					</div>
+				</uui-box>
+
+				<uui-box class="group">
+					<div class="property">
+						<div>
+							<uui-label>Folder</uui-label>
+							<div class="description">The Library folder the new element is created in. Leave empty to create at the Library root.</div>
+						</div>
+						<div>
+							<div class="switch"><uui-toggle label="Use a binding expression"></uui-toggle></div>
+							<div class="picker">
+								<uui-ref-list>
+									<uui-ref-node name="Reviews" detail="Schema snippets / Reviews">
+										<uui-icon slot="icon" name="icon-folder"></uui-icon>
+										<uui-action-bar slot="actions"><uui-button label="Remove">Remove</uui-button></uui-action-bar>
+									</uui-ref-node>
+								</uui-ref-list>
+							</div>
+						</div>
+					</div>
+					<div class="property">
+						<div>
+							<uui-label required>Element Type<span class="invalid-badge"><uui-badge color="danger" attention>!</uui-badge></span></uui-label>
+							<div class="description">The element type to create. Only types with "Allow in Library" turned on can be created.</div>
+						</div>
+						<div class="picker">
+							<uui-button class="choose" look="placeholder" label="Choose">Choose</uui-button>
+							<div class="validation-message">This field is required</div>
+						</div>
+					</div>
+					<div class="property">
+						<div>
+							<uui-label required>Name</uui-label>
+							<div class="description">The name of the new element.</div>
+						</div>
+						<div><uui-input label="Name" value="${ trigger.payload.productName } – AggregateRating"></uui-input></div>
+					</div>
+					<div class="property">
+						<div>
+							<uui-label>Culture</uui-label>
+							<div class="description">Culture code (e.g. en-US). Required if the element type varies by culture.</div>
+						</div>
+						<div><uui-input label="Culture" value=""></uui-input></div>
+					</div>
+					<div class="property">
+						<div>
+							<uui-label>Property Values</uui-label>
+							<div class="description">Property values as JSON (e.g. {"customSchema": "…"}). Culture-variant properties are set for the chosen culture.</div>
+						</div>
+						<div><code class="json">{
+  "customSchema": "{\"@type\":\"AggregateRating\",\"ratingValue\":4.6}"
+}</code></div>
+					</div>
+				</uui-box>
+				<!-- Replace to here -->
+			</div>
+
+			<div class="footer">
+				<div class="actions">
+					<uui-button label="Close">Close</uui-button>
+					<uui-button look="primary" color="positive" label="Save">Save</uui-button>
+				</div>
+			</div>
+		</div>
+	</aside>
+</body>
+</html>

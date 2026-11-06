@@ -80,6 +80,8 @@ export default {
         propertyNotFound: "Property not found",
         parentNotFound: "Parent not found",
         contentTypeNotFound: "Content type not found",
+        folderNotFound: "Folder not found",
+        elementTypeNotFound: "Element type not found",
         mediaTypeNotFound: "Media type not found",
         fileDownloadFailed: "File download failed",
         created: "Created",

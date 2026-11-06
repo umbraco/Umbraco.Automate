@@ -24,6 +24,19 @@ export class CatalogueApiHelper {
     return Array.isArray(body) ? body : body.items ?? [];
   }
 
+  async getTriggers() {
+    return await this.getList('triggers');
+  }
+
+  /** The display name of a trigger, as the trigger picker lists it. */
+  async getTriggerName(alias: string): Promise<string> {
+    const trigger = (await this.getTriggers()).find((t: any) => t.alias === alias);
+    if (!trigger) {
+      throw new Error(`Trigger "${alias}" is not in the catalogue.`);
+    }
+    return trigger.name;
+  }
+
   async getActions() {
     return await this.getList('actions');
   }
