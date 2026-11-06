@@ -85,6 +85,8 @@
 
 - **T21** `8eaef5e8` (06-11-2026): docs for the four element triggers in `functional-overview.md`, `engineering-spec.md` (new Library row) and `identity-ownership-permissions.md` (dispatch check: start node and folder permissions; the section guard checks the Library section first; check runs after commit), plus Change 4 in the UmbracoDocs draft below. Also corrected two older lines next to it: the markers are `IContentScopedTriggerOutput`/`IMediaScopedTriggerOutput` (there's no `INodeScopedTrigger`), and media dispatch checks the start node only. Reviewer FAIL then PASS: round 1 said the element check covered the Library section, which it doesn't.
 
+- **Finish (triggers)** (06-11-2026): full .NET suite green (2767 unit, 272 integration). Whole-feature review FAIL then PASS. `714ba9c4` refactor: the move/trash/restore check is `ElementSavedTrigger.IsEditSave` (was on the output DTO), sharing one `IsNew`; the output mapping is `ElementSavedTrigger.ToOutput`, shared with Batch Saved; the `parentId`/`trashed` alias limitation is documented in code and in the UmbracoDocs draft (Rick: document, don't guard); `LibraryApiHelper` reuses its URL getter. The loop-protection gap found in T20 is filed as #583. The branch merges cleanly with `v18/dev` at `224f3492`.
+
 ## UmbracoDocs draft (for Rick)
 
 > AI-assisted draft — pending review. Not published. Rick opens the UmbracoDocs PR.
