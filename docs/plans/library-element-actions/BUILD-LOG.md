@@ -87,7 +87,7 @@
 
 > AI-assisted draft — pending review. Not published. Rick opens the UmbracoDocs PR.
 >
-> Probable target: `18/umbraco-automate/concepts/actions.md`, plus one edit to `18/umbraco-automate/concepts/workspaces.md`. Rick to confirm. Three changes, below. The page has no per-action output sections, so none are added. Outputs are mentioned in prose only, in camelCase as authors write bindings.
+> Probable target: `18/umbraco-automate/concepts/actions.md`, plus one edit to `18/umbraco-automate/concepts/workspaces.md`. Rick to confirm. Four changes, below. Change 4 adds the Library triggers; the triggers page may be `18/umbraco-automate/concepts/triggers.md` (Rick to confirm). The page has no per-action output sections, so none are added. Outputs are mentioned in prose only, in camelCase as authors write bindings.
 
 #### Insertion 1: new `### Library` table
 
@@ -140,3 +140,41 @@ Insertion 2 links here for root access, and this section still says the granular
   - Second cell: change `(Create, Publish, Update, Move)` to `(Create, Publish, Update, Move, and for Library elements Read and Unpublish)`.
   - Third cell: append ` The Library actions check the same way on the element, or on the folder for **Create Element**.`
 - The sentence under the table: change "at the content or media root" to "at the content, media or Library root".
+
+#### Change 4: Library triggers
+
+Add a `### Library` table to the built-in triggers list, after the Media triggers, and a `## Library Elements` section for the details. If the triggers page has no such section, put this text under the Library table.
+
+##### Library
+
+| Trigger                | Starts when                                       |
+| ---------------------- | ------------------------------------------------- |
+| **Element Saved**      | A Library element is saved (created or updated).  |
+| **Element Published**  | A Library element is published.                   |
+| **Element Unpublished**| A Library element is unpublished.                 |
+| **Element Batch Saved**| One or more Library elements are saved, with all items as a collection. |
+
+#### Library Elements
+
+The Library triggers need Umbraco 18, because earlier versions have no Library. They fire for changes made in the backoffice and through any CMS service.
+
+**Element Saved**, **Element Published** and **Element Unpublished** start one run for each element. **Element Batch Saved** starts one run for each save operation, whether it saves one element or many, with every element saved in that operation in `items`. Use it with a **For Each** step. There is no batch Published or Unpublished trigger, because the CMS publishes and unpublishes elements one at a time.
+
+All four triggers have these settings:
+
+- **Element Types**: only start for these element types. Leave it blank to match all. **Element Batch Saved** starts with the whole batch when any element matches, and doesn't start when none match.
+- **When triggered by another automation** (Advanced): **Always run**, **Skip if this would loop** (the default) or **Skip entirely**. This applies to elements changed by the Create, Update, Publish and Unpublish Element actions.
+
+Outputs, in camelCase as authors write bindings:
+
+- **Element Saved**: `elementKey`, `elementName`, `contentTypeKey`, `contentTypeAlias`, `isNew`, and `cultures`. `isNew` is true when the save created the element. `cultures` lists the cultures edited in the save, and has no value (null) for an invariant element.
+- **Element Published**: `elementKey`, `elementName`, `contentTypeKey`, `contentTypeAlias`, and `cultures`, the cultures published. `cultures` has no value (null) for an invariant element.
+- **Element Unpublished**: `elementKey`, `elementName`, `contentTypeKey`, `contentTypeAlias`, and `cultures`, the cultures that were published before the element was unpublished. `cultures` has no value (null) for an invariant element.
+- **Element Batch Saved**: `items`, a list where each item has the **Element Saved** outputs, and `count`.
+
+Things that differ from the content triggers:
+
+- **Element Saved** and **Element Batch Saved** don't fire when a save only moves an element to another folder, sends it to the recycle bin, or restores it.
+- Restoring a published element from the recycle bin unpublishes it, and **Element Unpublished** fires. Restoring a folder fires it once for each published element inside. Restoring a published document unpublishes it without an event.
+
+A trigger only starts for elements the service account of the workspace can read. The account needs the **Library** section, a Library start node that covers the element, and the Read permission, including permissions set on a Library folder. **Element Batch Saved** leaves out the elements the account can't read, and doesn't start when none are left. An element in the recycle bin is hidden from an account whose Library start node is a folder. See [Service-Account Permissions](workspaces.md#service-account-permissions).

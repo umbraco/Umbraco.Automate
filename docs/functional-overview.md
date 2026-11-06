@@ -44,7 +44,7 @@ It is the first CMS-embedded automation engine in the .NET ecosystem.
 | **Content** | Content Published, Unpublished, Saved, Deleted, Moved | Publish, Unpublish, Create, Update, Delete Content |
 | **Media** | Media Uploaded, Media Deleted | Upload Media, Delete Media |
 | **Members** | Member Created, Approved, Locked Out | Create Member, Update Member, Assign Group |
-| **Library** | None yet | Get Element, Get Element Property, Create Element, Update Element Property, Publish Element, Unpublish Element |
+| **Library** | Element Saved, Element Published, Element Unpublished, Element Batch Saved | Get Element, Get Element Property, Create Element, Update Element Property, Publish Element, Unpublish Element |
 
 ### DXP integration packages
 

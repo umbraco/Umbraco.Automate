@@ -804,6 +804,7 @@ public class SlackAutomateComposer : IComposer
 | **Content** | Content Published, Content Unpublished, Content Saved, Content Deleted, Content Moved | Publish Content, Unpublish Content, Create Content, Update Content, Delete Content |
 | **Media** | Media Uploaded, Media Deleted | Upload Media, Delete Media |
 | **Members** | Member Created, Member Approved, Member Locked Out | Create Member, Update Member, Assign Group |
+| **Library** | Element Saved, Element Published, Element Unpublished, Element Batch Saved | Get Element, Get Element Property, Create Element, Update Element Property, Publish Element, Unpublish Element |
 
 **DXP Integration (separate NuGet packages)**:
 

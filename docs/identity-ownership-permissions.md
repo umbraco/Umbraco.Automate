@@ -288,7 +288,7 @@ different point in the lifecycle:
 | Layer | Declared by | Enforced at |
 |-------|-------------|-------------|
 | **Section access** | `RequiredSections = ["content", ...]` | Catalogue endpoint (picker filter) → publish-time validation → trigger dispatch → per-action runtime middleware |
-| **Dispatch authorisation** | `ITriggerDispatchAuthorizer` implementations | Trigger dispatch — runs after the section guard, before the run is started. Built-in handles CMS content/media nodes; provider packages plug in their own (e.g. Umbraco Commerce store membership) |
+| **Dispatch authorisation** | `ITriggerDispatchAuthorizer` implementations | Trigger dispatch — runs after the section guard, before the run is started. Built-in handles CMS content, media and Library element nodes; provider packages plug in their own (e.g. Umbraco Commerce store membership) |
 | **Node access (action)** | n/a (resolved from the action's target node at runtime) | Inside each content/media/Library element action via `IAutomationActionAuthorizer` |
 | **Permission verb** | `RequiredPermissions = [ActionPublish.ActionLetter, ...]` (content and Library actions) | Same as node access — fed into `IContentPermissionService` or `IElementPermissionService` / `IElementContainerPermissionService` `.AuthorizeAccessAsync` |
 
@@ -352,12 +352,14 @@ builder.AutomateTriggerDispatchAuthorizers()
 
 The built-in `NodeScopedTriggerDispatchAuthorizer` handles content and media
 triggers whose output identifies a single CMS node. It authorises the target
-node via `IContentPermissionService` / `IMediaPermissionService` with the
-`Umb.Document.Read` (Browse) permission. The built-in triggers
-(`ContentSaved/Published/Unpublished`, `MediaSaved`, `MediaTrashed`) opt in via
-the internal `INodeScopedTrigger` marker; the implementation detail isn't
+node via `IContentPermissionService` / `IMediaPermissionService`. Content
+needs the `Umb.Document.Read` (Browse) permission. Media is checked against the
+account's Media start node only, with no permission check. The built-in
+triggers (`ContentSaved/Published/Unpublished`, `MediaSaved`, `MediaTrashed`)
+opt in through the internal `IContentScopedTriggerOutput` and
+`IMediaScopedTriggerOutput` markers on their output classes; the markers aren't
 exposed because third-party providers with non-CMS resource models should
-write their own `ITriggerDispatchAuthorizer` rather than reuse the marker.
+write their own `ITriggerDispatchAuthorizer` rather than reuse them.
 
 `MediaTrashedTrigger` is also gated by this authoriser: after trashing, the
 media lives under the recycle bin (`,-1,-21,...`). CMS denies any non-root
@@ -366,6 +368,20 @@ here too — matching the backoffice UI, where scoped users do not see the
 recycle bin at all and cannot interact with trashed items even if they
 originally trashed them. Root-scoped service accounts (or unscoped accounts)
 still receive the notification.
+
+The Library element triggers (`ElementSaved`, `ElementPublished`,
+`ElementUnpublished`) opt in through the internal `IElementScopedTriggerOutput`
+marker, the element counterpart of `IContentScopedTriggerOutput`. The
+authoriser calls `AuthorizeElementAsync(user, elementKey, permissions, ct)` with
+the `Umb.Element.Read` permission for the workspace's service account. That
+covers the account's Library start node and permissions set on a Library
+folder. The section guard (`RequiredSections` on the trigger) has already
+checked the Library section before this call. A trashed element is hidden from an account whose
+Library start node is a folder, as it is for the element actions.
+
+The check runs when the outbox message is handled, after the change has
+committed. An element restored from the recycle bin is no longer trashed by
+then, so the trashed-element rule does not hide it.
 
 `MediaDeletedTrigger` is not node-scoped: by the time the dispatcher processes
 a deletion the node is permanently gone, so `AuthorizeAccessAsync` returns
@@ -379,7 +395,9 @@ item. Items the service account cannot Browse are removed from the batch
 left. If nothing is left, the run is skipped exactly like a denied
 single-item event. Each item follows its single-item rule, so
 `MediaBatchTrashed` items are denied for scoped accounts and
-`MediaBatchDeleted` items are not node-checked. Because batch settings
+`MediaBatchDeleted` items are not node-checked. `ElementBatchSaved` is checked
+the same way: elements the account cannot Read are removed, and the run is
+skipped when none are left. Because batch settings
 filters match if any item matches, the filter is re-checked against the
 narrowed batch, so a run never fires only because of an item the account
 cannot see. Authorisers registered after the built-in one see the narrowed
@@ -462,6 +480,9 @@ An extension method in `AutomationActionAuthorizerExtensions`,
   service, because the element lookup resolves element keys only. With no
   folder, the check is `IElementPermissionService.AuthorizeRootAccessAsync` on
   the Library root.
+- **Triggers** check Read (`Umb.Element.Read`) on the element at dispatch, with
+  the explicit-user `AuthorizeElementAsync` overload. See "Built-in CMS
+  node-scoped authorisation" above.
 - **Fail-closed defaults.** The three element members have default interface
   implementations that deny access, so an existing implementation of the
   interface keeps compiling and cannot grant Library access by accident. The
