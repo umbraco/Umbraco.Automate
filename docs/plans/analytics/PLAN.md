@@ -25,7 +25,7 @@
   Acceptance: `Analytics/AnalyticsActionQueryTests` green against SQLite.
   depends-on: T2
 
-- [ ] **T4** - story: AN-1 (AC1 to AC3). Add the opt-in speed test `Analytics/AnalyticsSpeedTests` to `Umbraco.Automate.Tests.Integration`, with `[Trait("Category", "Performance")]`. It's skipped unless the `AUTOMATE_PERF_SQLSERVER` connection string is set, so CI never runs it. It:
+- [x] **T4** - story: AN-1 (AC1 to AC3). Add the opt-in speed test `Analytics/AnalyticsSpeedTests` to `Umbraco.Automate.Tests.Integration`, with `[Trait("Category", "Performance")]`. It's skipped unless the `AUTOMATE_PERF_SQLSERVER` connection string is set, so CI never runs it. It:
   1. creates the database and applies the SQL Server migrations
   2. bulk-loads 1,000,000 runs and about 4,000,000 step runs over 180 days with `SqlBulkCopy` (STORIES AN-1)
   3. calls each repository query set once to warm up, then times the second call for a 90-day range plus its comparison
