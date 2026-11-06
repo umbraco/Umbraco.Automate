@@ -39,15 +39,15 @@ An absent context is `{}`. **Reject any other action.**
 > from MyGet.
 
 **Worktrees live at `.claude/worktrees/<slug>`**, which is gitignored. The slug is the branch
-name with the `feature/` segment dropped and remaining slashes flattened to dashes:
-`v17/feature/issue-112-binding-case-insensitive-lookup` → `v17-issue-112-binding-case-insensitive-lookup`.
+name with the `topic/` (or older `feature/`) segment dropped and remaining slashes flattened to dashes:
+`v17/topic/issue-112-binding-case-insensitive-lookup` → `v17-issue-112-binding-case-insensitive-lookup`.
 
-**The base is the line's own integration branch.** For a `vN/feature/*` branch, root it on
+**The base is the line's own integration branch.** For a `vN/topic/*` branch, root it on
 `origin/vN/dev`; fall back to `origin/vN/main` only if that line has no `dev`. **Version lines
 are never forward-merged** — never root a v17 branch on anything from v18, and vice versa.
 
 **`.githooks/pre-push` rejects any branch that is not** `vN/dev`, `vN/main`,
-`vN/{feature,release,hotfix}/*` or `claude/*`. A workspace on a branch outside that set cannot
+`vN/{topic,release,hotfix}/*` (plus the old `vN/feature/*`) or `claude/*`. A workspace on a branch outside that set cannot
 be pushed, so treat an off-pattern branch as an error rather than creating a tree for it.
 
 **Package feeds need no credentials.** `NuGet.config` is committed and points at public feeds
