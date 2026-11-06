@@ -103,7 +103,7 @@ Added when the triggers were folded into #574 (DECISION-LOG, 06-11-2026). Same p
   Acceptance: `ElementUnpublishedTriggerTests.cs` green.
   depends-on: T16. parallel-group: E
 
-- [ ] **T20** - **wire: the element triggers on a running site.** story: STORY-9 (AC1, AC5, AC6, AC13–AC17, AC21), STORY-10 (AC1–AC3, AC5). Turn on `automation.library-element-triggers.spec.ts` against the LocalDB demo site: the trigger picker's Library group (four triggers), the settings form, an editor's save/publish/unpublish (through the CMS Management API) starting a run, move/trash/restore not starting Element Saved, restore firing Element Unpublished, a folder permission without Read stopping dispatch, and no loop with Update Element Property. Add element trigger aliases and helpers to `ConstantHelper` / `LibraryApiHelper`. Screenshot the trigger picker and Element Saved settings into `screenshots/`.
+- [x] **T20** - **wire: the element triggers on a running site.** story: STORY-9 (AC1, AC5, AC6, AC13–AC17, AC21), STORY-10 (AC1–AC3, AC5). Turn on `automation.library-element-triggers.spec.ts` against the LocalDB demo site: the trigger picker's Library group (four triggers), the settings form, an editor's save/publish/unpublish (through the CMS Management API) starting a run, move/trash/restore not starting Element Saved, restore firing Element Unpublished, a folder permission without Read stopping dispatch, and no loop with Update Element Property. Add element trigger aliases and helpers to `ConstantHelper` / `LibraryApiHelper`. Screenshot the trigger picker and Element Saved settings into `screenshots/`.
   Acceptance: the spec passes against the running demo site.
   depends-on: T17, T18, T19
 
