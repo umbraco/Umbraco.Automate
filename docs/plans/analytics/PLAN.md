@@ -53,7 +53,7 @@
   Acceptance: `Analytics/AnalyticsRowTests` green in `Umbraco.Automate.Tests.Unit`.
   depends-on: T5
 
-- [ ] **T7** - story: AN-6 (AC1 to AC3, AC6). Move `ResolveAccessibleWorkspacesAsync` from `RunSummaryMetricsController` into `MetricsControllerBase` as a protected helper, and make `RunSummaryMetricsController` use it. No behaviour change.
+- [x] **T7** - story: AN-6 (AC1 to AC3, AC6). Move `ResolveAccessibleWorkspacesAsync` from `RunSummaryMetricsController` into `MetricsControllerBase` as a protected helper, and make `RunSummaryMetricsController` use it. No behaviour change.
   Acceptance: the existing `Metrics/RunSummaryMetricsControllerTests` stay green, unchanged.
   depends-on: T4. parallel-group: B
 
