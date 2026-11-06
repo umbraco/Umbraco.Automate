@@ -297,8 +297,8 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
   only on an explicit `'false'`.
 - **`@smoke` gates server-side-only PRs.** Keep the tagged set small and about the site working
   at all: the Automate section loads, the Management API answers, a workspace and an automation
-  can be created. Tag a test `@smoke` only if a broken boot, migration or DI registration would
-  fail it.
+  can be created, and a published automation runs to completion. Tag a test `@smoke` only if a
+  broken boot, migration, DI registration or engine run would fail it.
 - **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
   its own `testCommand`, e.g. `npm run test -- --shard=1/4`), each against its **own** demo site
   and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a
