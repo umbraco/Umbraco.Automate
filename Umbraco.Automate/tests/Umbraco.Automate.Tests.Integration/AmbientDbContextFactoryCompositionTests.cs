@@ -142,8 +142,8 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     /// <summary>
-    /// Released Umbraco.Automate.OpenIddict 18.1.5 calls this overload through InternalsVisibleTo, and
-    /// accepts any Core 18.x, so it must keep composing against newer Core.
+    /// Released Umbraco.Automate.OpenIddict 17.1.5 calls this overload through InternalsVisibleTo, and
+    /// accepts any Core 17.x, so it must keep composing against newer Core.
     /// </summary>
     [Fact]
     public void ObsoleteEnlistOverload_StillRegistersTheAmbientFactory()
