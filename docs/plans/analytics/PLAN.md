@@ -63,7 +63,7 @@
   Acceptance: `Analytics/AnalyticsMetricsControllerTests` green in `Umbraco.Automate.Tests.Unit`.
   depends-on: T6, T7
 
-- [ ] **T9** - **wire: analytics into the Management API.** story: AN-1 (AC1 to AC3), AN-8 (AC6). Register `IAutomateAnalyticsService` in `Umbraco.Automate.Core/Configuration/UmbracoBuilderExtensions.Collections.cs` and `IAutomateAnalyticsRepository` in `Umbraco.Automate.Persistence/Configuration/UmbracoBuilderExtensions.cs`, as singletons like the run service and repository.
+- [x] **T9** - **wire: analytics into the Management API.** story: AN-1 (AC1 to AC3), AN-8 (AC6). Register `IAutomateAnalyticsService` in `Umbraco.Automate.Core/Configuration/UmbracoBuilderExtensions.Collections.cs` and `IAutomateAnalyticsRepository` in `Umbraco.Automate.Persistence/Configuration/UmbracoBuilderExtensions.cs`, as singletons like the run service and repository.
   Acceptance:
   - on the v19 demo site, real backoffice-token requests to all three endpoints return 200 JSON in SPEC's shapes
   - a user without the Automate section gets 403
