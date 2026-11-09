@@ -61,6 +61,7 @@ export default {
         errorBehavior: "Error Behavior",
         retryInterval: "Retry Interval",
         maxRetries: "Max Retries",
+        workspace: "Workspace",
     },
     uaFieldGroups: {
         advancedLabel: "Advanced",
@@ -84,6 +85,10 @@ export default {
         connections: "Connections",
         monitoring: "Monitoring",
         analytics: "Analytics",
+    },
+    uaAnalytics: {
+        allWorkspaces: "All workspaces",
+        last90Days: "Last 90 days",
     },
     uaAutomation: {
         deleteConfirm: "Are you sure you want to delete this automation?",

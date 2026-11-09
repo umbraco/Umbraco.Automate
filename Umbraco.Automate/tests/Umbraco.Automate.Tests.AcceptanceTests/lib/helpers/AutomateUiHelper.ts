@@ -88,7 +88,57 @@ export class AutomateUiHelper {
   get analytics() {
     const page = this.page;
     const monitoringMenu = page.locator('umb-section-sidebar-menu').filter({ has: page.getByRole('heading', { name: 'Monitoring', exact: true }) });
+    const dateRange = page.locator('uaui-date-range');
+    const dialog = page.locator('uaui-date-range-dialog');
+    /* The date range dialog: open it, run `change`, save. */
+    const editDateRange = async (change: () => Promise<void>) => {
+      await dateRange.locator('uui-button').click();
+      await dialog.waitFor();
+      await change();
+      await dialog.locator('uui-button.save').click();
+      await dialog.waitFor({ state: 'detached' });
+    };
+    const isoDaysAgo = (daysAgo: number) => {
+      const date = new Date();
+      date.setDate(date.getDate() - daysAgo);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
     return {
+      /* The `uaui-date-range` in the header. `data-preset` carries the chosen preset id, or `custom`. */
+      dateRange,
+      /* The header's native workspace `<select>`; absent for a user with one workspace. */
+      workspaceSelect: page.locator('ua-analytics-workspace uui-select select'),
+      /* Picks a preset (`last-7-days`, `last-30-days`, `last-90-days`) in the date range dialog and saves. */
+      pickPreset: (presetId: string) =>
+        editDateRange(async () => {
+          await dialog.locator('uui-select[name="preset"] select').selectOption(presetId);
+        }),
+      /* Opens the date range dialog and returns the values of the presets it offers, then closes it. */
+      presetOptionValues: async () => {
+        await dateRange.locator('uui-button').click();
+        await dialog.waitFor();
+        // uui-select adds a hidden empty placeholder option of its own, which an editor can't see or pick.
+        const values = await dialog
+          .locator('uui-select[name="preset"] select')
+          .evaluate((el: HTMLSelectElement) => [...el.options].filter((option) => !option.hidden).map((option) => option.value));
+        await dialog.locator('uui-button[slot="actions"]:not(.save)').click();
+        await dialog.waitFor({ state: 'detached' });
+        return values;
+      },
+      /* Picks a custom range in the dialog, counted back from today, and saves. The dialog's first two
+       * date fields are From and To, in that order (a comparison's two follow them). */
+      pickCustomRange: ({ daysAgoFrom, daysAgoTo }: { daysAgoFrom: number; daysAgoTo: number }) =>
+        editDateRange(async () => {
+          await dialog.locator('uui-select[name="preset"] select').selectOption('custom');
+          await dialog.locator('uaui-date-field').nth(0).locator('input').fill(isoDaysAgo(daysAgoFrom));
+          await dialog.locator('uaui-date-field').nth(1).locator('input').fill(isoDaysAgo(daysAgoTo));
+        }),
+      /* Switches the Compare toggle in the dialog off and saves. */
+      turnComparisonOff: () =>
+        editDateRange(async () => {
+          const toggle = dialog.locator('uaui-compare-group uui-toggle');
+          if (await toggle.evaluate((el: any) => el.checked)) await toggle.click();
+        }),
       monitoringMenu,
       menuItem: monitoringMenu.locator('a[href$="/workspace/ua:analytics"]'),
       activeMenuItem: monitoringMenu.locator('uui-menu-item[active][href$="/workspace/ua:analytics"]'),

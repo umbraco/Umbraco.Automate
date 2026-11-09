@@ -8,10 +8,9 @@ import {
 export const analyticsWorkspaceManifests: Array<UmbExtensionManifest> = [
     {
         type: "workspace",
-        // "default" supplies UMB_WORKSPACE_CONTEXT for the view condition; T13 replaces it with its own api context.
-        kind: "default",
         alias: UA_ANALYTICS_WORKSPACE_ALIAS,
         name: "Analytics Workspace",
+        api: () => import("./analytics-workspace.context.js"),
         element: () => import("./analytics-workspace.element.js"),
         meta: {
             entityType: UA_ANALYTICS_ENTITY_TYPE,

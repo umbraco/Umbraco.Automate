@@ -1,24 +1,25 @@
 // Stories AN-6, AN-7: docs/plans/analytics/STORIES.md
-// Pending until T13 (AN-6 AC5, AC7; AN-7 AC1, AC2, AC4, AC13) and T15 (AN-7 AC3, AC5, AC7).
+// Pending until T15 (AN-7 AC3, AC5, AC7); AN-6 AC5, AC7 and AN-7 AC1, AC2, AC4, AC13 are on.
 import { expect } from '@playwright/test';
 import { test } from '../../../lib/index';
 
 test.describe('Feature: date range, comparison and workspace', () => {
   test.describe('Scenario: the first visit in this browser', () => {
-    test.skip('shows the last 30 days compared with the 30 before', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+    test('shows the last 30 days compared with the 30 before', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
-      await page.evaluate(() => localStorage.clear());
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      await page.evaluate(() => localStorage.clear());
+      await page.reload();
 
       await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset', 'last-30-days');
     });
 
-    test.skip('offers Last 7 days, Last 30 days, Last 90 days and Custom', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+    test('offers Last 7 days, Last 30 days, Last 90 days and Custom', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
-      const presetIds = await umbracoAutomateUi.automate.analytics.dateRange.evaluate((el: any) => el.presets.map((p: { id: string }) => p.id));
+      await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset');
 
-      expect(presetIds).toEqual(['last-7-days', 'last-30-days', 'last-90-days', 'custom']);
+      expect(await umbracoAutomateUi.automate.analytics.presetOptionValues()).toEqual(['last-7-days', 'last-30-days', 'last-90-days', 'custom']);
     });
   });
 
@@ -33,14 +34,45 @@ test.describe('Feature: date range, comparison and workspace', () => {
       await expect.poll(() => requests.sort()).toEqual(['actions', 'automations', 'summary']);
     });
 
-    test.skip('remembers the range and workspace next time', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+    test('remembers the range next time', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
       await umbracoAutomateUi.automate.analytics.pickPreset('last-90-days');
-      await umbracoAutomateUi.automate.analytics.workspaceSelect.selectOption({ label: automateWorkspace.name });
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.sectionUrl());
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
 
       await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset', 'last-90-days');
+    });
+
+    test('remembers the workspace next time', async ({ automateWorkspace, page, umbracoAutomateApi, umbracoAutomateUi }) => {
+      // A second workspace, so the select is shown even on a site with only the fixture's.
+      const second = await umbracoAutomateApi.workspaces.createForTest('Analytics remembered workspace');
+      try {
+        await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+        await umbracoAutomateUi.automate.analytics.workspaceSelect.selectOption(automateWorkspace.id);
+        await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.sectionUrl());
+        await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+
+        await expect(umbracoAutomateUi.automate.analytics.workspaceSelect).toHaveValue(automateWorkspace.id);
+      } finally {
+        await umbracoAutomateApi.workspaces.cleanUp(second.id);
+      }
+    });
+
+    test('ignores a remembered range that ends after today', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      await umbracoAutomateUi.automate.analytics.pickPreset('last-90-days');
+      // Overwrite what was just remembered (under this user's key) with a range in the future.
+      await page.evaluate(() => {
+        const key = Object.keys(localStorage).find((k) => k.startsWith('Ua.Analytics.Filters'))!;
+        const stored = JSON.parse(localStorage.getItem(key)!);
+        stored.range = { from: '2999-01-01', to: '2999-01-31', preset: 'custom' };
+        localStorage.setItem(key, JSON.stringify(stored));
+      });
+      await page.reload();
+
+      await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset', 'last-30-days');
     });
 
     test.skip('shows no change badges with the comparison off', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
@@ -61,30 +93,56 @@ test.describe('Feature: date range, comparison and workspace', () => {
   });
 
   test.describe('Scenario: a user with two workspaces', () => {
-    test.skip('offers All workspaces plus each of their workspaces', async ({ automateWorkspace, page, umbracoAutomateApi, umbracoAutomateUi }) => {
-      const second = await umbracoAutomateApi.workspaces.create('Analytics second workspace');
-      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+    test('offers All workspaces plus each of their workspaces', async ({ automateWorkspace, page, umbracoAutomateApi, umbracoAutomateUi }) => {
+      const second = await umbracoAutomateApi.workspaces.createForTest('Analytics second workspace');
+      try {
+        await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+        await expect(umbracoAutomateUi.automate.analytics.workspaceSelect).toBeVisible();
+        // uui-select adds a hidden empty placeholder option of its own, which an editor can't see or pick.
+        const values = await umbracoAutomateUi.automate.analytics.workspaceSelect.evaluate((el: HTMLSelectElement) =>
+          [...el.options].filter((option) => !option.hidden).map((option) => option.value)
+        );
+        // The site may hold other workspaces, so keep "All workspaces" (empty value) and the two created here.
+        const ids = [automateWorkspace.id, second.id];
+        const offered = values.filter((value, index) => index === 0 || ids.includes(value));
 
-      await expect(umbracoAutomateUi.automate.analytics.workspaceSelect.locator('option')).toHaveCount(3);
+        expect(offered.sort()).toEqual(['', ...ids].sort());
+      } finally {
+        await umbracoAutomateApi.workspaces.cleanUp(second.id);
+      }
     });
   });
 
   test.describe('Sad path', () => {
-    test.skip('hides the workspace select for a user with one workspace', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
-      expect(automateWorkspace.id).toBeTruthy();
+    test('hides the workspace select for a user with one workspace', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+      // The test user is an admin who sees every workspace on the site, so the list is cut down to the
+      // fixture's workspace to stand in for a user with access to just one.
+      await page.route(/\/automate\/management\/api\/v1\/workspaces\?(.*&)?take=100(&.*)?$/, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        const items = body.items.filter((item: { id: string }) => item.id === automateWorkspace.id);
+        await route.fulfill({ response, json: { ...body, items, total: items.length } });
+      });
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset');
 
       await expect(umbracoAutomateUi.automate.analytics.workspaceSelect).toBeHidden();
     });
 
-    test.skip('falls back to all workspaces when the remembered one is gone', async ({ page, umbracoAutomateApi, umbracoAutomateUi }) => {
-      const gone = await umbracoAutomateApi.workspaces.create('Analytics workspace to delete');
-      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
-      await umbracoAutomateUi.automate.analytics.workspaceSelect.selectOption({ label: gone.name });
-      await umbracoAutomateApi.workspaces.delete(gone.id);
-      await page.reload();
+    test('falls back to all workspaces when the remembered one is gone', async ({ automateWorkspace, page, umbracoAutomateApi, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
+      const gone = await umbracoAutomateApi.workspaces.createForTest('Analytics workspace to delete');
+      try {
+        await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+        await umbracoAutomateUi.automate.analytics.workspaceSelect.selectOption(gone.id);
+        await umbracoAutomateApi.workspaces.cleanUp(gone.id);
+        await page.reload();
 
-      await expect(umbracoAutomateUi.automate.analytics.workspaceSelect).toHaveValue('');
+        await expect(umbracoAutomateUi.automate.analytics.workspaceSelect).toHaveValue('');
+      } finally {
+        // Already gone on a passing run; this removes it when the test fails before the delete above.
+        await umbracoAutomateApi.workspaces.deleteById(gone.id);
+      }
     });
   });
 });
