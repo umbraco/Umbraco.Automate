@@ -158,6 +158,35 @@ export class AutomationApiHelper {
     return body.items ?? [];
   }
 
+  /* The data the trigger passed to a run, parsed, from `runs/{id}/trigger-data`. Null when it has none. */
+  async getRunTriggerData(runId: string): Promise<any> {
+    const response = await this.api.get(this.api.baseUrl + this.basePath + 'runs/' + runId + '/trigger-data');
+    await ensureOk(response, `Getting the trigger data of run ${runId}`);
+    const body = await response.json();
+    return body.triggerData ? JSON.parse(body.triggerData) : null;
+  }
+
+  /* Waits until the automation has `count` runs, and returns them (newest first). */
+  async waitForRuns(id: string, count: number = 1, timeout: number = 30000): Promise<any[]> {
+    await expect.poll(async () => (await this.getRuns(id)).length, { timeout }).toBe(count);
+    return await this.getRuns(id);
+  }
+
+  /**
+   * Watches the automation's runs for `windowMs` and fails as soon as the count is not `count`.
+   * This is how a spec shows that something did **not** start a run. A bounded wait can only show
+   * that nothing started within the window: the default is 20 polls of the outbox dispatcher
+   * (OutboxOptions.PollInterval, 500 ms).
+   */
+  async expectRunCountToStay(id: string, count: number, windowMs: number = 10_000, pollMs: number = 1_000) {
+    const deadline = Date.now() + windowMs;
+    do {
+      const runs = await this.getRuns(id);
+      expect(runs, `runs of automation ${id} within ${windowMs} ms`).toHaveLength(count);
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    } while (Date.now() < deadline);
+  }
+
   /* One run, including its per-step runs. The runs listing leaves `stepRuns` empty. */
   async getRun(runId: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId;

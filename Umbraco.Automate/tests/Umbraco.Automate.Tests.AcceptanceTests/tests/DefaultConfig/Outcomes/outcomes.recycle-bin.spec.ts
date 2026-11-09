@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { test, ConstantHelper, automationConnection, automationStep, manualTrigger, uniqueName } from '../../../lib/index';
+import { test, ConstantHelper, LibraryApiHelper, automationConnection, automationStep, manualTrigger, uniqueName } from '../../../lib/index';
 import { CmsContentApiHelper } from '../../../lib/helpers/CmsContentApiHelper';
 
 /**
@@ -52,6 +52,31 @@ async function runToCompletion(umbracoAutomateApi: any, automationId: string): P
   const automation = await umbracoAutomateApi.automations.getById(automationId);
   const aliasById = new Map<string, string>(automation.steps.map((s: any) => [s.id, s.alias]));
   return run.stepRuns.map((stepRun: any) => aliasById.get(stepRun.stepId)) as string[];
+}
+
+
+/** trigger → `actionAlias` alone, for actions with no outcomes (Publish and Unpublish Element). Published. */
+async function seedPublishedStep(
+  umbracoAutomateApi: any,
+  workspaceId: string,
+  actionAlias: string,
+  settings: Record<string, unknown>
+): Promise<{ id: string; stepId: string }> {
+  const step = automationStep(actionAlias, 'branching', settings, { x: 250, y: 200 });
+  const id = await umbracoAutomateApi.automations.create(uniqueName('Outcomes Recycle Bin'), workspaceId, {
+    trigger: manualTrigger(),
+    steps: [step],
+    connections: [automationConnection('trigger', step)]
+  });
+  await umbracoAutomateApi.automations.publish(id);
+  const saved = await umbracoAutomateApi.automations.getById(id);
+  return { id, stepId: umbracoAutomateApi.automations.stepByAlias(saved, 'branching').id };
+}
+
+/* Runs the published automation until it fails; returns the step run of `stepId`. */
+async function runUntilFailed(umbracoAutomateApi: any, automationId: string, stepId: string) {
+  const runId = await umbracoAutomateApi.automations.runUntil(automationId, 'Failed');
+  return umbracoAutomateApi.automations.stepRunOf(await umbracoAutomateApi.automations.getRun(runId), stepId);
 }
 
 test.describe('Content and media in the recycle bin', () => {
@@ -141,6 +166,210 @@ test.describe('Content and media in the recycle bin', () => {
       outcomes.parentNotFound
     );
     await cmsContent.trashMedia(folder.id);
+
+    // Act
+    const ran = await runToCompletion(umbracoAutomateApi, id);
+
+    // Assert
+    expect(ran).toEqual(['branching', 'onNotFound']);
+  });
+});
+
+/**
+ * The same rule for Library elements (R5, R6): an element or folder in the Library recycle bin
+ * counts as missing for every service account. `automateServiceAccountWorkspace` runs as
+ * Administrators, which has root Library access, as the content cases above do. Create Element
+ * also runs for an account whose Library start node is a folder (STORY-7 AC12), the one element
+ * criterion that names that account.
+ */
+test.describe('Library elements in the recycle bin', () => {
+  // STORY-2 AC9
+  test('Get Element takes the notFound path for a trashed element', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateApi,
+    library
+  }) => {
+    // Arrange
+    const element = await library.element('Trashed Element', { publish: true });
+    const id = await seedPublished(
+      umbracoAutomateApi,
+      automateServiceAccountWorkspace.id,
+      actions.getElement,
+      { elementKey: element.id },
+      outcomes.notFound
+    );
+    await library.trash(element.id);
+
+    // Act
+    const ran = await runToCompletion(umbracoAutomateApi, id);
+
+    // Assert
+    expect(ran).toEqual(['branching', 'onNotFound']);
+  });
+
+  // STORY-3 AC7
+  test('Get Element Property takes the notFound path for a trashed element', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateApi,
+    library
+  }) => {
+    // Arrange
+    const element = await library.element('Trashed Element', { publish: true });
+    const id = await seedPublished(
+      umbracoAutomateApi,
+      automateServiceAccountWorkspace.id,
+      actions.getElementProperty,
+      { elementKey: element.id, propertyAlias: LibraryApiHelper.propertyAlias },
+      outcomes.notFound
+    );
+    await library.trash(element.id);
+
+    // Act
+    const ran = await runToCompletion(umbracoAutomateApi, id);
+
+    // Assert
+    expect(ran).toEqual(['branching', 'onNotFound']);
+  });
+
+  // STORY-4 AC14
+  test('Update Element Property takes the notFound path for a trashed element', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateApi,
+    library
+  }) => {
+    // Arrange
+    const element = await library.element('Trashed Element');
+    const id = await seedPublished(
+      umbracoAutomateApi,
+      automateServiceAccountWorkspace.id,
+      actions.updateElementProperty,
+      { elementKey: element.id, propertyAlias: LibraryApiHelper.propertyAlias, value: 'never written' },
+      outcomes.notFound
+    );
+    await library.trash(element.id);
+
+    // Act
+    const ran = await runToCompletion(umbracoAutomateApi, id);
+
+    // Assert
+    expect(ran).toEqual(['branching', 'onNotFound']);
+  });
+
+  // STORY-5 AC9
+  test('Publish Element fails the step for a trashed element', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateApi,
+    library
+  }) => {
+    // Arrange: an unpublished element, trashed after the automation is published.
+    const element = await library.element('Trashed Element');
+    const { id, stepId } = await seedPublishedStep(
+      umbracoAutomateApi,
+      automateServiceAccountWorkspace.id,
+      actions.publishElement,
+      { elementKey: element.id }
+    );
+    await library.trash(element.id);
+
+    // Act
+    const stepRun = await runUntilFailed(umbracoAutomateApi, id, stepId);
+
+    // Assert
+    expect(stepRun.status).toBe('Failed');
+  });
+
+  // STORY-5 AC9
+  test('Publish Element leaves a trashed element unpublished', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateApi,
+    umbracoApi,
+    library
+  }) => {
+    // Arrange: as above.
+    const element = await library.element('Trashed Element');
+    const { id, stepId } = await seedPublishedStep(
+      umbracoAutomateApi,
+      automateServiceAccountWorkspace.id,
+      actions.publishElement,
+      { elementKey: element.id }
+    );
+    await library.trash(element.id);
+
+    // Act
+    await runUntilFailed(umbracoAutomateApi, id, stepId);
+
+    // Assert
+    expect(await umbracoApi.element.isElementPublished(element.id)).toBe(false);
+  });
+
+  // STORY-6 AC7
+  test('Unpublish Element fails the step for a trashed element', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateApi,
+    library
+  }) => {
+    // Arrange: a published element, trashed after the automation is published. The criterion's
+    // "the CMS's unpublish is never called" is the unit spec's to prove; through the site, the
+    // step failing is what shows.
+    const element = await library.element('Trashed Element', { publish: true });
+    const { id, stepId } = await seedPublishedStep(
+      umbracoAutomateApi,
+      automateServiceAccountWorkspace.id,
+      actions.unpublishElement,
+      { elementKey: element.id }
+    );
+    await library.trash(element.id);
+
+    // Act
+    const stepRun = await runUntilFailed(umbracoAutomateApi, id, stepId);
+
+    // Assert
+    expect(stepRun.status).toBe('Failed');
+  });
+
+  // STORY-7 AC11
+  test('Create Element takes the parentNotFound path under a trashed folder', async ({
+    automateServiceAccountWorkspace,
+    umbracoAutomateApi,
+    library
+  }) => {
+    // Arrange
+    const reviews = await library.folder('Trashed Reviews');
+    const elementType = await library.elementType();
+    const id = await seedPublished(
+      umbracoAutomateApi,
+      automateServiceAccountWorkspace.id,
+      actions.createElement,
+      { folderKey: reviews.id, elementType: elementType.id, name: uniqueName('Never Created') },
+      outcomes.parentNotFound
+    );
+    await library.trash(reviews.id, true);
+
+    // Act
+    const ran = await runToCompletion(umbracoAutomateApi, id);
+
+    // Assert
+    expect(ran).toEqual(['branching', 'onNotFound']);
+  });
+
+  // STORY-7 AC12
+  test('Create Element takes the parentNotFound path under a trashed folder for a folder-scoped account', async ({
+    umbracoAutomateApi,
+    library
+  }) => {
+    // Arrange: an account whose Library start node is "Schema snippets", and "Reviews" inside it.
+    const snippets = await library.folder('Schema snippets');
+    const reviews = await library.folder('Trashed Reviews', snippets.id);
+    const elementType = await library.elementType();
+    const workspace = await library.workspaceStartingAt(snippets.id);
+    const id = await seedPublished(
+      umbracoAutomateApi,
+      workspace.id,
+      actions.createElement,
+      { folderKey: reviews.id, elementType: elementType.id, name: uniqueName('Never Created') },
+      outcomes.parentNotFound
+    );
+    await library.trash(reviews.id, true);
 
     // Act
     const ran = await runToCompletion(umbracoAutomateApi, id);

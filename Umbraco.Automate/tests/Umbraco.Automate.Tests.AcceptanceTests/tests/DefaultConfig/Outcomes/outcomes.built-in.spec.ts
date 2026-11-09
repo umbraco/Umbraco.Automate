@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 import {
   test,
   ConstantHelper,
+  LibraryApiHelper,
   automationConnection,
   automationStep,
   manualTrigger,
@@ -29,12 +30,16 @@ function marker(alias: string, x: number) {
   return automationStep(actions.setVariable, alias, { name: alias, value: alias }, { x, y: 450 });
 }
 
-/** trigger → `actionAlias` (alias "branching"), with an `onSuccess` and an `onNotFound` step on its exits. */
+/**
+ * trigger → `actionAlias` (alias "branching"), with an `onSuccess` and an `onNotFound` step on its
+ * exits. `notFoundOutcome` names the second exit, for actions whose not-found exit has another key.
+ */
 async function seedBranching(
   umbracoAutomateApi: any,
   workspaceId: string,
   actionAlias: string,
-  settings: Record<string, unknown>
+  settings: Record<string, unknown>,
+  notFoundOutcome: string = outcomes.notFound
 ): Promise<Seeded> {
   const branching = automationStep(actionAlias, 'branching', settings, { x: 250, y: 200 });
   const onSuccess = marker('onSuccess', 100);
@@ -45,7 +50,7 @@ async function seedBranching(
     connections: [
       automationConnection('trigger', branching),
       automationConnection(branching, onSuccess, outcomes.success),
-      automationConnection(branching, onNotFound, outcomes.notFound)
+      automationConnection(branching, onNotFound, notFoundOutcome)
     ]
   });
   const saved = await umbracoAutomateApi.automations.getById(id);
@@ -159,6 +164,250 @@ test.describe('Built-in content and media outcomes', () => {
     });
   });
 
+  test.describe('Get Element', () => {
+    // STORY-2 AC8
+    test('takes the notFound path for an element key that does not exist', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi
+    }) => {
+      // Arrange
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.getElement, {
+        elementKey: randomUUID()
+      });
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onNotFound']);
+    });
+  });
+
+  test.describe('Get Element Property', () => {
+    // STORY-3 AC6
+    test('takes the notFound path for an element key that does not exist', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi
+    }) => {
+      // Arrange
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.getElementProperty, {
+        elementKey: randomUUID(),
+        propertyAlias: LibraryApiHelper.propertyAlias
+      });
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onNotFound']);
+    });
+
+    // STORY-3 AC8
+    test('takes the propertyNotFound path for a property the element type does not have', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi,
+      library
+    }) => {
+      // Arrange: a published element whose type has no `rating` property.
+      const element = await library.element('G2 review rating', { publish: true });
+      const { id } = await seedBranching(
+        umbracoAutomateApi,
+        automateServiceAccountWorkspace.id,
+        actions.getElementProperty,
+        { elementKey: element.id, propertyAlias: 'rating' },
+        outcomes.propertyNotFound
+      );
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onNotFound']);
+    });
+  });
+
+  test.describe('Update Element Property', () => {
+    // STORY-4 AC1
+    test('writes the value to the element', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi,
+      library
+    }) => {
+      // Arrange: an element whose property holds "old".
+      const element = await library.element('G2 review rating', { text: 'old' });
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.updateElementProperty, {
+        elementKey: element.id,
+        propertyAlias: LibraryApiHelper.propertyAlias,
+        value: 'new'
+      });
+
+      // Act
+      await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert: the element's saved value is "new".
+      expect(await library.propertyValue(element.id)).toBe('new');
+    });
+
+    // STORY-4 AC12
+    test('takes the notFound path for an element key that does not exist', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi
+    }) => {
+      // Arrange
+      const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.updateElementProperty, {
+        elementKey: randomUUID(),
+        propertyAlias: LibraryApiHelper.propertyAlias,
+        value: 'never written'
+      });
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onNotFound']);
+    });
+
+    // STORY-4 AC16
+    test('takes the propertyNotFound path for a property the element type does not have', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi,
+      library
+    }) => {
+      // Arrange: an element whose type has no `rating` property.
+      const element = await library.element('G2 review rating');
+      const { id } = await seedBranching(
+        umbracoAutomateApi,
+        automateServiceAccountWorkspace.id,
+        actions.updateElementProperty,
+        { elementKey: element.id, propertyAlias: 'rating', value: 'never written' },
+        outcomes.propertyNotFound
+      );
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onNotFound']);
+    });
+  });
+
+  test.describe('Create Element', () => {
+    // STORY-7 AC1
+    test('creates an element of the type and name in the folder', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi,
+      library
+    }) => {
+      // Arrange: folder "Reviews" and element type "Schema snippet".
+      const reviews = await library.folder('Reviews');
+      const elementType = await library.elementType('Schema snippet');
+      const name = uniqueName('Acme – AggregateRating');
+      const { id } = await seedBranching(
+        umbracoAutomateApi,
+        automateServiceAccountWorkspace.id,
+        actions.createElement,
+        {
+          folderKey: reviews.id,
+          elementType: elementType.id,
+          name
+        },
+        outcomes.parentNotFound
+      );
+
+      // Act
+      await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert: an element of that type, with that name, is in "Reviews".
+      const created = await library.adoptByName(name);
+      expect(await library.childNames(reviews.id)).toContain(name);
+      expect(created?.documentType?.id).toBe(elementType.id);
+    });
+
+    // STORY-7 AC1
+    test('takes the success path when the element is created', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi,
+      library
+    }) => {
+      // Arrange: as above.
+      const reviews = await library.folder('Reviews');
+      const elementType = await library.elementType('Schema snippet');
+      const name = uniqueName('Acme – AggregateRating');
+      const { id } = await seedBranching(
+        umbracoAutomateApi,
+        automateServiceAccountWorkspace.id,
+        actions.createElement,
+        {
+          folderKey: reviews.id,
+          elementType: elementType.id,
+          name
+        },
+        outcomes.parentNotFound
+      );
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+      await library.adoptByName(name);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onSuccess']);
+    });
+
+    // STORY-7 AC10
+    test('takes the parentNotFound path for a folder key that does not exist', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi,
+      library
+    }) => {
+      // Arrange
+      const elementType = await library.elementType();
+      const { id } = await seedBranching(
+        umbracoAutomateApi,
+        automateServiceAccountWorkspace.id,
+        actions.createElement,
+        {
+          folderKey: randomUUID(),
+          elementType: elementType.id,
+          name: uniqueName('Never created')
+        },
+        outcomes.parentNotFound
+      );
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onNotFound']);
+    });
+
+    // STORY-7 AC14
+    test('takes the elementTypeNotFound path for an element type key that does not exist', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateApi,
+      library
+    }) => {
+      // Arrange: a real folder, so only the element type is missing.
+      const reviews = await library.folder('Reviews');
+      const { id } = await seedBranching(
+        umbracoAutomateApi,
+        automateServiceAccountWorkspace.id,
+        actions.createElement,
+        {
+          folderKey: reviews.id,
+          elementType: randomUUID(),
+          name: uniqueName('Never created')
+        },
+        outcomes.elementTypeNotFound
+      );
+
+      // Act
+      const { ran } = await runToCompletion(umbracoAutomateApi, id);
+
+      // Assert
+      expect(ran).toEqual(['branching', 'onNotFound']);
+    });
+  });
+
   test.describe('exits on the canvas', () => {
     test('Get Content Property shows its description as the Found exit tooltip', async ({
       automateServiceAccountWorkspace,
@@ -225,6 +474,37 @@ test.describe('Built-in content and media outcomes', () => {
         outcomeLabels.withDefault(outcomeLabels.updated),
         outcomeLabels.notFound,
         outcomeLabels.propertyNotFound
+      ]);
+    });
+
+    // STORY-8 AC9
+    test('Create Element draws Created (default), Folder not found and Element type not found', async ({
+      automateServiceAccountWorkspace,
+      umbracoAutomateUi,
+      umbracoAutomateApi
+    }) => {
+      // Arrange
+      const { id, branchingId } = await seedBranching(
+        umbracoAutomateApi,
+        automateServiceAccountWorkspace.id,
+        actions.createElement,
+        {
+          folderKey: randomUUID(),
+          elementType: randomUUID(),
+          name: 'x'
+        },
+        outcomes.parentNotFound
+      );
+
+      // Act
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.automationEditUrl(id));
+      await umbracoAutomateUi.automate.waitForCanvas();
+
+      // Assert
+      await expect(umbracoAutomateUi.automate.outcomeExits(branchingId)).toHaveText([
+        outcomeLabels.withDefault(outcomeLabels.created),
+        outcomeLabels.folderNotFound,
+        outcomeLabels.elementTypeNotFound
       ]);
     });
   });

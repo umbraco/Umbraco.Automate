@@ -508,6 +508,8 @@ public class AutomationActionAuthorizerTests
         var sut = new AutomationActionAuthorizer(
             content.Object,
             media.Object,
+            Mock.Of<IElementPermissionService>(),
+            Mock.Of<IElementContainerPermissionService>(),
             accessor.Object,
             _entityService.Object,
             NullLogger<AutomationActionAuthorizer>.Instance);

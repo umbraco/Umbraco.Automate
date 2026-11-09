@@ -282,6 +282,25 @@ export class AutomateUiHelper {
   }
 
   /**
+   * The group headlines in the action picker, in the order shown. A group's headline is a `uui-box`
+   * property, not an attribute, so it is read in the page.
+   */
+  async pickerGroupHeadlines(): Promise<string[]> {
+    return await this.nodePickerModal
+      .locator('uui-box')
+      .evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement & { headline: string }).headline));
+  }
+
+  /** The names of the actions listed in the picker's `index`th group. */
+  async pickerGroupItemNames(index: number): Promise<(string | null)[]> {
+    return await this.nodePickerModal
+      .locator('uui-box')
+      .nth(index)
+      .locator('uui-ref-node')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('name')));
+  }
+
+  /**
    * Narrows the action picker with its search box.
    *
    * Waits for the list first: the catalogue loads asynchronously, and a query typed while it is
@@ -606,6 +625,52 @@ export class AutomateUiHelper {
 
   /* --- Step settings: bindable fields -------------------------------------------------- */
 
+  /* --- Triggers ------------------------------------------------------------------------- */
+
+  get triggerSettingsModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.triggerSettingsModal);
+  }
+
+  /* One field of the open trigger settings form, by its settings key (`elementTypes`). */
+  triggerSettingsField(key: string): Locator {
+    return this.triggerSettingsModal.locator(`umb-property[alias="${key}"]`);
+  }
+
+  /* The empty-canvas placeholder the trigger node shows until a trigger is chosen. */
+  get triggerPlaceholder(): Locator {
+    return this.triggerNode.locator('button.ua-node--placeholder');
+  }
+
+  /* Opens the trigger picker (`ua-node-picker-modal` in trigger mode) from the empty trigger node. */
+  async openTriggerPicker() {
+    await this.triggerPlaceholder.click({ force: true });
+    await this.nodePickerModal.waitFor({ state: 'visible' });
+  }
+
+  async waitForTriggerSettingsForm() {
+    await this.triggerSettingsModal.waitFor({ state: 'visible' });
+    await this.triggerSettingsModal.locator('ua-settings-form').waitFor({ state: 'attached' });
+  }
+
+  /* Opens the settings of the trigger already on the canvas. */
+  async openTriggerSettings() {
+    await this.triggerNode.getByRole('button', { name: 'Settings', exact: true }).click({ force: true });
+    await this.waitForTriggerSettingsForm();
+  }
+
+  /* Opens the document type picker of a trigger settings field. */
+  async openTriggerDocumentTypePicker(key: string) {
+    await this.clickInModal(this.triggerSettingsField(key).locator('uui-button#btn-add'));
+    await this.documentPickerModal.waitFor({ state: 'visible' });
+  }
+
+  /* Saves the trigger settings modal. Closing it without saving rolls a freshly picked trigger back. */
+  async submitTriggerSettings() {
+    await this.waitForTriggerSettingsForm();
+    await this.clickInModal(this.triggerSettingsModal.locator('[slot="actions"] uui-button[look="primary"]'));
+    await this.triggerSettingsModal.waitFor({ state: 'detached' });
+  }
+
   /* One field of the open step settings form, by its settings key (`contentKey`). */
   settingsField(key: string): Locator {
     return this.nodeSettingsModal.locator(`umb-property[alias="${key}"]`);
@@ -686,6 +751,39 @@ export class AutomateUiHelper {
    * state, which is what drives the "required" message, rather than the message's wording. */
   async isFieldMissing(key: string): Promise<boolean> {
     return await this.bindableEditor(key).evaluate((el) => (el as HTMLElement & { validity: ValidityState }).validity.valueMissing);
+  }
+
+  /* The card a Library element picker shows for the picked element or folder. `ua-element-key-picker`
+   * renders the pick as `umb-entity-item-ref` with the item's key as its id. It stays, in its error
+   * state, when the key no longer resolves. */
+  pickedElementRef(key: string, elementKey: string): Locator {
+    return this.settingsField(key).locator(`umb-entity-item-ref[id="${elementKey}"]`);
+  }
+
+  /* The error row the element picker shows when the saved key no longer resolves. */
+  elementNotFoundRef(key: string, elementKey: string): Locator {
+    return this.pickedElementRef(key, elementKey).locator('uui-ref-node[style*="danger"]');
+  }
+
+  /* The Remove button on the element picker's card. */
+  removeElementButton(key: string, elementKey: string): Locator {
+    return this.pickedElementRef(key, elementKey).locator('uui-action-bar uui-button');
+  }
+
+  /* An item listed in the open tree picker modal, by its name. */
+  treePickerItem(name: string): Locator {
+    return this.documentPickerModal.locator(`uui-menu-item[label="${name}"]`);
+  }
+
+  /* Picks a Library element or folder in a field's element picker. Same tree picker modal as `pickDocument`. */
+  async pickElement(key: string, elementName: string) {
+    await this.pickDocument(key, elementName);
+  }
+
+  /* Whether a field that is not wrapped in `ua-bindable-editor` is marked invalid. The CMS sets
+   * `invalid` on the field's `umb-property-layout` when validation fails. */
+  fieldLayout(key: string): Locator {
+    return this.settingsField(key).locator('umb-property-layout');
   }
 
   get documentPickerModal(): Locator {

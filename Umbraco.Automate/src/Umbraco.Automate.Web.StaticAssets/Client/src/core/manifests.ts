@@ -17,6 +17,8 @@ import { memberTypePickerManifests } from "./components/member-type-picker/manif
 import { userGroupPickerManifests } from "./components/user-group-picker/manifests.js";
 import { automationPickerManifests } from "./components/automation-picker/manifests.js";
 import { mediaKeyPickerManifests } from "./components/media-key-picker/manifests.js";
+import { elementKeyPickerManifests } from "./components/element-key-picker/manifests.js";
+import { documentTypePickerManifests } from "./components/document-type-picker/manifests.js";
 
 export const manifests: UmbExtensionManifest[] = [
     ...versionHistoryManifests,
@@ -38,4 +40,6 @@ export const manifests: UmbExtensionManifest[] = [
     ...userGroupPickerManifests,
     ...automationPickerManifests,
     ...mediaKeyPickerManifests,
+    ...elementKeyPickerManifests,
+    ...documentTypePickerManifests,
 ];
