@@ -115,7 +115,7 @@
   Acceptance: frontend build green. The listed criteria go green through T15 and T17's acceptance specs, which use this code.
   depends-on: T12, T13
 
-- [ ] **T15** - story: AN-2 (AC9 to AC11), AN-3 (AC6 to AC10), AN-7 (AC3, AC5, AC7). Build the top of the Overview view to match `mockups/analytics.png`:
+- [x] **T15** - story: AN-2 (AC9 to AC11), AN-3 (AC6 to AC10), AN-7 (AC3, AC5, AC7). Build the top of the Overview view to match `mockups/analytics.png`:
   - five `uaui-kpi-tile`s (Runs, Success rate with `delta-unit="points"`, Failed runs and Median run time with `lower-is-better`, Waiting for approval as an `href` to the Approvals dashboard)
   - the retention info line (R7)
   - "Runs over time" with `uaui-group-by` (day, week, month) and a stacked-bar `uaui-time-series-chart` with the comparison
@@ -133,7 +133,7 @@
   depends-on: T15
 
 - [ ] **T17** - story: AN-5 (AC8 to AC11). Add the Actions box to the view, in the same pattern: action name, runs (share), failure rate (percent, points, `lowerIsBetter`), retries, average run time (`lowerIsBetter`), most common error.
-  Each actions row carries `data-alias` and `data-top-error` (`none`, `other` or the category name) so specs don't depend on labels. Add `actionsTable` and `actionRow(alias)` to `AutomateUiHelper.analytics` first. Acceptance: `Analytics/analytics.actions.spec.ts` green.
+  Each actions row carries `data-alias` and `data-top-error` (`none`, `other` or the category name) so specs don't depend on labels. Add `actionsTable` and `actionRow(alias)` to `AutomateUiHelper.analytics` first. Acceptance: `Analytics/analytics.actions.spec.ts` green, and `Analytics/analytics.filters.spec.ts` AN-7 AC3 (re-skipped in T15 until the automations and actions requests exist) un-skipped and green.
   depends-on: T16
 
 - [ ] **T18** - story: AN-8 (AC3, AC5). In `section/dashboard/automate-dashboard.element.ts`, add the line under the status cards that links to Analytics (`mockups/overview.png`). It's left out in both welcome states. Add its `lang/en.ts` key.
