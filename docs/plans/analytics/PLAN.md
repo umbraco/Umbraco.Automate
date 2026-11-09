@@ -73,7 +73,7 @@
 
 ## Backoffice
 
-- [ ] **T10** - story: AN-3 (AC9). Add the Analytics UI dependency:
+- [x] **T10** - story: AN-3 (AC9). Add the Analytics UI dependency:
   - `Umbraco.Analytics.UI` in the root `Directory.Packages.props` and as a `PackageReference` in `Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj`, pinned to MyGet nightly `19.0.0-alpha.1`. The `[19.0.0, 19.999.999)` range can't admit a prerelease below 19.0.0; T20 swaps it.
   - `@umbraco/analytics-ui` as a devDependency in `Client/package.json`, by the MyGet tarball URL of `19.0.0-alpha.1` (`https://www.myget.org/F/umbraconightly/npm/@umbraco/analytics-ui/-/@umbraco/analytics-ui-19.0.0-alpha.1.tgz`). Don't add an `.npmrc` scope: it would send every `@umbraco/` package to MyGet.
   - run `npm install` at the repo root, since this is an npm workspace
