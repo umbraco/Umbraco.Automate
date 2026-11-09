@@ -5,6 +5,7 @@ using Examine.Lucene.Search;
 using Examine.Search;
 using Lucene.Net.QueryParsers.Classic;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
@@ -22,6 +23,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// A built-in action that searches content by name, optionally restricted by content type.
 /// Queries the Examine <c>ExternalIndex</c> (published content) by default, or the
 /// <c>InternalIndex</c> when <see cref="FindContentSettings.IncludeUnpublished"/> is true.
+/// Items in the recycle bin are never matched.
 /// </summary>
 [Action("umbracoAutomate.findContent", "Find Content",
     Description = "Finds content items by name, optionally filtered by content type.",
@@ -32,6 +34,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class FindContentAction : ActionBase<FindContentSettings, FindContentOutput>
 {
     // Not ICmsAction — this is a read, so no audit trail entry is written.
+
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
 
     /// <summary>Outcome emitted when no content matches.</summary>
     public const string OutcomeNotFound = "notFound";
@@ -69,6 +77,14 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
         _authorizer = authorizer;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -240,6 +256,12 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
             query += $" +({aliasClause})";
         }
 
+        // Leave out items in the recycle bin. "Include unpublished" searches the internal index,
+        // which keeps them, and the permission filter only drops them for start-node-scoped
+        // service accounts, never for a root one. Excluding them in the query (as the CMS's own
+        // backoffice search does) also keeps them from using up the Limit.
+        query += $" -{UmbracoExamineFieldNames.IndexPathFieldName}:{QueryParserBase.Escape(UmbracoConstants.System.RecycleBinContentPathPrefix)}*";
+
         return query;
     }
 
@@ -334,8 +356,8 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
             Path = TryGetString(result, "__Path"),
             Url = url,
             Culture = string.IsNullOrWhiteSpace(culture) ? null : culture,
-            CreateDate = TryParseDate(result, "createDate"),
-            UpdateDate = TryParseDate(result, "updateDate"),
+            CreateDate = IndexedDateParser.Parse(TryGetString(result, "createDate")),
+            UpdateDate = IndexedDateParser.Parse(TryGetString(result, "updateDate")),
         };
     }
 
@@ -362,28 +384,4 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
            && int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
             ? value
             : 0;
-
-    private static DateTime TryParseDate(ISearchResult result, string field)
-    {
-        var raw = TryGetString(result, field);
-        if (raw is null)
-        {
-            return default;
-        }
-
-        // Umbraco's Examine indexer encodes dates via Lucene's DateTools, which writes
-        // them as yyyyMMddHHmmssfff (milliseconds resolution) — the default DateTime
-        // parsers don't recognise that shape, so try the exact format first.
-        if (DateTime.TryParseExact(raw, "yyyyMMddHHmmssfff", CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var exact))
-        {
-            return exact;
-        }
-
-        // Fallback for indexers or custom fields that emit ISO-8601.
-        return DateTime.TryParse(raw, CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var value)
-            ? value
-            : default;
-    }
 }

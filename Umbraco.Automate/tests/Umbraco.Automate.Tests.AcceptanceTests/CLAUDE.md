@@ -191,9 +191,12 @@ fetched from a legacy CDN path that stalls on hosted agents. Keep this at 1.60.0
 
 ## Selector & assertion hygiene
 
-- **Do not assert on user-facing labels.** They get localised and break selectors. The one
-  deliberate exception is the section tab in `UiHelpers.goToAutomateSection`, which has no
-  stable alternative; its label lives in `ConstantHelper.sections.automate`.
+- **Do not assert on user-facing labels.** They get localised and break selectors. The
+  deliberate exceptions are the section tab in `UiHelpers.goToAutomateSection`, which has no
+  stable alternative (its label lives in `ConstantHelper.sections.automate`), and the outcome-exit
+  specs, whose acceptance criteria are about the English exit labels. Those live in
+  `ConstantHelper.outcomeLabels` (use `withDefault()` for the "(default)" mark) and
+  `ConstantHelper.staleOutcomeError()`; never spell them out in a spec.
 - Prefer per-property `expect()` over opaque boolean helpers. `AutomationApiHelper.getFullByName`
   exists so a failure pinpoints the exact field.
 - Expect pointer interception on elements under a resizable `umb-split-panel` divider and on
@@ -279,13 +282,23 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
   PR's changed files into areas (the table is in the comment above it in `azure-pipelines.yml`;
   update it when you add a project or move code). A PR touching only docs, repo tooling or the
   .NET unit/integration test projects skips the suite. A PR whose only acceptance changes are
-  specs or helpers (`tests/`, `lib/`, `umbraco.config.ts`) runs **one** unsharded leg with
-  Playwright's `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec
-  importing a changed file, plus the setup project. `package*.json`, `playwright.config.ts`,
-  `tsconfig.json` or install-script changes, and any product change, run the whole suite, because
-  specs don't import those files and `--only-changed` would miss them. Pushes always run the whole
-  suite. Use `HEAD~1`, never `HEAD^1`: npm runs the script through cmd.exe on Windows, where `^`
-  is the escape character. The job condition skips only on an explicit `'false'`.
+  specs (`tests/`, `umbraco.config.ts`) runs **one** unsharded leg with Playwright's
+  `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec importing a
+  changed file, plus the setup project. `lib/` changes run the whole sharded suite: every spec
+  imports `lib/index`, so `--only-changed` would pick everything and run it on one agent.
+  `package*.json`, `playwright.config.ts`, `tsconfig.json` or install-script changes run the whole
+  suite too, because specs don't import those files and `--only-changed` would miss them. A PR
+  whose only product changes are server-side C# outside the Management API and the frontends
+  (core `Umbraco.Automate/src/` except `Umbraco.Automate.Web` and `.Web.StaticAssets`, and the
+  OpenIddict and Slack `src/` except OpenIddict's `Client/`) runs **one** leg of the `@smoke`
+  tests; any other product change runs the whole suite. Pushes always run the whole suite, and so
+  does a manual run, which is how to force it for a PR. Use `HEAD~1`, never `HEAD^1`: npm runs the
+  script through cmd.exe on Windows, where `^` is the escape character. The job condition skips
+  only on an explicit `'false'`.
+- **`@smoke` gates server-side-only PRs.** Keep the tagged set small and about the site working
+  at all: the Automate section loads, the Management API answers, a workspace and an automation
+  can be created, and a published automation runs to completion. Tag a test `@smoke` only if a
+  broken boot, migration, DI registration or engine run would fail it.
 - **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
   its own `testCommand`, e.g. `npm run test -- --shard=1/4`), each against its **own** demo site
   and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a

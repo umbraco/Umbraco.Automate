@@ -90,6 +90,45 @@ public class GetContentPropertyActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetContentPropertySettings { ContentKey = key.ToString(), PropertyAlias = "title" }), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetContentPropertySettings { ContentKey = key.ToString(), PropertyAlias = "title" }), CancellationToken.None);
+
+        result.Outcome.ShouldBe("notFound");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NodeAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetContentPropertySettings { ContentKey = key.ToString(), PropertyAlias = "title" }), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ContentNotFound_ReturnsNotFoundOutcome()
     {
         var contentKey = Guid.NewGuid();

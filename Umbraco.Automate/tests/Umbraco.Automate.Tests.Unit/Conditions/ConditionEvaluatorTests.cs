@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Shouldly;
 using Umbraco.Automate.Core.Actions.BuiltIn;
@@ -22,6 +23,24 @@ public class ConditionEvaluatorTests
     {
         var set = BuildSingleCondition("hello", ConditionOperator.Equals, "hello");
         _evaluator.Evaluate(set, EmptyData).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Condition_WithUnknownFilter_Throws()
+    {
+        // Control-flow conditions and connection filters must not silently compare the
+        // unfiltered value when a filter name is mistyped.
+        var set = BuildSingleCondition("${ trigger.name | lowercse }", ConditionOperator.Equals, "jane");
+
+        Should.Throw<UnknownBindingFilterException>(() => _evaluator.Evaluate(set, EmptyData));
+    }
+
+    [Fact]
+    public void IsEmptyCondition_WithUnknownFilter_Throws()
+    {
+        var set = BuildSingleCondition("${ trigger.name | lowercse }", ConditionOperator.IsEmpty, string.Empty);
+
+        Should.Throw<UnknownBindingFilterException>(() => _evaluator.Evaluate(set, EmptyData));
     }
 
     [Fact]
@@ -383,6 +402,40 @@ public class ConditionEvaluatorTests
         _evaluator.Evaluate(set, EmptyData).ShouldBeTrue(); // "banana" > "apple" lexically
     }
 
+    // Regression (#489): on a comma-decimal server the bound number stringified as
+    // "0,99…" and the literal "0.8" parsed as 8, so the If step took the false branch.
+    // A literal typed with the server's own separator ("0,8") must keep working too.
+    public static TheoryData<object, string, bool> CommaDecimalCultureCases => new()
+    {
+        { 0.9999942779854932m, "0.8", true },
+        { 0.9999942779854932d, "0.8", true },
+        { 0.9999942779854932m, "0,8", true },
+
+        // A dot always reads as the decimal point, so "1.000" is 1, not 1000 as da-DK would read it.
+        { 1.5m, "1.000", true },
+
+        // Small doubles stringify with an exponent ("1E-05"); they must still compare as numbers.
+        { 0.00001d, "0.001", false },
+    };
+
+    [Theory]
+    [MemberData(nameof(CommaDecimalCultureCases))]
+    public void GreaterThan_NumberBindingOnCommaDecimalCulture_ComparesAsNumbers(object value, string right, bool expected)
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?>
+            {
+                ["classify"] = new Dictionary<string, object?> { ["confidence"] = value },
+            },
+        };
+        var set = BuildSingleCondition("${ steps.classify.confidence }", ConditionOperator.GreaterThan, right);
+
+        var result = WithCulture("da-DK", () => _evaluator.Evaluate(set, data));
+
+        result.ShouldBe(expected);
+    }
+
     #endregion
 
     #region Approval Output — the shape an If step branches on
@@ -446,6 +499,20 @@ public class ConditionEvaluatorTests
     }
 
     #endregion
+
+    private static T WithCulture<T>(string culture, Func<T> act)
+    {
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+        try
+        {
+            return act();
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
 
     private static ConditionSet BuildSingleCondition(string left, ConditionOperator op, string right)
     {

@@ -34,19 +34,32 @@ internal sealed class ExecutionNodeEligibility : IExecutionNodeEligibility
 {
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IOptions<ExecutionOptions> _executionOptions;
+    private readonly AutomateReadinessSignal _readinessSignal;
 
     public ExecutionNodeEligibility(
         IServerRoleAccessor serverRoleAccessor,
-        IOptions<ExecutionOptions> executionOptions)
+        IOptions<ExecutionOptions> executionOptions,
+        AutomateReadinessSignal readinessSignal)
     {
         _serverRoleAccessor = serverRoleAccessor;
         _executionOptions = executionOptions;
+        _readinessSignal = readinessSignal;
     }
 
     public bool CanExecuteWorkflows() => CanExecuteWorkflows(out _);
 
     public bool CanExecuteWorkflows(out string? reason)
     {
+        // Checked before the execution mode: with the WorkflowCore host stopped, this node runs
+        // nothing, so it must leave work pending (for another node, or for itself after a restart).
+        if (_readinessSignal.EngineStartFailed)
+        {
+            reason =
+                "The automation engine did not start on this node because startup recovery failed. " +
+                "Check the log for the error, resolve the cause and restart the site.";
+            return false;
+        }
+
         if (_executionOptions.Value.Mode == ExecutionMode.Distributed)
         {
             reason = null;
