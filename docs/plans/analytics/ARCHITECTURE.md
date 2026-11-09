@@ -18,7 +18,7 @@ An Analytics item in a new Monitoring menu opens its own workspace. Its Overview
 - **Rejected runs count as successes**, as `GetRunCountsByAutomationAsync` already does: someone saying no is an approval flow working. Rates are worked out over finished runs only. (SPEC R4)
 - **A new controller under the existing `metrics` route**, reusing `RunSummaryMetricsController`'s workspace-scoping helper. That helper moves into `MetricsControllerBase` so both controllers share it.
 - **Action names are looked up in the browser** from `UaCatalogueRepository`, as the run views do. The API returns aliases, so an action whose package has been removed still shows, by its alias.
-- **Analytics UI comes from the shared import map**, not bundled. Vite's `external: [/^@umbraco/]` already covers `@umbraco/analytics-ui`. Until it's on nuget.org, use the MyGet `umbraconightly` build (`19.0.0--alpha.1.preview.275.g7fa295d`, which `NuGet.config` already lists) and the npm `19.0.0-alpha.1.g7fa295d` types.
+- **Analytics UI comes from the shared import map**, not bundled. Vite's `external: [/^@umbraco/]` already covers `@umbraco/analytics-ui`. Until it's on nuget.org, use the MyGet `umbraconightly` build (`19.0.0-alpha.1`, from the feed `NuGet.config` already lists) and the npm `19.0.0-alpha.1` types.
 - **The date range, comparison and workspace are saved per user in `localStorage`**, so the page opens where they left it. If storage fails, the page falls back to the last 30 days, compared with the period before, for all workspaces.
 
 ## What changes

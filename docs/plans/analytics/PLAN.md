@@ -74,8 +74,8 @@
 ## Backoffice
 
 - [ ] **T10** - story: AN-3 (AC9). Add the Analytics UI dependency:
-  - `Umbraco.Analytics.UI` in the root `Directory.Packages.props` and as a `PackageReference` in `Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj`, pinned to MyGet nightly `19.0.0--alpha.1.preview.275.g7fa295d`. The `[19.0.0, 19.999.999)` range can't admit a prerelease below 19.0.0; T20 swaps it.
-  - `@umbraco/analytics-ui` as a devDependency in `Client/package.json`, by the MyGet tarball URL of `19.0.0-alpha.1.g7fa295d`. Don't add an `.npmrc` scope: it would send every `@umbraco/` package to MyGet.
+  - `Umbraco.Analytics.UI` in the root `Directory.Packages.props` and as a `PackageReference` in `Umbraco.Automate.Web.StaticAssets/Umbraco.Automate.Web.StaticAssets.csproj`, pinned to MyGet nightly `19.0.0-alpha.1`. The `[19.0.0, 19.999.999)` range can't admit a prerelease below 19.0.0; T20 swaps it.
+  - `@umbraco/analytics-ui` as a devDependency in `Client/package.json`, by the MyGet tarball URL of `19.0.0-alpha.1` (`https://www.myget.org/F/umbraconightly/npm/@umbraco/analytics-ui/-/@umbraco/analytics-ui-19.0.0-alpha.1.tgz`). Don't add an `.npmrc` scope: it would send every `@umbraco/` package to MyGet.
   - run `npm install` at the repo root, since this is an npm workspace
   Vite's existing `external: [/^@umbraco/]` already covers the import.
   Acceptance: `dotnet build` and the frontend build are green. On the demo site, the backoffice import map contains `@umbraco/analytics-ui`, and its module loads.
