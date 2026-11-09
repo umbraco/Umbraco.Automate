@@ -96,7 +96,7 @@
   Acceptance: the generated types match SPEC's shapes and the frontend build is green.
   depends-on: T9, T10. parallel-group: C
 
-- [ ] **T13** - story: AN-6 (AC5, AC7), AN-7 (AC1, AC2, AC4, AC13). Add `workspace/analytics-workspace.context.ts` (`UaAnalyticsWorkspaceContext`):
+- [x] **T13** - story: AN-6 (AC5, AC7), AN-7 (AC1, AC2, AC4, AC13). Add `workspace/analytics-workspace.context.ts` (`UaAnalyticsWorkspaceContext`):
   - holds the range, compare, workspace id and the browser's IANA time zone
   - stored in `localStorage` under a key that includes the current user's key, with every read and write in try/catch
   - defaults to the last 30 days vs the previous period, all workspaces

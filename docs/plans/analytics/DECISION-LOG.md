@@ -57,3 +57,12 @@
 - **09-11-2026 (feature-build T11):** The workspaces-exist condition race was fixed as its own `fix(ui):` commit, not inside T11, because the same code is on `v17/dev` and `v18/dev` and the fix may need porting.
 - **09-11-2026 (feature-build T11):** The Overview view reuses `uaDashboard_overview` instead of a new `uaAnalytics_overview` key with the same text.
 - **09-11-2026 (feature-build T12):** Nullable response fields come out of the generator as optional and nullable (`x?: null | T`), not SPEC's always-present `x: T | null`, as for the existing types. The data source (T14) checks them with `== null`, so a missing and a null value read the same.
+- **09-11-2026 (feature-build T13):** Analytics UI 19.0.0-alpha.1 differs from what ARCHITECTURE/SPEC assumed (checked live; the package ships types only):
+  - `uaui-date-range` exposes no `data-preset` or preset-id getter; `value.preset` carries the id, so the workspace element sets `data-preset` itself for the specs.
+  - `presets` must not include `custom`: the element always adds Custom last.
+  - A custom preset needs its own `range: (today) => ({from, to})` and an already-translated `label`; `uauiPresetRange("last-90-days")` returns undefined, so the 90-day range (today minus 89 days, inclusive) is computed locally.
+  - The dialog is a separate `uaui-date-range-dialog` opened through the modal manager, and `change` fires only on Save, with `detail {value, compare?}` (no `compare` means comparison off).
+  - `maxDate` already defaults to today; it's set explicitly anyway.
+- **09-11-2026 (feature-build T13):** The context reimplements the CMS default workspace context (`UmbEntityContext`, `UmbViewContext`, a `manifest` setter) because `UmbDefaultWorkspaceContext` isn't exported from `@umbraco-cms/backoffice/workspace`.
+- **09-11-2026 (feature-build T13):** Stored filters are accepted only with an offered preset id (or custom), `from <= to` and `to <= today`; anything else falls back to the defaults. Nothing is stored when there is no current user.
+- **09-11-2026 (feature-build T13):** The filter specs don't rely on the demo's workspaces: AN-6 AC7 stubs the workspace list to one entry (admins see every workspace), AC5 checks option values for the workspaces it creates, and AN-7 AC4 is split into range and workspace tests.
