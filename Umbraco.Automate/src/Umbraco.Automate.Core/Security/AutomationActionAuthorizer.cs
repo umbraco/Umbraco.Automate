@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Core.Services;
@@ -14,18 +16,27 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
 
     private readonly IContentPermissionService _contentPermissionService;
     private readonly IMediaPermissionService _mediaPermissionService;
+    private readonly IElementPermissionService _elementPermissionService;
+    private readonly IElementContainerPermissionService _elementContainerPermissionService;
     private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
+    private readonly IEntityService _entityService;
     private readonly ILogger<AutomationActionAuthorizer> _logger;
 
     public AutomationActionAuthorizer(
         IContentPermissionService contentPermissionService,
         IMediaPermissionService mediaPermissionService,
+        IElementPermissionService elementPermissionService,
+        IElementContainerPermissionService elementContainerPermissionService,
         IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
+        IEntityService entityService,
         ILogger<AutomationActionAuthorizer> logger)
     {
         _contentPermissionService = contentPermissionService;
         _mediaPermissionService = mediaPermissionService;
+        _elementPermissionService = elementPermissionService;
+        _elementContainerPermissionService = elementContainerPermissionService;
         _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
+        _entityService = entityService;
         _logger = logger;
     }
 
@@ -62,7 +73,10 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             "Content authorisation denied for service account {UserKey} on node {ContentKey} (permissions [{Permissions}]): {Status}",
             user.Key, contentKey, string.Join(", ", permissions), status);
 
-        return AutomationAuthorizationResult.Fail(MapContentReason(status, contentKey, permissions));
+        return status == ContentAuthorizationStatus.NotFound
+            || IsHiddenInRecycleBin(status == ContentAuthorizationStatus.UnauthorizedMissingPathAccess, UmbracoObjectTypes.Document, contentKey, UmbracoConstants.System.RecycleBinContentPathPrefix)
+            ? AutomationAuthorizationResult.NotFound(MapContentReason(ContentAuthorizationStatus.NotFound, contentKey, permissions))
+            : AutomationAuthorizationResult.Fail(MapContentReason(status, contentKey, permissions));
     }
 
     /// <inheritdoc />
@@ -96,7 +110,10 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             "Media authorisation denied for service account {UserKey} on node {MediaKey}: {Status}",
             user.Key, mediaKey, status);
 
-        return AutomationAuthorizationResult.Fail(MapMediaReason(status, mediaKey));
+        return status == MediaAuthorizationStatus.NotFound
+            || IsHiddenInRecycleBin(status == MediaAuthorizationStatus.UnauthorizedMissingPathAccess, UmbracoObjectTypes.Media, mediaKey, UmbracoConstants.System.RecycleBinMediaPathPrefix)
+            ? AutomationAuthorizationResult.NotFound(MapMediaReason(MediaAuthorizationStatus.NotFound, mediaKey))
+            : AutomationAuthorizationResult.Fail(MapMediaReason(status, mediaKey));
     }
 
     /// <inheritdoc />
@@ -284,6 +301,93 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
         return authorized;
     }
 
+    /// <inheritdoc />
+    public Task<AutomationAuthorizationResult> AuthorizeElementAsync(
+        Guid elementKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return Task.FromResult(AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage));
+        }
+
+        return AuthorizeElementAsync(user, elementKey, permissions, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeElementAsync(
+        IUser user,
+        Guid elementKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var status = await _elementPermissionService.AuthorizeAccessAsync(user, [elementKey], ToMutableSet(permissions));
+
+        if (status == ElementAuthorizationStatus.Success)
+        {
+            return AutomationAuthorizationResult.Success;
+        }
+
+        _logger.LogDebug(
+            "Element authorisation denied for service account {UserKey} on element {ElementKey} (permissions [{Permissions}]): {Status}",
+            user.Key, elementKey, string.Join(", ", permissions), status);
+
+        return ToElementFailure(status, UmbracoObjectTypes.Element, elementKey, permissions);
+    }
+
+    /// <inheritdoc />
+    public async Task<AutomationAuthorizationResult> AuthorizeElementParentAsync(
+        Guid? folderKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var user = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+        if (user is null)
+        {
+            return AutomationAuthorizationResult.Fail(NoBackofficeIdentityMessage);
+        }
+
+        var permissionSet = ToMutableSet(permissions);
+
+        // An element lookup resolves element keys only, so a folder goes through the container service.
+        var status = folderKey.HasValue
+            ? await _elementContainerPermissionService.AuthorizeAccessAsync(user, [folderKey.Value], permissionSet)
+            : await _elementPermissionService.AuthorizeRootAccessAsync(user, permissionSet);
+
+        if (status == ElementAuthorizationStatus.Success)
+        {
+            return AutomationAuthorizationResult.Success;
+        }
+
+        _logger.LogDebug(
+            "Element authorisation denied for service account {UserKey} on target folder {FolderKey} (permissions [{Permissions}]): {Status}",
+            user.Key, folderKey?.ToString() ?? "<root>", string.Join(", ", permissions), status);
+
+        return folderKey.HasValue
+            ? ToElementFailure(status, UmbracoObjectTypes.ElementContainer, folderKey.Value, permissions)
+            : AutomationAuthorizationResult.Fail(MapElementRootReason(status, permissions));
+    }
+
+    private AutomationAuthorizationResult ToElementFailure(
+        ElementAuthorizationStatus status,
+        UmbracoObjectTypes objectType,
+        Guid key,
+        IReadOnlySet<string> permissions)
+        => status == ElementAuthorizationStatus.NotFound
+            || IsHiddenInRecycleBin(status == ElementAuthorizationStatus.UnauthorizedMissingPathAccess, objectType, key, UmbracoConstants.System.RecycleBinElementPathPrefix)
+            ? AutomationAuthorizationResult.NotFound(MapElementReason(ElementAuthorizationStatus.NotFound, objectType, key, permissions))
+            : AutomationAuthorizationResult.Fail(MapElementReason(status, objectType, key, permissions));
+
+    // The CMS reports a trashed node as "missing path access" to any account without a root
+    // start node, because the recycle bin sits outside every start-node path. Such an account
+    // cannot see the bin, so for it a trashed node is the same as a deleted one.
+    private bool IsHiddenInRecycleBin(bool deniedOnPath, UmbracoObjectTypes objectType, Guid key, string recycleBinPathPrefix)
+        => deniedOnPath
+           && _entityService.GetAllPaths(objectType, key)
+               .Any(p => p.Path.StartsWith(recycleBinPathPrefix, StringComparison.Ordinal));
+
     private Task<ContentAuthorizationStatus> AuthorizeContentKeyAsync(
         IUser user,
         Guid contentKey,
@@ -323,6 +427,46 @@ internal sealed class AutomationActionAuthorizer : IAutomationActionAuthorizer
             ContentAuthorizationStatus.UnauthorizedMissingRootAccess =>
                 "Service account is not allowed to access the content root.",
             _ => "Service account is not authorised to access the content root.",
+        };
+
+    private static ISet<string> ToMutableSet(IReadOnlySet<string> permissions)
+        => new HashSet<string>(permissions, StringComparer.Ordinal);
+
+    private static string MapElementReason(
+        ElementAuthorizationStatus status,
+        UmbracoObjectTypes objectType,
+        Guid key,
+        IReadOnlySet<string> permissions)
+    {
+        var noun = objectType == UmbracoObjectTypes.ElementContainer ? "Library folder" : "Library element";
+        return status switch
+        {
+            ElementAuthorizationStatus.NotFound =>
+                $"{noun} '{key}' not found.",
+            ElementAuthorizationStatus.UnauthorizedMissingPathAccess =>
+                $"Service account is not allowed to access {noun.ToLowerInvariant()} '{key}' — outside its start-node path.",
+            ElementAuthorizationStatus.UnauthorizedMissingPermissionAccess =>
+                $"Service account lacks the required permissions ({string.Join(", ", permissions)}) on {noun.ToLowerInvariant()} '{key}'.",
+            ElementAuthorizationStatus.UnauthorizedMissingDescendantAccess =>
+                $"Service account is not allowed to access descendants of {noun.ToLowerInvariant()} '{key}'.",
+            ElementAuthorizationStatus.UnauthorizedMissingRootAccess =>
+                "Service account is not allowed to access the Library root.",
+            ElementAuthorizationStatus.UnauthorizedMissingBinAccess =>
+                "Service account is not allowed to access the Library recycle bin.",
+            ElementAuthorizationStatus.UnauthorizedMissingCulture =>
+                $"Service account is not allowed to access the cultures required for {noun.ToLowerInvariant()} '{key}'.",
+            _ => $"Service account is not authorised to access {noun.ToLowerInvariant()} '{key}'.",
+        };
+    }
+
+    private static string MapElementRootReason(ElementAuthorizationStatus status, IReadOnlySet<string> permissions)
+        => status switch
+        {
+            ElementAuthorizationStatus.UnauthorizedMissingPermissionAccess =>
+                $"Service account lacks the required permissions ({string.Join(", ", permissions)}) on the Library root.",
+            ElementAuthorizationStatus.UnauthorizedMissingRootAccess =>
+                "Service account is not allowed to access the Library root.",
+            _ => "Service account is not authorised to access the Library root.",
         };
 
     private static string MapMediaReason(MediaAuthorizationStatus status, Guid mediaKey)

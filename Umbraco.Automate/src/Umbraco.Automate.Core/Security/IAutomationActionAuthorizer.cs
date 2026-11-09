@@ -4,8 +4,9 @@ namespace Umbraco.Automate.Core.Security;
 
 /// <summary>
 /// Authorises a user — typically the workspace service account — against CMS content and
-/// media nodes. Wraps Umbraco's <c>IContentPermissionService</c> /
-/// <c>IMediaPermissionService</c>; the action-pipeline overloads resolve the service-account
+/// media nodes and Library elements. Wraps Umbraco's <c>IContentPermissionService</c> /
+/// <c>IMediaPermissionService</c> / <c>IElementPermissionService</c> /
+/// <c>IElementContainerPermissionService</c>; the action-pipeline overloads resolve the service-account
 /// identity from the ambient backoffice security accessor set by
 /// <c>BackOfficeIdentityMiddleware</c>, while the explicit-user overloads are used by
 /// dispatch-time authorisation before any action middleware runs.
@@ -107,5 +108,35 @@ public interface IAutomationActionAuthorizer
     /// </summary>
     Task<AutomationAuthorizationResult> AuthorizeMediaParentAsync(
         Guid? parentKey,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for
+    /// the given Library element and permission letters.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeElementAsync(
+        Guid elementKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises an explicit user for the given Library element and permission letters. Used
+    /// by dispatch-time authorisation, before any action middleware has set the ambient accessor.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeElementAsync(
+        IUser user,
+        Guid elementKey,
+        IReadOnlySet<string> permissions,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Authorises the service account currently set on the ambient backoffice accessor for a
+    /// target Library folder, or the Library root when <paramref name="folderKey"/> is
+    /// <c>null</c>. A folder is checked through the container permissions, not the element
+    /// permissions, because an element lookup resolves element keys only.
+    /// </summary>
+    Task<AutomationAuthorizationResult> AuthorizeElementParentAsync(
+        Guid? folderKey,
+        IReadOnlySet<string> permissions,
         CancellationToken cancellationToken);
 }

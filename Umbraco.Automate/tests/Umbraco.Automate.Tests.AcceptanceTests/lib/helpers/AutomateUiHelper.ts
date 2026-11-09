@@ -13,6 +13,9 @@ import { ConstantHelper } from './ConstantHelper';
  * normal click silently no-ops and a later wait hangs. The route patterns below mirror
  * `paths.ts` in the client and are stable.
  */
+/** An outcome as the catalogue and outcomes endpoints return it (`label` may be a `#term`). */
+export type StubbedOutcome = { key: string; label: string; isDefault: boolean };
+
 export class AutomateUiHelper {
   page: Page;
 
@@ -40,6 +43,12 @@ export class AutomateUiHelper {
 
   automationNotificationsUrl(id: string): string {
     return `${this.automationEditUrl(id)}/view/notifications`;
+  }
+
+  /* A run's own workspace, from src/run/workspace/run/paths.ts. `view` is the workspace view's
+   * pathname: `details` or `canvas`. */
+  runWorkspaceUrl(runId: string, view: 'details' | 'canvas' = 'canvas'): string {
+    return `${this.sectionPath()}/workspace/ua:run/edit/${runId}/view/${view}`;
   }
 
   /* The Approvals dashboard, from src/approval/dashboard/manifests.ts (pathname `approvals`). */
@@ -273,6 +282,25 @@ export class AutomateUiHelper {
   }
 
   /**
+   * The group headlines in the action picker, in the order shown. A group's headline is a `uui-box`
+   * property, not an attribute, so it is read in the page.
+   */
+  async pickerGroupHeadlines(): Promise<string[]> {
+    return await this.nodePickerModal
+      .locator('uui-box')
+      .evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement & { headline: string }).headline));
+  }
+
+  /** The names of the actions listed in the picker's `index`th group. */
+  async pickerGroupItemNames(index: number): Promise<(string | null)[]> {
+    return await this.nodePickerModal
+      .locator('uui-box')
+      .nth(index)
+      .locator('uui-ref-node')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('name')));
+  }
+
+  /**
    * Narrows the action picker with its search box.
    *
    * Waits for the list first: the catalogue loads asynchronously, and a query typed while it is
@@ -304,7 +332,7 @@ export class AutomateUiHelper {
    * (Delay, Run Script, Request Approval, If, While, Parallel) unless the spec fills them in.
    */
   async submitNodeSettings() {
-    await this.nodeSettingsModal.waitFor({ state: 'visible' });
+    await this.waitForNodeSettingsForm();
     await this.clickInModal(this.nodeSettingsModal.getByRole('button', { name: 'Save', exact: true }));
     await this.nodeSettingsModal.waitFor({ state: 'detached' });
   }
@@ -313,6 +341,26 @@ export class AutomateUiHelper {
   async openStepSettings(stepId: string) {
     await this.canvasNode(stepId).getByRole('button', { name: 'Settings', exact: true }).click({ force: true });
     await this.nodeSettingsModal.waitFor({ state: 'visible' });
+  }
+
+  /**
+   * Types into text fields of the open step settings modal, found by label, and saves the modal.
+   * A saved step's inputs are named "Field for <label>" and a freshly added step's just "<label>",
+   * so both are matched. Lit inputs commit on input events, so a field is cleared before the new value is filled, or the value is appended to what is there.
+   */
+  async changeStepSettingsAndSave(fields: Record<string, string>) {
+    for (const [label, value] of Object.entries(fields)) {
+      const field = this.nodeSettingsModal.getByRole('textbox', { name: new RegExp(`^(Field for )?${label}$`) });
+      await field.waitFor({ state: 'visible' });
+      await field.fill('');
+      await field.fill(value);
+    }
+    await this.clickInModal(this.nodeSettingsModal.getByRole('button', { name: 'Save', exact: true }));
+    await this.nodeSettingsModal.waitFor({ state: 'detached' });
+  }
+
+  async changeStepSettingAndSave(fieldLabel: string, value: string) {
+    await this.changeStepSettingsAndSave({ [fieldLabel]: value });
   }
 
   get bindingPicker(): Locator {
@@ -376,6 +424,47 @@ export class AutomateUiHelper {
     await this.bindingPicker.waitFor({ state: 'detached' });
   }
 
+  /**
+   * An email address field in the step settings modal (Send Email's To, Reply-To, CC and BCC),
+   * by its settings key. Each address in it is a `uui-tag`.
+   */
+  emailAddressField(key: string): Locator {
+    return this.nodeSettingsModal
+      .locator(`umb-property[alias="${key}"]`)
+      .locator(ConstantHelper.elements.emailAddressInput);
+  }
+
+  /* The tags of an email address field, one per address. */
+  emailAddressTags(key: string): Locator {
+    return this.emailAddressField(key).locator('uui-tag');
+  }
+
+  /* The input of an email address field, where the next address is typed. */
+  emailAddressInput(key: string): Locator {
+    return this.emailAddressField(key).locator('#input');
+  }
+
+  /**
+   * Types into an email address field key by key, as a person would, so each comma, semicolon
+   * or quote is handled as it is typed rather than in one go.
+   */
+  async typeEmailAddresses(key: string, text: string) {
+    await this.clickInModal(this.emailAddressInput(key));
+    await this.emailAddressInput(key).pressSequentially(text);
+  }
+
+  /**
+   * Opens the binding picker of an email address field. Unlike a text field's, it is a button
+   * beside the field rather than a property action, so `openBindingPicker` does not reach it.
+   */
+  async openEmailAddressBindingPicker(key: string) {
+    await this.clickInModal(
+      this.nodeSettingsModal.locator(`umb-property[alias="${key}"]`).locator('uui-button[slot="actions"]')
+    );
+    await this.bindingPicker.waitFor({ state: 'visible' });
+    await this.waitForStopMoving(this.bindingPicker);
+  }
+
   get runsTable(): Locator {
     return this.page.locator(ConstantHelper.elements.runsTable);
   }
@@ -429,6 +518,11 @@ export class AutomateUiHelper {
   /* The duration shown in a step run's header. */
   runDetailStepDuration(index: number): Locator {
     return this.runDetailStep(index).locator('.step-duration');
+  }
+
+  /* The "Exit taken" row of a step run's Details tab. Open the Details tab first. */
+  stepRunExitTaken(index: number): Locator {
+    return this.runDetailStep(index).locator(`umb-property-layout[label="${ConstantHelper.outcomeLabels.exitTaken}"] [slot="editor"]`);
   }
 
   /* The open tab's content in a step run. */
@@ -529,6 +623,247 @@ export class AutomateUiHelper {
     await dialog.waitFor({ state: 'detached' });
   }
 
+  /* --- Step settings: bindable fields -------------------------------------------------- */
+
+  /* --- Triggers ------------------------------------------------------------------------- */
+
+  get triggerSettingsModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.triggerSettingsModal);
+  }
+
+  /* One field of the open trigger settings form, by its settings key (`elementTypes`). */
+  triggerSettingsField(key: string): Locator {
+    return this.triggerSettingsModal.locator(`umb-property[alias="${key}"]`);
+  }
+
+  /* The empty-canvas placeholder the trigger node shows until a trigger is chosen. */
+  get triggerPlaceholder(): Locator {
+    return this.triggerNode.locator('button.ua-node--placeholder');
+  }
+
+  /* Opens the trigger picker (`ua-node-picker-modal` in trigger mode) from the empty trigger node. */
+  async openTriggerPicker() {
+    await this.triggerPlaceholder.click({ force: true });
+    await this.nodePickerModal.waitFor({ state: 'visible' });
+  }
+
+  async waitForTriggerSettingsForm() {
+    await this.triggerSettingsModal.waitFor({ state: 'visible' });
+    await this.triggerSettingsModal.locator('ua-settings-form').waitFor({ state: 'attached' });
+  }
+
+  /* Opens the settings of the trigger already on the canvas. */
+  async openTriggerSettings() {
+    await this.triggerNode.getByRole('button', { name: 'Settings', exact: true }).click({ force: true });
+    await this.waitForTriggerSettingsForm();
+  }
+
+  /* Opens the document type picker of a trigger settings field. */
+  async openTriggerDocumentTypePicker(key: string) {
+    await this.clickInModal(this.triggerSettingsField(key).locator('uui-button#btn-add'));
+    await this.documentPickerModal.waitFor({ state: 'visible' });
+  }
+
+  /* Saves the trigger settings modal. Closing it without saving rolls a freshly picked trigger back. */
+  async submitTriggerSettings() {
+    await this.waitForTriggerSettingsForm();
+    await this.clickInModal(this.triggerSettingsModal.locator('[slot="actions"] uui-button[look="primary"]'));
+    await this.triggerSettingsModal.waitFor({ state: 'detached' });
+  }
+
+  /* One field of the open step settings form, by its settings key (`contentKey`). */
+  settingsField(key: string): Locator {
+    return this.nodeSettingsModal.locator(`umb-property[alias="${key}"]`);
+  }
+
+  /* The wrapper (`ua-bindable-editor`) around a field's picker, present when the field can hold
+   * a picked value or a binding. */
+  bindableEditor(key: string): Locator {
+    return this.settingsField(key).locator('ua-bindable-editor');
+  }
+
+  /* The "Use a binding expression" switch's checkbox, for asserting its state. Matches nothing
+   * where the form shows no switch, so `toHaveCount(0)` proves its absence. */
+  bindingSwitch(key: string): Locator {
+    return this.bindableEditor(key).locator('umb-input-toggle input[role="switch"]');
+  }
+
+  /* The switch as a whole, which is what to click: the checkbox itself is visually hidden. */
+  bindingSwitchHost(key: string): Locator {
+    return this.bindableEditor(key).locator('umb-input-toggle');
+  }
+
+  async toggleBindingSwitch(key: string) {
+    await this.clickInModal(this.bindingSwitchHost(key));
+  }
+
+  /* The Monaco editor of a code-editor field (Run Script's Script, Send Email's Body, …). */
+  codeEditor(key: string): Locator {
+    return this.settingsField(key).locator('.monaco-editor');
+  }
+
+  /**
+   * Replaces a code-editor field's text by typing it, key by key, as a person would.
+   *
+   * `fill()` is no use here: Monaco has no `<input>` to fill, and typing is the point when a
+   * spec checks that keys like Space reach the editor.
+   */
+  async typeInCodeEditor(key: string, text: string) {
+    const editor = this.codeEditor(key);
+    await editor.waitFor({ state: 'visible' });
+    await this.waitForStopMoving(this.nodeSettingsModal);
+    await this.clickInModal(editor.locator('.view-lines'));
+    await expect(editor).toHaveClass(/\bfocused\b/);
+    await this.page.keyboard.press('ControlOrMeta+A');
+    await this.page.keyboard.type(text);
+  }
+
+  /* Presses one key (e.g. `Backspace`) in the code editor `typeInCodeEditor` left focused. */
+  async pressInCodeEditor(keyName: string) {
+    await this.page.keyboard.press(keyName);
+  }
+
+  /* The expression box a field shows in binding mode. */
+  bindingExpressionInput(key: string): Locator {
+    return this.bindableEditor(key).locator('ua-binding-text-box input');
+  }
+
+  async enterBindingExpression(key: string, text: string) {
+    await this.bindingExpressionInput(key).fill(text);
+  }
+
+  /* The picker's empty state. Used as the "Choose" button, and as the way to tell the picker is empty. */
+  pickerChooseButton(key: string): Locator {
+    return this.settingsField(key).locator('uui-button#btn-add');
+  }
+
+  /* The card a document picker shows for the picked node. Its `name` is the node's name. */
+  pickedDocumentCard(key: string): Locator {
+    return this.settingsField(key).locator('umb-document-item-ref uui-ref-node');
+  }
+
+  /* The cards a media picker shows for the picked items. */
+  pickedMediaCards(key: string): Locator {
+    return this.settingsField(key).locator('umb-input-media uui-card-media');
+  }
+
+  /* Whether the field's own validation reports it as missing. Reads the control's validity
+   * state, which is what drives the "required" message, rather than the message's wording. */
+  async isFieldMissing(key: string): Promise<boolean> {
+    return await this.bindableEditor(key).evaluate((el) => (el as HTMLElement & { validity: ValidityState }).validity.valueMissing);
+  }
+
+  /* The card a Library element picker shows for the picked element or folder. `ua-element-key-picker`
+   * renders the pick as `umb-entity-item-ref` with the item's key as its id. It stays, in its error
+   * state, when the key no longer resolves. */
+  pickedElementRef(key: string, elementKey: string): Locator {
+    return this.settingsField(key).locator(`umb-entity-item-ref[id="${elementKey}"]`);
+  }
+
+  /* The error row the element picker shows when the saved key no longer resolves. */
+  elementNotFoundRef(key: string, elementKey: string): Locator {
+    return this.pickedElementRef(key, elementKey).locator('uui-ref-node[style*="danger"]');
+  }
+
+  /* The Remove button on the element picker's card. */
+  removeElementButton(key: string, elementKey: string): Locator {
+    return this.pickedElementRef(key, elementKey).locator('uui-action-bar uui-button');
+  }
+
+  /* An item listed in the open tree picker modal, by its name. */
+  treePickerItem(name: string): Locator {
+    return this.documentPickerModal.locator(`uui-menu-item[label="${name}"]`);
+  }
+
+  /* Picks a Library element or folder in a field's element picker. Same tree picker modal as `pickDocument`. */
+  async pickElement(key: string, elementName: string) {
+    await this.pickDocument(key, elementName);
+  }
+
+  /* Whether a field that is not wrapped in `ua-bindable-editor` is marked invalid. The CMS sets
+   * `invalid` on the field's `umb-property-layout` when validation fails. */
+  fieldLayout(key: string): Locator {
+    return this.settingsField(key).locator('umb-property-layout');
+  }
+
+  get documentPickerModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.treePickerModal);
+  }
+
+  /**
+   * Picks a content node in a field's document picker: opens it, selects the node by name and
+   * confirms. Names are the unique ones the spec created, so this cannot hit a look-alike.
+   */
+  async pickDocument(key: string, nodeName: string) {
+    await this.openDocumentPicker(key);
+    await this.selectInDocumentPicker(nodeName);
+    await this.confirmDocumentPicker();
+  }
+
+  /* The three steps of `pickDocument`, for a spec that has to act between selecting and confirming. */
+  async openDocumentPicker(key: string) {
+    await this.clickInModal(this.pickerChooseButton(key));
+    await this.documentPickerModal.waitFor({ state: 'visible' });
+  }
+
+  async selectInDocumentPicker(nodeName: string) {
+    await this.clickInModal(this.documentPickerModal.locator(`uui-menu-item[label="${nodeName}"]`));
+  }
+
+  async confirmDocumentPicker() {
+    await this.clickInModal(this.documentPickerModal.locator('uui-button[look="primary"]'));
+    await this.documentPickerModal.waitFor({ state: 'detached' });
+  }
+
+  get mediaPickerModal(): Locator {
+    return this.page.locator(ConstantHelper.elements.mediaPickerModal);
+  }
+
+  /* A card in the open media picker, by the media item's key. Each carries `data-mark="media:<key>"`. */
+  mediaPickerCard(mediaKey: string): Locator {
+    return this.mediaPickerModal.getByTestId(`media:${mediaKey}`);
+  }
+
+  /* Opens a field's media picker and waits for its first level to render. */
+  async openMediaPicker(key: string) {
+    await this.clickInModal(this.pickerChooseButton(key));
+    await this.mediaPickerModal.waitFor({ state: 'visible' });
+    await this.mediaPickerModal.locator('uui-card-media').first().waitFor({ state: 'visible' });
+  }
+
+  /* Opens a folder card in the media picker, which lists its children in place. */
+  async enterMediaPickerFolder(folderKey: string) {
+    await this.clickInModal(this.mediaPickerCard(folderKey));
+  }
+
+  /* Selects an item in the media picker and confirms. */
+  async pickMedia(mediaKey: string) {
+    await this.clickInModal(this.mediaPickerCard(mediaKey));
+    await this.clickInModal(this.mediaPickerModal.locator('uui-button[look="primary"]'));
+    await this.mediaPickerModal.waitFor({ state: 'detached' });
+  }
+
+  /* Clicks Save in the step settings and returns straight away, so a spec can assert the modal
+   * stayed open because a field failed validation. `submitNodeSettings` is the one that waits
+   * for it to close. */
+  async attemptSaveNodeSettings() {
+    await this.waitForNodeSettingsForm();
+    await this.clickInModal(this.nodeSettingsModal.locator('[slot="actions"] uui-button[look="primary"]'));
+  }
+
+  /* The step settings hold back their form, and keep Save disabled, until the binding sources
+   * have loaded. Save is force-clicked, so it has to wait for the form or the click is lost. */
+  async waitForNodeSettingsForm() {
+    await this.nodeSettingsModal.waitFor({ state: 'visible' });
+    await this.nodeSettingsModal.locator('ua-settings-form').waitFor({ state: 'attached' });
+  }
+
+  /* Closes the step settings without saving, as the modal's Close button does. */
+  async closeNodeSettings() {
+    await this.clickInModal(this.nodeSettingsModal.locator('[slot="actions"] uui-button:not([look="primary"])'));
+    await this.nodeSettingsModal.waitFor({ state: 'detached' });
+  }
+
   /* --- Request stubs ------------------------------------------------------------------- */
 
   /**
@@ -548,6 +883,85 @@ export class AutomateUiHelper {
       });
     await this.page.route(pattern, handler);
     return async () => await this.page.unroute(pattern, handler);
+  }
+
+  /**
+   * Makes `actionAlias` an action with dynamic outcomes, and answers its outcomes endpoint from
+   * `resolve`. No built-in action has dynamic outcomes yet, so the editor is exercised by rewriting
+   * a real catalogue item and standing in for the endpoint.
+   *
+   * `resolve` receives the settings the editor posted and returns the outcomes to answer with, or
+   * `null` to answer with a 500. It is called per request, so a spec can change its answer part
+   * way through. Call before navigating to the automation.
+   */
+  async stubDynamicOutcomes(
+    actionAlias: string,
+    resolve: (settings: Record<string, unknown>) => StubbedOutcome[] | null
+  ) {
+    await this.page.route('**/umbraco/automate/management/api/v1/catalogue/actions**', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const items: any[] = Array.isArray(body) ? body : body.items;
+      const target = items.find((item) => item.alias === actionAlias);
+      if (!target) {
+        throw new Error(`Action "${actionAlias}" is not in the catalogue to make dynamic.`);
+      }
+      target.hasDynamicOutcomes = true;
+      target.outcomes = [];
+      await route.fulfill({ response, json: body });
+    });
+
+    await this.page.route(
+      `**/umbraco/automate/management/api/v1/catalogue/step-types/${actionAlias}/outcomes`,
+      async (route) => {
+        const outcomes = resolve(route.request().postDataJSON()?.settings ?? {});
+        if (outcomes === null) {
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/problem+json',
+            body: JSON.stringify({ type: 'Error', title: 'Stubbed failure', status: 500 })
+          });
+          return;
+        }
+        await route.fulfill({ status: 200, json: outcomes });
+      }
+    );
+  }
+
+  /**
+   * Holds every request matching `pattern` for `ms` before sending it on, and returns the matching
+   * unroute. Used to open a window a fast local site never shows, e.g. a panel used while the data
+   * it depends on is still loading.
+   */
+  async delayRequests(pattern: string, ms: number): Promise<() => Promise<void>> {
+    const handler = async (route: import('@playwright/test').Route) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      // The page may have navigated away during the delay, which aborts the request.
+      await route.continue().catch(() => {});
+    };
+    await this.page.route(pattern, handler);
+    return async () => await this.page.unroute(pattern, handler);
+  }
+
+  /**
+   * Makes one action field declare a different editor, by rewriting the catalogue answer the step
+   * settings read. No installed action names an editor that is not registered, so this is the way
+   * to reach the "editor package missing" case without breaking real data. Call before navigating.
+   */
+  async stubActionFieldEditor(actionAlias: string, fieldKey: string, editorUiAlias: string) {
+    await this.page.route('**/umbraco/automate/management/api/v1/catalogue/actions**', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const actions: any[] = Array.isArray(body) ? body : body.items ?? [];
+      const field = actions
+        .find((action) => action.alias === actionAlias)
+        ?.settingsSchema?.fields?.find((f: any) => f.key === fieldKey);
+      if (!field) {
+        throw new Error(`Field "${fieldKey}" of "${actionAlias}" is not in the catalogue answer.`);
+      }
+      field.editorUiAlias = editorUiAlias;
+      await route.fulfill({ response, json: body });
+    });
   }
 
   /* --- Connections: OAuth ------------------------------------------------------------- */
@@ -627,6 +1041,13 @@ export class AutomateUiHelper {
     return this.page.locator(`[data-testid="rf__node-${stepId}"]`);
   }
 
+  /* Selects a node with a single click on its type label, away from its Settings/Delete buttons
+   * (which stop the click, so they never select it). */
+  async selectCanvasNode(stepId: string) {
+    await this.canvasNode(stepId).locator('.ua-node__type').click({ force: true });
+    await expect(this.canvasNode(stepId)).toHaveClass(/\bselected\b/);
+  }
+
   get triggerNode(): Locator {
     return this.page.locator('[data-testid="rf__node-__trigger__"]');
   }
@@ -637,6 +1058,20 @@ export class AutomateUiHelper {
   /* Waits until the canvas has rendered the saved graph, not just the React Flow shell. */
   async waitForCanvas(timeout: number = 30000) {
     await this.triggerNode.waitFor({ state: 'visible', timeout });
+  }
+
+  get automationCanvas(): Locator {
+    return this.page.locator(ConstantHelper.elements.automationCanvas);
+  }
+
+  /* Removes the canvas element from the page and puts it back in the same place, as moving it would. */
+  async reattachCanvas() {
+    await this.automationCanvas.evaluate((canvas) => {
+      const parent = canvas.parentNode!;
+      const next = canvas.nextSibling;
+      canvas.remove();
+      parent.insertBefore(canvas, next);
+    });
   }
 
   /* The "Add action" button on a node, optionally for one branch ("Add action — rejected"). */
@@ -689,6 +1124,100 @@ export class AutomateUiHelper {
   /* An edge, by the accessible name xyflow gives it ("Edge from <source> to <target>"). */
   canvasEdge(sourceStepId: string, targetStepId: string): Locator {
     return this.page.getByRole('group', { name: `Edge from ${sourceStepId} to ${targetStepId}`, exact: true });
+  }
+
+  /* --- Canvas: outcome exits ------------------------------------------------------------ */
+
+  /* The right-edge exit rows of an action that declares outcomes, in render order. */
+  outcomeExits(stepId: string): Locator {
+    return this.canvasNode(stepId).locator('.ua-node__switch-case');
+  }
+
+  /* One exit row, found by the handle it carries (the outcome key, or `ConstantHelper.outcomes.anyResult`). */
+  outcomeExit(stepId: string, handleId: string): Locator {
+    return this.outcomeExits(stepId).filter({ has: this.page.locator(`[data-handleid="${handleId}"]`) });
+  }
+
+  /* The toast the backoffice raises for a failed request (`color="danger"`). */
+  get errorNotification(): Locator {
+    return this.page.locator('uui-toast-notification[color="danger"]');
+  }
+
+  /* The both-paths warning on a node, shown while an Any result line and a named line both leave it. */
+  outcomeWarning(stepId: string): Locator {
+    return this.canvasNode(stepId).locator('.ua-node__warning');
+  }
+
+  /**
+   * Removes a line by selecting it and pressing Delete, as the canvas's `deleteKeyCode` allows.
+   * Edges carry their own toolbar too, but it renders outside the edge, so with several lines on
+   * the canvas there is no way to tell whose Delete button is whose.
+   *
+   * The click lands on a point along the line, not on the edge's bounding box: its centre is
+   * usually empty space, the line's midpoint is covered by its own toolbar, and another line or a
+   * node can cover any one point. So it tries a few points until xyflow reports the edge selected.
+   */
+  async deleteEdge(sourceStepId: string, targetStepId: string) {
+    const edge = this.canvasEdge(sourceStepId, targetStepId);
+    await this.selectEdge(sourceStepId, targetStepId);
+    await this.page.keyboard.press('Delete');
+    await expect(edge).toHaveCount(0);
+  }
+
+  /* Clicks along a line until xyflow marks it selected (see deleteEdge for why several points). */
+  private async selectEdge(sourceStepId: string, targetStepId: string) {
+    const edge = this.canvasEdge(sourceStepId, targetStepId);
+    for (const fraction of [0.25, 0.75, 0.4, 0.6]) {
+      const point = await this.pointOnEdge(sourceStepId, targetStepId, fraction);
+      await this.page.mouse.click(point.x, point.y);
+      try {
+        await expect(edge).toHaveClass(/selected/, { timeout: 500 });
+        return;
+      } catch {
+        // Something else was under that point; try the next one.
+      }
+    }
+    throw new Error(`Could not select the line from ${sourceStepId} to ${targetStepId}.`);
+  }
+
+  /* A point on a line, in page coordinates, `fraction` of the way along it. */
+  private async pointOnEdge(sourceStepId: string, targetStepId: string, fraction: number) {
+    return await this.canvasEdge(sourceStepId, targetStepId)
+      .locator('path.react-flow__edge-interaction')
+      .evaluate((path: SVGPathElement, at: number) => {
+        const onPath = path.getPointAtLength(path.getTotalLength() * at);
+        const matrix = path.getScreenCTM()!;
+        return {
+          x: matrix.a * onPath.x + matrix.c * onPath.y + matrix.e,
+          y: matrix.b * onPath.x + matrix.d * onPath.y + matrix.f
+        };
+      }, fraction);
+  }
+
+  /**
+   * Presses "Insert action" on one line's toolbar, which opens the action picker to insert a step
+   * onto that line. Follow with `chooseActionInPicker()` and the step's settings.
+   *
+   * A line's toolbar renders outside the line, with nothing tying the two together, so the toolbar
+   * is the one centred nearest the line's midpoint.
+   */
+  async clickEdgeInsert(sourceStepId: string, targetStepId: string) {
+    const middle = await this.pointOnEdge(sourceStepId, targetStepId, 0.5);
+    const toolbars = this.page.locator('.ua-edge__actions');
+    const centres = await toolbars.evaluateAll((els) =>
+      els.map((el) => {
+        const box = el.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      })
+    );
+    const distances = centres.map((c) => Math.hypot(c.x - middle.x, c.y - middle.y));
+    const nearest = distances.indexOf(Math.min(...distances));
+    await toolbars.nth(nearest).getByRole('button', { name: 'Insert action', exact: true }).click({ force: true });
+  }
+
+  /* The source handles of a node: its exits, whichever side they are on. */
+  canvasSourceHandles(stepId: string): Locator {
+    return this.canvasNode(stepId).locator('.react-flow__handle.source');
   }
 
   get edgeFilterModal(): Locator {

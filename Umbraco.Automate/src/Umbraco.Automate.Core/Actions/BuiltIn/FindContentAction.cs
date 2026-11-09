@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Security;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
@@ -18,6 +19,7 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 /// A built-in action that searches content by name, optionally restricted by content type.
 /// Searches the Umbraco Search published content index by default, or the draft content index
 /// when <see cref="FindContentSettings.IncludeUnpublished"/> is true.
+/// Items in the recycle bin are never matched.
 /// </summary>
 [Action("umbracoAutomate.findContent", "Find Content",
     Description = "Finds content items by name, optionally filtered by content type.",
@@ -28,6 +30,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 public sealed class FindContentAction : ActionBase<FindContentSettings, FindContentOutput>
 {
     // Not ICmsAction — this is a read, so no audit trail entry is written.
+
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
 
     /// <summary>Outcome emitted when no content matches.</summary>
     public const string OutcomeNotFound = "notFound";
@@ -68,6 +76,14 @@ public sealed class FindContentAction : ActionBase<FindContentSettings, FindCont
         _authorizer = authorizer;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)

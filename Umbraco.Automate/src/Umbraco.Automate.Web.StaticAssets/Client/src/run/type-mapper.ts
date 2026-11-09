@@ -49,6 +49,7 @@ export const UaRunTypeMapper = {
                     error: sr.error ?? null,
                     retryCount: sr.retryCount,
                     durationMs: sr.durationMs ?? null,
+                    branchOutcome: sr.branchOutcome ?? null,
                     logEntries: sr.logEntries.map((entry) => ({
                         timestampUtc: entry.timestampUtc,
                         level: entry.level,

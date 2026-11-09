@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Realtime;
 using Umbraco.Automate.Core.Security;
@@ -20,6 +21,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, NotifyEditorOutput>
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when no content item exists for the configured key.
     /// </summary>
@@ -51,6 +58,14 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_sent") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<NotifyEditorSettings>();
@@ -63,8 +78,10 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
         }
 
         // Use IContentService so editors on unpublished / draft content still get notified.
+        // A trashed item counts as missing for every account, including one with a root start
+        // node, which the authorizer below would otherwise let through to the recycle bin.
         var content = _contentService.GetById(contentKey);
-        if (content is null)
+        if (content is null || content.Trashed)
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found — skipping editor notification.",

@@ -1,0 +1,85 @@
+<!doctype html>
+<!--
+  Trigger settings panel for Element Saved. Same fields as Content Saved (ContentSavedTriggerSettings):
+  a type filter and, in the Advanced group, "When triggered by another automation".
+  Element Types uses ua-document-type-picker with onlyPickElementTypes. Starter: modal-form.html.
+-->
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Mockup: Element Saved trigger settings</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@umbraco-ui/uui@2/dist/themes/light.css">
+	<link rel="stylesheet" href="_mockup.css">
+	<script type="module" src="_mockup.js"></script>
+	<style>
+		.main > uui-box { margin-bottom: var(--uui-size-space-4); }
+	</style>
+</head>
+<body class="uui-font uui-text">
+	<header class="app-header">
+		<span class="logo">Umbraco</span>
+		<uui-tab-group class="sections">
+			<uui-tab label="Content">Content</uui-tab>
+			<uui-tab label="Media">Media</uui-tab>
+			<uui-tab label="Library">Library</uui-tab>
+			<uui-tab label="Automate" active>Automate</uui-tab>
+			<uui-tab label="Settings">Settings</uui-tab>
+		</uui-tab-group>
+		<div class="apps">
+			<uui-button look="primary" compact label="User"><uui-avatar name="Rick Butterfield"></uui-avatar></uui-button>
+		</div>
+	</header>
+	<div class="section">
+		<nav class="section-sidebar"><h3>Automate</h3></nav>
+		<main class="section-main"></main>
+	</div>
+
+	<div class="modal-backdrop"></div>
+	<aside class="modal-sidebar">
+		<div class="body-layout">
+			<div class="header">
+				<h3 class="headline">Element Saved</h3>
+			</div>
+
+			<div class="main">
+				<!-- Replace from here -->
+				<uui-box class="group">
+					<div class="property">
+						<div>
+							<uui-label>Element Types</uui-label>
+							<div class="description">Only fire for these element types. Leave blank to match all.</div>
+						</div>
+						<div class="picker">
+							<uui-ref-list>
+								<uui-ref-node name="Schema Snippet" detail="schemaSnippet">
+									<uui-icon slot="icon" name="icon-code"></uui-icon>
+									<uui-action-bar slot="actions"><uui-button label="Remove">Remove</uui-button></uui-action-bar>
+								</uui-ref-node>
+							</uui-ref-list>
+							<uui-button class="choose" look="placeholder" label="Choose">Choose</uui-button>
+						</div>
+					</div>
+				</uui-box>
+
+				<uui-box class="group" headline="Advanced">
+					<div class="property">
+						<div>
+							<uui-label>When triggered by another automation</uui-label>
+							<div class="description">How to handle saves performed by another automation.</div>
+						</div>
+						<div><uui-select label="When triggered by another automation" placeholder="Skip if this would loop"></uui-select></div>
+					</div>
+				</uui-box>
+				<!-- Replace to here -->
+			</div>
+
+			<div class="footer">
+				<div class="actions">
+					<uui-button label="Close">Close</uui-button>
+					<uui-button look="primary" color="positive" label="Save">Save</uui-button>
+				</div>
+			</div>
+		</div>
+	</aside>
+</body>
+</html>

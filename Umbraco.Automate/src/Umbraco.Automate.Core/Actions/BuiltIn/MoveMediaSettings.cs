@@ -14,8 +14,9 @@ public sealed class MoveMediaSettings
     [Field(
         Label = "Media",
         Description = "The media item to move.",
-        EditorUiAlias = "Umb.PropertyEditorUi.MediaEntityPicker",
-        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""")]
+        EditorUiAlias = Constants.EditorUiAliases.MediaKeyPicker,
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }, { "alias": "folderFilter", "value": "filesAndFolders" }]""",
+        SupportsBindings = true)]
     [Required]
     public string MediaKey { get; set; } = string.Empty;
 
@@ -28,6 +29,8 @@ public sealed class MoveMediaSettings
         Description = "The media folder to move the item under. Leave empty to move to the media root.",
         SortOrder = 1,
         EditorUiAlias = "Umb.PropertyEditorUi.MediaEntityPicker",
-        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""")]
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""",
+        SupportsBindings = true,
+        BindingMustResolve = true)]
     public string? TargetParentKey { get; set; }
 }

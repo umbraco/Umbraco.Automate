@@ -2,10 +2,12 @@ import { manifests as versionHistoryManifests } from "./version-history/manifest
 import { conditionBuilderManifests } from "./components/condition-builder/manifests.js";
 import { switchCaseBuilderManifests } from "./components/switch-case-builder/manifests.js";
 import { keyValueEditorManifests } from "./components/key-value-editor/manifests.js";
+import { emailAddressInputManifests } from "./components/email-address-input/manifests.js";
 import { bindingPickerManifests } from "./components/binding-picker/manifests.js";
 import { bindingTextBoxManifests } from "./components/binding-text-box/manifests.js";
 import { bindingTextAreaManifests } from "./components/binding-text-area/manifests.js";
 import { bindingCodeEditorManifests } from "./components/binding-code-editor/manifests.js";
+import { bindableEditorManifests } from "./components/bindable-editor/manifests.js";
 import { webhookAuthenticatorPickerManifests } from "./components/webhook-authenticator-picker/manifests.js";
 import { webhookMethodPickerManifests } from "./components/webhook-method-picker/manifests.js";
 import { webhookSecretFieldManifests } from "./components/webhook-secret-field/manifests.js";
@@ -14,16 +16,21 @@ import { editorNotificationSeverityPickerManifests } from "./components/editor-n
 import { memberTypePickerManifests } from "./components/member-type-picker/manifests.js";
 import { userGroupPickerManifests } from "./components/user-group-picker/manifests.js";
 import { automationPickerManifests } from "./components/automation-picker/manifests.js";
+import { mediaKeyPickerManifests } from "./components/media-key-picker/manifests.js";
+import { elementKeyPickerManifests } from "./components/element-key-picker/manifests.js";
+import { documentTypePickerManifests } from "./components/document-type-picker/manifests.js";
 
 export const manifests: UmbExtensionManifest[] = [
     ...versionHistoryManifests,
     ...conditionBuilderManifests,
     ...switchCaseBuilderManifests,
     ...keyValueEditorManifests,
+    ...emailAddressInputManifests,
     ...bindingPickerManifests,
     ...bindingTextBoxManifests,
     ...bindingTextAreaManifests,
     ...bindingCodeEditorManifests,
+    ...bindableEditorManifests,
     ...webhookAuthenticatorPickerManifests,
     ...webhookMethodPickerManifests,
     ...webhookSecretFieldManifests,
@@ -32,4 +39,7 @@ export const manifests: UmbExtensionManifest[] = [
     ...memberTypePickerManifests,
     ...userGroupPickerManifests,
     ...automationPickerManifests,
+    ...mediaKeyPickerManifests,
+    ...elementKeyPickerManifests,
+    ...documentTypePickerManifests,
 ];

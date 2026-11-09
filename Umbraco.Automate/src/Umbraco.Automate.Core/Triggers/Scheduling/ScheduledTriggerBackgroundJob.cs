@@ -25,7 +25,10 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
     private readonly IRuntimeState _runtimeState;
     private readonly IServerRoleAccessor _serverRoleAccessor;
     private readonly IMainDom _mainDom;
+    private readonly AutomateReadinessSignal _readinessSignal;
+    private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly ILogger<ScheduledTriggerBackgroundJob> _logger;
+    private bool _enginePauseLogged;
 
     public ScheduledTriggerBackgroundJob(
         IServiceProvider serviceProvider,
@@ -34,6 +37,8 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
         IServerRoleAccessor serverRoleAccessor,
         IMainDom mainDom,
         TimeProvider timeProvider,
+        AutomateReadinessSignal readinessSignal,
+        IOptions<ExecutionOptions> executionOptions,
         ILogger<ScheduledTriggerBackgroundJob> logger)
         : base(logger, options.CurrentValue.PollInterval, options.CurrentValue.StartupDelay, timeProvider)
     {
@@ -42,6 +47,8 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
         _runtimeState = runtimeState;
         _serverRoleAccessor = serverRoleAccessor;
         _mainDom = mainDom;
+        _readinessSignal = readinessSignal;
+        _executionOptions = executionOptions;
         _logger = logger;
     }
 
@@ -70,6 +77,20 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
         {
             _logger.LogDebug("Scheduled trigger job will not run if not MainDom");
             return;
+        }
+
+        // With this node's engine down in SchedulerOnly mode, nothing can run a scheduled run, so
+        // due ticks are skipped rather than queued: a schedule resumes on its next tick after a
+        // restart that recovers, and the missed ticks are never replayed. In Distributed mode other
+        // nodes consume outbox work, so ticks keep dispatching for a healthy node to run.
+        var skipTicks = _readinessSignal.EngineStartFailed
+            && _executionOptions.Value.Mode == ExecutionMode.SchedulerOnly;
+        if (skipTicks && !_enginePauseLogged)
+        {
+            _enginePauseLogged = true;
+            _logger.LogWarning(
+                "Scheduled triggers are paused because the automation engine did not start after startup recovery failed. " +
+                "Ticks due until the site is restarted are skipped and will not be replayed.");
         }
 
         using var scope = _serviceProvider.CreateScope();
@@ -159,6 +180,14 @@ internal sealed class ScheduledTriggerBackgroundJob : RecurringHostedServiceBase
                 var dueAt = nextOccurrence.Value + offset;
                 if (dueAt > now)
                 {
+                    continue;
+                }
+
+                // Record the skipped tick as fired, so the next process starts from it instead of
+                // catching up on the last tick that fell due while the engine was down.
+                if (skipTicks)
+                {
+                    await stateStore.SetLastFiredAsync(automationId, now, CancellationToken.None);
                     continue;
                 }
 

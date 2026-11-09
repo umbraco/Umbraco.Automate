@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using Umbraco.Automate.Core.Security;
 using Umbraco.Automate.Core.Settings;
 
 namespace Umbraco.Automate.Core.Bindings;
@@ -25,6 +26,8 @@ internal sealed class SettingsBindingResolver
     /// rather than enumerating concrete collection types one by one. A list of objects is walked
     /// one level deeper, resolving each item's own string properties, which is what makes
     /// <c>${ }</c> work inside a key/value row.
+    /// A string property marked <c>BindingMustResolve</c> that held a binding and resolved to empty or
+    /// whitespace throws <see cref="SettingsBindingException"/>.
     /// The settings object is mutated in-place.
     /// </summary>
     public void ResolveBindings(object settings, IReadOnlyDictionary<string, object?> bindingData)
@@ -47,7 +50,17 @@ internal sealed class SettingsBindingResolver
             switch (property.GetValue(settings))
             {
                 case string value when property.CanWrite && !string.IsNullOrEmpty(value):
-                    property.SetValue(settings, _bindingEvaluator.Evaluate(value, bindingData));
+                    var resolved = _bindingEvaluator.Evaluate(value, bindingData);
+                    if (attr.BindingMustResolve
+                        && string.IsNullOrWhiteSpace(resolved)
+                        && BindingTokenizer.FindBindings(value).Any())
+                    {
+                        throw new SettingsBindingException(
+                            attr.Label ?? property.Name,
+                            attr.IsSensitive ? SensitiveDataMasker.MaskedValue : value);
+                    }
+
+                    property.SetValue(settings, resolved);
                     break;
 
                 case IList<string> list:
