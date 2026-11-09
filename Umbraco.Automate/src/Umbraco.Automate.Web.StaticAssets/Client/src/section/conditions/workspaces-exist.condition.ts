@@ -3,6 +3,7 @@ import type { UmbConditionConfigBase, UmbConditionControllerArguments, UmbExtens
 import { UmbConditionBase } from "@umbraco-cms/backoffice/extension-registry";
 import { UMB_ACTION_EVENT_CONTEXT } from "@umbraco-cms/backoffice/action";
 import { UaWorkspaceCollectionServerDataSource } from "../../workspace-management/repository/collection/workspace-collection.server.data-source.js";
+import { coreClientReady } from "../../core/client-ready.js";
 import { UaEntityActionEvent } from "../../core/index.js";
 import { UA_WORKSPACE_ENTITY_TYPE } from "../../workspace-management/constants.js";
 
@@ -32,6 +33,8 @@ export class UaWorkspacesExistCondition
     }
 
     async #check() {
+        // The generated client has no base URL or auth until app.ts has configured it.
+        await coreClientReady;
         const source = new UaWorkspaceCollectionServerDataSource(this._host);
         const { data } = await source.getCollection({ skip: 0, take: 1 });
         this.permitted = (data?.total ?? 0) > 0;

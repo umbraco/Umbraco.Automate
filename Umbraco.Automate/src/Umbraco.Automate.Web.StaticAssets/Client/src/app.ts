@@ -1,16 +1,14 @@
 import type { UmbEntryPointOnInit, UmbEntryPointOnUnload } from "@umbraco-cms/backoffice/extension-api";
 import { client } from "./api/client.gen.js";
 import { UMB_AUTH_CONTEXT } from "@umbraco-cms/backoffice/auth";
+import { markCoreClientReady } from "./core/client-ready.js";
 import { UaEditorNotificationListener } from "./core/realtime/editor-notification.listener.js";
 
 // Re-export everything from the main index
 export * from "./index.js";
 
-// Promise that resolves when the client is configured with auth
-let coreClientReadyResolve: (() => void) | undefined;
-export const coreClientReady = new Promise<void>((resolve) => {
-    coreClientReadyResolve = resolve;
-});
+// Public API since 18.5.1; the promise itself lives in its own module so other modules can share it.
+export { coreClientReady } from "./core/client-ready.js";
 
 let editorNotificationListener: UaEditorNotificationListener | undefined;
 
@@ -24,10 +22,7 @@ export const onInit: UmbEntryPointOnInit = (_host, _extensionRegistry) => {
         // the deprecated getOpenApiConfiguration()/setConfig() path.
         authContext.configureClient(client);
 
-        if (coreClientReadyResolve) {
-            coreClientReadyResolve();
-            coreClientReadyResolve = undefined;
-        }
+        markCoreClientReady();
     });
 
     editorNotificationListener = new UaEditorNotificationListener(_host);
