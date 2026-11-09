@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.Core;
+using Umbraco.Automate.Core.Analytics;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Messaging;
@@ -14,6 +15,7 @@ using Umbraco.Automate.Core.Triggers.Scheduling;
 using Umbraco.Automate.Core.Versioning;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
+using Umbraco.Automate.Persistence.Analytics;
 using Umbraco.Automate.Persistence.Automations;
 using Umbraco.Automate.Persistence.Workspaces;
 using Umbraco.Automate.Persistence.Connections;
@@ -86,6 +88,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IConnectionRepository, EFCoreConnectionRepository>();
         builder.Services.AddSingleton<IAutomationRunRepository, EFCoreAutomationRunRepository>();
         builder.Services.AddSingleton<IAutomationHealthRepository, EFCoreAutomationHealthRepository>();
+        builder.Services.AddSingleton<IAutomateAnalyticsRepository, EFCoreAutomateAnalyticsRepository>();
         // WorkflowCore's EventConsumer, WorkflowConsumer etc. inject the sub-interfaces directly,
         // not IPersistenceProvider. We must register all four so our EF provider is used everywhere.
         builder.Services.AddSingleton<EFCoreWorkflowPersistenceProvider>();

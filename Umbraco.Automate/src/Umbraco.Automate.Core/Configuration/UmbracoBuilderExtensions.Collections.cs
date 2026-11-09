@@ -1,6 +1,7 @@
 using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.Middleware;
+using Umbraco.Automate.Core.Analytics;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Cms;
@@ -183,6 +184,7 @@ public static partial class UmbracoBuilderExtensions
         builder.Services.AddSingleton<IAutomationService, AutomationService>();
         builder.Services.AddSingleton<IWorkspaceGroupService, WorkspaceGroupService>();
         builder.Services.AddSingleton<IAutomationRunService, AutomationRunService>();
+        builder.Services.AddSingleton<IAutomateAnalyticsService, AutomateAnalyticsService>();
         builder.Services.AddSingleton<IRunDataSanitizer, RunDataSanitizer>();
         builder.Services.AddSingleton<ICircuitBreakerService, CircuitBreakerService>();
         builder.Services.AddSingleton<ActionMiddlewarePipeline>();
