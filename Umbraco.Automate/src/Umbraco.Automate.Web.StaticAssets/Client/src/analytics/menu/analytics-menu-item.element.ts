@@ -4,11 +4,16 @@ import { ensureSlash } from "@umbraco-cms/backoffice/router";
 import { UMB_SECTION_CONTEXT } from "@umbraco-cms/backoffice/section";
 import type { ManifestMenuItem } from "@umbraco-cms/backoffice/menu";
 
+// TODO: Drop this element for the default menu item kind once umbraco/Umbraco-CMS#24527 is fixed
+// (umb-menu-item-layout only sets `active` on `navigationend`).
 /**
  * The default menu item layout only works out "active" on a navigation event, so an item that
  * connects after the page has loaded (this one sits behind the workspaces-exist condition) stays
  * inactive. This renders the same item and also checks the location when it connects, the way
  * tree menu items do.
+ *
+ * This copy leaves out the default element's UmbEntityContext provider and
+ * umb-entity-actions-bundle, because nothing registers entity actions for `ua:analytics`.
  */
 @customElement("ua-analytics-menu-item")
 export class UaAnalyticsMenuItemElement extends UmbLitElement {
