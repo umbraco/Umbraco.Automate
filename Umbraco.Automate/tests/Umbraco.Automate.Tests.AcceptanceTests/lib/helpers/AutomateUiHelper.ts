@@ -1,6 +1,8 @@
 import { Locator, Page, expect } from '@playwright/test';
 import { ConstantHelper } from './ConstantHelper';
 
+const WORKSPACES_API_PATH = '/umbraco/automate/management/api/v1/workspaces';
+
 /**
  * The Page Object Model for the Automate backoffice.
  *
@@ -75,7 +77,25 @@ export class AutomateUiHelper {
     return `${this.sectionPath()}/workspace/ua:workspace-mgmt-root/edit/null`;
   }
 
+  /* The Analytics workspace, from src/analytics/constants.ts (entity type `ua:analytics`). */
+  analyticsUrl(): string {
+    return `${this.sectionPath()}/workspace/ua:analytics`;
+  }
+
   /* --- Locators ------------------------------------------------------------------------ */
+
+  /* Analytics: the Monitoring sidebar group, its menu item, and the link on the Overview dashboard. */
+  get analytics() {
+    const page = this.page;
+    const monitoringMenu = page.locator('umb-section-sidebar-menu').filter({ has: page.getByRole('heading', { name: 'Monitoring', exact: true }) });
+    return {
+      monitoringMenu,
+      menuItem: monitoringMenu.locator('a[href$="/workspace/ua:analytics"]'),
+      activeMenuItem: monitoringMenu.locator('uui-menu-item[active][href$="/workspace/ua:analytics"]'),
+      settingsHeading: page.getByRole('heading', { name: 'Settings', exact: true }),
+      overviewLink: page.locator('ua-automate-dashboard a[href$="/workspace/ua:analytics"]')
+    };
+  }
 
   get dashboard(): Locator {
     return this.page.locator(ConstantHelper.elements.dashboard);
@@ -581,6 +601,28 @@ export class AutomateUiHelper {
   async stubOAuthProviderConfigured() {
     await this.page.route('**/umbraco/automate/oauth/status/**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isConfigured: true }) })
+    );
+  }
+
+  /**
+   * Answers the workspaces list with an empty page, as on a site with no workspaces. Matches the
+   * GET path only, whatever the query string. Call before navigating, then wait on
+   * `waitForWorkspacesResponse()` so the page has received the answer.
+   */
+  async stubNoWorkspaces() {
+    await this.page.route(
+      (url) => url.pathname === WORKSPACES_API_PATH,
+      (route) =>
+        route.request().method() === 'GET'
+          ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ total: 0, items: [] }) })
+          : route.fallback()
+    );
+  }
+
+  /* Resolves when the page receives a response from the workspaces list endpoint. */
+  waitForWorkspacesResponse() {
+    return this.page.waitForResponse(
+      (response) => new URL(response.url()).pathname === WORKSPACES_API_PATH && response.request().method() === 'GET'
     );
   }
 

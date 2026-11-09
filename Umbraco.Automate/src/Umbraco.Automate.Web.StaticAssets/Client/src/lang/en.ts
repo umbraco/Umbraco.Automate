@@ -82,6 +82,8 @@ export default {
         settings: "Settings",
         workspaces: "Workspaces",
         connections: "Connections",
+        monitoring: "Monitoring",
+        analytics: "Analytics",
     },
     uaAutomation: {
         deleteConfirm: "Are you sure you want to delete this automation?",

@@ -6,7 +6,7 @@ import { test, ConstantHelper } from '../../../lib/index';
 
 test.describe('Feature: open Analytics', () => {
   test.describe('Scenario: a site with a workspace', () => {
-    test.skip('shows Analytics under a Monitoring heading in the sidebar', async ({ automateWorkspace, umbracoUi, umbracoAutomateUi }) => {
+    test('shows Analytics under a Monitoring heading in the sidebar', async ({ automateWorkspace, umbracoUi, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
       await umbracoUi.goToBackOffice();
       await umbracoAutomateUi.goToAutomateSection();
@@ -14,11 +14,18 @@ test.describe('Feature: open Analytics', () => {
       await expect(umbracoAutomateUi.automate.analytics.menuItem).toBeVisible();
     });
 
-    test.skip('opens the Analytics page on its Overview view', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+    test('opens the Analytics page on its Overview view', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
 
       await expect(page.locator('ua-analytics-overview-view')).toBeVisible();
+    });
+
+    test('highlights the Analytics menu item on the Analytics page', async ({ automateWorkspace, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+
+      await expect(umbracoAutomateUi.automate.analytics.activeMenuItem).toHaveCount(1);
     });
   });
 
@@ -34,9 +41,14 @@ test.describe('Feature: open Analytics', () => {
   });
 
   test.describe('Sad path', () => {
-    test.skip('hides the Monitoring heading on a site with no workspaces', async ({ umbracoUi, umbracoAutomateUi }) => {
+    test('hides the Monitoring heading on a site with no workspaces', async ({ umbracoUi, umbracoAutomateUi }) => {
+      await umbracoAutomateUi.automate.stubNoWorkspaces();
+      const stubbed = umbracoAutomateUi.automate.waitForWorkspacesResponse();
       await umbracoUi.goToBackOffice();
       await umbracoAutomateUi.goToAutomateSection();
+      // Waits, not assertions: the stubbed answer has arrived and the sidebar has rendered.
+      await stubbed;
+      await umbracoAutomateUi.automate.analytics.settingsHeading.waitFor();
 
       await expect(umbracoAutomateUi.automate.analytics.monitoringMenu).toHaveCount(0);
     });
