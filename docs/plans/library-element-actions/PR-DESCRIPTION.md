@@ -71,12 +71,13 @@ Element Saved settings, with the loop setting at its default:
 ## Good to know
 
 - v18 only. CMS 17 has no element publishing service, so there's no port.
-- Element Saved also runs when an element is published, because the CMS saves it first. Content Saved does the same.
+- Element Saved runs when an element is saved, including the save in the backoffice's Save and publish. Publishing an element without saving it starts no Element Saved run (checked on the demo site).
+- Deleting a published element starts no Element Unpublished run: the CMS raises the event, but the dispatch check runs after the delete and no longer finds the element. Content Unpublished does the same; filed as #584.
 - Restoring a folder from the recycle bin fires Element Unpublished once for each published element inside. Restoring content raises no event, so this is an element-only difference.
 - An automation created through the API with no trigger settings skips "Skip if this would loop", for every trigger, not just these. It predates this PR and is filed as #583; the loop spec saves the setting as the backoffice does.
 - The acceptance specs ran against a demo site on SQL Server LocalDB, as CI uses: 14 of 14 for the triggers, 15 of 15 for the actions. The local SQLite demo threw `database is locked` on content and element tests alike.
 - Publishing an element updates pages that already rendered it on their next request, so there's no cache-refresh code. Checked on one page with no output cache.
-- Follow-ups filed: #575 (the culture rule in all three Update Property actions), #576 (Create Content's Content Type doesn't enforce "required"), #577 (`CannotUnpublishWhenReferenced` reported as Unknown), #578 (a shared helper for the per-action copies), #583 (loop protection with empty trigger settings).
+- Follow-ups filed: #575 (the culture rule in all three Update Property actions), #576 (Create Content's Content Type doesn't enforce "required"), #577 (`CannotUnpublishWhenReferenced` reported as Unknown), #578 (a shared helper for the per-action copies), #583 (loop protection with empty trigger settings), #584 (deletes start no Unpublished run).
 - The UmbracoDocs changes for the actions and triggers pages are drafted at the end of `BUILD-LOG.md`.
 
 ## Change outline
