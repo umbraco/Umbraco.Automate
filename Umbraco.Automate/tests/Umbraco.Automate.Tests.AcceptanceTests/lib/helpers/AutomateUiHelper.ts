@@ -139,6 +139,38 @@ export class AutomateUiHelper {
           const toggle = dialog.locator('uaui-compare-group uui-toggle');
           if (await toggle.evaluate((el: any) => el.checked)) await toggle.click();
         }),
+      /* A headline tile by its stable id: `runs`, `success-rate`, `failed-runs`, `median-run-time`, `waiting-for-approval`. */
+      tile: (id: string) => page.locator(`uaui-kpi-tile[data-tile="${id}"]`),
+      /* The Runs over time chart and the box around it. */
+      chart: page.locator('uaui-time-series-chart'),
+      chartBox: page.locator('uui-box[data-box="runs-over-time"]'),
+      /* Picks Day, Week or Month on the chart's `uaui-group-by`. */
+      groupBy: (value: 'day' | 'week' | 'month') => page.locator('uaui-group-by').locator(`button[data-value="${value}"]`).click({ force: true }),
+      /* Answers the summary endpoint with fixed figures, so a spec doesn't depend on the runs a site happens to hold.
+       * Call before navigating. `current` and `compare` are partial periods (the rest is zero). As the server does, the
+       * comparison is only answered when the request asks for it (`compareFrom`), so turning it off drops it. */
+      stubSummary: async ({ current = {}, compare = null, waitingForApproval = 0, retainedFromDaysAgo = null }: {
+        current?: Record<string, unknown>;
+        compare?: Record<string, unknown> | null;
+        waitingForApproval?: number;
+        retainedFromDaysAgo?: number | null;
+      } = {}) => {
+        const period = (overrides: Record<string, unknown>) => ({
+          runs: 0, completed: 0, rejected: 0, cancelled: 0, failed: 0, inProgress: 0, successRate: null, medianDurationMs: null, days: [], ...overrides
+        });
+        await page.route(/\/metrics\/analytics\/summary/, (route) =>
+          route.fulfill({
+            json: {
+              current: period(current),
+              compare: compare && new URL(route.request().url()).searchParams.has('compareFrom') ? period(compare) : null,
+              waitingForApproval,
+              retainedFrom: retainedFromDaysAgo === null ? null : isoDaysAgo(retainedFromDaysAgo)
+            }
+          })
+        );
+      },
+      /* The info line above the tiles about runs deleted by cleanup. */
+      retentionNotice: page.locator('[data-notice="retention"]'),
       monitoringMenu,
       menuItem: monitoringMenu.locator('a[href$="/workspace/ua:analytics"]'),
       activeMenuItem: monitoringMenu.locator('uui-menu-item[active][href$="/workspace/ua:analytics"]'),

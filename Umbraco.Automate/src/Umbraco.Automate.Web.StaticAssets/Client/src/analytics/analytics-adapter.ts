@@ -11,6 +11,7 @@ import type {
     AnalyticsAutomationRowResponseModel,
     AnalyticsDayResponseModel,
     AnalyticsPeriodResponseModel,
+    AnalyticsSummaryResponseModel,
 } from "../api/types.gen.js";
 
 /** Turns a localization key into text. Pass `(key) => this.localize.term(key)` from an element. */
@@ -33,10 +34,14 @@ const SERIES: ReadonlyArray<SeriesDefinition> = [
     { id: "inProgress", labelKey: "uaAnalytics_seriesInProgress", color: 1 },
 ];
 
-/** The first day of the week for a culture as an ISO weekday (1 Monday to 7 Sunday). Monday when the browser can't say. */
+/**
+ * The first day of the week for a culture as an ISO weekday (1 Monday to 7 Sunday). Monday when the browser can't say.
+ * Umbraco's bare `en` is English (UK), but `Intl` reads it as US English, whose week starts on Sunday, so it is read as `en-GB`.
+ */
 export function getWeekStart(culture: string): UauiWeekStart {
     try {
-        const locale = new Intl.Locale(culture) as Intl.Locale & {
+        const tag = culture.toLowerCase() === "en" ? "en-GB" : culture;
+        const locale = new Intl.Locale(tag) as Intl.Locale & {
             getWeekInfo?: () => { firstDay: number };
             weekInfo?: { firstDay: number };
         };
@@ -88,6 +93,60 @@ export function createCompareSeries(
 /** Every series is zero: the chart shows "No runs in this period". */
 export function hasNoRuns(period: AnalyticsPeriodResponseModel): boolean {
     return period.runs === 0;
+}
+
+/** The figures behind the headline tiles. A `previous...` value is undefined when there is nothing to compare with. */
+export interface UaAnalyticsKpis {
+    runs: number;
+    previousRuns?: number;
+    /** 0..1, or undefined when nothing finished. */
+    successRate?: number;
+    previousSuccessRate?: number;
+    failedRuns: number;
+    previousFailedRuns?: number;
+    medianDurationMs?: number;
+    previousMedianDurationMs?: number;
+    waitingForApproval: number;
+}
+
+/** A change in a count or a time is a percentage, which a comparison of 0 can't give. */
+const nonZero = (value: number | null | undefined): number | undefined => (value ? value : undefined);
+
+export function createKpis(summary: AnalyticsSummaryResponseModel): UaAnalyticsKpis {
+    const { current, compare } = summary;
+    return {
+        runs: current.runs,
+        previousRuns: nonZero(compare?.runs),
+        successRate: current.successRate ?? undefined,
+        previousSuccessRate: compare?.successRate ?? undefined,
+        failedRuns: current.failed,
+        previousFailedRuns: nonZero(compare?.failed),
+        medianDurationMs: current.medianDurationMs ?? undefined,
+        previousMedianDurationMs: nonZero(compare?.medianDurationMs),
+        waitingForApproval: summary.waitingForApproval,
+    };
+}
+
+/** The oldest day (ISO date) still kept by run cleanup; undefined when cleanup is off. */
+export function getRetainedFrom(summary: AnalyticsSummaryResponseModel): string | undefined {
+    return summary.retainedFrom ? summary.retainedFrom.slice(0, 10) : undefined;
+}
+
+/** A run time in the culture's short unit style ("1.8 sec", "1.6 days"), in the largest unit that keeps it at 1 or more. */
+export function formatDuration(ms: number, culture: string): string {
+    const units: ReadonlyArray<[Intl.NumberFormatOptions["unit"], number]> = [
+        ["day", 86_400_000],
+        ["hour", 3_600_000],
+        ["minute", 60_000],
+        ["second", 1_000],
+    ];
+    const [unit, size] = units.find(([, unitSize]) => ms >= unitSize) ?? (["millisecond", 1] as const);
+    const options: Intl.NumberFormatOptions = { style: "unit", unit, unitDisplay: "short", maximumFractionDigits: 1 };
+    try {
+        return new Intl.NumberFormat(culture, options).format(ms / size);
+    } catch {
+        return new Intl.NumberFormat(undefined, options).format(ms / size);
+    }
 }
 
 const ERROR_KEYS: Readonly<Record<string, string>> = {

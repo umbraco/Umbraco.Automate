@@ -45,7 +45,11 @@ export class UaAnalyticsWorkspaceContext extends UmbContextBase implements UmbWo
     constructor(host: UmbControllerHost) {
         super(host, UMB_WORKSPACE_CONTEXT.toString());
         this.#entityContext.setUnique(null);
-        this.#initialize().catch((error) => console.error("Analytics workspace failed to initialize", error));
+        this.#initialize().catch((error) => {
+            console.error("Analytics workspace failed to initialize", error);
+            // Without filters the views stay on their skeletons for good, so open on the defaults.
+            if (!this.#destroyed && !this.#filters.getValue()) this.#filters.setValue(createDefaultFilters());
+        });
     }
 
     set manifest(manifest: { alias: string; meta: { entityType: string; headline?: string } }) {

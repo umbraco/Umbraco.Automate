@@ -1,4 +1,5 @@
 import { UA_SECTION_ALIAS } from "../../section/constants.js";
+import { UA_APPROVALS_DASHBOARD_PATHNAME } from "./constants.js";
 import { UA_WORKSPACES_EXIST_CONDITION_ALIAS } from "../../section/conditions/workspaces-exist.condition.constants.js";
 
 const dashboard: UmbExtensionManifest = {
@@ -9,7 +10,7 @@ const dashboard: UmbExtensionManifest = {
     weight: 4,
     meta: {
         label: "#uaApproval_dashboardTitle",
-        pathname: "approvals",
+        pathname: UA_APPROVALS_DASHBOARD_PATHNAME,
     },
     conditions: [
         {

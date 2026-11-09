@@ -1,5 +1,5 @@
 // Stories AN-6, AN-7: docs/plans/analytics/STORIES.md
-// Pending until T15 (AN-7 AC3, AC5, AC7); AN-6 AC5, AC7 and AN-7 AC1, AC2, AC4, AC13 are on.
+// AN-7 AC7 stubs the summary answer (`analytics.stubSummary`) so it doesn't depend on the site's run cleanup setting.
 import { expect } from '@playwright/test';
 import { test } from '../../../lib/index';
 
@@ -24,6 +24,7 @@ test.describe('Feature: date range, comparison and workspace', () => {
   });
 
   test.describe('Scenario: the user changes the range', () => {
+    // Pending until T16 and T17 add the automations and actions requests.
     test.skip('requests the summary, automations and actions again', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
@@ -75,16 +76,20 @@ test.describe('Feature: date range, comparison and workspace', () => {
       await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset', 'last-30-days');
     });
 
-    test.skip('shows no change badges with the comparison off', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+    test('shows no change badges with the comparison off', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.automate.analytics.stubSummary({ current: { runs: 110, completed: 110, successRate: 1 }, compare: { runs: 100, completed: 100, successRate: 1 } });
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      // With the comparison on, the Runs tile shows its badge, so the count below can only reach 0 by the toggle.
+      await expect(umbracoAutomateUi.automate.analytics.tile('runs').locator('uaui-delta-badge')).toBeVisible();
       await umbracoAutomateUi.automate.analytics.turnComparisonOff();
 
       await expect(page.locator('uaui-delta-badge')).toHaveCount(0);
     });
 
-    test.skip('says runs were deleted when the range starts before the oldest kept day', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+    test('says runs were deleted when the range starts before the oldest kept day', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.automate.analytics.stubSummary({ current: { runs: 3, completed: 3, successRate: 1 }, retainedFromDaysAgo: 89 });
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
       await umbracoAutomateUi.automate.analytics.pickCustomRange({ daysAgoFrom: 120, daysAgoTo: 0 });
 
