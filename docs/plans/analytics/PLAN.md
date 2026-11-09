@@ -81,7 +81,7 @@
   Acceptance: `dotnet build` and the frontend build are green. On the demo site, the backoffice import map contains `@umbraco/analytics-ui`, and its module loads.
   depends-on: T4. parallel-group: B
 
-- [ ] **T11** - story: AN-8 (AC1, AC2, AC4). Create the shell under `Client/src/analytics/`:
+- [x] **T11** - story: AN-8 (AC1, AC2, AC4). Create the shell under `Client/src/analytics/`:
   - `constants.ts`: aliases, the entity type, the storage key
   - `menu/manifests.ts`: a Monitoring `sectionSidebarApp` with the same workspaces-exist condition as the Automations one, its `menu`, and the Analytics `menuItem` (icon `icon-chart`, `entityType` set)
   - `workspace/manifests.ts`: a `workspace` with its own element, plus the Overview `workspaceView`
