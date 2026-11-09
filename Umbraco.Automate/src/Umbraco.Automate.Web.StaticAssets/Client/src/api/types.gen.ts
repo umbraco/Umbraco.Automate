@@ -21,6 +21,65 @@ export type ActionItemResponseModel = {
 
 export type ActionLogLevelModel = 'Debug' | 'Info' | 'Warning' | 'Error';
 
+export type AnalyticsActionRowResponseModel = {
+    actionAlias: string;
+    runs: number;
+    failed: number;
+    retries: number;
+    failureRate?: null | number;
+    avgDurationMs?: null | number;
+    topErrorCategory?: null | string;
+};
+
+export type AnalyticsActionsResponseModel = {
+    items: Array<AnalyticsActionRowResponseModel>;
+    compareItems?: null | Array<AnalyticsActionRowResponseModel>;
+};
+
+export type AnalyticsAutomationRowResponseModel = {
+    automationId: string;
+    name: string;
+    workspaceName: string;
+    runs: number;
+    failed: number;
+    successRate?: null | number;
+    avgDurationMs?: null | number;
+    lastRunUtc: string;
+};
+
+export type AnalyticsAutomationsResponseModel = {
+    items: Array<AnalyticsAutomationRowResponseModel>;
+    compareItems?: null | Array<AnalyticsAutomationRowResponseModel>;
+};
+
+export type AnalyticsDayResponseModel = {
+    date: string;
+    completed: number;
+    rejected: number;
+    cancelled: number;
+    failed: number;
+    inProgress: number;
+};
+
+export type AnalyticsPeriodResponseModel = {
+    runs: number;
+    completed: number;
+    rejected: number;
+    cancelled: number;
+    failed: number;
+    inProgress: number;
+    successRate?: null | number;
+    medianDurationMs?: null | number;
+    days: Array<AnalyticsDayResponseModel>;
+};
+
+export type AnalyticsSummaryResponseModel = {
+    current: AnalyticsPeriodResponseModel;
+    compare?: null | AnalyticsPeriodResponseModel;
+    waitingForApproval: number;
+    retainedFrom?: null | string;
+};
+
 export type ApprovalDecisionRequestModel = {
     outcome: ApprovalOutcomeModel;
     comment?: null | string;
@@ -1691,6 +1750,114 @@ export type GetMetricsResponses = {
 };
 
 export type GetMetricsResponse = GetMetricsResponses[keyof GetMetricsResponses];
+
+export type GetMetricsAnalyticsActionsData = {
+    body?: never;
+    path?: never;
+    query: {
+        from: string;
+        to: string;
+        timeZone: string;
+        compareFrom?: string;
+        compareTo?: string;
+        workspaceId?: string;
+    };
+    url: '/umbraco/automate/management/api/v1/metrics/analytics/actions';
+};
+
+export type GetMetricsAnalyticsActionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetMetricsAnalyticsActionsError = GetMetricsAnalyticsActionsErrors[keyof GetMetricsAnalyticsActionsErrors];
+
+export type GetMetricsAnalyticsActionsResponses = {
+    /**
+     * OK
+     */
+    200: AnalyticsActionsResponseModel;
+};
+
+export type GetMetricsAnalyticsActionsResponse = GetMetricsAnalyticsActionsResponses[keyof GetMetricsAnalyticsActionsResponses];
+
+export type GetMetricsAnalyticsAutomationsData = {
+    body?: never;
+    path?: never;
+    query: {
+        from: string;
+        to: string;
+        timeZone: string;
+        compareFrom?: string;
+        compareTo?: string;
+        workspaceId?: string;
+    };
+    url: '/umbraco/automate/management/api/v1/metrics/analytics/automations';
+};
+
+export type GetMetricsAnalyticsAutomationsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetMetricsAnalyticsAutomationsError = GetMetricsAnalyticsAutomationsErrors[keyof GetMetricsAnalyticsAutomationsErrors];
+
+export type GetMetricsAnalyticsAutomationsResponses = {
+    /**
+     * OK
+     */
+    200: AnalyticsAutomationsResponseModel;
+};
+
+export type GetMetricsAnalyticsAutomationsResponse = GetMetricsAnalyticsAutomationsResponses[keyof GetMetricsAnalyticsAutomationsResponses];
+
+export type GetMetricsAnalyticsSummaryData = {
+    body?: never;
+    path?: never;
+    query: {
+        from: string;
+        to: string;
+        timeZone: string;
+        compareFrom?: string;
+        compareTo?: string;
+        workspaceId?: string;
+    };
+    url: '/umbraco/automate/management/api/v1/metrics/analytics/summary';
+};
+
+export type GetMetricsAnalyticsSummaryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetMetricsAnalyticsSummaryError = GetMetricsAnalyticsSummaryErrors[keyof GetMetricsAnalyticsSummaryErrors];
+
+export type GetMetricsAnalyticsSummaryResponses = {
+    /**
+     * OK
+     */
+    200: AnalyticsSummaryResponseModel;
+};
+
+export type GetMetricsAnalyticsSummaryResponse = GetMetricsAnalyticsSummaryResponses[keyof GetMetricsAnalyticsSummaryResponses];
 
 export type GetMetricsByAutomationData = {
     body?: never;
