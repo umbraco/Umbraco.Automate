@@ -7,8 +7,8 @@ namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 /// Fires when the Umbraco application has started. Raised on every start, restart or
 /// app pool recycle, and on every server in a load-balanced setup — use
 /// <see cref="ApplicationStartedTriggerSettings.OnlyRunOnMainServer"/> to limit it to the
-/// main server and <see cref="ApplicationStartedTriggerOutput.IsRestarting"/> to tell a
-/// cold start from a restart.
+/// main server. <see cref="ApplicationStartedTriggerOutput.IsRestarting"/> is only true
+/// for an in-process runtime restart (for example straight after an install).
 /// </summary>
 [Trigger("umbracoAutomate.applicationStarted", "Application Started",
     Description = "Fires when the Umbraco application starts, including every restart or app pool recycle. In a load-balanced setup it fires on each server unless \"Only run on the main server\" is enabled.",

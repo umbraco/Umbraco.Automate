@@ -11,7 +11,9 @@ public sealed class ApplicationStartedTriggerOutput
     public DateTimeOffset StartedAt { get; set; }
 
     /// <summary>
-    /// Gets a value indicating whether the application is restarting (true) or starting for the first time (false).
+    /// Gets a value indicating whether Umbraco restarted its runtime in-process, for example
+    /// straight after an install. App pool recycles and deployments start a new process and
+    /// report <c>false</c>, just like a cold start.
     /// </summary>
     public bool IsRestarting { get; set; }
 
