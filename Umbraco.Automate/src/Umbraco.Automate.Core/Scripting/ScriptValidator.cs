@@ -38,6 +38,10 @@ internal sealed class ScriptValidator : IScriptValidator
             return ["Script is required."];
         }
 
+        // Honour a cancelled caller up front. Otherwise a small script can finish compiling before
+        // WaitAsync runs, and WaitAsync returns an already-completed task without checking the token.
+        cancellationToken.ThrowIfCancellationRequested();
+
         // Compile on a background task under a wall-clock backstop: the engine's statement-checked
         // limits cannot interrupt pathological top-level code (e.g. a parked await), so the task
         // guarantees the caller stops waiting regardless. Not wrapped in `using` — an overran

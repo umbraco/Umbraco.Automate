@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Json.Schema;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Actions;
@@ -17,7 +18,7 @@ public class CatalogueMapDefinitionTests
 
     public CatalogueMapDefinitionTests()
     {
-        var mapDefinition = new CatalogueMapDefinition();
+        var mapDefinition = new CatalogueMapDefinition(NullLogger<CatalogueMapDefinition>.Instance);
         var definitions = new MapDefinitionCollection(() => [mapDefinition]);
         _mapper = new UmbracoMapper(
             definitions,

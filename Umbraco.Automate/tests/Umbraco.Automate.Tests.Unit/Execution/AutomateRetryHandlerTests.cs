@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Extensions;
 using WorkflowCore.Interface;
@@ -44,6 +45,16 @@ public class AutomateRetryHandlerTests
         var (_, pointer) = Handle(new NonRetryableStepFailureException(new InvalidOperationException("bad")));
 
         pointer.RetryCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void UnknownBindingFilter_TerminatesTheWorkflow()
+    {
+        // Thrown straight out of a control-flow step body (an If condition, a ForEach collection),
+        // which has no failure handling of its own. Retrying cannot make the filter exist.
+        var (workflow, _) = Handle(new UnknownBindingFilterException("uppercse", "trigger.name"));
+
+        workflow.Status.ShouldBe(WorkflowStatus.Terminated);
     }
 
     [Fact]

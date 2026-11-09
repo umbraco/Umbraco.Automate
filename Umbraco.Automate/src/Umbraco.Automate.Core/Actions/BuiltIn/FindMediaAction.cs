@@ -6,6 +6,7 @@ using Examine.Search;
 using Lucene.Net.QueryParsers.Classic;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Services;
@@ -29,6 +30,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class FindMediaAction : ActionBase<FindMediaSettings, FindMediaOutput>
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     // Not ICmsAction — this is a read, so no audit trail entry is written.
 
     /// <summary>Outcome emitted when no media matches.</summary>
@@ -67,6 +74,14 @@ public sealed class FindMediaAction : ActionBase<FindMediaSettings, FindMediaOut
         _authorizer = authorizer;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -287,8 +302,8 @@ public sealed class FindMediaAction : ActionBase<FindMediaSettings, FindMediaOut
             Level = TryParseInt(result, "level"),
             Path = TryGetString(result, "__Path"),
             Url = url,
-            CreateDate = TryParseDate(result, "createDate"),
-            UpdateDate = TryParseDate(result, "updateDate"),
+            CreateDate = IndexedDateParser.Parse(TryGetString(result, "createDate")),
+            UpdateDate = IndexedDateParser.Parse(TryGetString(result, "updateDate")),
         };
     }
 
@@ -322,28 +337,4 @@ public sealed class FindMediaAction : ActionBase<FindMediaSettings, FindMediaOut
            && int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
             ? value
             : 0;
-
-    private static DateTime TryParseDate(ISearchResult result, string field)
-    {
-        var raw = TryGetString(result, field);
-        if (raw is null)
-        {
-            return default;
-        }
-
-        // Umbraco's Examine indexer encodes dates via Lucene's DateTools, which writes
-        // them as yyyyMMddHHmmssfff (milliseconds resolution) — the default DateTime
-        // parsers don't recognise that shape, so try the exact format first.
-        if (DateTime.TryParseExact(raw, "yyyyMMddHHmmssfff", CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var exact))
-        {
-            return exact;
-        }
-
-        // Fallback for indexers or custom fields that emit ISO-8601.
-        return DateTime.TryParse(raw, CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var value)
-            ? value
-            : default;
-    }
 }

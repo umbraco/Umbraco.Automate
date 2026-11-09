@@ -27,28 +27,64 @@ export class ConstantHelper {
     automationTree: 'umb-tree',
     nodePickerModal: 'ua-node-picker-modal',
     nodeSettingsModal: 'ua-node-settings-modal',
+    triggerSettingsModal: 'ua-trigger-settings-modal',
     bindingPickerModal: 'ua-binding-picker-modal',
+    emailAddressInput: 'ua-input-email-address',
     runsTable: 'ua-runs-table',
     runDetailModal: 'ua-run-detail-modal',
     approvalDashboard: 'ua-approval-dashboard',
     approvalDecisionModal: 'ua-approval-decision-modal',
     edgeFilterModal: 'ua-edge-filter-modal',
+    automationCanvas: 'ua-automation-canvas',
     connectionTypePickerModal: 'ua-connection-type-picker-modal',
-    oauthEditor: 'umb-automate-property-editor-ui-oauth'
+    oauthEditor: 'umb-automate-property-editor-ui-oauth',
+    /* CMS pickers the settings form opens (not Automate's own). */
+    treePickerModal: 'umb-tree-picker-modal',
+    mediaPickerModal: 'umb-media-picker-modal'
   };
 
   /* Trigger and step type aliases, as the catalogue API reports them. */
   public static readonly triggers = {
-    manual: 'umbracoAutomate.manual'
+    manual: 'umbracoAutomate.manual',
+    contentSaved: 'umbracoAutomate.contentSaved',
+    elementSaved: 'umbracoAutomate.elementSaved',
+    elementPublished: 'umbracoAutomate.elementPublished',
+    elementUnpublished: 'umbracoAutomate.elementUnpublished',
+    elementBatchSaved: 'umbracoAutomate.elementBatchSaved'
+  };
+
+  /* Settings keys of the Library element triggers: the camelCase of ElementSavedTriggerSettings'
+   * properties. */
+  public static readonly elementTriggerSettings = {
+    elementTypes: 'elementTypes',
+    onAutomationOriginatedEvent: 'onAutomationOriginatedEvent'
   };
 
   public static readonly actions = {
+    createContent: 'umbracoAutomate.createContent',
+    createMedia: 'umbracoAutomate.createMedia',
     delay: 'umbracoAutomate.delay',
+    findContent: 'umbracoAutomate.findContent',
     getContent: 'umbracoAutomate.getContent',
+    getContentProperty: 'umbracoAutomate.getContentProperty',
+    getElement: 'umbracoAutomate.getElement',
+    getElementProperty: 'umbracoAutomate.getElementProperty',
+    createElement: 'umbracoAutomate.createElement',
+    updateElementProperty: 'umbracoAutomate.updateElementProperty',
+    publishElement: 'umbracoAutomate.publishElement',
+    unpublishElement: 'umbracoAutomate.unpublishElement',
+    getMedia: 'umbracoAutomate.getMedia',
+    getMediaProperty: 'umbracoAutomate.getMediaProperty',
+    updateContentProperty: 'umbracoAutomate.updateContentProperty',
+    updateMediaProperty: 'umbracoAutomate.updateMediaProperty',
     httpRequest: 'umbracoAutomate.httpRequest',
     logMessage: 'umbracoAutomate.logMessage',
+    moveContent: 'umbracoAutomate.moveContent',
+    moveMedia: 'umbracoAutomate.moveMedia',
+    publishContent: 'umbracoAutomate.publishContent',
     requestApproval: 'umbracoAutomate.requestApproval',
     runScript: 'umbracoAutomate.runScript',
+    sendEmail: 'umbracoAutomate.sendEmail',
     setVariable: 'umbracoAutomate.setVariable',
     startAutomation: 'umbracoAutomate.startAutomation',
     forEach: 'umbracoAutomate.forEach',
@@ -57,6 +93,45 @@ export class ConstantHelper {
     switch: 'umbracoAutomate.switch',
     while: 'umbracoAutomate.while'
   };
+
+  /* The outcome keys Get Content declares, and the handle id the canvas gives an unnamed
+   * ("Any result") line. Mirror ANY_RESULT_HANDLE in model-to-flow.ts in the client. */
+  public static readonly outcomes = {
+    success: 'success',
+    notFound: 'notFound',
+    parentNotFound: 'parentNotFound',
+    propertyNotFound: 'propertyNotFound',
+    elementTypeNotFound: 'elementTypeNotFound',
+    anyResult: '__any__'
+  };
+
+  /* English exit labels, from lang/en.ts (uaOutcomes, uaOutcomeExits). The outcome-exit specs are
+   * about these labels, so they are the one place besides the section tab where the suite asserts
+   * on translated text. `withDefault` adds the "(default)" mark the canvas appends to the default
+   * exit, so specs never spell that suffix out. */
+  public static readonly outcomeLabels = {
+    found: 'Found',
+    notFound: 'Not found',
+    propertyNotFound: 'Property not found',
+    updated: 'Updated',
+    created: 'Created',
+    folderNotFound: 'Folder not found',
+    elementTypeNotFound: 'Element type not found',
+    anyResult: 'Any result',
+    missing: 'Missing outcome',
+    exitTaken: 'Exit taken',
+    withDefault: (label: string): string => `${label} (default)`
+  };
+
+  /* English exit tooltips, from an outcome's description (lang/en.ts, uaOutcomes). */
+  public static readonly outcomeDescriptions = {
+    propertyFound: 'The item and the property were both found.'
+  };
+
+  /* The publish error for a line from an outcome its step no longer declares (S5 AC5). */
+  public static staleOutcomeError(stepName: string, outcome: string): string {
+    return `Step '${stepName}' has a connection from outcome '${outcome}', which the step no longer has. Reconnect or remove it.`;
+  }
 
   /* Source handle ids on branching and container nodes. Mirror model-to-flow.ts in the client. */
   public static readonly handles = {
@@ -67,6 +142,21 @@ export class ConstantHelper {
     body: 'body',
     done: 'done'
   };
+
+  /* Settings keys of the Library element actions: the camelCase of each settings class's
+   * properties (GetElementSettings, CreateElementSettings, ...). */
+  public static readonly elementSettings = {
+    element: 'elementKey',
+    folder: 'folderKey',
+    elementType: 'elementType'
+  };
+
+  /* The step picker's group headlines. The action attributes set them in code (`Group = "Library"`),
+   * so they are not translations. Groups sort by name, which puts Library between Content and Media. */
+  public static readonly pickerGroups = { content: 'Content', library: 'Library', media: 'Media' };
+
+  /* The publish error for an action whose section the service account lacks (AutomationService). */
+  public static readonly requiresSectionAccess = /requires section access/;
 
   /* Extension aliases. The CMS renders workspace and entity actions with
    * `data-mark="workspace-action:<alias>"` / `"entity-action:<alias>"`, which getByTestId reaches —
