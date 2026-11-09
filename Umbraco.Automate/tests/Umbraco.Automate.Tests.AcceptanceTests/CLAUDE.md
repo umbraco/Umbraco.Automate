@@ -5,8 +5,8 @@ Playwright end-to-end tests that drive a **running** demo site
 `@umbraco-cms/acceptance-test-helpers`. Specs live under `tests/DefaultConfig/`; auth is
 bootstrapped by `tests/auth.setup.ts`. Commands are in [README.md](README.md).
 
-Runs locally and in CI. The `AcceptanceTests` stage in `azure-pipelines.yml` runs
-alongside `Build` and gates pull requests too — see "How the CI stage works" below.
+Runs locally and in CI. The `AcceptanceTests` stage (Umbraco.Build's shared monorepo stage,
+inserted by `azure-pipelines.yml`) runs alongside `Build` and gates pull requests too — see "How the CI stage works" below.
 
 ---
 
@@ -270,7 +270,8 @@ bites in one place is usually this divergence, not a product bug.
 
 ## How the CI stage works
 
-The `AcceptanceTests` stage in `azure-pipelines.yml`:
+The `AcceptanceTests` stage is Umbraco.Build's `devops/monorepo/stages/acceptance-tests.yml`,
+inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automate's own settings:
 
 - **Depends on nothing (`dependsOn: []`), so it runs alongside `Build`.** It uses nothing
   `Build` produces, so waiting for it only cost ~3.5 min of wall-clock; the price is a wasted
@@ -279,8 +280,10 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
   on a pull request. The trade-off is that CI exercises **project references**, not a published
   package.
 - **Skips or narrows itself on pull requests.** A small `Changes` job in the same stage sorts the
-  PR's changed files into areas (the table is in the comment above it in `azure-pipelines.yml`;
-  update it when you add a project or move code). A PR touching only docs, repo tooling or the
+  PR's changed files into areas (the rules are in Umbraco.Build's
+  `devops/monorepo/steps/detect-acceptance-changes.yml`; Automate's `skip_paths`, `test_paths`,
+  `smoke_paths` and `full_paths` are in `azure-pipelines.yml`: update them when you add a project
+  or move code). A PR touching only docs, repo tooling or the
   .NET unit/integration test projects skips the suite. A PR whose only acceptance changes are
   specs (`tests/`, `umbraco.config.ts`) runs **one** unsharded leg with Playwright's
   `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec importing a
@@ -337,7 +340,7 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
 - **`maxFailures` stops a run that is going nowhere.** If the site wedges, every remaining spec
   fails in setup with three attempts each, which used to run into the job timeout.
 
-Two things to know if you edit that stage. Azure macro-expands `$(name)` before bash or pwsh
+Two things to know if you edit that stage (in Umbraco.Build). Azure macro-expands `$(name)` before bash or pwsh
 sees the script. PowerShell subexpressions such as `$($process.Id)` are safe, because Azure only
 matches a variable name after `$(`, but bash `$(command)` substitution is not. And
 `config.js` is deliberately **not** used in CI: it is interactive and reads the per-worktree
@@ -346,5 +349,5 @@ port from git config, which is a local-development affordance, whereas CI fixes 
 Build stage: the demo site builds from project references, and Nerdbank.GitVersioning fails
 on a shallow clone.
 
-`Pack` does **not** depend on this stage. Acceptance failures therefore do not block packaging;
-wire that up only if you want UI flakes to be able to hold a release.
+`Pack` waits for this stage. A failed or cancelled run stops packaging; a skipped one (a pull
+request that didn't need the suite) doesn't.
