@@ -31,6 +31,10 @@
     <PackageVersion Include="Umbraco.Cms.Tests.Integration" Version="19.0.0-beta1" />
     <PackageVersion Include="NUnit3TestAdapter" Version="5.1.0" />
   </ItemGroup>
+  <!-- Analytics UI: floor is the MyGet nightly prerelease; T20 raises it to 19.0.0 once Analytics UI is on nuget.org -->
+  <ItemGroup>
+    <PackageVersion Include="Umbraco.Analytics.UI" Version="[19.0.0-alpha.1, 19.999.999)" />
+  </ItemGroup>
   <!-- OpenAPI (replaces Swashbuckle, which CMS v18 and later no longer ship transitively) -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[11.0.0-rc.3.26522.148, 11.999.999)" />

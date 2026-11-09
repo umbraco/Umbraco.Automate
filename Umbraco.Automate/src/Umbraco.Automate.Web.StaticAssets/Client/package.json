@@ -15,6 +15,7 @@
     },
     "devDependencies": {
         "@hey-api/openapi-ts": "^0.99.0",
+        "@umbraco/analytics-ui": "https://www.myget.org/F/umbraconightly/npm/@umbraco/analytics-ui/-/@umbraco/analytics-ui-19.0.0-alpha.1.tgz",
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.1.4",
