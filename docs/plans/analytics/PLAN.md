@@ -107,7 +107,7 @@
   Add the `dateRange`, `workspaceSelect`, `pickPreset`, `pickCustomRange` and `turnComparisonOff` members to `AutomateUiHelper.analytics` first. Acceptance: `Analytics/analytics.filters.spec.ts` (the AN-6 and AN-7 criteria above) green.
   depends-on: T11
 
-- [ ] **T14** - story: AN-3 (AC6 to AC8), AN-5 (AC8 to AC11). Add:
+- [x] **T14** - story: AN-3 (AC6 to AC8), AN-5 (AC8 to AC11). Add:
   - `repository/analytics.server.data-source.ts`: the three generated-client calls, each keeping a request counter so an older answer is dropped
   - `analytics-adapter.ts`, which turns the summary into `UauiSeries` (Completed `positive`, Rejected `warning`, Cancelled `default`, Failed `danger`, In progress slot 1, in that order) and its comparison series
   - week and month totals in the adapter, from `uauiBucketsFor` with `weekStart` from `new Intl.Locale(culture).getWeekInfo().firstDay`
