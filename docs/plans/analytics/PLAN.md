@@ -92,7 +92,7 @@
   Acceptance: `Analytics/analytics.navigation.spec.ts` AN-8 AC1, AC2 and AC4 green in `Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests/tests/DefaultConfig/`.
   depends-on: T10. parallel-group: C
 
-- [ ] **T12** - story: AN-2 (AC9). Regenerate the API client (`npm run generate-client`) against the T9 demo site, so `Client/src/api/` has the three endpoints and their types.
+- [x] **T12** - story: AN-2 (AC9). Regenerate the API client (`npm run generate-client`) against the T9 demo site, so `Client/src/api/` has the three endpoints and their types.
   Acceptance: the generated types match SPEC's shapes and the frontend build is green.
   depends-on: T9, T10. parallel-group: C
 
