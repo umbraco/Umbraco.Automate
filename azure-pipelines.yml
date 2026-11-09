@@ -106,7 +106,7 @@ resources:
         - repository: build
           type: github
           name: umbraco/Umbraco.Build
-          ref: refs/heads/main
+          ref: refs/heads/feature/shared-test-stages
           endpoint: umbraco
 
 variables:
