@@ -3,7 +3,7 @@
 # The stages, and when each runs, come from Umbraco.Build's shared monorepo template:
 # https://github.com/umbraco/Umbraco.Build/tree/main/devops/monorepo
 # This file holds what is Automate's own: its products, its queue-time switches, its triggers and
-# its acceptance test settings.
+# its acceptance test patterns.
 
 parameters:
     # ============================================================
@@ -138,37 +138,54 @@ extends:
         # Playwright end-to-end tests against the demo site, on Windows + SQL Server LocalDB.
         # Automate shares the CMS connection string (Umbraco:Automate:UseNamedConnectionString =
         # umbracoDbDSN), so the stage's LocalDB connection string moves Automate onto it too.
-        acceptance_tests:
-            tests_dir: Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
-            demo_project_file: Umbraco.Automate.DemoSite.csproj
-            # A PR that only touches these never runs the suite: docs, repo tooling, the dotnet new
-            # templates (not scripts/templates/), changelog and release tooling, marketplace JSON.
-            skip_paths:
-                - "*.md"
-                - "docs/*"
-                - ".claude/*"
-                - ".github/*"
-                - ".githooks/*"
-                - "assets/*"
-                - "templates/*"
-                - "LICENSE"
-                - "commitlint.config.js"
-                - ".git-blame-ignore-revs"
-                - ".prettierrc"
-                - ".prettierignore"
-                - ".mcp.json"
-                - ".worktreeinclude"
-                - "*/changelog.config.json"
-                - "*/umbraco-marketplace*.json"
-                - "scripts/generate-changelog*"
-                - "scripts/generate-release-manifest*"
-                - "scripts/list-commit-options.js"
-                - "scripts/setup-git-hooks*"
-            # The .NET test projects: Build runs them.
-            test_paths:
-                - "Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/*"
-                - "Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/*"
-                - "Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/*"
-                - "Umbraco.Automate/tests/Directory.*"
-                - "Umbraco.Automate.OpenIddict/tests/*"
-                - "Umbraco.Automate.Slack/tests/*"
+        # Inserted through additional_tests, the same hook as Umbraco.Build's main template.
+        additional_tests:
+            - template: devops/monorepo/stages/acceptance-tests.yml@build
+              parameters:
+                  node_version: 22.x
+                  tests_dir: Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
+                  demo_project_file: Umbraco.Automate.DemoSite.csproj
+                  # A PR that only touches these never runs the suite: docs, repo tooling, the dotnet new
+                  # templates (not scripts/templates/), changelog and release tooling, marketplace JSON.
+                  skip_paths:
+                      - "*.md"
+                      - "docs/*"
+                      - ".claude/*"
+                      - ".github/*"
+                      - ".githooks/*"
+                      - "assets/*"
+                      - "templates/*"
+                      - "LICENSE"
+                      - "commitlint.config.js"
+                      - ".git-blame-ignore-revs"
+                      - ".prettierrc"
+                      - ".prettierignore"
+                      - ".mcp.json"
+                      - ".worktreeinclude"
+                      - "*/changelog.config.json"
+                      - "*/umbraco-marketplace*.json"
+                      - "scripts/generate-changelog*"
+                      - "scripts/generate-release-manifest*"
+                      - "scripts/list-commit-options.js"
+                      - "scripts/setup-git-hooks*"
+                  # The .NET test projects: Build runs them.
+                  test_paths:
+                      - "Umbraco.Automate/tests/Umbraco.Automate.Tests.Unit/*"
+                      - "Umbraco.Automate/tests/Umbraco.Automate.Tests.Integration/*"
+                      - "Umbraco.Automate/tests/Umbraco.Automate.Tests.Common/*"
+                      - "Umbraco.Automate/tests/Directory.*"
+                      - "Umbraco.Automate.OpenIddict/tests/*"
+                      - "Umbraco.Automate.Slack/tests/*"
+                  # Server-side C# the backoffice doesn't call directly runs only the @smoke tests: the
+                  # .NET tests in Build cover its behaviour, and the smoke set proves the site still
+                  # builds, migrates, boots and serves the backoffice. The push to vN/dev after merge
+                  # runs the whole suite, and a manual run of the PR's branch forces it.
+                  smoke_paths:
+                      - "Umbraco.Automate/src/*"
+                      - "Umbraco.Automate.OpenIddict/src/*"
+                      - "Umbraco.Automate.Slack/src/*"
+                  # Exceptions inside those: the Management API and the frontends run the whole suite.
+                  full_paths:
+                      - "Umbraco.Automate/src/Umbraco.Automate.Web/*"
+                      - "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/*"
+                      - "Umbraco.Automate.OpenIddict/src/*/Client/*"
