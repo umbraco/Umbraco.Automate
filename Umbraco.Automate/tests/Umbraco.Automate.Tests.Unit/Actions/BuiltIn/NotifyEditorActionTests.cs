@@ -130,6 +130,27 @@ public class NotifyEditorActionTests
         _notifier.Verify(n => n.NotifyAsync(It.IsAny<EditorNotificationMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // A root start node passes the authorizer for an item in the recycle bin (#507).
+    [Fact]
+    public async Task ExecuteAsync_ContentInRecycleBin_ReturnsNotFoundOutcome()
+    {
+        var contentKey = SetupExistingContent(trashed: true);
+
+        var result = await _action.ExecuteAsync(CreateContext(contentKey), CancellationToken.None);
+
+        result.Outcome.ShouldBe(NotifyEditorAction.OutcomeNotFound);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ContentInRecycleBin_DoesNotNotify()
+    {
+        var contentKey = SetupExistingContent(trashed: true);
+
+        await _action.ExecuteAsync(CreateContext(contentKey), CancellationToken.None);
+
+        _notifier.Verify(n => n.NotifyAsync(It.IsAny<EditorNotificationMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public void HasContentSectionRequirement()
         => _action.RequiredSections.ShouldBe([Umbraco.Cms.Core.Constants.Applications.Content]);
@@ -142,11 +163,12 @@ public class NotifyEditorActionTests
         return await _action.ExecuteAsync(CreateContext(contentKey), CancellationToken.None);
     }
 
-    private Guid SetupExistingContent()
+    private Guid SetupExistingContent(bool trashed = false)
     {
         var contentKey = Guid.NewGuid();
         var content = new Mock<IContent>();
         content.SetupGet(c => c.Name).Returns(ContentName);
+        content.SetupGet(c => c.Trashed).Returns(trashed);
         _contentService.Setup(s => s.GetById(contentKey)).Returns(content.Object);
         return contentKey;
     }

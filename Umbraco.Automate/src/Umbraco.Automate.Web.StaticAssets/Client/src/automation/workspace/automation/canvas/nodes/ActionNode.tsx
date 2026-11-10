@@ -1,6 +1,7 @@
 import { memo, useCallback } from "react";
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import type { ActionNodeData } from "../types.js";
+import ActionOutcomeExits from "./ActionOutcomeExits.js";
 import AddActionButton from "./AddActionButton.js";
 
 function ActionNode({ data, id }: NodeProps) {
@@ -28,6 +29,7 @@ function ActionNode({ data, id }: NodeProps) {
     );
 
     const hasSettings = nodeData.hasSettings ?? true;
+    const declaresOutcomes = nodeData.declaresOutcomes ?? false;
 
     const onDoubleClick = useCallback(
         (e: React.MouseEvent) => {
@@ -91,8 +93,14 @@ function ActionNode({ data, id }: NodeProps) {
                     </code>
                 </div>
             </div>
-            <Handle type="source" position={Position.Bottom} />
-            {!nodeData.runStatus && <AddActionButton nodeId={id} />}
+            {declaresOutcomes ? (
+                <ActionOutcomeExits nodeId={id} nodeData={nodeData} />
+            ) : (
+                <>
+                    <Handle type="source" position={Position.Bottom} />
+                    {!nodeData.runStatus && <AddActionButton nodeId={id} />}
+                </>
+            )}
         </div>
     );
 }

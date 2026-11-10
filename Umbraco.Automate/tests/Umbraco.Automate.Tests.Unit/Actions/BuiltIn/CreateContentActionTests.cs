@@ -220,6 +220,58 @@ public class CreateContentActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = key.ToString(), ContentType = Guid.NewGuid().ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = key.ToString(), ContentType = Guid.NewGuid().ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe("parentNotFound");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_DoesNotCreate()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Content node '{key}' not found."));
+
+        await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = key.ToString(), ContentType = Guid.NewGuid().ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        _contentService.Verify(x => x.Create(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeContentAsync(key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = key.ToString(), ContentType = Guid.NewGuid().ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ParentNotFound_ReturnsParentNotFoundOutcome()
     {
         var parentKey = Guid.NewGuid();
@@ -245,12 +297,35 @@ public class CreateContentActionTests
         output.ContentTypeKey.ShouldBe(contentTypeKey);
     }
 
+    // A root start node passes the authorizer for a parent in the recycle bin (#507).
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_ReturnsParentNotFoundOutcome()
+    {
+        var parentKey = SetupTrashedParent();
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = parentKey.ToString(), ContentType = Guid.NewGuid().ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe(CreateContentAction.OutcomeParentNotFound);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_DoesNotCreate()
+    {
+        var parentKey = Guid.NewGuid();
+        SetupInvariantCreate(parentKey, out var contentTypeKey);
+        SetupTrashedParent(parentKey);
+
+        await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = parentKey.ToString(), ContentType = contentTypeKey.ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        _contentService.Verify(x => x.Create(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
     [Fact]
     public async Task ExecuteAsync_ContentTypeNotFound_ReturnsContentTypeNotFoundOutcome()
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
         _contentTypeService.Setup(x => x.Get(contentTypeKey)).Returns((IContentType?)null);
 
         var context = CreateContext(
@@ -268,12 +343,27 @@ public class CreateContentActionTests
         result.Outcome.ShouldBe(CreateContentAction.OutcomeContentTypeNotFound);
     }
 
+    // The backoffice refuses a child type the parent's type doesn't allow; IContentService doesn't (#515).
+    [Fact]
+    public async Task ExecuteAsync_ParentTypeDoesNotAllowTheContentType_ReturnsValidationErrorWithoutCreating()
+    {
+        var parentKey = Guid.NewGuid();
+        SetupInvariantCreate(parentKey, out var contentTypeKey);
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(Guid.NewGuid()));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateContentSettings { ParentKey = parentKey.ToString(), ContentType = contentTypeKey.ToString(), Name = "New Page" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        _contentService.Verify(x => x.Create(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
     [Fact]
     public async Task ExecuteAsync_VariantContentTypeWithoutCulture_ReturnsValidationError()
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -301,7 +391,7 @@ public class CreateContentActionTests
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
         var contentKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -347,7 +437,7 @@ public class CreateContentActionTests
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -384,7 +474,7 @@ public class CreateContentActionTests
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -541,7 +631,7 @@ public class CreateContentActionTests
     {
         var typeKey = Guid.NewGuid();
         contentTypeKey = typeKey;
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var shortStringHelper = new Mock<IShortStringHelper>();
         shortStringHelper
@@ -665,7 +755,7 @@ public class CreateContentActionTests
     {
         var parentKey = Guid.NewGuid();
         var contentTypeKey = Guid.NewGuid();
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -752,7 +842,7 @@ public class CreateContentActionTests
     {
         var typeKey = Guid.NewGuid();
         contentTypeKey = typeKey;
-        _contentService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IContent>());
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(contentTypeKey));
 
         var contentType = new Mock<IContentType>();
         contentType.SetupGet(x => x.Alias).Returns("page");
@@ -779,6 +869,32 @@ public class CreateContentActionTests
             .Returns(new OperationResult(OperationResultType.Success, new EventMessages()));
 
         return created;
+    }
+
+    /// <summary>
+    /// A live parent whose content type allows <paramref name="childTypeKey"/> as a child.
+    /// </summary>
+    private IContent ParentAllowing(Guid childTypeKey)
+    {
+        var parentTypeKey = Guid.NewGuid();
+        var parentType = new Mock<IContentType>();
+        parentType.SetupGet(x => x.Alias).Returns("parentPage");
+        parentType.SetupGet(x => x.AllowedContentTypes).Returns([new ContentTypeSort(childTypeKey, 0, "page")]);
+        _contentTypeService.Setup(x => x.Get(parentTypeKey)).Returns(parentType.Object);
+
+        var parent = new Mock<IContent>();
+        parent.SetupGet(x => x.ContentType).Returns(Mock.Of<ISimpleContentType>(t => t.Key == parentTypeKey));
+        return parent.Object;
+    }
+
+    private Guid SetupTrashedParent(Guid? key = null)
+    {
+        var parentKey = key ?? Guid.NewGuid();
+        var parent = new Mock<IContent>();
+        parent.SetupGet(x => x.Key).Returns(parentKey);
+        parent.SetupGet(x => x.Trashed).Returns(true);
+        _contentService.Setup(x => x.GetById(parentKey)).Returns(parent.Object);
+        return parentKey;
     }
 
     private static ActionContext CreateContext(CreateContentSettings settings, Guid? serviceAccountKey = null)

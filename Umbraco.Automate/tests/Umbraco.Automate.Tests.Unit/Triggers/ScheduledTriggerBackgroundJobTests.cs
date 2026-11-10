@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Dispatch;
@@ -27,6 +28,9 @@ public class ScheduledTriggerBackgroundJobTests
     private readonly Mock<IRuntimeState> _runtimeState = new();
     private readonly Mock<IServerRoleAccessor> _serverRoleAccessor = new();
     private readonly Mock<IMainDom> _mainDom = new();
+    private readonly AutomateReadinessSignal _readinessSignal = new();
+    private readonly ExecutionOptions _executionOptions = new() { Mode = ExecutionMode.SchedulerOnly };
+    private readonly IServiceProvider _serviceProvider;
     private readonly ScheduledTriggerBackgroundJob _job;
 
     public ScheduledTriggerBackgroundJobTests()
@@ -40,23 +44,138 @@ public class ScheduledTriggerBackgroundJobTests
         services.AddSingleton(triggerCollection);
         services.AddSingleton(_stateStore.Object);
         services.AddSingleton(_dispatcher.Object);
-        var sp = services.BuildServiceProvider();
-
-        var options = Mock.Of<IOptionsMonitor<ScheduledTriggerOptions>>(
-            o => o.CurrentValue == new ScheduledTriggerOptions());
+        _serviceProvider = services.BuildServiceProvider();
 
         _runtimeState.Setup(r => r.Level).Returns(RuntimeLevel.Run);
         _serverRoleAccessor.Setup(r => r.CurrentServerRole).Returns(ServerRole.Single);
         _mainDom.Setup(m => m.IsMainDom).Returns(true);
 
-        _job = new ScheduledTriggerBackgroundJob(
-            sp,
-            options,
+        _job = CreateJob(_readinessSignal);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_EngineStartFailed_DoesNotDispatch()
+    {
+        _readinessSignal.SignalEngineStartFailed();
+        GivenDueYearlySchedule(Guid.NewGuid());
+
+        await _job.PerformExecuteAsync(CancellationToken.None);
+
+        _dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_EngineStartFailed_RecordsTheSkippedTickAsFired()
+    {
+        // A skipped tick is consumed, not owed: recording it keeps it from being replayed later.
+        _readinessSignal.SignalEngineStartFailed();
+        var automationId = Guid.NewGuid();
+        GivenDueYearlySchedule(automationId);
+
+        await _job.PerformExecuteAsync(CancellationToken.None);
+
+        _stateStore.Verify(
+            s => s.SetLastFiredAsync(automationId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_EngineStartFailedInDistributedMode_StillDispatches()
+    {
+        // Other nodes consume outbox work in Distributed mode, so a healthy node runs the tick.
+        _executionOptions.Mode = ExecutionMode.Distributed;
+        _readinessSignal.SignalEngineStartFailed();
+        GivenDueYearlySchedule(Guid.NewGuid());
+
+        await _job.PerformExecuteAsync(CancellationToken.None);
+
+        _dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_EngineStartFailed_LogsThePauseOnce()
+    {
+        _readinessSignal.SignalEngineStartFailed();
+        GivenDueYearlySchedule(Guid.NewGuid());
+        var logger = new Mock<ILogger<ScheduledTriggerBackgroundJob>>();
+        var job = CreateJob(_readinessSignal, logger.Object);
+
+        await job.PerformExecuteAsync(CancellationToken.None);
+        await job.PerformExecuteAsync(CancellationToken.None);
+
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task PerformExecuteAsync_AfterARestartThatRecovers_DoesNotCatchUpTicksSkippedWhileTheEngineWasDown()
+    {
+        _readinessSignal.SignalEngineStartFailed();
+        var automationId = Guid.NewGuid();
+        var lastFiredBeforeOutage = GivenDueYearlySchedule(automationId);
+        DateTime? recordedLastFired = null;
+        _stateStore
+            .Setup(s => s.SetLastFiredAsync(automationId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, DateTime, CancellationToken>((_, firedUtc, _) => recordedLastFired = firedUtc)
+            .Returns(Task.CompletedTask);
+        await _job.PerformExecuteAsync(CancellationToken.None);
+
+        // The next process starts with a healthy engine and reads back whatever the paused one
+        // left in the store: its recorded tick, or the last real fire if it recorded nothing.
+        _stateStore
+            .Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => recordedLastFired ?? lastFiredBeforeOutage);
+        await CreateJob(new AutomateReadinessSignal()).PerformExecuteAsync(CancellationToken.None);
+
+        _dispatcher.Verify(d => d.DispatchAsync(It.IsAny<TriggerEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private ScheduledTriggerBackgroundJob CreateJob(
+        AutomateReadinessSignal readinessSignal,
+        ILogger<ScheduledTriggerBackgroundJob>? logger = null)
+        => new(
+            _serviceProvider,
+            Mock.Of<IOptionsMonitor<ScheduledTriggerOptions>>(o => o.CurrentValue == new ScheduledTriggerOptions()),
             _runtimeState.Object,
             _serverRoleAccessor.Object,
             _mainDom.Object,
             TimeProvider.System,
-            Mock.Of<ILogger<ScheduledTriggerBackgroundJob>>());
+            readinessSignal,
+            Options.Create(_executionOptions),
+            logger ?? Mock.Of<ILogger<ScheduledTriggerBackgroundJob>>());
+
+    /// <summary>
+    /// A published automation on a once-a-year schedule that last fired two years ago, so its
+    /// next tick is due now and the tick after it is months away.
+    /// </summary>
+    private DateTime GivenDueYearlySchedule(Guid automationId)
+    {
+        _automationService.Setup(s => s.GetPublishedVersionReferencesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<(Guid Id, int PublishedVersion)> { (automationId, 1) });
+        _automationService.Setup(s => s.GetAutomationAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Automation
+            {
+                Alias = "test",
+                Name = "Test",
+                Status = AutomationStatus.Published,
+                Trigger = new TriggerConfiguration { TriggerAlias = ScheduledTriggerAlias, Settings = [] },
+            });
+
+        _mockTrigger.Setup(t => t.SettingsType).Returns((Type?)null);
+        var scheduled = _mockTrigger.As<IScheduledTrigger>();
+        scheduled.Setup(t => t.GetCronExpression(It.IsAny<object?>())).Returns("0 0 1 1 *");
+        scheduled.Setup(t => t.GetTimeZone(It.IsAny<object?>())).Returns(TimeZoneInfo.Utc);
+
+        var lastFired = DateTime.UtcNow.AddYears(-2);
+        _stateStore.Setup(s => s.GetLastFiredAsync(automationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(lastFired);
+        return lastFired;
     }
 
     [Fact]

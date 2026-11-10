@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+  </defs>
+  <rect width="760" height="460" fill="#ffffff"/>
+
+  <!-- Caller -->
+  <rect x="270" y="16" width="220" height="44" rx="8" fill="#f2f4f8" stroke="#8a94a6"/>
+  <text x="380" y="43" text-anchor="middle">Repository: CreateDbContext()</text>
+
+  <!-- Ambient factory -->
+  <rect x="250" y="92" width="260" height="44" rx="8" fill="#f2f4f8" stroke="#8a94a6"/>
+  <text x="380" y="119" text-anchor="middle">AmbientDbContextFactory (unchanged)</text>
+  <line x1="380" y1="60" x2="380" y2="90" stroke="#555" marker-end="url(#arrow)"/>
+
+  <!-- Ambient yes -->
+  <rect x="560" y="92" width="180" height="44" rx="8" fill="#f2f4f8" stroke="#8a94a6"/>
+  <text x="650" y="113" text-anchor="middle">Enlisted context on</text>
+  <text x="650" y="129" text-anchor="middle">the CMS transaction</text>
+  <line x1="510" y1="114" x2="558" y2="114" stroke="#555" marker-end="url(#arrow)"/>
+  <text x="534" y="106" text-anchor="middle" font-size="12" fill="#555">ambient tx</text>
+
+  <!-- New: resolving factory -->
+  <rect x="230" y="172" width="300" height="56" rx="8" fill="#e8f3ec" stroke="#2f8f5b" stroke-width="2"/>
+  <text x="380" y="196" text-anchor="middle" font-weight="600">ResolvingPooledDbContextFactory (new)</text>
+  <text x="380" y="215" text-anchor="middle" font-size="12" fill="#333">Was the pooled factory built on the placeholder?</text>
+  <line x1="380" y1="136" x2="380" y2="170" stroke="#555" marker-end="url(#arrow)"/>
+  <text x="392" y="157" font-size="12" fill="#555">no ambient tx</text>
+
+  <!-- No: DI pool -->
+  <rect x="20" y="268" width="210" height="56" rx="8" fill="#f2f4f8" stroke="#8a94a6"/>
+  <text x="125" y="292" text-anchor="middle">DI's pooled factory</text>
+  <text x="125" y="310" text-anchor="middle" font-size="12" fill="#333">today's path, real database</text>
+  <path d="M260,228 L180,266" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <text x="196" y="246" font-size="12" fill="#555">no</text>
+
+  <!-- Yes: real pool built? -->
+  <rect x="280" y="268" width="200" height="56" rx="8" fill="#e8f3ec" stroke="#2f8f5b"/>
+  <text x="380" y="292" text-anchor="middle">Real pool built already?</text>
+  <text x="380" y="310" text-anchor="middle" font-size="12" fill="#333">use it</text>
+  <line x1="380" y1="228" x2="380" y2="266" stroke="#555" marker-end="url(#arrow)"/>
+  <text x="390" y="250" font-size="12" fill="#555">yes</text>
+
+  <!-- Resolve -->
+  <rect x="530" y="268" width="210" height="56" rx="8" fill="#e8f3ec" stroke="#2f8f5b"/>
+  <text x="635" y="292" text-anchor="middle">DatabaseConnectionInfo.Resolve</text>
+  <text x="635" y="310" text-anchor="middle" font-size="12" fill="#333">not built yet: try again</text>
+  <line x1="480" y1="296" x2="528" y2="296" stroke="#555" marker-end="url(#arrow)"/>
+  <text x="504" y="288" text-anchor="middle" font-size="12" fill="#555">no</text>
+
+  <!-- Resolved -->
+  <rect x="440" y="372" width="200" height="56" rx="8" fill="#e8f3ec" stroke="#2f8f5b"/>
+  <text x="540" y="396" text-anchor="middle">Build the real pool once</text>
+  <text x="540" y="414" text-anchor="middle" font-size="12" fill="#333">log it, then use it</text>
+  <path d="M600,324 L560,370" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <text x="590" y="352" font-size="12" fill="#555">found</text>
+
+  <!-- Still missing -->
+  <rect x="660" y="372" width="90" height="56" rx="8" fill="#fbecec" stroke="#b44"/>
+  <text x="705" y="396" text-anchor="middle" font-size="12">Placeholder</text>
+  <text x="705" y="412" text-anchor="middle" font-size="12">context</text>
+  <path d="M680,324 L700,370" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <text x="702" y="352" font-size="12" fill="#555">missing</text>
+</svg>

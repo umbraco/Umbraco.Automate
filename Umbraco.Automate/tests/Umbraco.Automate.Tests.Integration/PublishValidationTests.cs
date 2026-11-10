@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
@@ -89,7 +90,8 @@ public class PublishValidationTests
                 new WebhookAuthenticatorCollection(Array.Empty<IWebhookAuthenticator>),
                 new NotificationChannelCollection(Array.Empty<INotificationChannel>)),
             new SectionAccessChecker(),
-            configReferenceResolver);
+            configReferenceResolver,
+            new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
     }
 
     [Fact]

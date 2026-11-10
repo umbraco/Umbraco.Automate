@@ -32,7 +32,7 @@ internal static class ContentCultureHelpers
     /// change-tracking heuristic when the notification carries no entry for the item.
     /// </summary>
     public static string[]? GetPublishedCultures(
-        IContent content,
+        IPublishableContentBase content,
         IReadOnlyDictionary<Guid, IReadOnlyCollection<string>>? publishedCultures)
     {
         if (!content.ContentType.VariesByCulture())
@@ -50,7 +50,7 @@ internal static class ContentCultureHelpers
     /// change-tracking heuristic when the notification carries no entry for the item.
     /// </summary>
     public static string[]? GetSavedCultures(
-        IContent content,
+        IPublishableContentBase content,
         IReadOnlyDictionary<Guid, IReadOnlyCollection<string>>? savedCultures)
     {
         if (!content.ContentType.VariesByCulture())
@@ -68,7 +68,7 @@ internal static class ContentCultureHelpers
     /// currently-published cultures when the notification carries no entry for the item.
     /// </summary>
     public static string[]? GetUnpublishedCultures(
-        IContent content,
+        IPublishableContentBase content,
         IReadOnlyDictionary<Guid, IReadOnlyCollection<string>>? unpublishedCultures)
     {
         if (!content.ContentType.VariesByCulture())
@@ -83,7 +83,7 @@ internal static class ContentCultureHelpers
     // The authoritative per-document delta from the notification, or null when the CMS reported
     // nothing for this document (the caller then applies its change-tracking fallback).
     private static string[]? TryGetReportedCultures(
-        IContent content,
+        IPublishableContentBase content,
         IReadOnlyDictionary<Guid, IReadOnlyCollection<string>>? reportedCultures)
         => reportedCultures is not null && reportedCultures.TryGetValue(content.Key, out var cultures)
             ? cultures.ToArray()
