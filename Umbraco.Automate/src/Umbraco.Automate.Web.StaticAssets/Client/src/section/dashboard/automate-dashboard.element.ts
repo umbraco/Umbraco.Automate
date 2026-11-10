@@ -1,6 +1,7 @@
 import { css, customElement, html, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import { UA_ANALYTICS_WORKSPACE_PATH } from "../../analytics/paths.js";
 import { UaAutomationCollectionServerDataSource } from "../../automation/repository/collection/automation-collection.server.data-source.js";
 import { UaRunListCollectionServerDataSource } from "../../run/repository/collection/run-list-collection.server.data-source.js";
 import { UaRunMetricsServerDataSource } from "../../run/repository/metrics/run-metrics.server.data-source.js";
@@ -103,6 +104,11 @@ export class UaAutomateDashboardElement extends UmbLitElement {
             <div class="uui-text">
                 <ua-status-cards .cards=${this._cards}></ua-status-cards>
 
+                <div class="analytics-link">
+                    <uui-icon name="icon-chart"></uui-icon>
+                    <span>${this.localize.htmlString("#uaDashboard_analyticsLink", UA_ANALYTICS_WORKSPACE_PATH)}</span>
+                </div>
+
                 <uui-box headline=${this.localize.term("uaDashboard_recentActivity")} class="activity-box">
                     <ua-activity-list .items=${this._activity}></ua-activity-list>
                 </uui-box>
@@ -168,6 +174,24 @@ export class UaAutomateDashboardElement extends UmbLitElement {
             .subtitle {
                 color: var(--uui-color-text-alt);
                 font-size: var(--uui-size-5);
+            }
+
+            .analytics-link {
+                display: flex;
+                align-items: center;
+                gap: var(--uui-size-space-2);
+                margin-top: var(--uui-size-space-4);
+                color: var(--uui-color-text-alt);
+            }
+
+            .analytics-link a {
+                color: var(--uui-color-interactive);
+                font-weight: 600;
+                text-decoration: none;
+            }
+
+            .analytics-link a:hover {
+                text-decoration: underline;
             }
 
             .activity-box {

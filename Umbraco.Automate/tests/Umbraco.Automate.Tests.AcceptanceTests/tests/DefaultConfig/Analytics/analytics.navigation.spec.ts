@@ -1,6 +1,5 @@
 // Story AN-8: docs/plans/analytics/STORIES.md
-// Pending until T11 (AC1, AC2, AC4), T18 (AC3, AC5) and T9 (AC6). The builder adds
-// `analyticsUrl()` and `analytics` to AutomateUiHelper, mirroring the client's paths.
+// AC1-AC5 are active. The AC6 spec (403 without the Automate section) stays skipped until T19.
 import { expect } from '@playwright/test';
 import { test, ConstantHelper } from '../../../lib/index';
 
@@ -30,7 +29,7 @@ test.describe('Feature: open Analytics', () => {
   });
 
   test.describe('Scenario: the Overview dashboard on a site with automations', () => {
-    test.skip('links to Analytics under the status cards', async ({ automateWorkspace, page, umbracoAutomateApi, umbracoAutomateUi }) => {
+    test('links to Analytics under the status cards', async ({ automateWorkspace, page, umbracoAutomateApi, umbracoAutomateUi }) => {
       await umbracoAutomateApi.automations.create('Analytics link check', automateWorkspace.id);
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.sectionUrl());
       await umbracoAutomateUi.automate.waitForDashboard();
@@ -53,9 +52,24 @@ test.describe('Feature: open Analytics', () => {
       await expect(umbracoAutomateUi.automate.analytics.monitoringMenu).toHaveCount(0);
     });
 
-    test.skip('shows no Analytics link on the welcome screen', async ({ page, umbracoAutomateUi }) => {
+    test('shows no Analytics link on the welcome screen', async ({ umbracoAutomateUi }) => {
+      await umbracoAutomateUi.automate.stubNoAutomations();
+      await umbracoAutomateUi.automate.stubNoWorkspaces();
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.sectionUrl());
+      // Waits, not assertions: the welcome content has rendered.
       await umbracoAutomateUi.automate.waitForDashboard();
+      await umbracoAutomateUi.automate.waitForDashboardWelcome();
+
+      await expect(umbracoAutomateUi.automate.analytics.overviewLink).toHaveCount(0);
+    });
+
+    test('shows no Analytics link on the welcome screen of a workspace with no automations', async ({ automateWorkspace, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.automate.stubNoAutomations();
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.sectionUrl());
+      // Waits, not assertions: the welcome content has rendered.
+      await umbracoAutomateUi.automate.waitForDashboard();
+      await umbracoAutomateUi.automate.waitForDashboardWelcome();
 
       await expect(umbracoAutomateUi.automate.analytics.overviewLink).toHaveCount(0);
     });

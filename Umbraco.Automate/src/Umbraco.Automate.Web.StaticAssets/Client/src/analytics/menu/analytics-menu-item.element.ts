@@ -1,8 +1,8 @@
-import { customElement, html, ifDefined, property, state } from "@umbraco-cms/backoffice/external/lit";
+import { customElement, html, property, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { ensureSlash } from "@umbraco-cms/backoffice/router";
-import { UMB_SECTION_CONTEXT } from "@umbraco-cms/backoffice/section";
 import type { ManifestMenuItem } from "@umbraco-cms/backoffice/menu";
+import { UA_ANALYTICS_WORKSPACE_PATH } from "../paths.js";
 
 // TODO: Drop this element for the default menu item kind once umbraco/Umbraco-CMS#24527 is fixed
 // (umb-menu-item-layout only sets `active` on `navigationend`).
@@ -21,24 +21,9 @@ export class UaAnalyticsMenuItemElement extends UmbLitElement {
     manifest?: ManifestMenuItem;
 
     @state()
-    private _href?: string;
-
-    @state()
     private _isActive = false;
 
-    constructor() {
-        super();
-        this.consumeContext(UMB_SECTION_CONTEXT, (sectionContext) => {
-            this.observe(
-                sectionContext?.pathname,
-                (pathname) => {
-                    this._href = pathname && this.manifest ? `section/${pathname}/workspace/${this.manifest.meta.entityType}` : undefined;
-                    this.#checkIsActive();
-                },
-                "observePathname",
-            );
-        });
-    }
+    readonly #href = UA_ANALYTICS_WORKSPACE_PATH;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -53,13 +38,13 @@ export class UaAnalyticsMenuItemElement extends UmbLitElement {
 
     #checkIsActive = () => {
         // Trailing slashes stop /path-1 matching /path-1-2, and the view segment after the item path still matches.
-        this._isActive = !!this._href && ensureSlash(window.location.pathname).includes(ensureSlash(this._href));
+        this._isActive = ensureSlash(window.location.pathname).includes(ensureSlash(this.#href));
     };
 
     override render() {
         const label = this.localize.string(this.manifest?.meta.label ?? this.manifest?.name ?? "");
         return html`
-            <uui-menu-item label=${label} href=${ifDefined(this._href)} ?active=${this._isActive}>
+            <uui-menu-item label=${label} href=${this.#href} ?active=${this._isActive}>
                 <umb-icon slot="icon" name=${this.manifest?.meta.icon ?? ""}></umb-icon>
             </uui-menu-item>
         `;

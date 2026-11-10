@@ -323,6 +323,8 @@ export default {
     uaDashboard: {
         overview: "Overview",
         recentActivity: "Recent Activity",
+        analyticsLink:
+            'See how runs are trending, and which automations and actions fail most, in <a href="{0}">Analytics</a>.',
         welcomeHeadline: "Welcome to Umbraco Automate",
         welcomeIntro:
             "Build powerful automations that respond to events in your Umbraco site — publish content, send notifications, call APIs, and more.",

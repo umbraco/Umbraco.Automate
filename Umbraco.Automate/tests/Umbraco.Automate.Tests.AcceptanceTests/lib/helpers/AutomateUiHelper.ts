@@ -2,6 +2,7 @@ import { Locator, Page, expect } from '@playwright/test';
 import { ConstantHelper } from './ConstantHelper';
 
 const WORKSPACES_API_PATH = '/umbraco/automate/management/api/v1/workspaces';
+const AUTOMATIONS_API_PATH = '/umbraco/automate/management/api/v1/automations';
 
 /**
  * The Page Object Model for the Automate backoffice.
@@ -293,6 +294,11 @@ export class AutomateUiHelper {
 
   async waitForDashboard(timeout: number = 30000) {
     await this.dashboard.waitFor({ state: 'visible', timeout });
+  }
+
+  /* Waits for the first-run welcome content, so a "nothing is shown" check isn't made while loading. */
+  async waitForDashboardWelcome(timeout: number = 30000) {
+    await this.dashboard.locator('.welcome').waitFor({ state: 'visible', timeout });
   }
 
   async isDashboardVisible() {
@@ -752,6 +758,20 @@ export class AutomateUiHelper {
   async stubNoWorkspaces() {
     await this.page.route(
       (url) => url.pathname === WORKSPACES_API_PATH,
+      (route) =>
+        route.request().method() === 'GET'
+          ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ total: 0, items: [] }) })
+          : route.fallback()
+    );
+  }
+
+  /**
+   * Answers the automations list with an empty page, as on a site with no automations. With
+   * `stubNoWorkspaces()` it gives the dashboard's first-run welcome screen. Call before navigating.
+   */
+  async stubNoAutomations() {
+    await this.page.route(
+      (url) => url.pathname === AUTOMATIONS_API_PATH,
       (route) =>
         route.request().method() === 'GET'
           ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ total: 0, items: [] }) })
