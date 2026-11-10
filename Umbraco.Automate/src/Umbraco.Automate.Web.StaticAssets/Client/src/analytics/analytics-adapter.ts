@@ -149,8 +149,15 @@ export function formatDuration(ms: number, culture: string): string {
     }
 }
 
+/** The language-neutral form of an error category: `none`, `other` (Unknown) or the category name. The one place that rule lives. */
+export function getErrorCategoryKey(category: string | null | undefined): string {
+    if (category == null) return "none";
+    return category === "Unknown" ? "other" : category;
+}
+
 const ERROR_KEYS: Readonly<Record<string, string>> = {
-    Unknown: "uaAnalytics_errorOther",
+    none: "uaAnalytics_errorNone",
+    other: "uaAnalytics_errorOther",
     Validation: "uaAnalytics_errorValidation",
     Authentication: "uaAnalytics_errorAuthentication",
     RateLimiting: "uaAnalytics_errorRateLimiting",
@@ -163,9 +170,9 @@ const ERROR_KEYS: Readonly<Record<string, string>> = {
 
 /** Null (no failures) reads "None", Unknown reads "Other", a category this build doesn't know shows as sent. */
 export function formatErrorCategory(category: string | null | undefined, translate: UaAnalyticsTranslate): string {
-    if (category == null) return translate("uaAnalytics_errorNone");
-    const key = ERROR_KEYS[category];
-    return key ? translate(key) : category;
+    const key = getErrorCategoryKey(category);
+    const termKey = ERROR_KEYS[key];
+    return termKey ? translate(termKey) : key;
 }
 
 /** Action names by alias, for `UaCatalogueRepository.requestActions()` items. */
@@ -205,6 +212,8 @@ export interface UaAnalyticsActionTableRow {
     avgDurationMs?: number;
     /** Localized: "None", "Other" or the category's name. */
     topError: string;
+    /** The category as the server sent it; null when the action had no failures. */
+    topErrorCategory: string | null;
 }
 
 export function createAutomationRows(
@@ -237,5 +246,6 @@ export function createActionRows(
         failureRate: item.failureRate ?? undefined,
         avgDurationMs: item.avgDurationMs ?? undefined,
         topError: formatErrorCategory(item.topErrorCategory, translate),
+        topErrorCategory: item.topErrorCategory ?? null,
     }));
 }

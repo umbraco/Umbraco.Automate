@@ -24,10 +24,14 @@ test.describe('Feature: date range, comparison and workspace', () => {
   });
 
   test.describe('Scenario: the user changes the range', () => {
-    // Pending until T16 and T17 add the automations and actions requests.
-    test.skip('requests the summary, automations and actions again', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+    test('requests the summary, automations and actions again', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
       expect(automateWorkspace.id).toBeTruthy();
+      // Let the first load of all three boxes answer, so only the range change is counted.
+      const firstLoad = Promise.all(
+        ['summary', 'automations', 'actions'].map((name) => page.waitForResponse((r: { url(): string }) => new URL(r.url()).pathname.endsWith(`/metrics/analytics/${name}`)))
+      );
       await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      await firstLoad;
       const requests: string[] = [];
       page.on('request', (r: { url(): string }) => r.url().includes('/metrics/analytics/') && requests.push(new URL(r.url()).pathname.split('/').pop()!));
       await umbracoAutomateUi.automate.analytics.pickPreset('last-7-days');

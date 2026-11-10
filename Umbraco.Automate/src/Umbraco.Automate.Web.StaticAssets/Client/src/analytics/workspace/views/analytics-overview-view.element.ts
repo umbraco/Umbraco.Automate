@@ -11,11 +11,18 @@ import { UMB_DASHBOARD_PATH_PATTERN } from "@umbraco-cms/backoffice/dashboard";
 import { css, html, customElement, nothing, state, type PropertyValues } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import type { AnalyticsAutomationsResponseModel, AnalyticsSummaryResponseModel } from "../../../api/types.gen.js";
+import type {
+    AnalyticsActionsResponseModel,
+    AnalyticsAutomationsResponseModel,
+    AnalyticsSummaryResponseModel,
+} from "../../../api/types.gen.js";
 import { UA_APPROVALS_DASHBOARD_PATHNAME } from "../../../approval/dashboard/constants.js";
 import { UA_EDIT_AUTOMATION_WORKSPACE_PATH_PATTERN } from "../../../automation/workspace/automation/paths.js";
+import { UaCatalogueRepository } from "../../../catalogue/repository/catalogue.repository.js";
 import { UA_SECTION_PATHNAME } from "../../../section/constants.js";
 import {
+    createActionNameLookup,
+    createActionRows,
     createAutomationRows,
     createCompareSeries,
     createKpis,
@@ -28,8 +35,10 @@ import {
 import { UaAnalyticsServerDataSource } from "../../repository/analytics.server.data-source.js";
 import type { UaAnalyticsFilters } from "../analytics-filters.js";
 import { UA_ANALYTICS_WORKSPACE_CONTEXT } from "../analytics-workspace.context-token.js";
+import "./local-components/analytics-action-name-cell.element.js";
 import "./local-components/analytics-date-time-cell.element.js";
 import "./local-components/analytics-duration-cell.element.js";
+import "./local-components/analytics-error-cell.element.js";
 
 const APPROVALS_HREF = UMB_DASHBOARD_PATH_PATTERN.generateAbsolute({
     sectionName: UA_SECTION_PATHNAME,
@@ -44,6 +53,12 @@ interface LoadedSummary {
 
 interface LoadedAutomations {
     answer: AnalyticsAutomationsResponseModel;
+}
+
+interface LoadedActions {
+    answer: AnalyticsActionsResponseModel;
+    /** Action names by alias; empty when the catalogue couldn't be read, so rows show their alias. */
+    names: ReadonlyMap<string, string>;
 }
 
 /** Sorts two ISO date-times by the instant they name; a missing or unreadable one goes last. */
@@ -67,6 +82,8 @@ const withHref = (row: AutomationRow) => ({
 export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     // One instance for the view's life: its stale-answer counters live on it.
     #dataSource = new UaAnalyticsServerDataSource(this);
+    // One instance for the view's life: it caches the catalogue, which only supplies action names.
+    #catalogueRepository = new UaCatalogueRepository(this);
 
     @state()
     private _filters?: UaAnalyticsFilters;
@@ -93,6 +110,18 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     private _automationsSort: UauiTableSort = { key: "runs", direction: "desc" };
 
     @state()
+    private _actions?: LoadedActions;
+
+    @state()
+    private _actionsLoading = false;
+
+    @state()
+    private _actionsError = false;
+
+    @state()
+    private _actionsSort: UauiTableSort = { key: "runs", direction: "desc" };
+
+    @state()
     private _groupBy: UauiGroupBy = "day";
 
     private _series: UauiSeries[] = [];
@@ -100,6 +129,9 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     private _automationRows: ReturnType<typeof withHref>[] = [];
     private _automationCompareRows: ReturnType<typeof withHref>[] = [];
     private _automationColumns: UauiTableColumn[] = [];
+    private _actionRows: ReturnType<typeof createActionRows> = [];
+    private _actionCompareRows: ReturnType<typeof createActionRows> = [];
+    private _actionColumns: UauiTableColumn[] = [];
 
     constructor() {
         super();
@@ -112,6 +144,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                     this._filters = filters;
                     this.#loadSummary();
                     this.#loadAutomations();
+                    this.#loadActions();
                 },
                 "_observeFilters",
             );
@@ -158,6 +191,30 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         this._automations = { answer: result.data };
     }
 
+    async #loadActions() {
+        const filters = this._filters;
+        if (!filters) return;
+
+        this._actionsLoading = true;
+        this._actionsError = false;
+
+        // The names are only decoration: if the catalogue fails, rows fall back to the alias.
+        const [result, catalogue] = await Promise.all([
+            this.#dataSource.getActions(filters),
+            this.#catalogueRepository.requestActions(),
+        ]);
+        // A newer request has been started; it will report.
+        if (result.stale) return;
+
+        this._actionsLoading = false;
+        if (result.error || !result.data) {
+            this._actionsError = true;
+            return;
+        }
+
+        this._actions = { answer: result.data, names: createActionNameLookup(catalogue.data ?? []) };
+    }
+
     #onGroupByChange(event: CustomEvent<UauiGroupByChangeDetail>) {
         this._groupBy = event.detail.value;
     }
@@ -171,6 +228,16 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
             const answer = this._automations?.answer;
             this._automationRows = createAutomationRows(answer?.items ?? []).map(withHref);
             this._automationCompareRows = createAutomationRows(answer?.compareItems ?? []).map(withHref);        }
+
+        if (this._actionColumns.length === 0) this._actionColumns = this.#getActionColumns();
+
+        if (changed.has("_actions")) {
+            const translate = (key: string) => this.localize.term(key);
+            const names = this._actions?.names ?? new Map<string, string>();
+            const answer = this._actions?.answer;
+            this._actionRows = createActionRows(answer?.items ?? [], names, translate);
+            this._actionCompareRows = createActionRows(answer?.compareItems ?? [], names, translate);
+        }
 
         if (!changed.has("_loaded") && !changed.has("_groupBy")) return;
 
@@ -387,9 +454,95 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         </uui-box>`;
     }
 
+    /** Like `#isLoading`, for the actions request. */
+    get #isLoadingActions() {
+        return this._actionsLoading || (!this._actions && !this._actionsError);
+    }
+
+    #getActionColumns(): UauiTableColumn[] {
+        const term = (key: string) => this.localize.term(key);
+        return [
+            {
+                key: "name",
+                label: term("uaAnalytics_columnAction"),
+                elementName: "ua-analytics-action-name-cell",
+                searchable: true,
+                sortable: true,
+            },
+            {
+                key: "runs",
+                label: term("uaAnalytics_runs"),
+                elementName: UAUI_TABLE_CELL.share,
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "failureRate",
+                label: term("uaAnalytics_columnFailureRate"),
+                elementName: UAUI_TABLE_CELL.percent,
+                meta: { deltaUnit: "points", lowerIsBetter: true },
+                valueFormat: { style: "percent", maximumFractionDigits: 1 },
+                align: "end",
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "retries",
+                label: term("uaAnalytics_columnRetries"),
+                elementName: UAUI_TABLE_CELL.number,
+                meta: { lowerIsBetter: true },
+                align: "end",
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "avgDurationMs",
+                label: term("uaAnalytics_columnAvgRunTime"),
+                elementName: "ua-analytics-duration-cell",
+                meta: { lowerIsBetter: true },
+                align: "end",
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "topError",
+                label: term("uaAnalytics_columnMostCommonError"),
+                elementName: "ua-analytics-error-cell",
+                sortable: true,
+            },
+        ];
+    }
+
+    #renderActionsBox() {
+        return html`<uui-box class="flush" data-box="actions" headline=${this.localize.term("uaAnalytics_actionsTitle")}>
+            <uaui-data-table
+                data-table="actions"
+                mode="client"
+                row-key="unique"
+                reset-page-on-rows
+                .label=${this.localize.term("uaAnalytics_actionsTitle")}
+                .columns=${this._actionColumns}
+                .pageSize=${100}
+                .rows=${this._actionRows}
+                .compareRows=${this._actionCompareRows}
+                .sort=${this._actionsSort}
+                .loading=${this.#isLoadingActions}
+                .error=${this._actionsError}
+                .errorHeadline=${this.localize.term("uaAnalytics_actionsErrorHeadline")}
+                .errorDescription=${this.localize.term("uaAnalytics_errorDescription")}
+                .emptyHeadline=${this.localize.term("uaAnalytics_actionsEmptyHeadline")}
+                .emptyDescription=${this.localize.term("uaAnalytics_actionsEmptyDescription")}
+                retryable
+                @sort-change=${(event: CustomEvent<UauiTableSort>) => (this._actionsSort = event.detail)}
+                @retry=${() => this.#loadActions()}>
+                <uaui-search-field slot="toolbar-start" data-search="actions"></uaui-search-field>
+            </uaui-data-table>
+        </uui-box>`;
+    }
+
     override render() {
         return html`${this.#renderRetentionNotice()} ${this.#renderTiles()} ${this.#renderChartBox()}
-        ${this.#renderAutomationsBox()}`;
+        ${this.#renderAutomationsBox()} ${this.#renderActionsBox()}`;
     }
 
     static override styles = [

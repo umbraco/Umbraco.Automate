@@ -199,6 +199,34 @@ export class AutomateUiHelper {
           });
         });
       },
+      /* The Actions table. */
+      actionsTable: page.locator('uaui-data-table[data-table="actions"]'),
+      /* An action's name cell, found by its alias. The table can't put attributes on a row, so this cell carries
+       * `data-alias` and `data-top-error` (`none`, `other` or the category name), and its text is the action's name. */
+      actionNameCell: (alias: string) => page.locator(`uaui-data-table[data-table="actions"] ua-analytics-action-name-cell[data-alias="${alias}"]`),
+      /* An action's whole row (`uui-table-row`), found by the alias in its name cell. */
+      actionRow: (alias: string) =>
+        page.locator('uaui-data-table[data-table="actions"] uui-table-row').filter({
+          has: page.locator(`ua-analytics-action-name-cell[data-alias="${alias}"]`)
+        }),
+      /* Answers the actions endpoint with fixed rows, like `stubAutomations`. Call before navigating. `topErrorCategory`
+       * defaults to null (no failures). */
+      stubActions: async ({ items = [], compareItems = null }: {
+        items?: Record<string, unknown>[];
+        compareItems?: Record<string, unknown>[] | null;
+      } = {}) => {
+        const row = (overrides: Record<string, unknown>) => ({
+          actionAlias: '', runs: 0, failed: 0, retries: 0, failureRate: null, avgDurationMs: null, topErrorCategory: null, ...overrides
+        });
+        await page.route(/\/metrics\/analytics\/actions/, (route) =>
+          route.fulfill({
+            json: {
+              items: items.map(row),
+              compareItems: compareItems && new URL(route.request().url()).searchParams.has('compareFrom') ? compareItems.map(row) : null
+            }
+          })
+        );
+      },
       /* The info line above the tiles about runs deleted by cleanup. */
       retentionNotice: page.locator('[data-notice="retention"]'),
       monitoringMenu,
