@@ -5,6 +5,13 @@ All notable changes to Umbraco.Automate.OpenIddict will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.1.6](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@17.1.5...Umbraco.Automate.OpenIddict@17.1.6) (2026-11-09)
+
+### fix
+
+* **openiddict:** Pick up the connection string without a restart ([9a9b7b1](https://github.com/umbraco/Umbraco.Automate/commit/9a9b7b1d5fb4922a8db6f2908ff786bb1190795f)), closes [#532](https://github.com/umbraco/Umbraco.Automate/issues/532) [#531](https://github.com/umbraco/Umbraco.Automate/issues/531)
+* **openiddict:** Start without a database connection string ([280ce84](https://github.com/umbraco/Umbraco.Automate/commit/280ce84988cdfc38a174da5a30099edc92d5bc27)), closes [#226](https://github.com/umbraco/Umbraco.Automate/issues/226) [#487](https://github.com/umbraco/Umbraco.Automate/issues/487)
+
 ## [17.1.5](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.OpenIddict@17.1.4...Umbraco.Automate.OpenIddict@17.1.5) (2026-10-01)
 
 ### fix
