@@ -123,7 +123,7 @@
   Add `tile(id)` (by a stable id such as `runs`, never its label), `chart`, `chartBox`, `groupBy` and `retentionNotice` to `AutomateUiHelper.analytics` first. Acceptance: `Analytics/analytics.summary.spec.ts` green.
   depends-on: T14
 
-- [ ] **T16** - story: AN-4 (AC4 to AC6, AC8). Add the Automations box to the view: `uaui-data-table` in client mode with a search field, compare rows, and columns:
+- [x] **T16** - story: AN-4 (AC4 to AC6, AC8). Add the Automations box to the view: `uaui-data-table` in client mode with a search field, compare rows, and columns:
   - name as a link cell to `UA_EDIT_AUTOMATION_WORKSPACE_PATH_PATTERN`, with the workspace name as its second line
   - runs as a share cell
   - success rate as a percent cell in points
