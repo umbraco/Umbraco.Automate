@@ -289,6 +289,9 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("BranchOutcome")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("CompletedUtc")
                         .HasColumnType("datetime2");
 
@@ -303,6 +306,12 @@ namespace Umbraco.Automate.Persistence.SqlServer.Migrations
 
                     b.Property<string>("InputData")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("IterationIndex")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IterationTotal")
+                        .HasColumnType("int");
 
                     b.Property<string>("LogEntries")
                         .HasColumnType("nvarchar(max)");

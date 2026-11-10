@@ -40,15 +40,15 @@ public sealed class ContentValueNormaliser : IContentValueNormaliser
 
     /// <inheritdoc />
     public IDictionary<string, object?> NormaliseProperties(IPublishedContent content, string? culture)
+        => NormaliseProperties((IPublishedElement)content, culture);
+
+    /// <inheritdoc />
+    public IDictionary<string, object?> NormaliseProperties(IPublishedElement element, string? culture)
     {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var prop in content.Properties)
+        foreach (var prop in element.Properties)
         {
-            var raw = content.Value(
-                _publishedValueFallback,
-                prop.Alias,
-                culture,
-                fallback: Fallback.ToLanguage);
+            var raw = ReadRaw(element, prop.Alias, culture);
 
             result[prop.Alias] = NormaliseInternal(raw, culture, depth: 0);
         }
@@ -58,15 +58,22 @@ public sealed class ContentValueNormaliser : IContentValueNormaliser
 
     /// <inheritdoc />
     public object? ReadProperty(IPublishedContent content, string alias, string? culture)
+        => ReadProperty((IPublishedElement)content, alias, culture);
+
+    /// <inheritdoc />
+    public object? ReadProperty(IPublishedElement element, string alias, string? culture)
     {
-        var raw = content.Value(
-            _publishedValueFallback,
-            alias,
-            culture,
-            fallback: Fallback.ToLanguage);
+        var raw = ReadRaw(element, alias, culture);
 
         return NormaliseInternal(raw, culture, depth: 0);
     }
+
+    // Content keeps the IPublishedContent Value overload: it resolves the segment per content item
+    // and routes fallback through the IPublishedContent TryGetValue overload that sites can override.
+    private object? ReadRaw(IPublishedElement element, string alias, string? culture)
+        => element is IPublishedContent content
+            ? content.Value(_publishedValueFallback, alias, culture, fallback: Fallback.ToLanguage)
+            : element.Value(_publishedValueFallback, alias, culture, fallback: Fallback.ToLanguage);
 
     private object? NormaliseInternal(object? value, string? culture, int depth)
     {

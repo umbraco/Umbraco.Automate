@@ -35,6 +35,16 @@ public sealed class EngineStatusHealthCheck : HealthCheck
             }];
         }
 
+        if (_readinessSignal.EngineStartFailed)
+        {
+            return [new HealthCheckStatus(
+                "The automation engine did not start because startup recovery failed, so no automations will run. " +
+                "Check the log for the error, resolve the cause and restart the site.")
+            {
+                ResultType = StatusResultType.Error,
+            }];
+        }
+
         try
         {
             await _healthService.GetQueueStatsAsync(CancellationToken.None);

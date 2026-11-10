@@ -52,6 +52,7 @@ internal sealed class AutomationService : IAutomationService
     private readonly ISensitiveSettingsStripper _sensitiveStripper;
     private readonly ISectionAccessChecker _sectionAccessChecker;
     private readonly IConfigurationReferenceResolver _configurationReferenceResolver;
+    private readonly BindingEvaluator _bindingEvaluator;
 
     public AutomationService(
         IAutomationRepository automationRepository,
@@ -67,7 +68,8 @@ internal sealed class AutomationService : IAutomationService
         ControlFlowCollection controlFlows,
         ISensitiveSettingsStripper sensitiveStripper,
         ISectionAccessChecker sectionAccessChecker,
-        IConfigurationReferenceResolver configurationReferenceResolver)
+        IConfigurationReferenceResolver configurationReferenceResolver,
+        BindingEvaluator bindingEvaluator)
     {
         _automationRepository = automationRepository;
         _runRepository = runRepository;
@@ -83,6 +85,7 @@ internal sealed class AutomationService : IAutomationService
         _sensitiveStripper = sensitiveStripper;
         _sectionAccessChecker = sectionAccessChecker;
         _configurationReferenceResolver = configurationReferenceResolver;
+        _bindingEvaluator = bindingEvaluator;
     }
 
     public Task<Automation?> GetAutomationAsync(Guid id, CancellationToken cancellationToken = default)
@@ -214,6 +217,8 @@ internal sealed class AutomationService : IAutomationService
 
         AddDisallowedConnectionErrors(automation, workspace, errors);
         AddDanglingStepReferenceErrors(automation, errors);
+        AddUnknownBindingFilterErrors(automation, errors);
+        await AddDanglingOutcomeErrorsAsync(automation, errors, cancellationToken);
         await AddStepPublishSettingsErrorsAsync(automation, errors, cancellationToken);
 
         if (workspace.ServiceAccountKey != Guid.Empty)
@@ -279,6 +284,143 @@ internal sealed class AutomationService : IAutomationService
             foreach (var reference in FindDanglingStepReferences(haystack, validReferences))
             {
                 errors.Add($"A connection filter has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Flags <c>${ }</c> bindings that pipe a value through a filter alias no registered binding
+    /// filter declares, typically a typo. At run time such a binding fails the step, or the run for
+    /// a connection filter, so publish rejects it first, naming the step, the field and the alias.
+    /// The scan covers settings fields marked <c>SupportsBindings</c> (action and control-flow steps
+    /// alike, including the property-initializer defaults the run also resolves), input mappings,
+    /// and connection filters, including those on edges from the trigger. A field without
+    /// <c>SupportsBindings</c>, such as a script, never goes through the binding evaluator and can
+    /// hold <c>${ a | b }</c> for its own reasons, so it is skipped. Within a scanned field every
+    /// string value is checked, which is slightly wider than what the run evaluates (for example a
+    /// Switch case's name, or values nested deeper than one row in an action's settings).
+    /// </summary>
+    private void AddUnknownBindingFilterErrors(Automation automation, List<string> errors)
+    {
+        foreach (var step in automation.Steps)
+        {
+            var label = string.IsNullOrEmpty(step.Alias) ? $"Step '{step.Name}'" : $"Step '{step.Name}' ({step.Alias})";
+
+            foreach (var (fieldLabel, value) in GetBindableSettingValues(step))
+            {
+                foreach (var alias in UnknownBindingFilterScanner.FindUnknownFilterAliases(value, _bindingEvaluator))
+                {
+                    errors.Add($"{label}: Field '{fieldLabel}' {UnknownBindingFilterScanner.Describe(alias)}");
+                }
+            }
+
+            foreach (var (input, expression) in step.InputMappings)
+            {
+                foreach (var alias in UnknownBindingFilterScanner.FindUnknownFilterAliases(expression, _bindingEvaluator))
+                {
+                    errors.Add($"{label}: Input '{input}' {UnknownBindingFilterScanner.Describe(alias)}");
+                }
+            }
+        }
+
+        errors.AddRange(UnknownBindingFilterScanner.GetConnectionFilterErrors(automation, _bindingEvaluator));
+    }
+
+    /// <summary>
+    /// Returns the label and value of every settings field marked <c>SupportsBindings</c> on the
+    /// step's settings type. The saved settings are deserialized the way the run resolves them, so
+    /// a default the author never changed is checked too. A step whose type or settings can't be
+    /// resolved yields nothing; the other publish checks report those.
+    /// </summary>
+    private List<(string FieldLabel, object? Value)> GetBindableSettingValues(StepConfiguration step)
+    {
+        var stepType = (IStepType?)_actions.GetByAlias(step.ActionAlias) ?? _controlFlows.GetByAlias(step.ActionAlias);
+        if (stepType?.SettingsType is not { } settingsType || stepType.GetSettingsSchema() is not { } schema)
+        {
+            return [];
+        }
+
+        object? settings;
+        try
+        {
+            settings = EditableModelResolver.DeserializeModel(settingsType, step.Settings);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException)
+        {
+            return [];
+        }
+
+        if (settings is null)
+        {
+            return [];
+        }
+
+        return schema.Fields
+            .Where(field => field.SupportsBindings && !string.IsNullOrEmpty(field.PropertyName))
+            .Select(field => (field.Label, settingsType.GetProperty(field.PropertyName)?.GetValue(settings)))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Flags connections drawn from an outcome the step no longer has — typically left behind after
+    /// a dynamic step's options were edited. Publish-only: a draft may keep a stale line so the
+    /// author can reconnect it. Unnamed connections (<see cref="StepConnection.Outcome"/> null) are
+    /// never flagged, and steps whose type is not an action (control flows route by their own
+    /// handles) are skipped. Static declarations are read without resolving settings; only dynamic
+    /// ones resolve the saved settings. The resolved list is checked with
+    /// <see cref="StepOutcomeValidator"/>, and a step with an invalid declaration is reported
+    /// without comparing its connections.
+    /// </summary>
+    private async Task AddDanglingOutcomeErrorsAsync(
+        Automation automation,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        foreach (var step in automation.Steps)
+        {
+            if (_actions.GetByAlias(step.ActionAlias) is not IStepType stepType)
+            {
+                continue;
+            }
+
+            IReadOnlyList<StepOutcome>? outcomes;
+            try
+            {
+                outcomes = stepType.HasDynamicOutcomes
+                    ? await stepType.GetOutcomesAsync(step.Settings, cancellationToken)
+                    : stepType.GetOutcomes();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                errors.Add($"Step '{step.Name}' could not list its outcomes: {ex.Message}");
+                continue;
+            }
+
+            if (outcomes is null)
+            {
+                errors.Add($"Step '{step.Name}' could not list its outcomes: the action returned no list.");
+                continue;
+            }
+
+            // Nothing declared: the step has no outcome lines to check.
+            if (!stepType.HasDynamicOutcomes && outcomes.Count == 0)
+            {
+                continue;
+            }
+
+            var declarationErrors = StepOutcomeValidator.Validate(outcomes);
+            if (declarationErrors.Count > 0)
+            {
+                errors.AddRange(declarationErrors.Select(e => $"Step '{step.Name}': {e}"));
+                continue;
+            }
+
+            var keys = outcomes.Select(o => o.Key).ToHashSet(StringComparer.Ordinal);
+            var staleConnections = automation.Connections
+                .Where(c => c.SourceStepId == step.Id && c.Outcome is not null && !keys.Contains(c.Outcome));
+            foreach (var connection in staleConnections)
+            {
+                errors.Add($"Step '{step.Name}' has a connection from outcome '{connection.Outcome}', which the step no longer has. Reconnect or remove it.");
             }
         }
     }

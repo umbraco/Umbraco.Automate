@@ -3,6 +3,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
+using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
@@ -23,6 +25,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredSections = [UmbracoConstants.Applications.Media])]
 public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMediaOutput>, ICmsAction
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when the parent media item does not exist.
     /// </summary>
@@ -75,6 +83,16 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_created") { IsDefault = true },
+            new StepOutcome(OutcomeParentNotFound, "#uaOutcomes_parentNotFound"),
+            new StepOutcome(OutcomeMediaTypeNotFound, "#uaOutcomes_mediaTypeNotFound"),
+            new StepOutcome(OutcomeFileDownloadFailed, "#uaOutcomes_fileDownloadFailed"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<CreateMediaSettings>();
@@ -107,17 +125,42 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
 
         // The root is not a node, so it takes its own check: a service account confined to a
         // start node can reach folders inside it but must not write to the root.
-        var failure = atRoot
-            ? await _authorizer.AuthorizeMediaRootOrFailAsync(cancellationToken)
-            : await _authorizer.AuthorizeMediaOrFailAsync(parentKey, cancellationToken);
-
-        if (failure is not null)
+        if (atRoot)
         {
-            return failure;
+            if (await _authorizer.AuthorizeMediaRootOrFailAsync(cancellationToken) is { } rootFailure)
+            {
+                return rootFailure;
+            }
+        }
+        else
+        {
+            // A parent reported as not existing (deleted, or in the recycle bin for an account
+            // confined to a start node) is not a permission problem, so it routes to the
+            // parentNotFound outcome.
+            var authorization = await _authorizer.AuthorizeMediaAsync(parentKey, cancellationToken);
+            if (authorization.IsNotFound)
+            {
+                context.LogWarning($"Parent media {parentKey} was not found, so nothing was created");
+
+                return SuccessWithOutcome(OutcomeParentNotFound, new CreateMediaOutput
+                {
+                    Name = settings.Name,
+                    MediaTypeKey = mediaTypeKey,
+                    ParentKey = parentKey,
+                });
+            }
+
+            if (!authorization.Authorized)
+            {
+                return authorization.ToFailedActionResult();
+            }
         }
 
+        // A service account with a root start node is authorised for the recycle bin too, so a
+        // trashed parent gets this far. Treat it as missing: creating under it would save a live
+        // item inside the bin, where the recycle bin view doesn't list it.
         var parent = atRoot ? null : _mediaService.GetById(parentKey);
-        if (!atRoot && parent is null)
+        if (!atRoot && (parent is null || parent.Trashed))
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Parent media {ParentKey} not found.",
@@ -148,6 +191,30 @@ public sealed class CreateMediaAction : ActionBase<CreateMediaSettings, CreateMe
                 MediaTypeKey = mediaTypeKey,
                 ParentKey = parentKey,
             });
+        }
+
+        // The backoffice only creates a media type at the root when it allows that, and only
+        // a child type the parent's type allows. IMediaService.CreateMedia checks neither.
+        if (atRoot && !mediaType.AllowedAsRoot)
+        {
+            return ActionResult.Failed(
+                new ArgumentException(
+                    $"Media type '{mediaType.Alias}' is not allowed at the media root. " +
+                    "Pick a parent, or enable 'Allow at root' on the media type."),
+                StepRunErrorCategory.Validation);
+        }
+
+        if (parent is not null)
+        {
+            var parentType = _mediaTypeService.Get(parent.ContentType.Key);
+            if (parentType?.AllowedContentTypes?.Any(t => t.Key == mediaTypeKey) != true)
+            {
+                return ActionResult.Failed(
+                    new ArgumentException(
+                        $"Media type '{mediaType.Alias}' is not allowed under '{parent.Name}'. " +
+                        $"Pick another parent, or add it to the allowed child types of '{parentType?.Alias}'."),
+                    StepRunErrorCategory.Validation);
+            }
         }
 
         var userKey = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key

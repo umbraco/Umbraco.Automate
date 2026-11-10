@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
@@ -97,7 +98,8 @@ public class TerminalStepFailureTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddDebug());
-        services.AddWorkflow();
+        services.AddWorkflow(o => o.UsePollInterval(TestTimeouts.EventPollInterval));
+        services.AddSingleton<IGreyList, NoGreyList>();
         services.ReplaceWorkflowRetryHandler();
 
         // The run row only reaches its final status through RunFinalizer, which the production
@@ -159,6 +161,7 @@ public class TerminalStepFailureTests : IAsyncLifetime
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
         services.AddSingleton<IEventAggregator>(Mock.Of<IEventAggregator>());
+        services.AddSingleton<AutomateReadinessSignal>();
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();
@@ -782,8 +785,14 @@ public class TerminalStepFailureTests : IAsyncLifetime
             .Build();
 
         var runId = await TriggerAsync(automation);
+        var eventKey = $"{runId}:{approval.Id}";
         await WaitForStepRunCountAsync(runId, approval.Id, StepRunStatus.WaitingForInput, 1, TestTimeouts.WorkflowWait);
         await WaitForRunStatusAsync(runId, AutomationRunStatus.Suspended, TestTimeouts.WorkflowWait);
+
+        // The step body writes WaitingForInput and Suspended before it returns; the engine persists
+        // the waiting pointer and its subscription afterwards. Stopping the host before that cancels
+        // the persist, so the pointer the decision is delivered to below would not exist.
+        await WaitForSubscriptionAsync(RequestApprovalAction.ApprovalEventName, eventKey, TestTimeouts.WorkflowWait);
 
         await _workflowHost.StopAsync(CancellationToken.None);
 
@@ -793,7 +802,6 @@ public class TerminalStepFailureTests : IAsyncLifetime
             ApprovedByUserKey = Guid.NewGuid(),
             DecisionUtc = DateTime.UtcNow,
         };
-        var eventKey = $"{runId}:{approval.Id}";
         await PublishApprovalEventAsync(runId, approval.Id, decision);
 
         // What SeedSubscription persists before the step runs: the event on the pointer, the
@@ -966,6 +974,22 @@ public class TerminalStepFailureTests : IAsyncLifetime
         }
 
         throw new TimeoutException($"Step {stepId} in run {runId} did not reach {count} x {status} within {timeout}.");
+    }
+
+    private async Task WaitForSubscriptionAsync(string eventName, string eventKey, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if ((await _persistence.GetSubscriptions(eventName, eventKey, DateTime.UtcNow)).Any())
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"No subscription to {eventName}/{eventKey} was persisted within {timeout}.");
     }
 
     private async Task<WorkflowInstance> WaitForWorkflowStatusAsync(AutomationRun run, WorkflowStatus status, TimeSpan timeout)

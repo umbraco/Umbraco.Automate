@@ -161,6 +161,13 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 | `docs/functional-overview.md`           | Business-focused feature overview                      |
 | `docs/identity-ownership-permissions.md`| Workspaces, service accounts, access control spec      |
 | `docs/vocabulary.md`                    | Standard terminology reference                         |
+| `docs/plans/<feature-slug>/`             | Per-feature plan folder (BRIEF, ARCHITECTURE, SPEC, STORIES, PLAN, BUILD-LOG, DECISION-LOG) |
+
+## Feature Plans
+
+- **Per-feature plan folders** live at `docs/plans/<feature-slug>/` (one folder per feature, one file per planning phase: `BRIEF.md`, `ARCHITECTURE.md`, `SPEC.md`, `STORIES.md`, `PLAN.md`, `BUILD-LOG.md`, plus `README.md` and `DECISION-LOG.md`).
+- `docs/plans/internal/` holds older single-file plans. Leave them as they are; don't add new folders there.
+- **Finding the current feature's plan folder:** match the current branch/worktree name against the folder slugs under `docs/plans/`.
 
 ## Database
 
@@ -246,3 +253,10 @@ All commits should follow the [Conventional Commits](https://www.conventionalcom
 **Scope must not repeat the type** - commitlint's `scope-not-type` rule rejects `ci(ci):`, `docs(docs):`, `build(build):`. Drop the scope (`ci: ...`) or use a more specific one (`ci(hooks): ...`).
 
 **Subject must be sentence-case** - Capitalize the first word after the scope.
+
+## Issue tracker
+- Type: GitHub Issues
+- Location: umbraco/Umbraco.Automate (same repo as the source code)
+- Access: `gh` CLI
+- State labels: ready → `state/sprint-candidate`, needs-decision → `state/needs-design`, blocked → `state/blocked`, in-progress → `state/in-progress`, needs-info → `question`, needs-investigation → no label (comment only; the issue stays untriaged until proven)
+- Needs-info timeout: 30 days

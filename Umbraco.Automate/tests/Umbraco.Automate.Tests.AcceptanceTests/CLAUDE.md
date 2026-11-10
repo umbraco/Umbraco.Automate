@@ -5,8 +5,8 @@ Playwright end-to-end tests that drive a **running** demo site
 `@umbraco-cms/acceptance-test-helpers`. Specs live under `tests/DefaultConfig/`; auth is
 bootstrapped by `tests/auth.setup.ts`. Commands are in [README.md](README.md).
 
-Runs locally and in CI. The `AcceptanceTests` stage in `azure-pipelines.yml` runs
-alongside `Build` and gates pull requests too — see "How the CI stage works" below.
+Runs locally and in CI. The `AcceptanceTests` stage (Umbraco.Build's shared monorepo stage,
+inserted by `azure-pipelines.yml`) runs alongside `Build` and gates pull requests too — see "How the CI stage works" below.
 
 ---
 
@@ -191,9 +191,12 @@ fetched from a legacy CDN path that stalls on hosted agents. Keep this at 1.60.0
 
 ## Selector & assertion hygiene
 
-- **Do not assert on user-facing labels.** They get localised and break selectors. The one
-  deliberate exception is the section tab in `UiHelpers.goToAutomateSection`, which has no
-  stable alternative; its label lives in `ConstantHelper.sections.automate`.
+- **Do not assert on user-facing labels.** They get localised and break selectors. The
+  deliberate exceptions are the section tab in `UiHelpers.goToAutomateSection`, which has no
+  stable alternative (its label lives in `ConstantHelper.sections.automate`), and the outcome-exit
+  specs, whose acceptance criteria are about the English exit labels. Those live in
+  `ConstantHelper.outcomeLabels` (use `withDefault()` for the "(default)" mark) and
+  `ConstantHelper.staleOutcomeError()`; never spell them out in a spec.
 - Prefer per-property `expect()` over opaque boolean helpers. `AutomationApiHelper.getFullByName`
   exists so a failure pinpoints the exact field.
 - Expect pointer interception on elements under a resizable `umb-split-panel` divider and on
@@ -267,7 +270,8 @@ bites in one place is usually this divergence, not a product bug.
 
 ## How the CI stage works
 
-The `AcceptanceTests` stage in `azure-pipelines.yml`:
+The `AcceptanceTests` stage is Umbraco.Build's `devops/monorepo/stages/acceptance-tests.yml`,
+inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automate's own settings:
 
 - **Depends on nothing (`dependsOn: []`), so it runs alongside `Build`.** It uses nothing
   `Build` produces, so waiting for it only cost ~3.5 min of wall-clock; the price is a wasted
@@ -276,16 +280,28 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
   on a pull request. The trade-off is that CI exercises **project references**, not a published
   package.
 - **Skips or narrows itself on pull requests.** A small `Changes` job in the same stage sorts the
-  PR's changed files into areas (the table is in the comment above it in `azure-pipelines.yml`;
-  update it when you add a project or move code). A PR touching only docs, repo tooling or the
+  PR's changed files into areas (the rules are in Umbraco.Build's
+  `devops/monorepo/steps/detect-acceptance-changes.yml`; Automate's `skip_paths`, `test_paths`,
+  `smoke_paths` and `full_paths` are in `azure-pipelines.yml`: update them when you add a project
+  or move code). A PR touching only docs, repo tooling or the
   .NET unit/integration test projects skips the suite. A PR whose only acceptance changes are
-  specs or helpers (`tests/`, `lib/`, `umbraco.config.ts`) runs **one** unsharded leg with
-  Playwright's `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec
-  importing a changed file, plus the setup project. `package*.json`, `playwright.config.ts`,
-  `tsconfig.json` or install-script changes, and any product change, run the whole suite, because
-  specs don't import those files and `--only-changed` would miss them. Pushes always run the whole
-  suite. Use `HEAD~1`, never `HEAD^1`: npm runs the script through cmd.exe on Windows, where `^`
-  is the escape character. The job condition skips only on an explicit `'false'`.
+  specs (`tests/`, `umbraco.config.ts`) runs **one** unsharded leg with Playwright's
+  `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec importing a
+  changed file, plus the setup project. `lib/` changes run the whole sharded suite: every spec
+  imports `lib/index`, so `--only-changed` would pick everything and run it on one agent.
+  `package*.json`, `playwright.config.ts`, `tsconfig.json` or install-script changes run the whole
+  suite too, because specs don't import those files and `--only-changed` would miss them. A PR
+  whose only product changes are server-side C# outside the Management API and the frontends
+  (core `Umbraco.Automate/src/` except `Umbraco.Automate.Web` and `.Web.StaticAssets`, and the
+  OpenIddict and Slack `src/` except OpenIddict's `Client/`) runs **one** leg of the `@smoke`
+  tests; any other product change runs the whole suite. Pushes always run the whole suite, and so
+  does a manual run, which is how to force it for a PR. Use `HEAD~1`, never `HEAD^1`: npm runs the
+  script through cmd.exe on Windows, where `^` is the escape character. The job condition skips
+  only on an explicit `'false'`.
+- **`@smoke` gates server-side-only PRs.** Keep the tagged set small and about the site working
+  at all: the Automate section loads, the Management API answers, a workspace and an automation
+  can be created, and a published automation runs to completion. Tag a test `@smoke` only if a
+  broken boot, migration, DI registration or engine run would fail it.
 - **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
   its own `testCommand`, e.g. `npm run test -- --shard=1/4`), each against its **own** demo site
   and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a
@@ -324,7 +340,7 @@ The `AcceptanceTests` stage in `azure-pipelines.yml`:
 - **`maxFailures` stops a run that is going nowhere.** If the site wedges, every remaining spec
   fails in setup with three attempts each, which used to run into the job timeout.
 
-Two things to know if you edit that stage. Azure macro-expands `$(name)` before bash or pwsh
+Two things to know if you edit that stage (in Umbraco.Build). Azure macro-expands `$(name)` before bash or pwsh
 sees the script. PowerShell subexpressions such as `$($process.Id)` are safe, because Azure only
 matches a variable name after `$(`, but bash `$(command)` substitution is not. And
 `config.js` is deliberately **not** used in CI: it is interactive and reads the per-worktree
@@ -333,5 +349,5 @@ port from git config, which is a local-development affordance, whereas CI fixes 
 Build stage: the demo site builds from project references, and Nerdbank.GitVersioning fails
 on a shallow clone.
 
-`Pack` does **not** depend on this stage. Acceptance failures therefore do not block packaging;
-wire that up only if you want UI flakes to be able to hold a release.
+`Pack` waits for this stage. A failed or cancelled run stops packaging; a skipped one (a pull
+request that didn't need the suite) doesn't.

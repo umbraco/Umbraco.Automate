@@ -6,9 +6,9 @@ using Umbraco.Cms.Core.Models.Membership;
 namespace Umbraco.Automate.Core.Dispatch.Authorization;
 
 /// <summary>
-/// Built-in authoriser for triggers whose output is bound to CMS content or media nodes.
-/// Outputs opt in by implementing <see cref="IContentScopedTriggerOutput"/> or
-/// <see cref="IMediaScopedTriggerOutput"/>; the authoriser then checks the workspace
+/// Built-in authoriser for triggers whose output is bound to CMS content, media or element nodes.
+/// Outputs opt in by implementing <see cref="IContentScopedTriggerOutput"/>,
+/// <see cref="IMediaScopedTriggerOutput"/> or <see cref="IElementScopedTriggerOutput"/>; the authoriser then checks the workspace
 /// service account's start-node / Browse permission via
 /// <see cref="IAutomationActionAuthorizer"/>, matching the per-action node guard.
 /// </summary>
@@ -29,6 +29,7 @@ namespace Umbraco.Automate.Core.Dispatch.Authorization;
 internal sealed class NodeScopedTriggerDispatchAuthorizer : IOutputNarrowingTriggerDispatchAuthorizer
 {
     private static readonly IReadOnlySet<string> BrowsePermissions = new HashSet<string> { ActionBrowse.ActionLetter };
+    private static readonly IReadOnlySet<string> ElementReadPermissions = new HashSet<string> { ActionElementBrowse.ActionLetter };
 
     private readonly IAutomationActionAuthorizer _nodeAuthorizer;
 
@@ -133,6 +134,10 @@ internal sealed class NodeScopedTriggerDispatchAuthorizer : IOutputNarrowingTrig
             case IMediaScopedTriggerOutput media when media.GetMediaKey() is { } mediaKey:
                 return await _nodeAuthorizer.AuthorizeMediaAsync(
                     serviceAccount, mediaKey, cancellationToken);
+
+            case IElementScopedTriggerOutput element when element.GetElementKey() is { } elementKey:
+                return await _nodeAuthorizer.AuthorizeElementAsync(
+                    serviceAccount, elementKey, ElementReadPermissions, cancellationToken);
 
             default:
                 return AutomationAuthorizationResult.Success;
