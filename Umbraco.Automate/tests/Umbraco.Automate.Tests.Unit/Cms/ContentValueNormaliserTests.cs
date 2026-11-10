@@ -205,15 +205,6 @@ public class ContentValueNormaliserTests
     }
 
     [Fact]
-    public void NormaliseProperties_DefaultImplementation_ForwardsContentToExistingMethod()
-    {
-        IContentValueNormaliser legacy = new LegacyNormaliser();
-        IPublishedElement content = MockPublishedContent(Guid.NewGuid(), "About", "page").Object;
-
-        legacy.NormaliseProperties(content, culture: null).ShouldContainKey("legacy");
-    }
-
-    [Fact]
     public void ReadProperty_ContentWithNoValue_UsesContentFallbackOverload()
     {
         var content = MockPublishedContent(Guid.NewGuid(), "Page", "page").Object;
@@ -231,33 +222,6 @@ public class ContentValueNormaliserTests
                 out It.Ref<object?>.IsAny,
                 out It.Ref<IPublishedProperty?>.IsAny),
             Times.Once);
-    }
-
-    [Fact]
-    public void ReadProperty_DefaultImplementation_ForwardsContentToExistingMethod()
-    {
-        IContentValueNormaliser legacy = new LegacyNormaliser();
-        IPublishedElement content = MockPublishedContent(Guid.NewGuid(), "About", "page").Object;
-
-        legacy.ReadProperty(content, "title", culture: null).ShouldBe("legacy");
-    }
-
-    [Fact]
-    public void NormaliseProperties_DefaultImplementation_ThrowsForPlainElement()
-    {
-        IContentValueNormaliser legacy = new LegacyNormaliser();
-        var element = MockPublishedElement("block", ("title", "Hello")).Object;
-
-        Should.Throw<NotSupportedException>(() => legacy.NormaliseProperties(element, culture: null));
-    }
-
-    [Fact]
-    public void ReadProperty_DefaultImplementation_ThrowsForPlainElement()
-    {
-        IContentValueNormaliser legacy = new LegacyNormaliser();
-        var element = MockPublishedElement("block", ("title", "Hello")).Object;
-
-        Should.Throw<NotSupportedException>(() => legacy.ReadProperty(element, "title", culture: null));
     }
 
     // --- helpers ---
@@ -279,17 +243,6 @@ public class ContentValueNormaliserTests
         }
 
         return content.Object;
-    }
-
-    // Implements only the members that existed before the element overloads, as a third party would.
-    private sealed class LegacyNormaliser : IContentValueNormaliser
-    {
-        public object? Normalise(object? value, string? culture) => value;
-
-        public IDictionary<string, object?> NormaliseProperties(IPublishedContent content, string? culture)
-            => new Dictionary<string, object?> { ["legacy"] = true };
-
-        public object? ReadProperty(IPublishedContent content, string alias, string? culture) => "legacy";
     }
 
     private static Mock<IPublishedContent> MockPublishedContent(Guid key, string name, string typeAlias)

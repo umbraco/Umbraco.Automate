@@ -94,31 +94,11 @@ internal static class AmbientDbContextFactoryExtensions
     }
 
     /// <summary>
-    /// Binary-compatibility shim for Umbraco.Automate.OpenIddict 18.1.x and earlier, which call this
-    /// exact signature through InternalsVisibleTo and accept any Core in the 18.x range. Removing or
-    /// changing it would throw a MissingMethodException at composition for a site that upgrades Core
-    /// but keeps that OpenIddict release. Behaves as before the late-connection-string fix: no
-    /// resolving wrapper, so callers do not get the #531 fix. The caller must have registered the
-    /// DbContext with <c>AddUmbracoDbContext</c> first.
-    /// </summary>
-    /// <remarks>
-    /// Do not change the declaring type (<c>Umbraco.Automate.Extensions.AmbientDbContextFactoryExtensions</c>),
-    /// its namespace, the method name or its signature before it is removed in v19: released
-    /// Umbraco.Automate.OpenIddict 18.1.x binds to them.
-    /// </remarks>
-    [Obsolete("Used by Umbraco.Automate.OpenIddict 18.1.x and earlier, which call it through InternalsVisibleTo. Use AddAutomatePooledDbContext instead. Scheduled for removal in Umbraco.Automate 19.")]
-    internal static IServiceCollection EnlistDbContextFactoryInAmbientScope<TDbContext>(
-        this IServiceCollection services,
-        Func<IServiceProvider, DbConnection, string, TDbContext> createEnlistedContext)
-        where TDbContext : DbContext
-        => services.AddAmbientAwareFactories(createEnlistedContext, resolvingSettings: null);
-
-    /// <summary>
     /// Wraps the already-registered <see cref="IDbContextFactory{TContext}"/> for
     /// <typeparamref name="TDbContext"/> in an <see cref="AmbientDbContextFactory{TDbContext}"/>, so
     /// every consumer of the factory gets ambient-transaction participation without having to ask for
     /// it. Private so new callers go through <see cref="AddAutomatePooledDbContext{TDbContext}"/> and get
-    /// the late-connection-string pickup; <c>null</c> settings exist only for the obsolete shim.
+    /// the late-connection-string pickup.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -134,7 +114,7 @@ internal static class AmbientDbContextFactoryExtensions
     private static IServiceCollection AddAmbientAwareFactories<TDbContext>(
         this IServiceCollection services,
         Func<IServiceProvider, DbConnection, string, TDbContext> createEnlistedContext,
-        ResolvingPooledFactorySettings? resolvingSettings)
+        ResolvingPooledFactorySettings resolvingSettings)
         where TDbContext : DbContext
     {
         // Shared by every participating DbContext: whether Automate targets the Umbraco database, and
@@ -191,14 +171,9 @@ internal static class AmbientDbContextFactoryExtensions
     private static IDbContextFactory<TDbContext> WrapInResolvingFactory<TDbContext>(
         IServiceProvider serviceProvider,
         IDbContextFactory<TDbContext> pooledFactory,
-        ResolvingPooledFactorySettings? settings)
+        ResolvingPooledFactorySettings settings)
         where TDbContext : DbContext
     {
-        if (settings is null)
-        {
-            return pooledFactory;
-        }
-
         // The state is read by the factory per create, after the pool above was resolved: resolving
         // the pool is what runs the options delegate that sets it.
         return new ResolvingPooledDbContextFactory<TDbContext>(

@@ -39,40 +39,16 @@ public interface IContentValueNormaliser
     /// applying the configured language fallback and normalising each into the same
     /// binding-friendly shape used for content.
     /// </summary>
-    /// <remarks>
-    /// The default implementation forwards an <see cref="IPublishedContent"/> to
-    /// <see cref="NormaliseProperties(IPublishedContent, string?)"/> and throws for any other element,
-    /// so existing implementers keep compiling.
-    /// </remarks>
     /// <param name="element">The element to read.</param>
     /// <param name="culture">The culture to read, or null for invariant.</param>
-    /// <exception cref="NotSupportedException">The implementation does not support plain elements.</exception>
-    // TODO (V19): Remove the default implementation.
-    // The default keeps existing implementations of this interface compiling. Plain elements cannot be read through the content members, so it throws.
-    IDictionary<string, object?> NormaliseProperties(IPublishedElement element, string? culture)
-        => element is IPublishedContent content
-            ? NormaliseProperties(content, culture)
-            : throw new NotSupportedException(
-                $"{GetType().Name} does not support normalising {nameof(IPublishedElement)} values.");
+    IDictionary<string, object?> NormaliseProperties(IPublishedElement element, string? culture);
 
     /// <summary>
     /// Reads a single property from a published element, applying the configured language
     /// fallback and normalising the result into the same shape used for content.
     /// </summary>
-    /// <remarks>
-    /// The default implementation forwards an <see cref="IPublishedContent"/> to
-    /// <see cref="ReadProperty(IPublishedContent, string, string?)"/> and throws for any other element,
-    /// so existing implementers keep compiling.
-    /// </remarks>
     /// <param name="element">The element to read.</param>
     /// <param name="alias">The property alias to read.</param>
     /// <param name="culture">The culture to read, or null for invariant.</param>
-    /// <exception cref="NotSupportedException">The implementation does not support plain elements.</exception>
-    // TODO (V19): Remove the default implementation.
-    // The default keeps existing implementations of this interface compiling. Plain elements cannot be read through the content members, so it throws.
-    object? ReadProperty(IPublishedElement element, string alias, string? culture)
-        => element is IPublishedContent content
-            ? ReadProperty(content, alias, culture)
-            : throw new NotSupportedException(
-                $"{GetType().Name} does not support normalising {nameof(IPublishedElement)} values.");
+    object? ReadProperty(IPublishedElement element, string alias, string? culture);
 }

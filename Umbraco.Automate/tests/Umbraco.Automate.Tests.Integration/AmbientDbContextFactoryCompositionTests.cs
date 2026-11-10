@@ -142,32 +142,6 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     /// <summary>
-    /// Released Umbraco.Automate.OpenIddict 18.1.5 calls this overload through InternalsVisibleTo, and
-    /// accepts any Core 18.x, so it must keep composing against newer Core.
-    /// </summary>
-    [Fact]
-    public void ObsoleteEnlistOverload_StillRegistersTheAmbientFactory()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(new ConfigurationBuilder().Build());
-        services.AddLogging();
-        services.AddSingleton(Mock.Of<IAmbientAutomateConnection>());
-        services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-            (_, options, _, _) => options.UseSqlite("Data Source=:memory:"),
-            shareUmbracoConnection: false);
-
-#pragma warning disable CS0618
-        services.EnlistDbContextFactoryInAmbientScope<UmbracoAutomateDbContext>(
-            (_, connection, _) => new UmbracoAutomateDbContext(
-                new DbContextOptionsBuilder<UmbracoAutomateDbContext>().UseSqlite(connection).Options));
-#pragma warning restore CS0618
-
-        services.BuildServiceProvider()
-            .GetRequiredService<IDbContextFactory<UmbracoAutomateDbContext>>()
-            .ShouldBeOfType<AmbientDbContextFactory<UmbracoAutomateDbContext>>();
-    }
-
-    /// <summary>
     /// Builds a container with the DbContext registration <c>AddUmbracoAutomatePersistence</c> uses
     /// (<c>AddUmbracoAutomateDbContext</c>), plus the few host services it depends on. The registration
     /// itself is the production one, as <c>IUmbracoBuilder</c> is not constructible outside a full
