@@ -1,13 +1,13 @@
 [Plan folder](https://github.com/umbraco/Umbraco.Automate/tree/v19/feature/analytics/docs/plans/analytics) | Related: [umbraco/Umbraco-CMS#24527](https://github.com/umbraco/Umbraco-CMS/issues/24527)
 
-> [!IMPORTANT]
-> **9 choices were made without you.** Please check each one.
+> [!NOTE]
+> **9 choices were made without the feature owner. All reviewed on 10-11-2026:** 8 kept as recommended, and #1 changed in 4e2597aa (the service now returns `DateOutOfRange`). Kept here for the record.
 >
 > **1. Design: the public analytics service throws on extreme dates**\
 > Plan said: R10 lists the statuses the service returns for a bad query.\
 > Built: [the 2000–2999 date bounds are checked only in the controller](https://github.com/umbraco/Umbraco.Automate/blob/5c6d360c36b89c0df1a059bb6e5748bdcc617b81/Umbraco.Automate/src/Umbraco.Automate.Web/Api/Management/Metrics/Controllers/AnalyticsMetricsController.cs#L22), so another caller of the public `IAutomateAnalyticsService` with, say, 9999-12-31 gets an exception, not a status.
 >
-> - **A. Add `AnalyticsQueryStatus.DateOutOfRange` and move the check into the service before 19.0.0 ships** *(recommended)*
+> - **A. Add `AnalyticsQueryStatus.DateOutOfRange` and move the check into the service before 19.0.0 ships** *(recommended; done in 4e2597aa)*
 > - B. Leave it: only the controller calls the service today.
 >
 > **2. Behavior: one-workspace actions are slower than the target on small SQL Server**\
