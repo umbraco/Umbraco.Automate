@@ -44,8 +44,21 @@ export class ServiceAccountApiHelper {
     return await this.api.user.createDefaultUser(name, email, [userGroupId], 'Api');
   }
 
+  /**
+   * Deletes the service account, or disables it when the CMS refuses the delete. A user the audit
+   * log refers to cannot be deleted (FK_umbracoLog_umbracoUser_id), and an account that saved or
+   * published anything during a run has audit entries, so the CMS answers 500. The DELETE is
+   * therefore sent directly: the helpers' own `delete` fails the test on any 5xx.
+   */
   async deleteById(id: string) {
-    return await this.api.user.delete(id);
+    const response = await this.api.page.request.delete(`${this.api.baseUrl}/umbraco/management/api/v1/user/${id}`, {
+      ignoreHTTPSErrors: true
+    });
+    if (response.status() < 500) {
+      return response;
+    }
+
+    return await this.api.user.disable([id]);
   }
 
   async ensureNameNotExists(name: string) {
