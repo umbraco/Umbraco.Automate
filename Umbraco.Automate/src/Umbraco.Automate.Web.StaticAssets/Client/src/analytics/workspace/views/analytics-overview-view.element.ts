@@ -1,17 +1,22 @@
 import {
+    UAUI_TABLE_CELL,
     uauiFormatDateRange,
     type UauiGroupBy,
     type UauiGroupByChangeDetail,
     type UauiSeries,
+    type UauiTableColumn,
+    type UauiTableSort,
 } from "@umbraco/analytics-ui";
 import { UMB_DASHBOARD_PATH_PATTERN } from "@umbraco-cms/backoffice/dashboard";
 import { css, html, customElement, nothing, state, type PropertyValues } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
-import type { AnalyticsSummaryResponseModel } from "../../../api/types.gen.js";
+import type { AnalyticsAutomationsResponseModel, AnalyticsSummaryResponseModel } from "../../../api/types.gen.js";
 import { UA_APPROVALS_DASHBOARD_PATHNAME } from "../../../approval/dashboard/constants.js";
+import { UA_EDIT_AUTOMATION_WORKSPACE_PATH_PATTERN } from "../../../automation/workspace/automation/paths.js";
 import { UA_SECTION_PATHNAME } from "../../../section/constants.js";
 import {
+    createAutomationRows,
     createCompareSeries,
     createKpis,
     createSeries,
@@ -23,6 +28,8 @@ import {
 import { UaAnalyticsServerDataSource } from "../../repository/analytics.server.data-source.js";
 import type { UaAnalyticsFilters } from "../analytics-filters.js";
 import { UA_ANALYTICS_WORKSPACE_CONTEXT } from "../analytics-workspace.context-token.js";
+import "./local-components/analytics-date-time-cell.element.js";
+import "./local-components/analytics-duration-cell.element.js";
 
 const APPROVALS_HREF = UMB_DASHBOARD_PATH_PATTERN.generateAbsolute({
     sectionName: UA_SECTION_PATHNAME,
@@ -34,6 +41,27 @@ interface LoadedSummary {
     summary: AnalyticsSummaryResponseModel;
     filters: UaAnalyticsFilters;
 }
+
+interface LoadedAutomations {
+    answer: AnalyticsAutomationsResponseModel;
+}
+
+/** Sorts two ISO date-times by the instant they name; a missing or unreadable one goes last. */
+const compareInstants = (a: unknown, b: unknown) => {
+    const time = (value: unknown) => (typeof value === "string" ? Date.parse(value) : Number.NaN);
+    const [first, second] = [time(a), time(b)];
+    if (Number.isNaN(first)) return Number.isNaN(second) ? 0 : 1;
+    if (Number.isNaN(second)) return -1;
+    return first - second;
+};
+
+type AutomationRow = ReturnType<typeof createAutomationRows>[number];
+
+/** A table row: the adapter's row plus the link to its automation, which the link cell reads from `href`. */
+const withHref = (row: AutomationRow) => ({
+    ...row,
+    href: UA_EDIT_AUTOMATION_WORKSPACE_PATH_PATTERN.generateAbsolute({ unique: row.unique }),
+});
 
 @customElement("ua-analytics-overview-view")
 export class UaAnalyticsOverviewViewElement extends UmbLitElement {
@@ -53,10 +81,25 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     private _error = false;
 
     @state()
+    private _automations?: LoadedAutomations;
+
+    @state()
+    private _automationsLoading = false;
+
+    @state()
+    private _automationsError = false;
+
+    @state()
+    private _automationsSort: UauiTableSort = { key: "runs", direction: "desc" };
+
+    @state()
     private _groupBy: UauiGroupBy = "day";
 
     private _series: UauiSeries[] = [];
     private _compareSeries: UauiSeries[] = [];
+    private _automationRows: ReturnType<typeof withHref>[] = [];
+    private _automationCompareRows: ReturnType<typeof withHref>[] = [];
+    private _automationColumns: UauiTableColumn[] = [];
 
     constructor() {
         super();
@@ -68,6 +111,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                 (filters) => {
                     this._filters = filters;
                     this.#loadSummary();
+                    this.#loadAutomations();
                 },
                 "_observeFilters",
             );
@@ -94,11 +138,40 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         this._loaded = { summary: result.data, filters };
     }
 
+    async #loadAutomations() {
+        const filters = this._filters;
+        if (!filters) return;
+
+        this._automationsLoading = true;
+        this._automationsError = false;
+
+        const result = await this.#dataSource.getAutomations(filters);
+        // A newer request has been started; it will report.
+        if (result.stale) return;
+
+        this._automationsLoading = false;
+        if (result.error || !result.data) {
+            this._automationsError = true;
+            return;
+        }
+
+        this._automations = { answer: result.data };
+    }
+
     #onGroupByChange(event: CustomEvent<UauiGroupByChangeDetail>) {
         this._groupBy = event.detail.value;
     }
 
     protected override willUpdate(changed: PropertyValues) {
+        // The columns don't depend on the answer, so the table has its headers and loading rows before it arrives.
+        if (this._automationColumns.length === 0) this._automationColumns = this.#getAutomationColumns();
+
+        if (changed.has("_automations")) {
+            // Worked out here, not in render, so the table keeps one rows array (it resets its page on a new one).
+            const answer = this._automations?.answer;
+            this._automationRows = createAutomationRows(answer?.items ?? []).map(withHref);
+            this._automationCompareRows = createAutomationRows(answer?.compareItems ?? []).map(withHref);        }
+
         if (!changed.has("_loaded") && !changed.has("_groupBy")) return;
 
         const loaded = this._loaded;
@@ -149,7 +222,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
             <uaui-kpi-tile
                 data-tile="runs"
                 icon="icon-play"
-                .label=${this.localize.term("uaAnalytics_tileRuns")}
+                .label=${this.localize.term("uaAnalytics_runs")}
                 .value=${kpis?.runs}
                 .previous=${kpis?.previousRuns}
                 .detail=${comparisonDeleted ? this.localize.term("uaAnalytics_tileNoComparison") : undefined}
@@ -159,7 +232,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                 data-tile="success-rate"
                 icon="icon-check"
                 delta-unit="points"
-                .label=${this.localize.term("uaAnalytics_tileSuccessRate")}
+                .label=${this.localize.term("uaAnalytics_successRate")}
                 .value=${kpis?.successRate}
                 .valueFormat=${{ style: "percent", maximumFractionDigits: 1 }}
                 .previous=${kpis?.previousSuccessRate}
@@ -218,7 +291,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                 .loading=${this.#isLoading}
                 .error=${this._error}
                 .errorHeadline=${this.localize.term("uaAnalytics_runsOverTimeErrorHeadline")}
-                .errorDescription=${this.localize.term("uaAnalytics_runsOverTimeErrorDescription")}
+                .errorDescription=${this.localize.term("uaAnalytics_errorDescription")}
                 .emptyHeadline=${this.localize.term("uaAnalytics_runsOverTimeEmptyHeadline")}
                 .emptyDescription=${this.localize.term("uaAnalytics_runsOverTimeEmptyDescription")}
                 retryable
@@ -226,8 +299,97 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         </uui-box>`;
     }
 
+    /** Like `#isLoading`, for the automations request. */
+    get #isLoadingAutomations() {
+        return this._automationsLoading || (!this._automations && !this._automationsError);
+    }
+
+    #getAutomationColumns(): UauiTableColumn[] {
+        const term = (key: string) => this.localize.term(key);
+        return [
+            {
+                key: "name",
+                label: term("uaAnalytics_columnAutomation"),
+                elementName: UAUI_TABLE_CELL.link,
+                meta: { hrefKey: "href", secondaryKey: "workspaceName" },
+                searchable: true,
+                sortable: true,
+            },
+            {
+                key: "runs",
+                label: term("uaAnalytics_runs"),
+                elementName: UAUI_TABLE_CELL.share,
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "successRate",
+                label: term("uaAnalytics_successRate"),
+                elementName: UAUI_TABLE_CELL.percent,
+                meta: { deltaUnit: "points" },
+                valueFormat: { style: "percent", maximumFractionDigits: 1 },
+                align: "end",
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "failed",
+                label: term("uaAnalytics_columnFailed"),
+                elementName: UAUI_TABLE_CELL.number,
+                meta: { lowerIsBetter: true },
+                align: "end",
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "avgDurationMs",
+                label: term("uaAnalytics_columnAvgRunTime"),
+                elementName: "ua-analytics-duration-cell",
+                meta: { lowerIsBetter: true },
+                align: "end",
+                sortable: true,
+                sortAs: "number",
+            },
+            {
+                key: "lastRunUtc",
+                label: term("uaAnalytics_columnLastRun"),
+                elementName: "ua-analytics-date-time-cell",
+                sortable: true,
+                sortAs: compareInstants,
+            },
+        ];
+    }
+
+    #renderAutomationsBox() {
+        return html`<uui-box class="flush" data-box="automations" headline=${this.localize.term("uaAnalytics_automationsTitle")}>
+            <uaui-data-table
+                data-table="automations"
+                mode="client"
+                row-key="unique"
+                reset-page-on-rows
+                .label=${this.localize.term("uaAnalytics_automationsTitle")}
+                .columns=${this._automationColumns}
+                .pageSize=${100}
+                .rows=${this._automationRows}
+                .compareRows=${this._automationCompareRows}
+                .sort=${this._automationsSort}
+                .loading=${this.#isLoadingAutomations}
+                .error=${this._automationsError}
+                .errorHeadline=${this.localize.term("uaAnalytics_automationsErrorHeadline")}
+                .errorDescription=${this.localize.term("uaAnalytics_errorDescription")}
+                .emptyHeadline=${this.localize.term("uaAnalytics_automationsEmptyHeadline")}
+                .emptyDescription=${this.localize.term("uaAnalytics_automationsEmptyDescription")}
+                retryable
+                @sort-change=${(event: CustomEvent<UauiTableSort>) => (this._automationsSort = event.detail)}
+                @retry=${() => this.#loadAutomations()}>
+                <uaui-search-field slot="toolbar-start" data-search="automations"></uaui-search-field>
+            </uaui-data-table>
+        </uui-box>`;
+    }
+
     override render() {
-        return html`${this.#renderRetentionNotice()} ${this.#renderTiles()} ${this.#renderChartBox()}`;
+        return html`${this.#renderRetentionNotice()} ${this.#renderTiles()} ${this.#renderChartBox()}
+        ${this.#renderAutomationsBox()}`;
     }
 
     static override styles = [

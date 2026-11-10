@@ -89,8 +89,9 @@ export default {
     uaAnalytics: {
         allWorkspaces: "All workspaces",
         last90Days: "Last 90 days",
-        tileRuns: "Runs",
-        tileSuccessRate: "Success rate",
+        runs: "Runs",
+        successRate: "Success rate",
+        errorDescription: "Check your connection and try again.",
         tileFailedRuns: "Failed runs",
         tileMedianRunTime: "Median run time",
         tileWaitingForApproval: "Waiting for approval",
@@ -103,7 +104,15 @@ export default {
         runsOverTimeEmptyDescription:
             "Runs show here once a published automation is triggered. Choose a longer date range, or another workspace.",
         runsOverTimeErrorHeadline: "Couldn't load runs over time",
-        runsOverTimeErrorDescription: "Check your connection and try again.",
+        automationsTitle: "Automations",
+        automationsEmptyHeadline: "No automations ran in this period",
+        automationsEmptyDescription:
+            "Automations show here once they run. Choose a longer date range, or another workspace.",
+        automationsErrorHeadline: "Couldn't load automations",
+        columnAutomation: "Automation",
+        columnFailed: "Failed",
+        columnAvgRunTime: "Avg run time",
+        columnLastRun: "Last run",
         seriesCompleted: "Completed",
         seriesRejected: "Rejected",
         seriesCancelled: "Cancelled",

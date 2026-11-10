@@ -106,8 +106,8 @@ export class AutomateUiHelper {
     return {
       /* The `uaui-date-range` in the header. `data-preset` carries the chosen preset id, or `custom`. */
       dateRange,
-      /* The header's native workspace `<select>`; absent for a user with one workspace. */
-      workspaceSelect: page.locator('ua-analytics-workspace uui-select select'),
+      /* The header's native workspace `<select>`; absent for a user with one workspace. Scoped to the header, as the tables' pager has selects too. */
+      workspaceSelect: page.locator('ua-analytics-workspace .header-controls uui-select select'),
       /* Picks a preset (`last-7-days`, `last-30-days`, `last-90-days`) in the date range dialog and saves. */
       pickPreset: (presetId: string) =>
         editDateRange(async () => {
@@ -168,6 +168,36 @@ export class AutomateUiHelper {
             }
           })
         );
+      },
+      /* The Automations table, and the search box in its toolbar. */
+      automationsTable: page.locator('uaui-data-table[data-table="automations"]'),
+      automationsSearch: page.locator('uaui-data-table[data-table="automations"] uaui-search-field input'),
+      /* Answers the automations endpoint with fixed rows, so a spec doesn't depend on the runs a site holds. Call before
+       * navigating. Rows are partial (the rest is zero or empty). As the server does, `compareItems` is only answered
+       * when the request asks for a comparison (`compareFrom`). `failFirst` answers the first request with a 500, so
+       * the box shows its error state until Retry. */
+      stubAutomations: async ({ items = [], compareItems = null, failFirst = false }: {
+        items?: Record<string, unknown>[];
+        compareItems?: Record<string, unknown>[] | null;
+        failFirst?: boolean;
+      } = {}) => {
+        let failed = !failFirst;
+        const row = (overrides: Record<string, unknown>) => ({
+          automationId: '00000000-0000-0000-0000-000000000000', name: '', workspaceName: '', runs: 0, failed: 0,
+          successRate: null, avgDurationMs: null, lastRunUtc: new Date().toISOString(), ...overrides
+        });
+        await page.route(/\/metrics\/analytics\/automations/, (route) => {
+          if (!failed) {
+            failed = true;
+            return route.fulfill({ status: 500, json: {} });
+          }
+          return route.fulfill({
+            json: {
+              items: items.map(row),
+              compareItems: compareItems && new URL(route.request().url()).searchParams.has('compareFrom') ? compareItems.map(row) : null
+            }
+          });
+        });
       },
       /* The info line above the tiles about runs deleted by cleanup. */
       retentionNotice: page.locator('[data-notice="retention"]'),
