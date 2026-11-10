@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Analytics;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Automate.Web.Api.Management.Metrics.Models;
-using Umbraco.Cms.Api.Common.Builders;
 using Umbraco.Cms.Core.Mapping;
 using Umbraco.Cms.Core.Security.Authorization;
 
@@ -17,11 +16,6 @@ namespace Umbraco.Automate.Web.Api.Management.Metrics.Controllers;
 [ApiVersion("1.0")]
 public class AnalyticsMetricsController : MetricsControllerBase
 {
-    // The earliest and latest dates accepted. They keep the service's date arithmetic (such as
-    // adding a day to the last date) clear of the edges of the calendar.
-    private static readonly DateOnly EarliestDate = new(2000, 1, 1);
-    private static readonly DateOnly LatestDate = new(2999, 12, 31);
-
     private readonly IAutomateAnalyticsService _analyticsService;
     private readonly IWorkspaceService _workspaceService;
     private readonly IAuthorizationHelper _authorizationHelper;
@@ -55,11 +49,6 @@ public class AnalyticsMetricsController : MetricsControllerBase
         [FromQuery] AnalyticsQueryRequestModel query,
         CancellationToken cancellationToken = default)
     {
-        if (DatesOutOfBounds(query))
-        {
-            return DatesOutOfBoundsResult();
-        }
-
         var attempt = await _analyticsService.GetSummaryAsync(await BuildQueryAsync(query, cancellationToken), cancellationToken);
         return attempt.Success
             ? Ok(_mapper.Map<AnalyticsSummaryResponseModel>(attempt.Result!))
@@ -79,11 +68,6 @@ public class AnalyticsMetricsController : MetricsControllerBase
         [FromQuery] AnalyticsQueryRequestModel query,
         CancellationToken cancellationToken = default)
     {
-        if (DatesOutOfBounds(query))
-        {
-            return DatesOutOfBoundsResult();
-        }
-
         var attempt = await _analyticsService.GetAutomationsAsync(await BuildQueryAsync(query, cancellationToken), cancellationToken);
         return attempt.Success
             ? Ok(_mapper.Map<AnalyticsAutomationsResponseModel>(attempt.Result!))
@@ -103,20 +87,11 @@ public class AnalyticsMetricsController : MetricsControllerBase
         [FromQuery] AnalyticsQueryRequestModel query,
         CancellationToken cancellationToken = default)
     {
-        if (DatesOutOfBounds(query))
-        {
-            return DatesOutOfBoundsResult();
-        }
-
         var attempt = await _analyticsService.GetActionsAsync(await BuildQueryAsync(query, cancellationToken), cancellationToken);
         return attempt.Success
             ? Ok(_mapper.Map<AnalyticsActionsResponseModel>(attempt.Result!))
             : InvalidQuery(attempt.Status);
     }
-
-    private static bool DatesOutOfBounds(AnalyticsQueryRequestModel query)
-        => new DateOnly?[] { query.From, query.To, query.CompareFrom, query.CompareTo }
-            .Any(d => d.HasValue && (d.Value < EarliestDate || d.Value > LatestDate));
 
     private async Task<AnalyticsQuery> BuildQueryAsync(AnalyticsQueryRequestModel query, CancellationToken cancellationToken)
         => new()
@@ -129,12 +104,6 @@ public class AnalyticsMetricsController : MetricsControllerBase
             WorkspaceIds = await ResolveAccessibleWorkspacesAsync(_workspaceService, _authorizationHelper, query.WorkspaceId, cancellationToken),
         };
 
-    private IActionResult DatesOutOfBoundsResult()
-        => BadRequest(new ProblemDetailsBuilder()
-            .WithTitle("Invalid analytics query")
-            .WithDetail($"Dates must be between {EarliestDate:yyyy-MM-dd} and {LatestDate:yyyy-MM-dd}.")
-            .Build());
-
     private IActionResult InvalidQuery(AnalyticsQueryStatus status)
         => OperationStatusResult(status, problem => BadRequest(problem
             .WithTitle("Invalid analytics query")
@@ -145,6 +114,7 @@ public class AnalyticsMetricsController : MetricsControllerBase
                 AnalyticsQueryStatus.RangeTooLong => "The range is longer than 366 days.",
                 AnalyticsQueryStatus.IncompleteCompare => "Only one of the two comparison dates was given.",
                 AnalyticsQueryStatus.CompareLengthMismatch => "The comparison range isn't the same length as the range.",
+                AnalyticsQueryStatus.DateOutOfRange => "Dates must be between 2000-01-01 and 2999-12-31.",
                 _ => "The query is not valid.",
             })
             .Build()));

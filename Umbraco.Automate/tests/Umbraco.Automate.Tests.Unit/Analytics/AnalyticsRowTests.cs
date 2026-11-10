@@ -267,6 +267,11 @@ public class AnalyticsRowTests
 
             harness.Repository.Invocations.ShouldBeEmpty();
         }
+
+        [Fact]
+        public async Task ARangeEndingOnTheLastDayOfTheCalendarIsRefused()
+            => (await new AnalyticsServiceHarness().Build().GetAutomationsAsync(Query(from: "9999-12-30", to: "9999-12-31"))).Status
+                .ShouldBe(AnalyticsQueryStatus.DateOutOfRange);
     }
 
     public class GivenAnInvalidQueryForActions

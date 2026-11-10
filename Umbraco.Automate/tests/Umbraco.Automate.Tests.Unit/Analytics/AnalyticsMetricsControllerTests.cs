@@ -249,32 +249,4 @@ public class AnalyticsMetricsControllerTests
             (await ProblemFrom(Endpoint.Summary)).Extensions.ShouldNotContainKey("status");
         }
     }
-
-    public class GivenADateAtTheEdgeOfTheCalendar : ControllerScenario
-    {
-        public GivenADateAtTheEdgeOfTheCalendar() => SignInAs(isAdmin: true);
-
-        [Theory]
-        [MemberData(nameof(Endpoints), MemberType = typeof(AnalyticsMetricsControllerTests))]
-        public async Task Answers400(Endpoint endpoint)
-        {
-            var result = (ObjectResult)await Call(endpoint, to: DateOnly.MaxValue);
-
-            result.StatusCode.ShouldBe(StatusCodes.Status400BadRequest);
-        }
-
-        [Theory]
-        [MemberData(nameof(Endpoints), MemberType = typeof(AnalyticsMetricsControllerTests))]
-        public async Task DoesNotCallTheService(Endpoint endpoint)
-        {
-            await Call(endpoint, to: DateOnly.MaxValue);
-
-            Service.Invocations.Count.ShouldBe(0);
-        }
-
-        [Theory]
-        [MemberData(nameof(Endpoints), MemberType = typeof(AnalyticsMetricsControllerTests))]
-        public async Task TheBodyHasAType(Endpoint endpoint)
-            => (await ProblemFrom(endpoint, DateOnly.MaxValue)).Type.ShouldNotBeNullOrEmpty();
-    }
 }

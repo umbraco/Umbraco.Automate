@@ -170,6 +170,13 @@ internal sealed class AutomateAnalyticsService : IAutomateAnalyticsService
             return (null, AnalyticsQueryStatus.UnknownTimeZone);
         }
 
+        // Checked first: the day maths below must never see a date near the edge of the calendar.
+        if (new DateOnly?[] { query.From, query.To, query.CompareFrom, query.CompareTo }
+            .Any(d => d is { } date && AnalyticsDateLimits.IsOutOfRange(date)))
+        {
+            return (zone, AnalyticsQueryStatus.DateOutOfRange);
+        }
+
         if (query.From > query.To)
         {
             return (zone, AnalyticsQueryStatus.RangeBackwards);

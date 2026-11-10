@@ -284,5 +284,18 @@ public class AnalyticsSummaryTests
         public async Task AComparisonOfADifferentLengthIsRefused()
             => (await _service.GetSummaryAsync(Query(from: "2026-10-01", to: "2026-10-31", compareFrom: "2026-09-01", compareTo: "2026-09-30"))).Status
                 .ShouldBe(AnalyticsQueryStatus.CompareLengthMismatch);
+
+        [Fact]
+        public async Task AFromDateBeforeTheYearTwoThousandIsRefused()
+            => (await _service.GetSummaryAsync(Query(from: "1999-12-31", to: "2000-01-02"))).Status.ShouldBe(AnalyticsQueryStatus.DateOutOfRange);
+
+        [Fact]
+        public async Task ACompareToDateOfTheLastDayOfYearNineThousandNineHundredNinetyNineIsRefused()
+            => (await _service.GetSummaryAsync(Query(from: "2026-10-01", to: "2026-10-31", compareFrom: "2026-09-01", compareTo: "9999-12-31"))).Status
+                .ShouldBe(AnalyticsQueryStatus.DateOutOfRange);
+
+        [Fact]
+        public async Task ARangeEndingOnTheLastDayOfTheCalendarIsRefused()
+            => (await _service.GetSummaryAsync(Query(from: "9999-12-30", to: "9999-12-31"))).Status.ShouldBe(AnalyticsQueryStatus.DateOutOfRange);
     }
 }

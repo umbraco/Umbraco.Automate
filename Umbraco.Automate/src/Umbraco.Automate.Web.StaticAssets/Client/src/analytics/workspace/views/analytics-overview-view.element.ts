@@ -78,6 +78,7 @@ const REJECTION_KEYS: Readonly<Record<string, string>> = {
     CompareLengthMismatch: "uaAnalytics_rejectedCompareLength",
     IncompleteCompare: "uaAnalytics_rejectedCompareLength",
     UnknownTimeZone: "uaAnalytics_rejectedTimeZone",
+    DateOutOfRange: "uaAnalytics_rejectedDateOutOfRange",
 };
 
 type AutomationRow =ReturnType<typeof createAutomationRows>[number];

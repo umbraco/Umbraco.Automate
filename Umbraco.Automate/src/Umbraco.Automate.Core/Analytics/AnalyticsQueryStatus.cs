@@ -22,4 +22,7 @@ public enum AnalyticsQueryStatus
 
     /// <summary>The comparison range isn't the same length as the range.</summary>
     CompareLengthMismatch = 5,
+
+    /// <summary>A date is outside the supported range, 2000-01-01 to 2999-12-31.</summary>
+    DateOutOfRange = 6,
 }

@@ -97,6 +97,7 @@ export default {
         rejectedRangeBackwards: "The date range starts after it ends. Choose another range.",
         rejectedCompareLength: "The comparison must be as many days long as the date range. Choose another comparison.",
         rejectedTimeZone: "Your browser's time zone isn't recognised by the server.",
+        rejectedDateOutOfRange: "A date is outside the supported range. Choose dates between 2000 and 2999.",
         rangeClamped: "The date range can be at most {0} days, so it was shortened to end on the date you chose.",
         tileFailedRuns: "Failed runs",
         tileMedianRunTime: "Median run time",
