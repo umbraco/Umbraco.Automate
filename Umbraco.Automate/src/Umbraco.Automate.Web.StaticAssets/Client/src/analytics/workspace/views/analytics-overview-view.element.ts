@@ -33,7 +33,8 @@ import {
     hasNoRuns,
 } from "../../analytics-adapter.js";
 import { UaAnalyticsServerDataSource } from "../../repository/analytics.server.data-source.js";
-import type { UaAnalyticsFilters } from "../analytics-filters.js";
+import type { UaAnalyticsRejection } from "../../repository/analytics.server.data-source.js";
+import { UA_ANALYTICS_MAX_RANGE_DAYS, type UaAnalyticsFilters } from "../analytics-filters.js";
 import { UA_ANALYTICS_WORKSPACE_CONTEXT } from "../analytics-workspace.context-token.js";
 import "./local-components/analytics-action-name-cell.element.js";
 import "./local-components/analytics-date-time-cell.element.js";
@@ -70,7 +71,16 @@ const compareInstants = (a: unknown, b: unknown) => {
     return first - second;
 };
 
-type AutomationRow = ReturnType<typeof createAutomationRows>[number];
+/** The text for each `operationStatus` the analytics endpoints answer a 400 with; anything else gets the general one. */
+const REJECTION_KEYS: Readonly<Record<string, string>> = {
+    RangeTooLong: "uaAnalytics_rejectedRangeTooLong",
+    RangeBackwards: "uaAnalytics_rejectedRangeBackwards",
+    CompareLengthMismatch: "uaAnalytics_rejectedCompareLength",
+    IncompleteCompare: "uaAnalytics_rejectedCompareLength",
+    UnknownTimeZone: "uaAnalytics_rejectedTimeZone",
+};
+
+type AutomationRow =ReturnType<typeof createAutomationRows>[number];
 
 /** A table row: the adapter's row plus the link to its automation, which the link cell reads from `href`. */
 const withHref = (row: AutomationRow) => ({
@@ -132,6 +142,20 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     private _actionRows: ReturnType<typeof createActionRows> = [];
     private _actionCompareRows: ReturnType<typeof createActionRows> = [];
     private _actionColumns: UauiTableColumn[] = [];
+    #lang = "";
+
+    @state()
+    private _rangeClamped = false;
+
+    /** Set while a box shows the server's 400: the filters were refused, which a retry can't fix. */
+    @state()
+    private _summaryRejection?: UaAnalyticsRejection;
+
+    @state()
+    private _automationsRejection?: UaAnalyticsRejection;
+
+    @state()
+    private _actionsRejection?: UaAnalyticsRejection;
 
     constructor() {
         super();
@@ -142,12 +166,14 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                 context.filters,
                 (filters) => {
                     this._filters = filters;
+                    this._summaryRejection = this._automationsRejection = this._actionsRejection = undefined;
                     this.#loadSummary();
                     this.#loadAutomations();
                     this.#loadActions();
                 },
                 "_observeFilters",
             );
+            this.observe(context.rangeClamped, (clamped) => (this._rangeClamped = clamped), "_observeRangeClamped");
         });
     }
 
@@ -165,6 +191,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         this._loading = false;
         if (result.error || !result.data) {
             this._error = true;
+            this._summaryRejection = result.rejection;
             return;
         }
 
@@ -185,6 +212,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         this._automationsLoading = false;
         if (result.error || !result.data) {
             this._automationsError = true;
+            this._automationsRejection = result.rejection;
             return;
         }
 
@@ -209,6 +237,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         this._actionsLoading = false;
         if (result.error || !result.data) {
             this._actionsError = true;
+            this._actionsRejection = result.rejection;
             return;
         }
 
@@ -220,8 +249,13 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     }
 
     protected override willUpdate(changed: PropertyValues) {
+        // Headers, series names and error text are translated when built, so a language switch rebuilds them.
+        const lang = this.localize.lang();
+        const langChanged = lang !== this.#lang;
+        this.#lang = lang;
+
         // The columns don't depend on the answer, so the table has its headers and loading rows before it arrives.
-        if (this._automationColumns.length === 0) this._automationColumns = this.#getAutomationColumns();
+        if (langChanged || this._automationColumns.length === 0) this._automationColumns = this.#getAutomationColumns();
 
         if (changed.has("_automations")) {
             // Worked out here, not in render, so the table keeps one rows array (it resets its page on a new one).
@@ -229,9 +263,9 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
             this._automationRows = createAutomationRows(answer?.items ?? []).map(withHref);
             this._automationCompareRows = createAutomationRows(answer?.compareItems ?? []).map(withHref);        }
 
-        if (this._actionColumns.length === 0) this._actionColumns = this.#getActionColumns();
+        if (langChanged || this._actionColumns.length === 0) this._actionColumns = this.#getActionColumns();
 
-        if (changed.has("_actions")) {
+        if (changed.has("_actions") || langChanged) {
             const translate = (key: string) => this.localize.term(key);
             const names = this._actions?.names ?? new Map<string, string>();
             const answer = this._actions?.answer;
@@ -239,7 +273,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
             this._actionCompareRows = createActionRows(answer?.compareItems ?? [], names, translate);
         }
 
-        if (!changed.has("_loaded") && !changed.has("_groupBy")) return;
+        if (!langChanged && !changed.has("_loaded") && !changed.has("_groupBy")) return;
 
         const loaded = this._loaded;
         // Nothing ran: leave the series empty so the chart shows its empty state.
@@ -259,6 +293,23 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     /** No answer yet and no failure: the workspace is still loading or the first request is on its way. */
     get #isLoading() {
         return this._loading || (!this._loaded && !this._error);
+    }
+
+    /** Why a box couldn't load: the filters were refused (400), or the request didn't get through. */
+    #errorDescription(rejection?: UaAnalyticsRejection) {
+        if (!rejection) return this.localize.term("uaAnalytics_errorDescription");
+
+        const status = rejection.operationStatus;
+        return this.localize.term((status && REJECTION_KEYS[status]) || "uaAnalytics_rejectedDescription");
+    }
+
+    #renderRangeClampedNotice() {
+        if (!this._rangeClamped) return nothing;
+
+        return html`<div class="notice" data-notice="range-clamped">
+            <uui-icon name="icon-info"></uui-icon>
+            <span>${this.localize.term("uaAnalytics_rangeClamped", UA_ANALYTICS_MAX_RANGE_DAYS)}</span>
+        </div>`;
     }
 
     #renderRetentionNotice() {
@@ -358,7 +409,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                 .loading=${this.#isLoading}
                 .error=${this._error}
                 .errorHeadline=${this.localize.term("uaAnalytics_runsOverTimeErrorHeadline")}
-                .errorDescription=${this.localize.term("uaAnalytics_errorDescription")}
+                .errorDescription=${this.#errorDescription(this._summaryRejection)}
                 .emptyHeadline=${this.localize.term("uaAnalytics_runsOverTimeEmptyHeadline")}
                 .emptyDescription=${this.localize.term("uaAnalytics_runsOverTimeEmptyDescription")}
                 retryable
@@ -443,7 +494,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                 .loading=${this.#isLoadingAutomations}
                 .error=${this._automationsError}
                 .errorHeadline=${this.localize.term("uaAnalytics_automationsErrorHeadline")}
-                .errorDescription=${this.localize.term("uaAnalytics_errorDescription")}
+                .errorDescription=${this.#errorDescription(this._automationsRejection)}
                 .emptyHeadline=${this.localize.term("uaAnalytics_automationsEmptyHeadline")}
                 .emptyDescription=${this.localize.term("uaAnalytics_automationsEmptyDescription")}
                 retryable
@@ -529,7 +580,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
                 .loading=${this.#isLoadingActions}
                 .error=${this._actionsError}
                 .errorHeadline=${this.localize.term("uaAnalytics_actionsErrorHeadline")}
-                .errorDescription=${this.localize.term("uaAnalytics_errorDescription")}
+                .errorDescription=${this.#errorDescription(this._actionsRejection)}
                 .emptyHeadline=${this.localize.term("uaAnalytics_actionsEmptyHeadline")}
                 .emptyDescription=${this.localize.term("uaAnalytics_actionsEmptyDescription")}
                 retryable
@@ -541,7 +592,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     }
 
     override render() {
-        return html`${this.#renderRetentionNotice()} ${this.#renderTiles()} ${this.#renderChartBox()}
+        return html`${this.#renderRangeClampedNotice()} ${this.#renderRetentionNotice()} ${this.#renderTiles()} ${this.#renderChartBox()}
         ${this.#renderAutomationsBox()} ${this.#renderActionsBox()}`;
     }
 

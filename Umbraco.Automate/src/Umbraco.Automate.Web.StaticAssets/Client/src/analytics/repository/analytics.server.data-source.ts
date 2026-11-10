@@ -1,5 +1,5 @@
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
-import { tryExecute } from "@umbraco-cms/backoffice/resources";
+import { tryExecute, UmbApiError } from "@umbraco-cms/backoffice/resources";
 import { MetricsService } from "../../api/sdk.gen.js";
 import type {
     AnalyticsActionsResponseModel,
@@ -16,6 +16,26 @@ export interface UaAnalyticsResult<T> {
     data?: T;
     error?: unknown;
     stale?: boolean;
+    rejection?: UaAnalyticsRejection;
+}
+
+/** Set when the server answered 400: the filters were refused, so asking again can't help. */
+export interface UaAnalyticsRejection {
+    /** The ProblemDetails `operationStatus` (`RangeTooLong`, `CompareLengthMismatch`, ...), when the answer had one. */
+    operationStatus?: string;
+}
+
+function failure<T>(error: unknown): UaAnalyticsResult<T> {
+    const result: UaAnalyticsResult<T> = { error: error ?? new Error("No data") };
+    // The generated client resolves a failed request to its ProblemDetails body (no `throwOnError`), and
+    // tryExecute only wraps a rejection in an UmbApiError, so the body can arrive either way.
+    const body = (UmbApiError.isUmbApiError(error) ? error.problemDetails : error) as
+        | { status?: unknown; operationStatus?: unknown }
+        | undefined;
+    if (body?.status === 400) {
+        result.rejection = { operationStatus: typeof body.operationStatus === "string" ? body.operationStatus : undefined };
+    }
+    return result;
 }
 
 interface AnalyticsQuery {
@@ -61,7 +81,7 @@ export class UaAnalyticsServerDataSource {
             { disableNotifications: true },
         );
         if (request !== this.#summaryRequest) return { stale: true };
-        return error || !data ? { error: error ?? new Error("No data") } : { data };
+        return error || !data ? failure(error) : { data };
     }
 
     async getAutomations(filters: UaAnalyticsFilters): Promise<UaAnalyticsResult<AnalyticsAutomationsResponseModel>> {
@@ -72,7 +92,7 @@ export class UaAnalyticsServerDataSource {
             { disableNotifications: true },
         );
         if (request !== this.#automationsRequest) return { stale: true };
-        return error || !data ? { error: error ?? new Error("No data") } : { data };
+        return error || !data ? failure(error) : { data };
     }
 
     async getActions(filters: UaAnalyticsFilters): Promise<UaAnalyticsResult<AnalyticsActionsResponseModel>> {
@@ -83,6 +103,6 @@ export class UaAnalyticsServerDataSource {
             { disableNotifications: true },
         );
         if (request !== this.#actionsRequest) return { stale: true };
-        return error || !data ? { error: error ?? new Error("No data") } : { data };
+        return error || !data ? failure(error) : { data };
     }
 }

@@ -35,16 +35,16 @@ public sealed class SeededSqlServerAnalyticsDatabase : IAsyncLifetime
 
     private static readonly string[] ActionAliases =
     [
-        "umbAutomate.logMessage",
-        "umbAutomate.httpRequest",
-        "umbAutomate.publishContent",
-        "umbAutomate.delay",
-        "umbAutomate.runScript",
-        "umbAutomate.createContent",
-        "umbAutomate.sendEmail",
-        "umbAutomate.updateContent",
-        "umbAutomate.approval",
-        "umbAutomate.setVariable",
+        "umbracoAutomate.logMessage",
+        "umbracoAutomate.httpRequest",
+        "umbracoAutomate.publishContent",
+        "umbracoAutomate.delay",
+        "umbracoAutomate.runScript",
+        "umbracoAutomate.createContent",
+        "umbracoAutomate.sendEmail",
+        "umbracoAutomate.updateContentProperty",
+        "umbracoAutomate.requestApproval",
+        "umbracoAutomate.setVariable",
     ];
 
     private EFCoreAutomateAnalyticsRepository _repository = null!;

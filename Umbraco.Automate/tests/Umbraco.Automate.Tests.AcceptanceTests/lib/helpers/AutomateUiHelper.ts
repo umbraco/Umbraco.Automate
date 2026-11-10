@@ -134,6 +134,17 @@ export class AutomateUiHelper {
           await dialog.locator('uaui-date-field').nth(0).locator('input').fill(isoDaysAgo(daysAgoFrom));
           await dialog.locator('uaui-date-field').nth(1).locator('input').fill(isoDaysAgo(daysAgoTo));
         }),
+      /* Picks a custom range between two ISO dates, with the comparison on in the given mode (`previous-period`,
+       * `previous-year`), and saves. */
+      pickRangeWithComparison: ({ from, to, compareMode }: { from: string; to: string; compareMode: 'previous-period' | 'previous-year' }) =>
+        editDateRange(async () => {
+          await dialog.locator('uui-select[name="preset"] select').selectOption('custom');
+          await dialog.locator('uaui-date-field').nth(0).locator('input').fill(from);
+          await dialog.locator('uaui-date-field').nth(1).locator('input').fill(to);
+          const toggle = dialog.locator('uaui-compare-group uui-toggle');
+          if (!(await toggle.evaluate((el: any) => el.checked))) await toggle.click();
+          await dialog.locator('uaui-compare-group uui-select[name="compare-mode"] select').selectOption(compareMode);
+        }),
       /* Switches the Compare toggle in the dialog off and saves. */
       turnComparisonOff: () =>
         editDateRange(async () => {

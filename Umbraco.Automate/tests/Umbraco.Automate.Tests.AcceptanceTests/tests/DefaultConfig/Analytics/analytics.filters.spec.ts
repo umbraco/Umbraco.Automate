@@ -101,6 +101,53 @@ test.describe('Feature: date range, comparison and workspace', () => {
     });
   });
 
+  // The server refuses a range over 366 days and a comparison of another length, so the page must never send one.
+  test.describe('Scenario: ranges the server would refuse', () => {
+    const summaryUrl = (request: { url(): string }) => new URL(request.url()).pathname.endsWith('/metrics/analytics/summary');
+    const days = (from: string, to: string) => (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1;
+
+    test('shortens a custom range of 400 days to 366 days', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset');
+      const request = page.waitForRequest((r: { url(): string }) => {
+        const params = new URL(r.url()).searchParams;
+        return summaryUrl(r) && days(params.get('from')!, params.get('to')!) > 30;
+      });
+      await umbracoAutomateUi.automate.analytics.pickCustomRange({ daysAgoFrom: 399, daysAgoTo: 0 });
+
+      const params = new URL((await request).url()).searchParams;
+      expect(days(params.get('from')!, params.get('to')!)).toBe(366);
+    });
+
+    test('asks for a year-back comparison as long as a range that crosses 29 February', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset');
+      const request = page.waitForRequest((r: { url(): string }) => summaryUrl(r) && new URL(r.url()).searchParams.get('from') === '2024-02-15');
+      await umbracoAutomateUi.automate.analytics.pickRangeWithComparison({ from: '2024-02-15', to: '2024-03-15', compareMode: 'previous-year' });
+
+      const params = new URL((await request).url()).searchParams;
+      expect(days(params.get('compareFrom')!, params.get('compareTo')!)).toBe(days(params.get('from')!, params.get('to')!));
+    });
+
+    test('ignores a remembered range over 366 days', async ({ automateWorkspace, page, umbracoAutomateUi }) => {
+      expect(automateWorkspace.id).toBeTruthy();
+      await umbracoAutomateUi.goToUrl(umbracoAutomateUi.automate.analyticsUrl());
+      await umbracoAutomateUi.automate.analytics.pickPreset('last-90-days');
+      await page.evaluate(() => {
+        const key = Object.keys(localStorage).find((k) => k.startsWith('Ua.Analytics.Filters'))!;
+        const stored = JSON.parse(localStorage.getItem(key)!);
+        stored.range = { from: '2020-01-01', to: '2022-01-01', preset: 'custom' };
+        stored.compare = null;
+        localStorage.setItem(key, JSON.stringify(stored));
+      });
+      await page.reload();
+
+      await expect(umbracoAutomateUi.automate.analytics.dateRange).toHaveAttribute('data-preset', 'last-30-days');
+    });
+  });
+
   test.describe('Scenario: a user with two workspaces', () => {
     test('offers All workspaces plus each of their workspaces', async ({ automateWorkspace, page, umbracoAutomateApi, umbracoAutomateUi }) => {
       const second = await umbracoAutomateApi.workspaces.createForTest('Analytics second workspace');

@@ -3,7 +3,7 @@ import { UMB_CURRENT_USER_CONTEXT } from "@umbraco-cms/backoffice/current-user";
 import { UmbContextBase } from "@umbraco-cms/backoffice/class-api";
 import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { UmbEntityContext } from "@umbraco-cms/backoffice/entity";
-import { UmbArrayState, UmbObjectState } from "@umbraco-cms/backoffice/observable-api";
+import { UmbArrayState, UmbBooleanState, UmbObjectState } from "@umbraco-cms/backoffice/observable-api";
 import { UmbViewContext } from "@umbraco-cms/backoffice/view";
 import { UMB_WORKSPACE_CONTEXT, type UmbWorkspaceContext } from "@umbraco-cms/backoffice/workspace";
 import { coreClientReady } from "../../core/client-ready.js";
@@ -11,6 +11,8 @@ import { UaWorkspaceCollectionServerDataSource } from "../../workspace-managemen
 import type { UaWorkspaceItemModel } from "../../workspace-management/types.js";
 import { UA_ANALYTICS_STORAGE_KEY } from "../constants.js";
 import {
+    alignCompare,
+    clampRange,
     createDefaultFilters,
     readStoredFilters,
     writeStoredFilters,
@@ -38,6 +40,10 @@ export class UaAnalyticsWorkspaceContext extends UmbContextBase implements UmbWo
     #workspaces = new UmbArrayState<UaWorkspaceItemModel>([], (workspace) => workspace.unique);
     /** The workspaces the user can access. */
     readonly workspaces = this.#workspaces.asObservable();
+
+    #rangeClamped = new UmbBooleanState(false);
+    /** True when the range the editor last picked was longer than the server answers and was shortened. */
+    readonly rangeClamped = this.#rangeClamped.asObservable();
 
     #storageKey?: string;
     #destroyed = false;
@@ -70,9 +76,14 @@ export class UaAnalyticsWorkspaceContext extends UmbContextBase implements UmbWo
         return this.#filters.getValue();
     }
 
-    /** Sets the range and its comparison together, as `uaui-date-range` raises them. */
+    /**
+     * Sets the range and its comparison together, as `uaui-date-range` raises them. The server rejects a range over
+     * 366 days and a comparison of another length, so the range is shortened and the comparison made as long as it.
+     */
     setDateRange(range: UauiDateRange, compare?: UauiCompare) {
-        this.#update({ range, compare });
+        const clamped = clampRange(range);
+        this.#rangeClamped.setValue(clamped.clamped);
+        this.#update({ range: clamped.range, compare: compare ? alignCompare(clamped.range, compare) : undefined });
     }
 
     setWorkspace(workspaceId?: string) {
@@ -134,6 +145,7 @@ export class UaAnalyticsWorkspaceContext extends UmbContextBase implements UmbWo
     override destroy() {
         this.#destroyed = true;
         this.#filters.destroy();
+        this.#rangeClamped.destroy();
         this.#workspaces.destroy();
         super.destroy();
     }
