@@ -1,5 +1,4 @@
 // Story AN-8: docs/plans/analytics/STORIES.md
-// AC1-AC5 are active. The AC6 spec (403 without the Automate section) stays skipped until T19.
 import { expect } from '@playwright/test';
 import { test, ConstantHelper } from '../../../lib/index';
 
@@ -74,13 +73,12 @@ test.describe('Feature: open Analytics', () => {
       await expect(umbracoAutomateUi.automate.analytics.overviewLink).toHaveCount(0);
     });
 
-    test.skip('answers 403 to a user without the Automate section', async ({ umbracoApi }) => {
-      // The builder signs in as a user whose groups lack the Automate section, as the T9 wire task describes.
-      const response = await umbracoApi.get(
-        umbracoApi.baseUrl + ConstantHelper.api.basePath + 'metrics/analytics/summary?from=2026-10-01&to=2026-10-31&timeZone=UTC'
-      );
+    test('answers 403 to a user without the Automate section', async ({ umbracoApi, umbracoAutomateApi }) => {
+      const url = umbracoApi.baseUrl + ConstantHelper.api.basePath + 'metrics/analytics/summary?from=2026-10-01&to=2026-10-31&timeZone=UTC';
 
-      expect(response.status()).toBe(403);
+      const status = await umbracoAutomateApi.limitedUsers.getStatusAs('Editors', url);
+
+      expect(status).toBe(403);
     });
   });
 });

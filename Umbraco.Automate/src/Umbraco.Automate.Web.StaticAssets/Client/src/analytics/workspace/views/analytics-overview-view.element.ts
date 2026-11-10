@@ -344,7 +344,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
         const compareLabel =
             loaded && compare && loaded.summary.compare ? uauiFormatDateRange(this.localize, compare) : undefined;
 
-        return html`<uui-box class="flush" data-box="runs-over-time" headline=${this.localize.term("uaAnalytics_runsOverTime")}>
+        return html`<uui-box class="flush" data-box="runs-over-time" headline-variant="h4" headline=${this.localize.term("uaAnalytics_runsOverTime")}>
             <uaui-group-by slot="header-actions" .value=${this._groupBy} @change=${this.#onGroupByChange}></uaui-group-by>
             <uaui-time-series-chart
                 kind="stacked-bar"
@@ -428,7 +428,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     }
 
     #renderAutomationsBox() {
-        return html`<uui-box class="flush" data-box="automations" headline=${this.localize.term("uaAnalytics_automationsTitle")}>
+        return html`<uui-box class="flush" data-box="automations" headline-variant="h4" headline=${this.localize.term("uaAnalytics_automationsTitle")}>
             <uaui-data-table
                 data-table="automations"
                 mode="client"
@@ -514,7 +514,7 @@ export class UaAnalyticsOverviewViewElement extends UmbLitElement {
     }
 
     #renderActionsBox() {
-        return html`<uui-box class="flush" data-box="actions" headline=${this.localize.term("uaAnalytics_actionsTitle")}>
+        return html`<uui-box class="flush" data-box="actions" headline-variant="h4" headline=${this.localize.term("uaAnalytics_actionsTitle")}>
             <uaui-data-table
                 data-table="actions"
                 mode="client"

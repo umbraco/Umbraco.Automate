@@ -7,6 +7,7 @@ export type { AutomationConnection, AutomationStep } from './AutomationBuilder';
 export { CatalogueApiHelper } from './CatalogueApiHelper';
 export { ConnectionApiHelper } from './ConnectionApiHelper';
 export { ConstantHelper } from './ConstantHelper';
+export { LimitedUserApiHelper } from './LimitedUserApiHelper';
 export { ServiceAccountApiHelper } from './ServiceAccountApiHelper';
 export { test } from './testExtension';
 export { toAlias, uniqueName, uniqueSuffix } from './TestData';

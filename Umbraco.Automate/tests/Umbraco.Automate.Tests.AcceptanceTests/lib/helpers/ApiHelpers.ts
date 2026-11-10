@@ -3,6 +3,7 @@ import { ApiHelpers as UmbracoApiHelpers } from '@umbraco-cms/acceptance-test-he
 import { AutomationApiHelper } from './AutomationApiHelper';
 import { CatalogueApiHelper } from './CatalogueApiHelper';
 import { ConnectionApiHelper } from './ConnectionApiHelper';
+import { LimitedUserApiHelper } from './LimitedUserApiHelper';
 import { ServiceAccountApiHelper } from './ServiceAccountApiHelper';
 import { WorkspaceApiHelper } from './WorkspaceApiHelper';
 
@@ -18,6 +19,7 @@ export class ApiHelpers {
   connections: ConnectionApiHelper;
   workspaces: WorkspaceApiHelper;
   serviceAccounts: ServiceAccountApiHelper;
+  limitedUsers: LimitedUserApiHelper;
 
   constructor(page: Page, umbracoApi: UmbracoApiHelpers) {
     this.page = page;
@@ -27,5 +29,6 @@ export class ApiHelpers {
     this.connections = new ConnectionApiHelper(umbracoApi);
     this.workspaces = new WorkspaceApiHelper(umbracoApi);
     this.serviceAccounts = new ServiceAccountApiHelper(umbracoApi);
+    this.limitedUsers = new LimitedUserApiHelper(umbracoApi);
   }
 }
