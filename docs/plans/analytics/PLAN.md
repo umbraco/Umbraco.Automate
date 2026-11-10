@@ -132,7 +132,7 @@
   Add `automationsTable` and `automationsSearch` to `AutomateUiHelper.analytics` first. Acceptance: `Analytics/analytics.automations.spec.ts` green.
   depends-on: T15
 
-- [ ] **T17** - story: AN-5 (AC8 to AC11). Add the Actions box to the view, in the same pattern: action name, runs (share), failure rate (percent, points, `lowerIsBetter`), retries, average run time (`lowerIsBetter`), most common error.
+- [x] **T17** - story: AN-5 (AC8 to AC11). Add the Actions box to the view, in the same pattern: action name, runs (share), failure rate (percent, points, `lowerIsBetter`), retries, average run time (`lowerIsBetter`), most common error.
   Each actions row carries `data-alias` and `data-top-error` (`none`, `other` or the category name) so specs don't depend on labels. Add `actionsTable` and `actionRow(alias)` to `AutomateUiHelper.analytics` first. Acceptance: `Analytics/analytics.actions.spec.ts` green, and `Analytics/analytics.filters.spec.ts` AN-7 AC3 (re-skipped in T15 until the automations and actions requests exist) un-skipped and green.
   depends-on: T16
 
