@@ -136,7 +136,7 @@
   Each actions row carries `data-alias` and `data-top-error` (`none`, `other` or the category name) so specs don't depend on labels. Add `actionsTable` and `actionRow(alias)` to `AutomateUiHelper.analytics` first. Acceptance: `Analytics/analytics.actions.spec.ts` green, and `Analytics/analytics.filters.spec.ts` AN-7 AC3 (re-skipped in T15 until the automations and actions requests exist) un-skipped and green.
   depends-on: T16
 
-- [ ] **T18** - story: AN-8 (AC3, AC5). In `section/dashboard/automate-dashboard.element.ts`, add the line under the status cards that links to Analytics (`mockups/overview.png`). It's left out in both welcome states. Add its `lang/en.ts` key.
+- [x] **T18** - story: AN-8 (AC3, AC5). In `section/dashboard/automate-dashboard.element.ts`, add the line under the status cards that links to Analytics (`mockups/overview.png`). It's left out in both welcome states. Add its `lang/en.ts` key.
   Acceptance: `Analytics/analytics.navigation.spec.ts` AN-8 AC3 and AC5 green.
   depends-on: T17
 
@@ -145,7 +145,7 @@
   - every box loads real data
   - the screen matches the mockups
   - axe passes in the light, dark and high-contrast themes (SPEC Targets)
-  Acceptance: every `Analytics/*.spec.ts` acceptance spec green together, and a smoke test with no findings left open.
+  Acceptance: every `Analytics/*.spec.ts` acceptance spec green together with none skipped, including AN-8 AC6's 403 spec in `analytics.navigation.spec.ts` (T9 checked the 403 by hand but never un-skipped it; it needs a user without the Automate section, not the admin `umbracoApi`), and a smoke test with no findings left open.
   depends-on: T17, T18
 
 ## Release
