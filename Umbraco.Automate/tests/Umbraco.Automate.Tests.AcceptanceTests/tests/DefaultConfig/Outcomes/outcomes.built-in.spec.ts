@@ -127,10 +127,14 @@ test.describe('Built-in content and media outcomes', () => {
 
     test('takes the success path when content matches the name', async ({
       automateServiceAccountWorkspace,
-      umbracoAutomateApi
+      umbracoAutomateApi,
+      umbracoApi,
+      cmsContent
     }) => {
-      // Arrange — the name of content already on the demo site.
-      const { name } = await umbracoAutomateApi.content.getPublishedRootDocument();
+      // Arrange — a published page of the test's own (the demo site may hold no content), indexed
+      // before the run, because Find Content searches the index.
+      const { id: pageId, name } = await cmsContent.createPage('Find Content Match', { publish: true });
+      await umbracoApi.document.waitUntilIndexed(name, pageId);
       const { id } = await seedBranching(umbracoAutomateApi, automateServiceAccountWorkspace.id, actions.findContent, {
         name,
         matchMode: 'Contains'

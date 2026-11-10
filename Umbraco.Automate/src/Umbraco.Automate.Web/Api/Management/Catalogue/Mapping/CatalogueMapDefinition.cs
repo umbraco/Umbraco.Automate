@@ -1,6 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Connections;
@@ -21,19 +19,9 @@ public class CatalogueMapDefinition : IMapDefinition
     private readonly ILogger<CatalogueMapDefinition> _logger;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="CatalogueMapDefinition"/> class without logging.
-    /// </summary>
-    [Obsolete("Use the constructor taking a logger. Scheduled for removal in Umbraco Automate 19.")]
-    public CatalogueMapDefinition()
-        : this(NullLogger<CatalogueMapDefinition>.Instance)
-    {
-    }
-
-    /// <summary>
     /// Initializes a new instance of the <see cref="CatalogueMapDefinition"/> class.
     /// </summary>
     /// <param name="logger">The logger.</param>
-    [ActivatorUtilitiesConstructor]
     public CatalogueMapDefinition(ILogger<CatalogueMapDefinition> logger) => _logger = logger;
 
     /// <inheritdoc />

@@ -311,10 +311,11 @@ test.describe('Get Content outcomes', () => {
 
     test('takes the success path when the content key exists (S9 AC4)', async ({
       automateServiceAccountWorkspace,
-      umbracoAutomateApi
+      umbracoAutomateApi,
+      cmsContent
     }) => {
-      // Arrange — content already on the demo site; nothing is published for this.
-      const contentKey = await umbracoAutomateApi.content.getPublishedRootDocumentKey();
+      // Arrange — a published page of the test's own: the demo site may hold no content.
+      const { id: contentKey } = await cmsContent.createPage('Get Content Found', { publish: true });
       const { id } = await seedGetContent(umbracoAutomateApi, automateServiceAccountWorkspace.id, contentKey, [
         { alias: 'onFound', handle: outcomes.success },
         { alias: 'onNotFound', handle: outcomes.notFound }
@@ -388,10 +389,11 @@ test.describe('Get Content outcomes', () => {
 
     test('still fires when the content is found (S6 AC6)', async ({
       automateServiceAccountWorkspace,
-      umbracoAutomateApi
+      umbracoAutomateApi,
+      cmsContent
     }) => {
       // Arrange
-      const contentKey = await umbracoAutomateApi.content.getPublishedRootDocumentKey();
+      const { id: contentKey } = await cmsContent.createPage('Get Content Any Result', { publish: true });
       const { id } = await seedGetContent(umbracoAutomateApi, automateServiceAccountWorkspace.id, contentKey, [
         { alias: 'always', handle: null }
       ]);

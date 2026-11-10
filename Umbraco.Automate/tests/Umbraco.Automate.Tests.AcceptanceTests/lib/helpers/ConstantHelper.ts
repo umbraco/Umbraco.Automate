@@ -40,6 +40,8 @@ export class ConstantHelper {
     oauthEditor: 'umb-automate-property-editor-ui-oauth',
     /* CMS pickers the settings form opens (not Automate's own). */
     treePickerModal: 'umb-tree-picker-modal',
+    /* Umbraco 19 opens documents in their own picker (Browse and Search tabs), not the tree picker. */
+    documentPickerModal: 'umb-document-picker-modal',
     mediaPickerModal: 'umb-media-picker-modal'
   };
 

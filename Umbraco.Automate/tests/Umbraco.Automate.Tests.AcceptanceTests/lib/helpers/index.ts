@@ -10,7 +10,6 @@ export { CmsContentApiHelper } from './CmsContentApiHelper';
 export type { TestMedia, TestPage } from './CmsContentApiHelper';
 export { ConnectionApiHelper } from './ConnectionApiHelper';
 export { LibraryApiHelper } from './LibraryApiHelper';
-export { ContentApiHelper } from './ContentApiHelper';
 export { ConstantHelper } from './ConstantHelper';
 export { ServiceAccountApiHelper } from './ServiceAccountApiHelper';
 export { test } from './testExtension';

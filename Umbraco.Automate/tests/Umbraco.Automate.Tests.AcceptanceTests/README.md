@@ -65,7 +65,6 @@ npx playwright test -g "loads the Automate section"
 | `lib/helpers/CatalogueApiHelper.ts` | The installed step types — names and output descriptions specs read instead of hard-coding |
 | `lib/helpers/WorkspaceApiHelper.ts` | Automate management API — workspaces |
 | `lib/helpers/ConnectionApiHelper.ts` | Automate management API — connections |
-| `lib/helpers/ContentApiHelper.ts` | Read-only lookup of content already on the demo site (a published key for Get Content runs) |
 | `lib/helpers/ServiceAccountApiHelper.ts` | Service accounts (CMS users of kind Api) |
 | `lib/helpers/testExtension.ts` | The Playwright fixtures |
 

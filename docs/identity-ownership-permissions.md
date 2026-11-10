@@ -489,11 +489,9 @@ An extension method in `AutomationActionAuthorizerExtensions`,
 - **Triggers** check Read (`Umb.Element.Read`) on the element at dispatch, with
   the explicit-user `AuthorizeElementAsync` overload. See "Built-in CMS
   node-scoped authorisation" above.
-- **Fail-closed defaults.** The three element members have default interface
-  implementations that deny access, so an existing implementation of the
-  interface keeps compiling and cannot grant Library access by accident. The
-  defaults are marked `TODO (V19)` for removal. `AutomationActionAuthorizer`
-  implements all three.
+- **No default implementations.** Every implementation of the interface must
+  implement the three element members. `AutomationActionAuthorizer` implements
+  all three.
 
 **Trashed elements and folders.** Same rule as content and media. The recycle
 bin path prefix is `-1,-22,`. An account confined to a start node cannot see

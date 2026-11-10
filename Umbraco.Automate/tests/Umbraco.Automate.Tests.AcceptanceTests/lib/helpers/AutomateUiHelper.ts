@@ -786,8 +786,11 @@ export class AutomateUiHelper {
     return this.settingsField(key).locator('umb-property-layout');
   }
 
+  /* The open CMS picker a settings field launched. Documents use their own picker on Umbraco 19;
+   * Library elements and folders, and document types, still use the tree picker. Both list nodes
+   * as `uui-menu-item`s and confirm with the primary button, so one locator serves either. */
   get documentPickerModal(): Locator {
-    return this.page.locator(ConstantHelper.elements.treePickerModal);
+    return this.page.locator(`${ConstantHelper.elements.documentPickerModal}, ${ConstantHelper.elements.treePickerModal}`);
   }
 
   /**
