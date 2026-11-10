@@ -5,6 +5,60 @@ All notable changes to Umbraco.Automate will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.6.0](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.5.1...Umbraco.Automate@17.6.0) (2026-11-09)
+
+### feat
+
+* **action:** Declare Found and Not found outcomes on Get Content ([2a76811](https://github.com/umbraco/Umbraco.Automate/commit/2a7681182010a7680b449dc247569327bd8ed64c))
+* **action:** Declare outcomes on the content actions ([1a6db11](https://github.com/umbraco/Umbraco.Automate/commit/1a6db118cd0a4cd472f21fba2e34cbbc87d5bd53))
+* **action:** Declare outcomes on the media actions ([342cb35](https://github.com/umbraco/Umbraco.Automate/commit/342cb354f8ac06765cacacca1c4f322e301f4f16))
+* **action:** Let Send Email set Reply-To, CC and BCC addresses ([a86f8a3](https://github.com/umbraco/Umbraco.Automate/commit/a86f8a38094606beddb89b289f8054ad59756d87))
+* **action:** Route deleted content to Get Content's Not found exit ([8821517](https://github.com/umbraco/Umbraco.Automate/commit/8821517c1005c4ba4169ec5c6d6496b773c2a743))
+* **api:** Add endpoint to resolve a step's outcomes from settings ([514e6bd](https://github.com/umbraco/Umbraco.Automate/commit/514e6bd480fb0ccdd199189c9e7709e9ab9b6676))
+* **api:** Add outcomes to catalogue step type items ([89773d6](https://github.com/umbraco/Umbraco.Automate/commit/89773d6a6bdc00c4ae64ed5c7ccba999af651114))
+* **api:** Return the exit taken on step runs ([709cd86](https://github.com/umbraco/Umbraco.Automate/commit/709cd8668d721330ead29210356f01f51676a3c5))
+* **automation:** Block publish on lines from missing outcomes ([4a8e99f](https://github.com/umbraco/Umbraco.Automate/commit/4a8e99f636867c81984dfee27530fee75be24da5))
+* **core:** Add a pooled DbContext factory that picks up a late connection string ([5935356](https://github.com/umbraco/Umbraco.Automate/commit/5935356b8b2847c2134c8da1d96bc883fbf256b2)), closes [#531](https://github.com/umbraco/Umbraco.Automate/issues/531)
+* **core:** Add an optional description to step outcomes ([dd282c2](https://github.com/umbraco/Umbraco.Automate/commit/dd282c286e4299f8adff3fc9e72e785c116c3112))
+* **core:** Add ContainsBinding string extension ([d4ef81f](https://github.com/umbraco/Umbraco.Automate/commit/d4ef81f541674da4f367ea5eabd68d6c458c3fbb))
+* **core:** Add StepOutcome and outcome members on step types ([d8ffd3b](https://github.com/umbraco/Umbraco.Automate/commit/d8ffd3bf930d68d97a0ab4ac03d328788d8f82f6))
+* **core:** Add StepOutcomeValidator for outcome declarations ([8b3d356](https://github.com/umbraco/Umbraco.Automate/commit/8b3d356ffe5fd649fe86fa1edea131e20700c80e))
+* **core:** Let the action test harness check outcomes ([ce4df05](https://github.com/umbraco/Umbraco.Automate/commit/ce4df0560c1d70282e06df3d2aaabe309cf7d296))
+* **core:** Persist the exit each step run took ([39e80a7](https://github.com/umbraco/Umbraco.Automate/commit/39e80a7d6dc080efcf240d3b186ce61bab77a7bf))
+* **frontend:** Load step outcomes in the catalogue ([a799ac8](https://github.com/umbraco/Umbraco.Automate/commit/a799ac8429a0e0d0ded5cf637a984e150bdfaed0))
+* **frontend:** Wire step outcomes into the automation canvas ([0f8469b](https://github.com/umbraco/Umbraco.Automate/commit/0f8469bc6557237de47c2b4e8716d56b61e7cff5))
+* **step:** Route action steps on their declared outcomes ([40bb517](https://github.com/umbraco/Umbraco.Automate/commit/40bb517e16235435040971a68a221034cda4571f))
+* **trigger:** Add application started trigger ([c023091](https://github.com/umbraco/Umbraco.Automate/commit/c0230917ac5d79e669648e7457253118334f66a9))
+* **ui:** Draw one exit per outcome on action nodes ([d192605](https://github.com/umbraco/Umbraco.Automate/commit/d192605e5ab8e0c76e7b4760068fd11dba4f3e2b))
+* **ui:** Let picker settings fields take a binding expression ([3303e6e](https://github.com/umbraco/Umbraco.Automate/commit/3303e6edaefdb0e5c36679d5a9f9b335d3454014)), closes [#83](https://github.com/umbraco/Umbraco.Automate/issues/83)
+* **ui:** Show the exit each step took in the run view ([6a79cb4](https://github.com/umbraco/Umbraco.Automate/commit/6a79cb4f2d78e80c4d5af20d36cd78030f8a1536))
+* **ui:** Update a step's exits when its settings change ([0b88146](https://github.com/umbraco/Umbraco.Automate/commit/0b8814675811153fe2dd01ed231ae50b3936dcca))
+
+### fix
+
+* **action:** Leave recycle-bin items out of Find Content results ([55e7e9a](https://github.com/umbraco/Umbraco.Automate/commit/55e7e9a58d72a8bd726adb7ef7cc683993df8b41)), closes [#513](https://github.com/umbraco/Umbraco.Automate/issues/513)
+* **action:** Read indexed tick dates in Find Content and Find Media ([a142bc5](https://github.com/umbraco/Umbraco.Automate/commit/a142bc5121b63721d9a97ed3962ebf7d146b4f7e)), closes [#536](https://github.com/umbraco/Umbraco.Automate/issues/536)
+* **action:** Refuse child types the parent's type doesn't allow in Create Content and Create Media ([d13b729](https://github.com/umbraco/Umbraco.Automate/commit/d13b729c6c167822d0a3b024e25cd3a957f6e44f)), closes [#515](https://github.com/umbraco/Umbraco.Automate/issues/515)
+* **action:** Stop a slow fetch from failing Run Script ([b345cd5](https://github.com/umbraco/Umbraco.Automate/commit/b345cd57602053a5eb9abbac15faf4fdd8b004fb))
+* **action:** Treat recycle-bin items as missing for every service account ([e777395](https://github.com/umbraco/Umbraco.Automate/commit/e77739584805183fbba63d072c1451218e2e9fac)), closes [#507](https://github.com/umbraco/Umbraco.Automate/issues/507)
+* **api:** Return 400 for invalid settings from output schema ([8778c28](https://github.com/umbraco/Umbraco.Automate/commit/8778c28712e2bb804c8ecafd712a21134ef29e20))
+* **api:** Write Management API dates with the invariant culture ([057721e](https://github.com/umbraco/Umbraco.Automate/commit/057721e8e1f8ab8d33a49375407e70a9cb9ba609)), closes [#523](https://github.com/umbraco/Umbraco.Automate/issues/523)
+* **automation:** Reject unknown binding filters when publishing ([7a7a29e](https://github.com/umbraco/Umbraco.Automate/commit/7a7a29ea6ce4dd8cb7aab9f5a93002c761f43ec4)), closes [#558](https://github.com/umbraco/Umbraco.Automate/issues/558)
+* **core:** Compare and format numbers with the invariant culture ([0c3ae83](https://github.com/umbraco/Umbraco.Automate/commit/0c3ae830c11a726c488adffc3ebc3a06f242af3f)), closes [#489](https://github.com/umbraco/Umbraco.Automate/issues/489)
+* **core:** Fail runs that use an unknown binding filter ([1efe09f](https://github.com/umbraco/Umbraco.Automate/commit/1efe09fff3629f06eab31657c5f292f588e637fb))
+* **core:** Hold runs and report the engine as down when startup recovery fails ([cda3bac](https://github.com/umbraco/Umbraco.Automate/commit/cda3bacf47b556352be129f2e72adb5e8009fa61))
+* **core:** Keep date strings as written in workflow data between steps ([26c2319](https://github.com/umbraco/Umbraco.Automate/commit/26c23190948a13d8fbadc6209ffb718acf35056b)), closes [#559](https://github.com/umbraco/Umbraco.Automate/issues/559)
+* **core:** Keep the site up when stuck-run recovery fails ([9649fe3](https://github.com/umbraco/Umbraco.Automate/commit/9649fe334943c55b274d6def2dc719d0360b329f)), closes [#569](https://github.com/umbraco/Umbraco.Automate/issues/569)
+* **core:** Let formatDate format ISO date strings ([0932aaf](https://github.com/umbraco/Umbraco.Automate/commit/0932aaf5d0363ef9111bf3675fce27e858e250f3)), closes [#517](https://github.com/umbraco/Umbraco.Automate/issues/517) [#538](https://github.com/umbraco/Umbraco.Automate/issues/538)
+* **core:** Persist loop iteration on step runs ([0e42fa6](https://github.com/umbraco/Umbraco.Automate/commit/0e42fa63c648e946ab40782a3906fa8f8216a0b7)), closes [#344](https://github.com/umbraco/Umbraco.Automate/issues/344)
+* **core:** Pick up Automate's connection string without a restart ([673ccd1](https://github.com/umbraco/Umbraco.Automate/commit/673ccd1d4d87313da54cc38ed8196ee4941185ca)), closes [#531](https://github.com/umbraco/Umbraco.Automate/issues/531)
+* **core:** Render dates in bindings as ISO 8601 on every server ([8f8a4e4](https://github.com/umbraco/Umbraco.Automate/commit/8f8a4e417ac914a3ff31087c0b9f7b4735397874)), closes [#517](https://github.com/umbraco/Umbraco.Automate/issues/517)
+* **core:** Skip scheduled triggers while the engine is down ([823bb93](https://github.com/umbraco/Umbraco.Automate/commit/823bb9315046f09553dc5fb5820b0f1f2ff423ef))
+* **frontend:** Re-create the canvas when its element is re-attached ([8ebcca1](https://github.com/umbraco/Umbraco.Automate/commit/8ebcca1ee2b17844713dab4bfad3c8462fa9cffb)), closes [#521](https://github.com/umbraco/Umbraco.Automate/issues/521)
+* **settings:** Read decimal configuration values with the invariant culture ([9f2547c](https://github.com/umbraco/Umbraco.Automate/commit/9f2547c8b0fa1882678998a821eeb986b88ec628)), closes [#516](https://github.com/umbraco/Umbraco.Automate/issues/516)
+* **ui:** Ignore programmatic canvas moves when persisting viewport ([f51b744](https://github.com/umbraco/Umbraco.Automate/commit/f51b744924aaa0c9a41dd092c7fc8cf790d8650b)), closes [#481](https://github.com/umbraco/Umbraco.Automate/issues/481)
+* **ui:** Keep Space and Backspace in code editors over the automation canvas ([5916f7f](https://github.com/umbraco/Umbraco.Automate/commit/5916f7fb350ed8487accf18e98e1de64e12620fe)), closes [#511](https://github.com/umbraco/Umbraco.Automate/issues/511)
+
 ## [17.5.1](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate@17.5.0...Umbraco.Automate@17.5.1) (2026-10-08)
 
 ### fix

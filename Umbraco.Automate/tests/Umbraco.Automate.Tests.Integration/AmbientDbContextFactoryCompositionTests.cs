@@ -25,7 +25,7 @@ namespace Umbraco.Automate.Tests.Integration;
 public class AmbientDbContextFactoryCompositionTests
 {
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_ReplacesTheResolvedFactory()
+    public void AddUmbracoAutomateDbContext_ReplacesTheResolvedFactory()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -34,7 +34,7 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_StillCreatesAWorkingContext()
+    public void AddUmbracoAutomateDbContext_StillCreatesAWorkingContext()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -53,7 +53,7 @@ public class AmbientDbContextFactoryCompositionTests
     /// enlisting and nothing else would notice.
     /// </summary>
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_KeepsThePooledFactoryReachableAsDetached()
+    public void AddUmbracoAutomateDbContext_KeepsThePooledFactoryReachableAsDetached()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -85,7 +85,7 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_KeepsTheTransientDbContextRegistrationWorking()
+    public void AddUmbracoAutomateDbContext_KeepsTheTransientDbContextRegistrationWorking()
     {
         ServiceProvider serviceProvider = BuildServiceProvider();
 
@@ -103,7 +103,7 @@ public class AmbientDbContextFactoryCompositionTests
     /// package does not own.
     /// </summary>
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_RegistersAnAmbientConnectionThatResolvesInAnUmbracoHost()
+    public void AddUmbracoAutomateDbContext_RegistersAnAmbientConnectionThatResolvesInAnUmbracoHost()
     {
         ServiceProvider serviceProvider = BuildServiceProvider(useRealAmbientConnection: true);
 
@@ -128,7 +128,7 @@ public class AmbientDbContextFactoryCompositionTests
     /// site; an ephemeral CI boot serving only <c>swagger.json</c>).
     /// </summary>
     [Fact]
-    public void EnlistDbContextFactoryInAmbientScope_DoesNotThrowWhenNoConnectionStringIsConfigured()
+    public void AddUmbracoAutomateDbContext_DoesNotThrowWhenNoConnectionStringIsConfigured()
     {
         ServiceProvider serviceProvider = BuildServiceProvider(configureConnectionString: false);
 
@@ -142,12 +142,36 @@ public class AmbientDbContextFactoryCompositionTests
     }
 
     /// <summary>
-    /// Replicates the persistence-layer registration block from
-    /// <c>UmbracoBuilderExtensions.AddUmbracoAutomatePersistence</c>. Kept in step with it by hand,
-    /// as <c>IUmbracoBuilder</c> is not constructible outside a full Umbraco host — except for the
-    /// pooled factory's options delegate, which is shared with production via
-    /// <c>AutomatePooledDbContextOptions.Configure</c> so this test exercises the real fallback
-    /// behaviour rather than a hand-copied approximation of it.
+    /// Released Umbraco.Automate.OpenIddict 17.1.5 calls this overload through InternalsVisibleTo, and
+    /// accepts any Core 17.x, so it must keep composing against newer Core.
+    /// </summary>
+    [Fact]
+    public void ObsoleteEnlistOverload_StillRegistersTheAmbientFactory()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new ConfigurationBuilder().Build());
+        services.AddLogging();
+        services.AddSingleton(Mock.Of<IAmbientAutomateConnection>());
+        services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
+            (_, options, _, _) => options.UseSqlite("Data Source=:memory:"),
+            shareUmbracoConnection: false);
+
+#pragma warning disable CS0618
+        services.EnlistDbContextFactoryInAmbientScope<UmbracoAutomateDbContext>(
+            (_, connection, _) => new UmbracoAutomateDbContext(
+                new DbContextOptionsBuilder<UmbracoAutomateDbContext>().UseSqlite(connection).Options));
+#pragma warning restore CS0618
+
+        services.BuildServiceProvider()
+            .GetRequiredService<IDbContextFactory<UmbracoAutomateDbContext>>()
+            .ShouldBeOfType<AmbientDbContextFactory<UmbracoAutomateDbContext>>();
+    }
+
+    /// <summary>
+    /// Builds a container with the DbContext registration <c>AddUmbracoAutomatePersistence</c> uses
+    /// (<c>AddUmbracoAutomateDbContext</c>), plus the few host services it depends on. The registration
+    /// itself is the production one, as <c>IUmbracoBuilder</c> is not constructible outside a full
+    /// Umbraco host.
     /// </summary>
     /// <param name="useRealAmbientConnection">
     /// When <c>true</c>, leaves <see cref="IAmbientAutomateConnection"/> to the extension and registers
@@ -190,18 +214,7 @@ public class AmbientDbContextFactoryCompositionTests
             services.AddSingleton(Mock.Of<IAmbientAutomateConnection>());
         }
 
-        services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-            AutomatePooledDbContextOptions.Configure,
-            shareUmbracoConnection: false);
-
-        services.EnlistDbContextFactoryInAmbientScope(
-            (_, connection, providerName) =>
-            {
-                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
-
-                return new UmbracoAutomateDbContext(options.Options);
-            });
+        services.AddUmbracoAutomateDbContext();
 
         return services.BuildServiceProvider();
     }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Umbraco.Automate.Core.Cms;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
@@ -33,6 +34,12 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     /// requested culture" cases, which the published cache reports uniformly.
     /// </summary>
     public const string OutcomeNotFound = "notFound";
+
+    /// <summary>
+    /// Outcome key for a successful read. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a found item leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
 
     private readonly IPublishedContentCache _publishedContentCache;
     private readonly IUmbracoContextFactory _umbracoContextFactory;
@@ -69,6 +76,14 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_found") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<GetContentSettings>();
@@ -84,9 +99,19 @@ public sealed class GetContentAction : ActionBase<GetContentSettings, GetContent
         // Node-level authorisation: section access is checked upstream by the middleware,
         // but the service account's start node / granular permissions may scope it to a
         // subset of the Content section. Reject reads outside the account's accessible path.
-        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        // A key the CMS reports as not existing (e.g. deleted) is not a permission problem, so
+        // it routes to the notFound outcome like an unpublished item does.
+        var authorization = await _authorizer.AuthorizeContentAsync(contentKey, RequiredPermissions, cancellationToken);
+        if (authorization.IsNotFound)
         {
-            return failure;
+            context.LogWarning($"Content {contentKey} was not found");
+
+            return SuccessWithOutcome(OutcomeNotFound, new GetContentOutput { ContentKey = contentKey });
+        }
+
+        if (!authorization.Authorized)
+        {
+            return authorization.ToFailedActionResult();
         }
 
         // Required when running from the outbox dispatcher, which has no HTTP request

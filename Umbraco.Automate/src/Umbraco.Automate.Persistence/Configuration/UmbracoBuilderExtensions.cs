@@ -1,10 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Execution;
@@ -24,7 +19,6 @@ using Umbraco.Automate.Persistence.Outbox;
 using Umbraco.Automate.Persistence.Runs;
 using Umbraco.Automate.Persistence.Versioning;
 using Umbraco.Automate.Persistence.Workflows;
-using Umbraco.Automate.Core.Persistence;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
 using Umbraco.Extensions;
@@ -42,40 +36,7 @@ public static partial class UmbracoBuilderExtensions
     /// </summary>
     public static IUmbracoBuilder AddUmbracoAutomatePersistence(this IUmbracoBuilder builder)
     {
-        // Resolve the connection string lazily inside the factory (run time), not here at
-        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
-        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
-        //
-        // shareUmbracoConnection: false — Automate defaults to its own database, and even when it is
-        // pointed at umbracoDbDSN nothing here resolves an IEfCoreScope<UmbracoAutomateDbContext>.
-        // Sharing the ambient connection is handled by AmbientAutomateDbContextFactory below, which
-        // decides per call rather than once at composition time.
-        builder.Services.AddUmbracoDbContext<UmbracoAutomateDbContext>(
-            AutomatePooledDbContextOptions.Configure,
-            shareUmbracoConnection: false);
-
-        // Decorate the pooled factory so that when Automate is pointed at the Umbraco CMS database
-        // (Umbraco:Automate:UseNamedConnectionString: umbracoDbDSN — the required setting on Umbraco
-        // Cloud, where the CMS connection string is not user-editable) its reads and writes join the
-        // ambient Umbraco transaction instead of opening a second connection to the same database.
-        // On SQLite a second connection cannot get the write lock the ambient scope is holding, which
-        // deadlocks any caller that keeps a transaction open across an Automate write — Umbraco
-        // Deploy's restore being the reported case. See AmbientDbContextFactory.
-        builder.Services.EnlistDbContextFactoryInAmbientScope(
-            (serviceProvider, connection, providerName) =>
-            {
-                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
-                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
-
-                // Mirrors the interceptor on the pooled factory, so a write is gated on Automate's
-                // startup migrations whichever path it takes — but with a timeout, because this path
-                // waits while holding the caller's transaction (and on SQLite, its write lock).
-                options.AddInterceptors(new AutomateReadinessInterceptor(
-                    serviceProvider.GetRequiredService<AutomateReadinessSignal>(),
-                    AutomateReadinessInterceptor.EnlistedWaitTimeout));
-
-                return new UmbracoAutomateDbContext(options.Options);
-            });
+        builder.Services.AddUmbracoAutomateDbContext();
 
         builder.Services.AddSingleton<AutomationFactory>();
         builder.Services.AddSingleton<ConnectionFactory>();
@@ -121,10 +82,47 @@ public static partial class UmbracoBuilderExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Registers the pooled <see cref="UmbracoAutomateDbContext"/> factory and enlists it in the ambient
+    /// Umbraco scope. Split out of <see cref="AddUmbracoAutomatePersistence"/> so the composition tests
+    /// exercise this exact registration instead of a hand-kept copy of it.
+    /// </summary>
+    internal static IServiceCollection AddUmbracoAutomateDbContext(this IServiceCollection services)
+    {
+        // See AddAutomatePooledDbContext for how the connection string is resolved and why sharing the
+        // ambient connection is decided per call. The enlisted context below is what lets Automate
+        // join the ambient Umbraco transaction when it is pointed at umbracoDbDSN; on SQLite a second
+        // connection would deadlock on the held write lock (Umbraco Deploy restore).
+        services.AddAutomatePooledDbContext<UmbracoAutomateDbContext>(
+            AutomatePooledDbContextOptions.Configure,
+            (serviceProvider, connection, providerName) =>
+            {
+                var options = new DbContextOptionsBuilder<UmbracoAutomateDbContext>();
+                UmbracoAutomateDbContext.ConfigureProvider(options, connection, providerName);
+
+                // Mirrors the interceptor on the pooled factory, so a write is gated on Automate's
+                // startup migrations whichever path it takes — but with a timeout, because this path
+                // waits while holding the caller's transaction (and on SQLite, its write lock).
+                options.AddInterceptors(new AutomateReadinessInterceptor(
+                    serviceProvider.GetRequiredService<AutomateReadinessSignal>(),
+                    AutomateReadinessInterceptor.EnlistedWaitTimeout));
+
+                return new UmbracoAutomateDbContext(options.Options);
+            },
+            placeholderWarning:
+                "Umbraco Automate has no database connection string configured yet. Automate stays " +
+                "inactive until one is configured. A connection string added by the installer is picked " +
+                "up straight away; one added any other way needs the application to restart.",
+            foundMessage: "Umbraco Automate found its database connection string and is now using it.",
+            loggerCategory: "Umbraco.Automate.Extensions.UmbracoBuilderExtensions");
+
+        return services;
+    }
 }
 
 /// <summary>
-/// Configures the pooled <see cref="UmbracoAutomateDbContext"/> factory's options.
+/// Applies the provider setup for the pooled <see cref="UmbracoAutomateDbContext"/> factory.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -136,22 +134,11 @@ public static partial class UmbracoBuilderExtensions
 /// do. A distinctly-named type sidesteps that.
 /// </para>
 /// <para>
-/// Resolve the connection string lazily inside the factory (run time), not at composition time:
-/// hosts like Umbraco Cloud / Deploy synthesise the DSN through the ConnectionStrings options
-/// pipeline, which has not run yet during AddComposers(). But "lazily" only reaches as far as
-/// <c>AddPooledDbContextFactory</c> allows — it builds this delegate's
-/// <see cref="DbContextOptionsBuilder"/> the moment something first resolves
-/// <c>IDbContextFactory&lt;UmbracoAutomateDbContext&gt;</c>, not per <c>CreateDbContext()</c> call.
-/// Automate's own background services (the outbox dispatcher, the WorkflowCore host, ...) are
-/// <c>IHostedService</c>s whose constructors reach that factory, and the generic host resolves every
-/// <c>IHostedService</c>'s constructor graph at <c>Host.StartAsync</c> — before Umbraco's runtime
-/// level is known. A genuinely unconfigured connection string (a fresh, not-yet-installed site; an
-/// ephemeral CI boot serving only <c>swagger.json</c>) must not throw here, unlike
-/// <see cref="AutomateSchemaInitializer"/>, which only ever resolves once <c>RuntimeLevel.Run</c> is
-/// confirmed. Falling back to <see cref="DatabaseConnectionInfo.PlaceholderConnection"/> defers the
-/// failure instead: nothing reads or writes through the resulting context before
-/// <see cref="AutomateReadinessSignal"/> is signalled, which never happens below that level.
-/// See <see href="https://github.com/umbraco/Umbraco.Automate/issues/226"/>.
+/// Resolving the connection string, the placeholder fallback for a not-yet-configured site and the
+/// switch to the real connection string once it appears all live in
+/// <c>AddAutomatePooledDbContext</c> and <c>ResolvingPooledDbContextFactory</c>
+/// (see <see href="https://github.com/umbraco/Umbraco.Automate/issues/531"/>). This only configures the
+/// provider for whichever connection string they hand it.
 /// </para>
 /// </remarks>
 internal static class AutomatePooledDbContextOptions
@@ -159,31 +146,9 @@ internal static class AutomatePooledDbContextOptions
     internal static void Configure(
         IServiceProvider serviceProvider,
         DbContextOptionsBuilder options,
-        string? cmsConnectionString,
-        string? cmsProviderName)
+        string connectionString,
+        string providerName)
     {
-        string connectionString;
-        string providerName;
-        try
-        {
-            (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
-                serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                serviceProvider.GetRequiredService<IConfiguration>());
-        }
-        catch (InvalidOperationException ex)
-        {
-            (connectionString, providerName) = DatabaseConnectionInfo.PlaceholderConnection;
-
-            // GetService, not GetRequiredService: this catch block exists so a missing connection
-            // string can never crash the host, so logging it must not risk crashing the host either.
-            (serviceProvider.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance)
-                .CreateLogger("Umbraco.Automate.Extensions.UmbracoBuilderExtensions")
-                .LogWarning(
-                    ex,
-                    "Umbraco Automate has no database connection string configured yet. Automate will " +
-                    "remain inactive until one is configured and the host restarts into RuntimeLevel.Run.");
-        }
-
         UmbracoAutomateDbContext.ConfigureProvider(options, connectionString, providerName);
 
         // Defer writes on this (DI-resolved) context until Automate's own startup migrations

@@ -13,7 +13,9 @@ public sealed class GetMediaSettings
     /// </summary>
     [Field(
         Label = "Media Key",
-        Description = "The key of the media item to fetch.",
+        Description = "The media item to fetch.",
+        EditorUiAlias = Constants.EditorUiAliases.MediaKeyPicker,
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }, { "alias": "folderFilter", "value": "filesOnly" }]""",
         SupportsBindings = true)]
     public string MediaKey { get; set; } = string.Empty;
 

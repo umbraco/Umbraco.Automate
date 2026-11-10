@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,6 +14,7 @@ using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -80,7 +82,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Resume path: workflow is resuming after Sleep with persisted data.
         if (context.PersistenceData is SleepPersistenceData sleepData)
         {
-            return await HandleSleepResumeAsync(sleepData, data, cancellationToken);
+            return await HandleSleepResumeAsync(sleepData, context, cancellationToken);
         }
 
         // Resume path: workflow is resuming after WaitForEvent with the event data.
@@ -194,6 +196,31 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Execute through the middleware pipeline with the timeout-linked token.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
 
+        // Map what the action returned onto the exit the run follows. Done before the log entries
+        // are captured so a warning about an undeclared outcome lands in the step's run log. A
+        // broken declaration or a missing outcome turns the result into a Validation failure, which
+        // the Failed handling below records and (being a terminal category) never retries.
+        var routedOutcome = result.Outcome;
+        if (result.Status == ActionResultStatus.Success && result.Suspension is null)
+        {
+            var routing = await ResolveOutcomeRoutingAsync(result.Outcome, cancellationToken, stepCancellationToken);
+            if (routing.FailureMessage is not null)
+            {
+                result = ActionResult.Failed(new ValidationException(routing.FailureMessage), StepRunErrorCategory.Validation);
+            }
+            else
+            {
+                routedOutcome = routing.Outcome;
+                if (routing.UndeclaredOutcomeWarning is not null)
+                {
+                    actionContext.LogWarning(routing.UndeclaredOutcomeWarning);
+                    _logger.LogWarning(
+                        "Action '{ActionAlias}' returned outcome '{Outcome}', which it does not declare, for step {StepId}",
+                        _action.Alias, routedOutcome, _stepConfig.Id);
+                }
+            }
+        }
+
         // Capture any log entries the action recorded, regardless of outcome. Reads from
         // the same ActionContext instance the pipeline just executed — ErrorHandlingMiddleware
         // catches exceptions on this same context, so entries recorded before a throw survive
@@ -250,6 +277,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             case ActionResultStatus.Success:
                 stepRun.Status = StepRunStatus.Completed;
+                stepRun.BranchOutcome = routedOutcome;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 _metrics.StepExecuted(_action.Alias);
                 break;
@@ -281,13 +309,49 @@ internal sealed class ActionStepBody : StepBodyAsync
             throw SelectFailureToThrow(exception, result.ErrorCategory ?? StepRunErrorCategory.Unknown, context);
         }
 
-        // If the action returned a named outcome, route via WorkflowCore's outcome matching.
-        if (result.Status == ActionResultStatus.Success && result.Outcome is not null)
+        // Route via WorkflowCore's outcome matching: the action's own outcome, or the default
+        // exit it declared when it returned none.
+        if (result.Status == ActionResultStatus.Success && routedOutcome is not null)
         {
-            return ExecutionResult.Outcome(result.Outcome);
+            return ExecutionResult.Outcome(routedOutcome);
         }
 
         return ExecutionResult.Next();
+    }
+
+    /// <summary>
+    /// Works out which exit a successful action result follows, from the step's saved, unbound
+    /// settings (never the binding-resolved settings the action ran with) so run time agrees with
+    /// what the author published. The rule itself lives in <see cref="StepOutcomeRouter"/>.
+    /// </summary>
+    /// <param name="returnedOutcome">The outcome the action returned, or <c>null</c> for none.</param>
+    /// <param name="cancellationToken">The workflow host's token. Its cancellation is a real cancellation and escapes.</param>
+    /// <param name="stepCancellationToken">
+    /// The step's timeout-linked token, so a step type whose outcome list hangs is bounded by the
+    /// step timeout like the action itself. Running out of time is reported as a routing failure.
+    /// </param>
+    private async Task<StepOutcomeRouting> ResolveOutcomeRoutingAsync(
+        string? returnedOutcome,
+        CancellationToken cancellationToken,
+        CancellationToken stepCancellationToken)
+    {
+        StepOutcomeRouting routing;
+        try
+        {
+            routing = await StepOutcomeRouter.ResolveAsync(_action, _stepConfig.Settings, returnedOutcome, stepCancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            routing = StepOutcomeRouting.Failure(
+                $"Action '{_action.Alias}' could not list its outcomes before the step timed out.", ex);
+        }
+
+        if (routing.Exception is not null)
+        {
+            _logger.LogError(routing.Exception, "Action '{ActionAlias}' could not list its outcomes for step {StepId}", _action.Alias, _stepConfig.Id);
+        }
+
+        return routing;
     }
 
     /// <summary>
@@ -496,13 +560,16 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             var approved = decision.Outcome == ApprovalOutcome.Approved;
 
+            var outcome = approved
+                ? RequestApprovalAction.ApprovedOutcome
+                : RequestApprovalAction.RejectedOutcome;
+
             stepRun.Status = approved ? StepRunStatus.Completed : StepRunStatus.Rejected;
+            stepRun.BranchOutcome = outcome;
             await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
             _metrics.StepExecuted(_action.Alias);
 
-            return ExecutionResult.Outcome(approved
-                ? RequestApprovalAction.ApprovedOutcome
-                : RequestApprovalAction.RejectedOutcome);
+            return ExecutionResult.Outcome(outcome);
         }
 
         // No decision on the event — the step was resumed by something that is not an approval
@@ -629,7 +696,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
     private async Task<ExecutionResult> HandleSleepResumeAsync(
         SleepPersistenceData sleepData,
-        AutomationWorkflowData data,
+        IStepExecutionContext context,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Step {StepId} resumed after sleep", sleepData.StepId);
@@ -643,7 +710,13 @@ internal sealed class ActionStepBody : StepBodyAsync
             return ExecutionResult.Next();
         }
 
-        stepRun.Status = StepRunStatus.Completed;
+        // A sleeping action can't name an outcome, so it finishes on its default exit, the same as
+        // an action that succeeds without naming one. Without this, an action that declares outcomes
+        // would resume with no outcome and none of its named lines would run.
+        using var routingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        routingCts.CancelAfter(_executionOptions.Value.DefaultTimeout);
+        var routing = await ResolveOutcomeRoutingAsync(returnedOutcome: null, cancellationToken, routingCts.Token);
+
         stepRun.CompletedUtc = DateTime.UtcNow;
         stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
 
@@ -652,10 +725,23 @@ internal sealed class ActionStepBody : StepBodyAsync
             _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
         }
 
+        if (routing.FailureMessage is not null)
+        {
+            stepRun.Status = StepRunStatus.Failed;
+            stepRun.Error = routing.FailureMessage;
+            stepRun.ErrorCategory = StepRunErrorCategory.Validation;
+            _metrics.StepFailed(_action.Alias);
+            await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
+
+            throw SelectFailureToThrow(new ValidationException(routing.FailureMessage), StepRunErrorCategory.Validation, context);
+        }
+
+        stepRun.Status = StepRunStatus.Completed;
+        stepRun.BranchOutcome = routing.Outcome;
         _metrics.StepExecuted(_action.Alias);
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
-        return ExecutionResult.Next();
+        return routing.Outcome is null ? ExecutionResult.Next() : ExecutionResult.Outcome(routing.Outcome);
     }
 
     private void StoreOutputData(

@@ -1,4 +1,5 @@
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Extensions;
 
 namespace Umbraco.Automate.Core.Security;
 
@@ -23,9 +24,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeContentAsync(contentKey, ToSet(permissions), cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -41,9 +40,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeMediaAsync(mediaKey, cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -59,9 +56,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeContentRootAsync(ToSet(permissions), cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -75,9 +70,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeMediaRootAsync(cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -96,9 +89,7 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeContentParentAsync(parentKey, ToSet(permissions), cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
     /// <summary>
@@ -115,12 +106,10 @@ public static class AutomationActionAuthorizerExtensions
         var result = await authorizer.AuthorizeMediaParentAsync(parentKey, cancellationToken);
         return result.Authorized
             ? null
-            : ActionResult.Failed(
-                new UnauthorizedAccessException(result.FailureReason),
-                StepRunErrorCategory.Authentication);
+            : result.ToFailedActionResult();
     }
 
-    private static IReadOnlySet<string> ToSet(IReadOnlyList<string> permissions)
+    internal static IReadOnlySet<string> ToSet(IReadOnlyList<string> permissions)
         => permissions.Count == 0
             ? EmptyPermissionSet
             : new HashSet<string>(permissions, StringComparer.Ordinal);

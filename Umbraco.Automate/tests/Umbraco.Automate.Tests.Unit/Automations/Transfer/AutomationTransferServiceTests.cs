@@ -1,6 +1,7 @@
 using System.Data;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
@@ -70,7 +71,8 @@ public class AutomationTransferTests
                 new WebhookAuthenticatorCollection(() => []),
                 new NotificationChannelCollection(() => [])),
             new SectionAccessChecker(),
-            Mock.Of<IConfigurationReferenceResolver>());
+            Mock.Of<IConfigurationReferenceResolver>(),
+            new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
     }
 
     #region Export Tests

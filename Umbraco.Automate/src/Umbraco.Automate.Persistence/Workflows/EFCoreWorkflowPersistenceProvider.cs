@@ -25,6 +25,12 @@ internal sealed class EFCoreWorkflowPersistenceProvider : IPersistenceProvider
     {
         TypeNameHandling = TypeNameHandling.All,
         ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+
+        // Keep ISO-looking strings as strings. The default (DateTime) turns a string with a UTC
+        // offset into server local time and drops the offset, so inline trigger and step outputs
+        // read differently inside steps than at the trigger edge or when offloaded (#559).
+        // Properties declared as DateTime still deserialize to DateTime.
+        DateParseHandling = DateParseHandling.None,
     };
 
     // Storage format for the WorkflowInstance.Data column. Version 0 (legacy) stored the whole

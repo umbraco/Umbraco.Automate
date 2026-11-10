@@ -12,6 +12,7 @@
 | **Step** | A configured instance of an action within an automation | Backoffice user |
 | **Inputs** | Runtime data flowing into a step (from settings + mapped outputs) | System |
 | **Outputs** | Runtime data produced by a step for downstream steps | System |
+| **Outcome** | A named exit an action can finish through, so each result can lead to its own next step | Provider author |
 | **Filter** | Conditional logic controlling step execution / branching | Backoffice user |
 | **Run** | A single execution of an automation | System |
 
@@ -112,6 +113,22 @@ person configuring an automation. All of this repo's built-in triggers and actio
 same convention — see `Umbraco.Automate.Core/Actions/BuiltIn/*Output.cs` and
 `Umbraco.Automate.Core/Triggers/BuiltIn/*Output.cs` for examples.
 
+### Outcome
+
+A named exit that an action declares for a successful result, such as "Found" or "Not found". Each outcome is an exit on the step, and the author connects each exit to its own next step. A run leaves a step through one outcome. An action that declares no outcomes keeps a single exit.
+
+An outcome has a stable **key** (saved on the connection) and a **label** (display text, either a `#key` localization key or literal text), and an optional **description** (the exit's tooltip, in the same `#key`-or-literal form). An action can mark at most one outcome as the **default outcome**, which is the one taken when the action succeeds without naming an outcome.
+
+An automation saved before its action declared outcomes may have an unnamed connection from that step. It still runs on every result, and the canvas shows it as an **Any result** exit. A named connection whose outcome the step no longer declares shows as a **Missing outcome** exit and blocks publish.
+
+Outcomes route on success only. The exit a step took is recorded on its step run and shown in the run view.
+
+- **Level:** Definition (declared by the action), Instance (the connection drawn from it)
+- **Who creates it:** Provider author
+- **Examples:** Get Content declares `success` (default, "Found") and `notFound` ("Not found")
+- **WorkflowCore mapping:** `ExecutionResult.Outcome(key)` routed to the connection's `ValueOutcome`
+- **Developer guide:** see "Outcomes (Named Exits)" in [engineering-spec.md](engineering-spec.md)
+
 ### Filter
 
 Conditional logic that controls whether a step executes or which path an automation takes. Filters evaluate bindings against the current data context.
@@ -139,6 +156,7 @@ Automation (user-created)
   has many  -->  Step    (configured instance of an Action, with Settings values)
                    each step has --> Inputs  (from settings + mapped outputs)
                    each step has --> Outputs (produced at runtime)
+                   each step has --> Outcomes (declared exits, one taken per run)
 
 Run (single execution)
   tracks    -->  Status per step
@@ -163,5 +181,6 @@ Run (single execution)
 
 - **Settings vs Inputs/Outputs:** Settings describe the static configuration shape of an action (schema-driven, UI-rendered). Inputs and outputs describe the runtime data flowing between steps during a run. A step's inputs are derived from its settings values, which may include dynamic mappings to previous step outputs.
 - **Action vs Step:** An action is a definition (what it does). A step is an instance (a specific usage of an action within an automation, with configured settings values). This mirrors the class vs instance distinction.
+- **Outcome vs Output:** Outputs are data a step produces for later steps to bind to. An outcome is which exit the step leaves through, and so which step runs next. An action that makes one decision usually does both: the answer in its output, and the matching outcome.
 - **Trigger vs Action:** Triggers are a specialisation of the action concept. They share the same settings model pattern but are distinguished by their role as the entry point of an automation.
 - **Provider-driven architecture:** The system is extensible by design. Providers register actions and triggers via a collection builder pattern, consistent with Umbraco's existing composition model. The settings UI is generated automatically from the settings model using the EditableModels infrastructure (shared with Umbraco.AI).
