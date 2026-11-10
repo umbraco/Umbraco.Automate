@@ -140,7 +140,7 @@
   Acceptance: `Analytics/analytics.navigation.spec.ts` AN-8 AC3 and AC5 green.
   depends-on: T17
 
-- [ ] **T19** - **wire: Analytics into the backoffice.** story: AN-8 (AC1 to AC3). End to end on the v19 demo site with real runs:
+- [x] **T19** - **wire: Analytics into the backoffice.** story: AN-8 (AC1 to AC3). End to end on the v19 demo site with real runs:
   - open Analytics from the sidebar and from Overview
   - every box loads real data
   - the screen matches the mockups
