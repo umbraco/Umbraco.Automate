@@ -111,21 +111,19 @@ dotnet new umbraco --force -n "Umbraco.Automate.DemoSite" --friendly-name "Admin
 Pop-Location
 
 # Step 3.1: Install Clean starter kit
-# Clean's major version does not match the CMS major — map explicitly and add
+# Clean's major version matched the CMS major only from v19 — map explicitly and add
 # new entries as majors are released. Floating patterns keep multi-version installs correct:
-#   17 -> 7.*   (stable)
-#   18 -> 8.*-* (the CMS-v18-compatible Clean, e.g. 8.0.0-rc1, is still prerelease)
-#   19 -> none   (no Clean release supports CMS 19 yet; skipped until one ships)
+#   17 -> 7.*    (stable)
+#   18 -> 8.*-*  (the CMS-v18-compatible Clean, e.g. 8.0.0-rc1, is still prerelease)
+#   19 -> 19.*-* (Clean 19 follows the CMS major; still prerelease, e.g. 19.0.0-beta01)
 $cleanVersionMap = @{
     "17" = "7.*"
     "18" = "8.*-*"
-    "19" = $null
+    "19" = "19.*-*"
 }
 $cleanVersion = $cleanVersionMap["$VersionMajor"]
 Push-Location $DemoSiteDir
-if ($cleanVersionMap.ContainsKey("$VersionMajor") -and -not $cleanVersion) {
-    Write-Host "Skipping Clean starter kit: no Clean release supports CMS v$VersionMajor yet." -ForegroundColor Yellow
-} elseif ($cleanVersion) {
+if ($cleanVersion) {
     Write-Host "Installing Clean starter kit..." -ForegroundColor Green
     dotnet add package Clean --version $cleanVersion
 } else {

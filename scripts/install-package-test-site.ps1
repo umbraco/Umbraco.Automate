@@ -110,15 +110,27 @@ $devSettings.ConnectionStrings | Add-Member -NotePropertyName "umbracoAutomateDb
 
 $devSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $devSettingsPath -Encoding utf8 -Force
 
-# Step 5: Install Clean starter kit (none supports CMS 19 yet; skipped until one ships)
-if ($VersionMajor -eq 19) {
-    Write-Host "Skipping Clean starter kit: no Clean release supports CMS v$VersionMajor yet." -ForegroundColor Yellow
+# Step 5: Install Clean starter kit
+# Map each CMS major to a Clean version, as install-demo-site does. An empty value means
+# the latest stable (17 and 18); 19 needs a floating prerelease pattern while Clean 19 is
+# in beta. Add new entries as majors are released.
+$cleanVersionMap = @{
+    "17" = ""
+    "18" = ""
+    "19" = "19.*-*"
+}
+Push-Location "demos\v$VersionMajor\$SiteName"
+if (-not $cleanVersionMap.ContainsKey("$VersionMajor")) {
+    Write-Host "Warning: No Clean version mapping for v$VersionMajor, using latest stable." -ForegroundColor Yellow
+    dotnet add package Clean
+} elseif ($cleanVersionMap["$VersionMajor"]) {
+    Write-Host "Installing Clean starter kit..." -ForegroundColor Green
+    dotnet add package Clean --version $cleanVersionMap["$VersionMajor"]
 } else {
     Write-Host "Installing Clean starter kit..." -ForegroundColor Green
-    Push-Location "demos\v$VersionMajor\$SiteName"
     dotnet add package Clean
-    Pop-Location
 }
+Pop-Location
 
 # Step 6: Configure NuGet sources and PackageSourceMapping
 Write-Host "Configuring NuGet sources and package routing..." -ForegroundColor Green
@@ -163,10 +175,11 @@ if ($Feed -eq "release") {
       <package pattern="Umbraco.Automate.*" />
       <package pattern="Umbraco" />
       <package pattern="Umbraco.*" />
-      <package pattern="Clean" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />
+      <package pattern="Clean" />
+      <package pattern="Clean.*" />
       <package pattern="Umbraco.Automate" />
       <package pattern="Umbraco.Automate.*" />
     </packageSource>

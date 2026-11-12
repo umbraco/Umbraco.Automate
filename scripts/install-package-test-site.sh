@@ -135,15 +135,29 @@ pushd "demos/v${VERSION_MAJOR}" > /dev/null
 dotnet new umbraco --force -n "$SITE_NAME" --friendly-name "Administrator" --email "admin@example.com" --password "password1234" --development-database-type SQLite
 popd > /dev/null
 
-# Step 4: Install Clean starter kit (none supports CMS 19 yet; skipped until one ships)
-if [ "$VERSION_MAJOR" = "19" ]; then
-    echo "Skipping Clean starter kit: no Clean release supports CMS v$VERSION_MAJOR yet."
+# Step 4: Install Clean starter kit
+# Map each CMS major to a Clean version, as install-demo-site does. An empty value means
+# the latest stable (17 and 18); 19 needs a floating prerelease pattern while Clean 19 is
+# in beta. Add new entries as majors are released.
+CLEAN_MAPPED=true
+case "$VERSION_MAJOR" in
+    17) CLEAN_VERSION="" ;;
+    18) CLEAN_VERSION="" ;;
+    19) CLEAN_VERSION="19.*-*" ;;
+    *)  CLEAN_VERSION=""; CLEAN_MAPPED=false ;;
+esac
+pushd "demos/v${VERSION_MAJOR}/$SITE_NAME" > /dev/null
+if [ "$CLEAN_MAPPED" = false ]; then
+    echo "Warning: No Clean version mapping for v$VERSION_MAJOR, using latest stable."
+    dotnet add package Clean
+elif [ -n "$CLEAN_VERSION" ]; then
+    echo "Installing Clean starter kit..."
+    dotnet add package Clean --version "$CLEAN_VERSION"
 else
     echo "Installing Clean starter kit..."
-    pushd "demos/v${VERSION_MAJOR}/$SITE_NAME" > /dev/null
     dotnet add package Clean
-    popd > /dev/null
 fi
+popd > /dev/null
 
 # Step 5: Configure NuGet sources and PackageSourceMapping
 echo "Configuring NuGet sources and package routing..."
@@ -192,10 +206,11 @@ else
       <package pattern="Umbraco.Automate.*" />
       <package pattern="Umbraco" />
       <package pattern="Umbraco.*" />
-      <package pattern="Clean" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />
+      <package pattern="Clean" />
+      <package pattern="Clean.*" />
     </packageSource>
   </packageSourceMapping>
 </configuration>
