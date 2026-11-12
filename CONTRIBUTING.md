@@ -52,7 +52,7 @@ All long-term branches are **version-prefixed** with `vN`, where `N` is the CMS 
 
 | CMS Version | Type | Branches                  | Policy                |
 | ----------- | ---- | ------------------------- | --------------------- |
-| v19         | STS  | `v19/dev` / `v19/main`    | Features + bug fixes; ships as 19.0.0-beta pre-releases until CMS 19 is stable |
+| v19         | STS  | `v19/dev` / `v19/main`    | Features + bug fixes; ships as 19.0.0 pre-releases (beta, rc1) until CMS 19 is stable |
 | v18         | STS  | `v18/dev` / `v18/main`    | Features + bug fixes  |
 | v17         | LTS  | `v17/dev` / `v17/main`    | Features + bug fixes  |
 

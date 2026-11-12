@@ -182,7 +182,7 @@ Automations follow a draft/published lifecycle consistent with the Umbraco conte
 ## Target Framework
 
 - .NET 11.0 (`net11.0`)
-- Umbraco CMS 19.x (minimum `19.0.0-beta1`, no upper bound; see `Directory.Packages.props`)
+- Umbraco CMS 19.x (minimum `19.0.0-rc1`, no upper bound; see `Directory.Packages.props`)
 - WorkflowCore 3.9.0
 - EF Core 11.x
 - Central Package Management via `Directory.Packages.props`

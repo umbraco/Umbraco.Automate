@@ -7,7 +7,7 @@
         "build": "tsc && vite build"
     },
     "dependencies": {
-        "@umbraco-cms/backoffice": "^19.0.0-beta1"
+        "@umbraco-cms/backoffice": "^19.0.0-rc1"
     },
     "devDependencies": {
         "typescript": "^5.9.2",

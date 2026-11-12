@@ -179,9 +179,9 @@ acceptance suite is deliberately **outside** the root workspaces, with its own l
 
 ## Keep the helper package aligned to the CMS range
 
-`package.json` must track `Umbraco.Cms.Core` in `Directory.Packages.props` (currently 19.0.0-beta1):
+`package.json` must track `Umbraco.Cms.Core` in `Directory.Packages.props` (currently 19.0.0-rc1):
 `@umbraco-cms/acceptance-test-helpers` and the `@umbraco-cms/backoffice` devDep are both pinned
-`^19.0.0-beta1` so they float within the major. A stale pin can drift helper behaviour against the
+`^19.0.0-rc1` so they float within the major. A stale pin can drift helper behaviour against the
 running site. Bumping affects the **whole** suite — re-run everything after a bump.
 
 ## Playwright version pin
