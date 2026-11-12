@@ -1,6 +1,6 @@
 {
     "name": "umbraco-automate-monorepo",
-    "version": "19.0.0-beta",
+    "version": "19.0.0-rc1",
     "private": true,
     "description": "Root package for Umbraco.Automate frontend development",
     "engines": {

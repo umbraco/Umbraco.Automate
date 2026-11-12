@@ -16,29 +16,29 @@
   <!-- Ships ContentPublishedNotification.PublishedCultures / ContentSavedNotification.SavedCultures /
        ContentUnpublishedNotification.UnpublishedCultures (umbraco/Umbraco-CMS#23313), which the content triggers consume. -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Cms.Core" Version="19.0.0-beta1" />
-    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="19.0.0-beta1" />
-    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="19.0.0-beta1" />
-    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="19.0.0-beta1" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="19.0.0-beta1" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="19.0.0-beta1" />
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="19.0.0-beta1" />
+    <PackageVersion Include="Umbraco.Cms.Core" Version="19.0.0-rc1" />
+    <PackageVersion Include="Umbraco.Cms.Infrastructure" Version="19.0.0-rc1" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="19.0.0-rc1" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="19.0.0-rc1" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="19.0.0-rc1" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.SqlServer" Version="19.0.0-rc1" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore.Sqlite" Version="19.0.0-rc1" />
     <!-- Test-only (never shipped): the real Umbraco Search provider the Find Content / Find Media tests run against.
          Must equal the Umbraco.Cms.* version above; bump them together. -->
-    <PackageVersion Include="Umbraco.Cms.Search.Provider.Examine" Version="19.0.0-beta1" />
+    <PackageVersion Include="Umbraco.Cms.Search.Provider.Examine" Version="19.0.0-rc1" />
     <!-- Test-only (never shipped): Umbraco's own integration test base (NUnit), for tests that need a real CMS
          database. Same lock-step rule as above. -->
-    <PackageVersion Include="Umbraco.Cms.Tests.Integration" Version="19.0.0-beta1" />
+    <PackageVersion Include="Umbraco.Cms.Tests.Integration" Version="19.0.0-rc1" />
     <PackageVersion Include="NUnit3TestAdapter" Version="5.1.0" />
   </ItemGroup>
   <!-- OpenAPI (replaces Swashbuckle, which CMS v18 and later no longer ship transitively) -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[11.0.0-rc.3.26522.148, 11.999.999)" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[11.0.0, 11.999.999)" />
   </ItemGroup>
   <!-- Inter-product (Umbraco.Automate) -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[19.0.0-beta, 19.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[19.0.0-beta, 19.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="[19.0.0-rc1, 19.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.OpenIddict" Version="[19.0.0-rc1, 19.999.999)" />
   </ItemGroup>
   <!-- WorkflowCore (automation engine) -->
   <ItemGroup>
@@ -62,14 +62,14 @@
     <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="[7.7.2, 7.999.999)" />
   </ItemGroup>
   <!-- Shared dependencies -->
-  <!-- The 11.0.0-rc.3 floor matches the .NET runtime libraries Umbraco.Cms 19.0.0-beta1 bundles; keep in lockstep with the host CMS. -->
+  <!-- The 11.0.0 floor matches the .NET runtime libraries Umbraco.Cms 19.0.0-rc1 bundles; keep in lockstep with the host CMS. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[11.0.0-rc.3.26522.148, 11.999.999)" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[11.0.0-rc.3.26522.148, 11.999.999)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="[11.0.0, 11.999.999)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="[11.0.0, 11.999.999)" />
   </ItemGroup>
   <!-- Test dependencies -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="[11.0.0-rc.3.26522.148, 11.999.999)" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="[11.0.0, 11.999.999)" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Shouldly" Version="4.2.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
