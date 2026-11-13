@@ -5,6 +5,12 @@ All notable changes to Umbraco.Automate.Slack will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [19.0.0-rc1](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@18.0.6...Umbraco.Automate.Slack@19.0.0-rc1) (2026-11-12)
+
+### ⚠ BREAKING CHANGE
+
+* **core,openiddict,slack:** Requires Umbraco CMS 19 (19.0.0-rc1 or later) and .NET 11.
+
 ## [18.0.6](https://github.com/umbraco/Umbraco.Automate/compare/Umbraco.Automate.Slack@18.0.5...Umbraco.Automate.Slack@18.0.6) (2026-10-01)
 
 ### Internal
