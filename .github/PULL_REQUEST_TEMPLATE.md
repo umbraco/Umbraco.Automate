@@ -1,6 +1,6 @@
 ### Prerequisites
 
-- [ ] Branch name follows the convention (`vN/feature/<anything>`, see [CONTRIBUTING.md](https://github.com/umbraco/Umbraco.Automate/blob/v17/dev/CONTRIBUTING.md#branch-naming-convention))
+- [ ] Branch name follows the convention (`vN/topic/<anything>`, see [CONTRIBUTING.md](https://github.com/umbraco/Umbraco.Automate/blob/v17/dev/CONTRIBUTING.md#branch-naming-convention))
 - [ ] PR targets the correct `vN/dev` base branch
 - [ ] PR title follows [Conventional Commits](https://www.conventionalcommits.org/) (example: `fix(trigger): Resolve memory leak in event listener`)
 - [ ] I have added steps to test this contribution in the description below
