@@ -16,6 +16,7 @@ import { editorNotificationSeverityPickerManifests } from "./components/editor-n
 import { memberTypePickerManifests } from "./components/member-type-picker/manifests.js";
 import { userGroupPickerManifests } from "./components/user-group-picker/manifests.js";
 import { automationPickerManifests } from "./components/automation-picker/manifests.js";
+import { connectionTypePickerManifests } from "./components/connection-type-picker/manifests.js";
 import { mediaKeyPickerManifests } from "./components/media-key-picker/manifests.js";
 
 export const manifests: UmbExtensionManifest[] = [
@@ -37,5 +38,6 @@ export const manifests: UmbExtensionManifest[] = [
     ...memberTypePickerManifests,
     ...userGroupPickerManifests,
     ...automationPickerManifests,
+    ...connectionTypePickerManifests,
     ...mediaKeyPickerManifests,
 ];
