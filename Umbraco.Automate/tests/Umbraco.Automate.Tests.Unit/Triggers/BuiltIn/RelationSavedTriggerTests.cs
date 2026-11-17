@@ -132,24 +132,41 @@ public class RelationSavedTriggerTests
         var events = _trigger.MapEvent(notification).ToList();
 
         events.Count.ShouldBe(1);
-        events[0].IdempotencyKey.ShouldBe($"umbracoAutomate.relationSaved:{relationKey}");
+        events[0].IdempotencyKey.ShouldBe(
+            IdempotencyKeyFactory.ForVersionlessEntitySaveEvent("umbracoAutomate.relationSaved", relationKey, relation.UpdateDate));
     }
 
     [Fact]
-    public void MapEvent_DuplicateSaveOfSameRelation_ProducesSameIdempotencyKey()
+    public void MapEvent_SameUpdateDate_ProducesSameIdempotencyKey()
     {
-        // Relations have no CMS version id to key off, so a re-saved relation (e.g. comment
-        // edited) collapses to the same idempotency key as its prior save.
+        // A duplicate notification for the same save collapses to the same key.
+        var relationKey = Guid.NewGuid();
+        var first = CreateRelation(relationKey, Guid.NewGuid(), 1, 2, isNew: false);
+        var duplicate = CreateRelation(relationKey, Guid.NewGuid(), 1, 2, isNew: false);
+
+        var firstEvent = _trigger.MapEvent(new RelationSavedNotification(new[] { first }, new EventMessages()))
+            .ShouldHaveSingleItem();
+        var duplicateEvent = _trigger.MapEvent(new RelationSavedNotification(new[] { duplicate }, new EventMessages()))
+            .ShouldHaveSingleItem();
+
+        duplicateEvent.IdempotencyKey.ShouldBe(firstEvent.IdempotencyKey);
+    }
+
+    [Fact]
+    public void MapEvent_DifferentUpdateDate_ProducesDifferentIdempotencyKey()
+    {
+        // Relations have no CMS version id, so UpdateDate distinguishes legitimate re-saves
+        // (e.g. comment edited) from the prior save.
         var relationKey = Guid.NewGuid();
         var original = CreateRelation(relationKey, Guid.NewGuid(), 1, 2, isNew: true);
         var edited = CreateRelation(relationKey, Guid.NewGuid(), 1, 2, isNew: false);
 
-        var firstEvent = _trigger.MapEvent(new RelationSavedNotification(new[] { original }, new EventMessages()))
+        var originalEvent = _trigger.MapEvent(new RelationSavedNotification(new[] { original }, new EventMessages()))
             .ShouldHaveSingleItem();
-        var secondEvent = _trigger.MapEvent(new RelationSavedNotification(new[] { edited }, new EventMessages()))
+        var editedEvent = _trigger.MapEvent(new RelationSavedNotification(new[] { edited }, new EventMessages()))
             .ShouldHaveSingleItem();
 
-        firstEvent.IdempotencyKey.ShouldBe(secondEvent.IdempotencyKey);
+        editedEvent.IdempotencyKey.ShouldNotBe(originalEvent.IdempotencyKey);
     }
 
     [Fact]
