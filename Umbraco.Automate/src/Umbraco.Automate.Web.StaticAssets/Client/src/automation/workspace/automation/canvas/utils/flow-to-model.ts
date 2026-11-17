@@ -37,6 +37,7 @@ export function flowToSteps(
                 name: data.label,
                 alias: existing?.alias ?? null,
                 connectionId: existing?.connectionId ?? null,
+                connectionBinding: existing?.connectionBinding ?? null,
                 settings: data.settings,
                 inputMappings: existing?.inputMappings ?? {},
                 position: { x: node.position.x, y: node.position.y },

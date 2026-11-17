@@ -18,6 +18,8 @@ export interface UaNodeSettingsModalData {
     schema: EditableModelSchemaModel;
     /** Current explicit connection override for the step, or null to auto-resolve. */
     connectionId: string | null;
+    /** Current `${ }` binding that resolves the step's connection at run time, or null. Mutually exclusive with `connectionId`. */
+    connectionBinding: string | null;
     /** Id of the workspace that owns the automation — scopes the available connections. */
     workspaceId: string;
     errorBehavior: StepErrorBehaviorModel;
@@ -36,6 +38,7 @@ export interface UaNodeSettingsModalValue {
     alias: string | null;
     settings: Record<string, unknown>;
     connectionId: string | null;
+    connectionBinding: string | null;
     errorBehavior: StepErrorBehaviorModel;
     retryInterval: string | null;
     maxRetries: number | null;

@@ -377,6 +377,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 settings: step.settings,
                 schema: catalogueItem.schema,
                 connectionId: step.connectionId ?? null,
+                connectionBinding: step.connectionBinding ?? null,
                 workspaceId: this._model.workspaceId,
                 errorBehavior: step.errorBehavior,
                 retryInterval: step.retryInterval ?? null,
@@ -390,11 +391,11 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
         });
 
         try {
-            const { name, alias, settings, connectionId, errorBehavior, retryInterval, maxRetries } =
+            const { name, alias, settings, connectionId, connectionBinding, errorBehavior, retryInterval, maxRetries } =
                 await modal.onSubmit();
             const updatedSteps = this._model.steps.map((s) =>
                 s.id === stepId
-                    ? { ...s, name, alias, settings, connectionId, errorBehavior, retryInterval, maxRetries }
+                    ? { ...s, name, alias, settings, connectionId, connectionBinding, errorBehavior, retryInterval, maxRetries }
                     : s,
             );
             this.#workspaceContext?.updateProperty("steps", updatedSteps);
@@ -499,6 +500,7 @@ export class UaAutomationWorkflowWorkspaceViewElement extends UmbLitElement {
                 name: item.name,
                 alias: this.#generateStepAlias(item.alias),
                 connectionId: null,
+                connectionBinding: null,
                 settings: {},
                 inputMappings: {},
                 // From the "+" button, a connected-handle insert takes the existing target's slot

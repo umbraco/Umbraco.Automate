@@ -12,7 +12,12 @@ import { UaCatalogueRepository } from "../../../catalogue/repository/catalogue.r
 import { UaConnectionCollectionRepository } from "../../../connection/repository/collection/connection-collection.repository.js";
 import type { UaConnectionItemModel } from "../../../connection/types.js";
 import { WorkspacesService } from "../../../api/sdk.gen.js";
+import type { UmbPropertyDatasetElement } from "@umbraco-cms/backoffice/property";
+import { BINDING_TEXT_BOX_UI_ALIAS } from "../../../core/components/binding-text-box/manifests.js";
+import { escapeUfmExpressions } from "../../../core/utils/ufm.utils.js";
 import "../../../core/components/settings-form/settings-form.element.js";
+
+const CONNECTION_BINDING_ALIAS = "connectionBinding";
 
 @customElement("ua-node-settings-modal")
 export class UaNodeSettingsModalElement extends UmbModalBaseElement<
@@ -51,6 +56,14 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     @state()
     private _connectionId: string | null = null;
 
+    /** The connection binding as typed. Kept while the author toggles back to the picker, so switching doesn't lose it. */
+    @state()
+    private _connectionBinding = "";
+
+    /** Whether the connection is picked from the dropdown or resolved from a binding at run time. */
+    @state()
+    private _connectionMode: "picker" | "binding" = "picker";
+
     @state()
     private _availableConnections: UaConnectionItemModel[] = [];
 
@@ -71,6 +84,9 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
         this._maxRetries = this.data?.maxRetries != null ? String(this.data.maxRetries) : "";
         this._settings = { ...this.data?.settings };
         this._connectionId = this.data?.connectionId ?? null;
+        this._connectionBinding = this.data?.connectionBinding ?? "";
+        // Open in the mode the step was saved in: a saved binding opens bound, anything else in the picker.
+        this._connectionMode = this._connectionBinding ? "binding" : "picker";
         this.#loadBindingSources();
         this.#loadConnectionOptions();
     }
@@ -182,6 +198,17 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
         this._connectionId = next === "" ? null : next;
     }
 
+    #onConnectionModeChange(event: Event) {
+        const checked = (event.target as HTMLElement & { checked: boolean }).checked;
+        this._connectionMode = checked ? "binding" : "picker";
+    }
+
+    #onConnectionBindingChange(event: Event) {
+        const dataset = event.target as UmbPropertyDatasetElement;
+        const value = dataset.value.find((v) => v.alias === CONNECTION_BINDING_ALIAS)?.value;
+        this._connectionBinding = typeof value === "string" ? value : "";
+    }
+
     /**
      * Cross-references the alias against sibling steps in the automation — a check the alias
      * field's own validators can't express, since duplication isn't a property of this field's
@@ -241,11 +268,14 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
             // so the field-level errors stay visible.
             return;
         }
+        // Only the active mode is saved: the server rejects a step with both a connection and a binding.
+        const isBound = this._connectionMode === "binding";
         this.value = {
             name: this._name.trim(),
             alias: this._alias.trim() || null,
             settings: this._settings,
-            connectionId: this._connectionId,
+            connectionId: isBound ? null : this._connectionId,
+            connectionBinding: isBound ? this._connectionBinding.trim() || null : null,
             errorBehavior: this._errorBehavior,
             retryInterval: this._retryInterval.trim() || null,
             maxRetries: this._maxRetries.trim() ? Number.parseInt(this._maxRetries, 10) : null,
@@ -260,8 +290,9 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     override render() {
         if (!this.data) return html``;
 
-        // Only surface the connection picker when the workspace has a real choice to offer.
-        const hasConnectionChoice = this._availableConnections.length >= 2;
+        // Only surface the connection picker when the workspace has a real choice to offer, or
+        // when the step already binds its connection (so a saved binding is never hidden).
+        const hasConnectionChoice = this._availableConnections.length >= 2 || !!this.data.connectionBinding;
 
         return html`
             <umb-body-layout .headline=${this.data.actionName}>
@@ -395,6 +426,60 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
     }
 
     #renderConnectionBox() {
+        return html`
+            <uui-box headline=${this.localize.term("uaLabels_connection")}>
+                ${this.#renderConnectionModeToggle()}
+                ${this._connectionMode === "binding" ? this.#renderConnectionBinding() : this.#renderConnectionPicker()}
+            </uui-box>
+        `;
+    }
+
+    /**
+     * Same switch as `ua-bindable-editor`: one fixed label with the toggle carrying yes/no. Unlike
+     * that editor it is shown even when there are no binding sources: the connection box only
+     * appears when there is a real choice to make, and an expression can still be typed by hand,
+     * e.g. a webhook payload field or a manual trigger, neither of which has an output schema.
+     */
+    #renderConnectionModeToggle() {
+        const label = this.localize.term("uaBindings_useBinding");
+        return html`
+            <umb-input-toggle
+                id="connection-mode"
+                .showLabels=${true}
+                .labelOff=${label}
+                .labelOn=${label}
+                ?checked=${this._connectionMode === "binding"}
+                @change=${this.#onConnectionModeChange}
+            ></umb-input-toggle>
+        `;
+    }
+
+    /**
+     * Renders the binding as an `umb-property` with the binding text box editor, so the standard
+     * "Insert binding" property action (which reads `bindingSources` from the property config) works.
+     */
+    #renderConnectionBinding() {
+        return html`
+            <umb-property-dataset
+                .value=${[{ alias: CONNECTION_BINDING_ALIAS, value: this._connectionBinding }]}
+                @change=${this.#onConnectionBindingChange}
+            >
+                <umb-property
+                    label=${this.localize.term("uaAutomation_stepConnectionBindingLabel")}
+                    description=${escapeUfmExpressions(this.localize.term("uaAutomation_stepConnectionBindingDescription"))}
+                    alias=${CONNECTION_BINDING_ALIAS}
+                    property-editor-ui-alias=${BINDING_TEXT_BOX_UI_ALIAS}
+                    .appearance=${{ labelOnTop: true }}
+                    .config=${[
+                        { alias: "bindingSources", value: this._bindingSources },
+                        { alias: "placeholder", value: "${ loop.item.id }" },
+                    ]}
+                ></umb-property>
+            </umb-property-dataset>
+        `;
+    }
+
+    #renderConnectionPicker() {
         const options = [
             {
                 name: this.localize.term("uaAutomation_stepConnectionAutoResolve"),
@@ -409,16 +494,14 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
         ];
 
         return html`
-            <uui-box headline=${this.localize.term("uaLabels_connection")}>
-                <p class="description">
-                    ${this.localize.term("uaAutomation_stepConnectionDescription")}
-                </p>
-                <uui-select
-                    label=${this.localize.term("uaLabels_connection")}
-                    .options=${options}
-                    @change=${this.#onConnectionChange}
-                ></uui-select>
-            </uui-box>
+            <p class="description">
+                ${this.localize.term("uaAutomation_stepConnectionDescription")}
+            </p>
+            <uui-select
+                label=${this.localize.term("uaLabels_connection")}
+                .options=${options}
+                @change=${this.#onConnectionChange}
+            ></uui-select>
         `;
     }
 
@@ -435,6 +518,11 @@ export class UaNodeSettingsModalElement extends UmbModalBaseElement<
             }
             uui-select {
                 width: 100%;
+            }
+            #connection-mode {
+                display: block;
+                margin-bottom: var(--uui-size-space-4);
+                font-size: var(--uui-type-small-size, 12px);
             }
             /* Match ua-settings-form so the Details rows sit on the same rhythm as the
                settings fields below. */
