@@ -216,6 +216,7 @@ internal sealed class AutomationService : IAutomationService
         }
 
         AddDisallowedConnectionErrors(automation, workspace, errors);
+        AddConnectionBindingErrors(automation, errors);
         AddDanglingStepReferenceErrors(automation, errors);
         AddUnknownBindingFilterErrors(automation, errors);
         await AddDanglingOutcomeErrorsAsync(automation, errors, cancellationToken);
@@ -244,6 +245,32 @@ internal sealed class AutomationService : IAutomationService
     }
 
     /// <summary>
+    /// Flags steps whose connection is both selected and bound, or whose connection binding holds
+    /// no <c>${ }</c> expression. A bound connection is otherwise only checked at run time (exists,
+    /// allowed in the workspace, matching type), because its value isn't known until then.
+    /// </summary>
+    private static void AddConnectionBindingErrors(Automation automation, List<string> errors)
+    {
+        foreach (var step in automation.Steps)
+        {
+            if (string.IsNullOrWhiteSpace(step.ConnectionBinding))
+            {
+                continue;
+            }
+
+            if (step.ConnectionId.HasValue)
+            {
+                errors.Add($"Step '{step.Name}' has both a selected connection and a connection binding. Use one or the other.");
+            }
+
+            if (!BindingTokenizer.FindBindings(step.ConnectionBinding).Any())
+            {
+                errors.Add($"Step '{step.Name}' has a connection binding '{step.ConnectionBinding}' that is not a binding expression. Use a ${{ }} expression, such as ${{ loop.item.id }}.");
+            }
+        }
+    }
+
+    /// <summary>
     /// Flags binding expressions (e.g. <c>${ steps.myAlias.field }</c>) that reference a step
     /// which no longer exists under that alias or ID — typically left behind after a step's
     /// alias was renamed without updating the expressions that pointed at the old one. Scans
@@ -266,7 +293,8 @@ internal sealed class AutomationService : IAutomationService
 
         foreach (var step in automation.Steps)
         {
-            var haystack = JsonSerializer.Serialize(step.Settings) + " " + string.Join(' ', step.InputMappings.Values);
+            var haystack = JsonSerializer.Serialize(step.Settings) + " " + string.Join(' ', step.InputMappings.Values)
+                + " " + step.ConnectionBinding;
             foreach (var reference in FindDanglingStepReferences(haystack, validReferences))
             {
                 errors.Add($"Step '{step.Name}' has a binding that references unknown step '{reference}' — it may have been renamed or removed.");
@@ -319,6 +347,14 @@ internal sealed class AutomationService : IAutomationService
                 foreach (var alias in UnknownBindingFilterScanner.FindUnknownFilterAliases(expression, _bindingEvaluator))
                 {
                     errors.Add($"{label}: Input '{input}' {UnknownBindingFilterScanner.Describe(alias)}");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(step.ConnectionBinding))
+            {
+                foreach (var alias in UnknownBindingFilterScanner.FindUnknownFilterAliases(step.ConnectionBinding, _bindingEvaluator))
+                {
+                    errors.Add($"{label}: Connection binding {UnknownBindingFilterScanner.Describe(alias)}");
                 }
             }
         }
@@ -847,6 +883,7 @@ internal sealed class AutomationService : IAutomationService
             ConnectionId = s.ConnectionAlias is not null && connectionAliasToId.TryGetValue(s.ConnectionAlias, out var connId)
                 ? connId
                 : null,
+            ConnectionBinding = s.ConnectionBinding,
             Settings = s.Settings,
             InputMappings = s.InputMappings,
             Position = s.Position,
@@ -959,6 +996,7 @@ internal sealed class AutomationService : IAutomationService
             Name = step.Name,
             Alias = step.Alias,
             ConnectionAlias = connectionAlias,
+            ConnectionBinding = step.ConnectionBinding,
             Settings = strippedSettings,
             InputMappings = step.InputMappings,
             Position = step.Position,

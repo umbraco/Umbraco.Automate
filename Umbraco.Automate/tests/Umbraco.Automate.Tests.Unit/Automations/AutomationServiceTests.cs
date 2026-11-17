@@ -378,6 +378,103 @@ public class AutomationServiceTests
     }
 
     [Fact]
+    public async Task PublishAutomationAsync_ConnectionBinding_Succeeds()
+    {
+        // A bound connection is only known at run time, so publish does not check it against the workspace.
+        var automation = ArrangePublishableAutomation(new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithConnectionBinding("${ trigger.connectionId }")
+            .Build());
+
+        var result = await _service.PublishAutomationAsync(automation.Id);
+
+        result.Status.ShouldBe(AutomationStatus.Published);
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_ConnectionIdAndConnectionBinding_ThrowsValidationException()
+    {
+        var connectionId = Guid.NewGuid();
+        var automation = ArrangePublishableAutomation(
+            new StepConfigurationBuilder()
+                .WithActionAlias("someAction")
+                .WithName("Both")
+                .WithConnectionId(connectionId)
+                .WithConnectionBinding("${ trigger.connectionId }")
+                .Build(),
+            connectionId);
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain(e => e.Contains("'Both'") && e.Contains("both a selected connection and a connection binding"));
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_ConnectionBindingWithoutExpression_ThrowsValidationException()
+    {
+        var automation = ArrangePublishableAutomation(new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithConnectionBinding("not-a-binding")
+            .Build());
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain(e => e.Contains("'not-a-binding'") && e.Contains("not a binding expression"));
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_ConnectionBindingReferencingUnknownStep_ThrowsValidationException()
+    {
+        var automation = ArrangePublishableAutomation(new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithConnectionBinding("${ steps.renamedAway.connectionId }")
+            .Build());
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain(e => e.Contains("renamedAway"));
+    }
+
+    [Fact]
+    public async Task PublishAutomationAsync_ConnectionBindingWithUnknownFilter_ThrowsValidationException()
+    {
+        var automation = ArrangePublishableAutomation(new StepConfigurationBuilder()
+            .WithActionAlias("someAction")
+            .WithConnectionBinding("${ trigger.connectionId | uppercse }")
+            .Build());
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain(e => e.Contains("Connection binding") && e.Contains("uppercse"));
+    }
+
+    private Automation ArrangePublishableAutomation(StepConfiguration step, params Guid[] allowedConnections)
+    {
+        var automation = new AutomationBuilder()
+            .WithId(Guid.NewGuid())
+            .AsDraft()
+            .WithManualTrigger()
+            .AddStep(step)
+            .Build();
+
+        var workspace = new WorkspaceBuilder()
+            .WithAllowedConnections(allowedConnections)
+            .Build();
+        _workspaceService.Setup(w => w.GetWorkspaceAsync(automation.WorkspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(workspace);
+        _repo.Setup(r => r.GetAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+        _repo.Setup(r => r.SaveMetadataAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        return automation;
+    }
+
+    [Fact]
     public async Task PublishAutomationAsync_CancelledByNotification_Throws()
     {
         var id = Guid.NewGuid();

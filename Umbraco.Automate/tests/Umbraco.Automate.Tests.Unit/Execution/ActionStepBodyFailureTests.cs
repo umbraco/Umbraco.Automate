@@ -102,6 +102,21 @@ public class ActionStepBodyFailureTests
     }
 
     [Fact]
+    public async Task UnresolvableConnectionBindingUnderRetry_ThrowsANonRetryableFailureAndRecordsTheBinding()
+    {
+        var stepConfig = StepConfig(StepErrorBehavior.Retry);
+        stepConfig.ConnectionBinding = "${ trigger.connectionId }";
+
+        await Should.ThrowAsync<NonRetryableStepFailureException>(() => CreateBody(stepConfig).RunAsync(CreateContext()));
+
+        _runRepository.Verify(r => r.AddStepRunAsync(
+            It.Is<StepRun>(s => s.Status == StepRunStatus.Failed
+                && s.ErrorCategory == StepRunErrorCategory.ConfigurationError
+                && s.Error!.Contains("${ trigger.connectionId }")),
+            It.IsAny<CancellationToken>()));
+    }
+
+    [Fact]
     public async Task ApprovalResumedWithoutADecisionUnderRetry_ThrowsANonRetryableFailure()
     {
         var stepConfig = StepConfig(StepErrorBehavior.Retry);

@@ -76,6 +76,7 @@ internal sealed class SensitiveSettingsStripper : ISensitiveSettingsStripper
             Name = s.Name,
             Alias = s.Alias,
             ConnectionId = s.ConnectionId,
+            ConnectionBinding = s.ConnectionBinding,
             Settings = StripStepSettings(s.ActionAlias, s.Settings),
             InputMappings = s.InputMappings,
             Position = s.Position,

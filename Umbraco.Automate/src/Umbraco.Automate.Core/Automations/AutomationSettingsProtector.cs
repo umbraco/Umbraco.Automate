@@ -279,6 +279,7 @@ internal sealed class AutomationSettingsProtector : IAutomationSettingsProtector
             Name = step.Name,
             Alias = step.Alias,
             ConnectionId = step.ConnectionId,
+            ConnectionBinding = step.ConnectionBinding,
             Settings = settings,
             InputMappings = step.InputMappings,
             Position = step.Position,

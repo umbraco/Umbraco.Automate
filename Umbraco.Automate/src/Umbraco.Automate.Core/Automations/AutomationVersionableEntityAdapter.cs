@@ -181,6 +181,7 @@ internal sealed class AutomationVersionableEntityAdapter : VersionableEntityAdap
             CompareScalar(changes, $"{prefix}.ActionAlias", fromStep.ActionAlias, toStep.ActionAlias);
             CompareScalar(changes, $"{prefix}.Name", fromStep.Name, toStep.Name);
             CompareScalar(changes, $"{prefix}.ConnectionId", fromStep.ConnectionId?.ToString(), toStep.ConnectionId?.ToString());
+            CompareScalar(changes, $"{prefix}.ConnectionBinding", fromStep.ConnectionBinding, toStep.ConnectionBinding);
             CompareScalar(changes, $"{prefix}.ErrorBehavior", fromStep.ErrorBehavior.ToString(), toStep.ErrorBehavior.ToString());
             CompareScalar(changes, $"{prefix}.RetryInterval", fromStep.RetryInterval?.ToString(), toStep.RetryInterval?.ToString());
             CompareScalar(changes, $"{prefix}.MaxRetries", fromStep.MaxRetries?.ToString(), toStep.MaxRetries?.ToString());
