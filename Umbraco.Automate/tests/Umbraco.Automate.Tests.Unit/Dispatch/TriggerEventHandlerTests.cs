@@ -219,6 +219,69 @@ public class TriggerEventHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_OnlyMatchingAutomationOverRateLimit_ThrowsSoTheOutboxRetriesTheEvent()
+    {
+        var overLimit = CreatePublishedAutomation("myTrigger");
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { overLimit });
+
+        _executor.Setup(e => e.ExecuteAsync(
+                It.Is<Automation>(a => a.Id == overLimit.Id),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, object?>?>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IReadOnlyList<Guid>>()))
+            .ThrowsAsync(new RateLimitExceededException(overLimit.Id, "over the limit"));
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "myTrigger",
+            InitiatorType = "system",
+        });
+
+        // Nothing else ran on this attempt, so a retry can't start a duplicate run.
+        await Should.ThrowAsync<RateLimitExceededException>(() => _handler.HandleAsync(body, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_TargetedAutomationOverRateLimit_ThrowsSoTheOutboxRetriesTheEvent()
+    {
+        // The webhook case: siblings share the trigger alias, but the event targets one automation.
+        var target = new AutomationBuilder().WithId(Guid.NewGuid()).WithTrigger("myTrigger").Build();
+        var sibling = new AutomationBuilder().WithId(Guid.NewGuid()).WithTrigger("myTrigger").Build();
+
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { target, sibling });
+
+        _executor.Setup(e => e.ExecuteAsync(
+                It.Is<Automation>(a => a.Id == target.Id),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, object?>?>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IReadOnlyList<Guid>>()))
+            .ThrowsAsync(new RateLimitExceededException(target.Id, "over the limit"));
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = "myTrigger",
+            InitiatorType = "webhook",
+            TargetAutomationId = target.Id,
+        });
+
+        await Should.ThrowAsync<RateLimitExceededException>(() => _handler.HandleAsync(body, CancellationToken.None));
+
+        _executor.Verify(e => e.ExecuteAsync(
+            It.Is<Automation>(a => a.Id == sibling.Id),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(), It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+    }
+
+    [Fact]
     public async Task HandleAsync_TargetAutomationId_RunsOnlyTargetedAutomation()
     {
         // Two published automations share the alias (the webhook fan-out scenario). The event

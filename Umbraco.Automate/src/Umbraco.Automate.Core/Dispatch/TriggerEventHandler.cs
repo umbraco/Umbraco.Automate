@@ -311,11 +311,14 @@ internal sealed class TriggerEventHandler : IMessageHandler
                     cancellationToken,
                     originChain: message.OriginAutomationChain);
             }
-            catch (RateLimitExceededException ex)
+            catch (RateLimitExceededException ex) when (matching.Count > 1)
             {
-                // An over-limit automation must not fail the whole message: the outbox would
-                // retry it and start a second run for every automation that already ran on
-                // this attempt, and dead-letter the event for all of them.
+                // An over-limit automation must not fail a message that matched others: the
+                // outbox would retry it and start a second run for every automation that
+                // already ran on this attempt, and dead-letter the event for all of them.
+                // With a single match (always the case for a webhook) nothing else ran, so
+                // the exception propagates and the outbox retries the event with backoff
+                // instead of dropping an event the caller was already told was accepted.
                 _logger.LogWarning(
                     "Automation {AutomationAlias} ({AutomationId}) skipped for trigger {TriggerAlias} — rate limit exceeded: {Reason}",
                     executionAutomation.Alias, executionAutomation.Id, message.TriggerAlias, ex.Message);
