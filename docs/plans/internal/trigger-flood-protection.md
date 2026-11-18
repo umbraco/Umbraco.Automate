@@ -6,7 +6,7 @@ When a bulk CMS operation occurs (e.g., publishing 500 content nodes via an impo
 
 Today the only guards against this are:
 - **Idempotency keys** — prevent the exact same CMS notification from firing twice (same content key + version ID), but each distinct publish is a legitimately different event
-- **Per-automation rate limiting** — `RateLimitService` rejects runs exceeding `MaxRunsPerAutomationPerMinute` (default 60) or `MaxConcurrentRunsPerAutomation` (default 10), but rejected events are lost, not queued
+- **Per-automation rate limiting** — `RateLimitService` rejects runs exceeding `MaxRunsPerAutomationPerMinute` (default 60) or `MaxConcurrentRunsPerAutomation` (default 10), but rejected events are lost, not queued, unless the event matched only that automation (always true for a webhook), when the outbox retries it with backoff
 - **Outbox backpressure** — `MaxPendingMessages` (default 10,000) rejects new publishes when the outbox is full, but this is a last-resort circuit breaker, not a throttling mechanism
 
 None of these provide deliberate flood protection — the ability to detect a burst of trigger events and handle them gracefully (queue, batch, debounce, or drip-feed) rather than either running them all at once or dropping them.
