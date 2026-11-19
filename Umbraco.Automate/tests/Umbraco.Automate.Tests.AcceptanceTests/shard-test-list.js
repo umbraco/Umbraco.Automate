@@ -6,12 +6,12 @@
  *   npm run test -- --test-list <outFile>
  *
  * Each full-run leg of the CI stage (devops/ci/acceptance-tests.yml) runs exactly that, e.g.
- * `node shard-test-list.js 1/4 playwright/shard-test-list.txt && npm run test -- --test-list
+ * `node shard-test-list.js 1/3 playwright/shard-test-list.txt && npm run test -- --test-list
  * playwright/shard-test-list.txt`. See CLAUDE.md, "CI shards are split by duration".
  *
  * Playwright's own --shard gives every shard the same NUMBER of tests, in file order, so shard 1
- * always got the slow automation specs and finished last: medians of 55 runs (November 2026) were
- * 824, 738, 711 and 580 s for the four shards.
+ * always got the slow automation specs and finished last: medians of 55 runs on four shards
+ * (November 2026) were 824, 738, 711 and 580 s.
  *
  * Every shard runs this script with the same inputs, so they all compute the same split and each
  * keeps its own part. The tests come from `playwright test --list`, not from the timings file, so
@@ -40,7 +40,7 @@ function parseShard(arg) {
   const current = match && Number(match[1]);
   const total = match && Number(match[2]);
   if (!match || total < 1 || current < 1 || current > total) {
-    throw new Error(`Expected <current>/<total>, for example 1/4; got "${arg}"`);
+    throw new Error(`Expected <current>/<total>, for example 1/3; got "${arg}"`);
   }
   return { current, total };
 }

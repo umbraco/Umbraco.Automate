@@ -51,10 +51,12 @@ parameters:
   - name: full_paths
     type: object
     default: []
-  # Legs for a full run. Each needs its own agent.
+  # Legs for a full run: the one number to change for more or fewer shards. Each leg is its own
+  # agent and pays about 6 min of setup (build, scaffold, first boot) before its tests, so fewer,
+  # longer legs cost fewer agent-minutes. shard-test-list.js splits for any count.
   - name: shards
     type: number
-    default: 4
+    default: 3
   - name: node_version
     type: string
     default: 24.x

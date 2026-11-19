@@ -323,13 +323,13 @@ steps.
   fail it and no smoke test already would. If a `vN/dev` push catches a regression its PR's smoke
   leg missed, consider tagging the test that caught it. The automation list in a workspace and the
   version history have no tests yet, so smoke cannot cover them.
-- **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
-  its own `testCommand`), each against its **own** demo site and LocalDB. Specs share site data
-  and the suite runs a single worker, so shards must not share a site. The shards are split by
-  recorded test duration, not `--shard`: see "CI shards are split by duration" below. Every shard
-  runs `auth.setup.ts` itself. Each shard pays the full setup (build, scaffold, first boot), so
-  extra shards only help while the tests themselves dominate; results and artifacts are named per
-  leg.
+- **Is sharded across three parallel agents** (`shards` in the stage; a matrix from the `Changes`
+  job, each leg with its own `testCommand`), each against its **own** demo site and LocalDB. Specs
+  share site data and the suite runs a single worker, so shards must not share a site. The shards
+  are split by recorded test duration, not `--shard`: see "CI shards are split by duration" below.
+  Every shard runs `auth.setup.ts` itself. Each shard pays the full setup (about 6 min of build,
+  scaffold and first boot), so extra shards only help while the tests themselves dominate.
+  Results and artifacts are named per leg.
 - **Scaffolds the site with `scripts/install-demo-site.ps1`**, the same script developers run, so
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to
@@ -373,9 +373,10 @@ steps.
 - **`maxFailures` stops a run that is going nowhere.** If the site wedges, every remaining spec
   fails in setup with three attempts each, which used to run into the job timeout.
 
-Two things to know if you edit the stage, or the Umbraco.Build steps it calls. Azure macro-expands `$(name)` before bash or pwsh
-sees the script. PowerShell subexpressions such as `$($process.Id)` are safe, because Azure only
-matches a variable name after `$(`, but bash `$(command)` substitution is not. And
+Two things to know if you edit the stage, or the Umbraco.Build steps it calls. Azure
+macro-expands `$(name)` before bash or pwsh sees the script. PowerShell subexpressions such as
+`$($process.Id)` are safe, because Azure only matches a variable name after `$(`, but bash
+`$(command)` substitution is not. And
 `config.js` is deliberately **not** used in CI: it is interactive and reads the per-worktree
 port from git config, which is a local-development affordance, whereas CI fixes the URL via
 `ASPNETCORE_URLS` and writes `.env` directly. The checkout needs `fetchDepth: 0`, like the
@@ -387,13 +388,14 @@ request that didn't need the suite) doesn't.
 
 ## CI shards are split by duration (`shard-test-list.js`)
 
-CI's four full-run shards don't use `--shard`. Each runs
-`node shard-test-list.js <n>/4 playwright/shard-test-list.txt && npm run test -- --test-list playwright/shard-test-list.txt`
+CI's three full-run shards don't use `--shard`. Each runs
+`node shard-test-list.js <n>/3 playwright/shard-test-list.txt && npm run test -- --test-list playwright/shard-test-list.txt`
 (the matrix in `devops/ci/acceptance-tests.yml`). The script lists the suite the way `npm run test`
 runs it (`playwright test DefaultConfig --list --no-deps`), hands the tests out longest first to the
 least loaded shard using `shard-timings.json`, and writes that shard's `--test-list`. `--shard`
 gives each shard the same number of tests, so shard 1 always got the slow automation specs and
-finished last: 824 s against 580 s for shard 4 (medians of 55 runs, November 2026).
+finished last: 824 s against 580 s for shard 4 (medians of 55 runs on four shards, November 2026).
+The split works for any shard count; `shards` in the stage sets it.
 
 - The test list comes from the live suite, so every test runs on exactly one shard. A new test with
   no recorded time counts as the median; out-of-date timings only make the split less even.
