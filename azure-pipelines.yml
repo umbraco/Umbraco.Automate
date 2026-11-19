@@ -145,6 +145,10 @@ extends:
                   node_version: 22.x
                   tests_dir: Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
                   demo_project_file: Umbraco.Automate.DemoSite.csproj
+                  # windows-2025, not windows-latest: on the windows-2025-vs2026 image that windows-latest
+                  # started serving on 17-11-2026, LocalDB refuses the AttachDbFilename .mdf (SqlException
+                  # 15350) and the demo site never boots. Move back once that attach works there.
+                  vm_image: windows-2025
                   # A PR that only touches these never runs the suite: docs, repo tooling, the dotnet new
                   # templates (not scripts/templates/), changelog and release tooling, marketplace JSON.
                   skip_paths:
