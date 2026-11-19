@@ -3,7 +3,7 @@
 # The stages, and when each runs, come from Umbraco.Build's shared monorepo template:
 # https://github.com/umbraco/Umbraco.Build/tree/main/devops/monorepo
 # This file holds what is Automate's own: its products, its queue-time switches, its triggers and
-# its acceptance test patterns.
+# its acceptance test patterns. The acceptance test stage itself is in devops/ci/.
 
 parameters:
     # ============================================================
@@ -138,9 +138,10 @@ extends:
         # Playwright end-to-end tests against the demo site, on Windows + SQL Server LocalDB.
         # Automate shares the CMS connection string (Umbraco:Automate:UseNamedConnectionString =
         # umbracoDbDSN), so the stage's LocalDB connection string moves Automate onto it too.
-        # Inserted through additional_tests, the same hook as Umbraco.Build's main template.
+        # The stage is Automate's own (devops/ci/acceptance-tests.yml), built from Umbraco.Build's
+        # step templates, and inserted through additional_tests, as Umbraco Forms does.
         additional_tests:
-            - template: devops/monorepo/stages/acceptance-tests.yml@build
+            - template: devops/ci/acceptance-tests.yml
               parameters:
                   node_version: 24.x
                   tests_dir: Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests

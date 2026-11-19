@@ -1,0 +1,258 @@
+# AcceptanceTests stage: Playwright end-to-end tests against the demo site, scaffolded from source
+# with scripts/install-demo-site.ps1, so the run exercises project references the same way local
+# development does. azure-pipelines.yml inserts it through additional_tests, as Umbraco Forms does
+# with its devops/ci/ stages.
+#
+# Automate's own stage, built from Umbraco.Build's monorepo step templates (`@build`). It started
+# as Umbraco.Build's devops/monorepo/stages/acceptance-tests.yml. What is Automate's own:
+#   - the matrix (Compute acceptance matrix below): full runs split the shards by recorded test
+#     duration with the acceptance folder's shard-test-list.js, not Playwright's --shard
+#   - the demo site starts as soon as it is built and LocalDB is up, and boots while the test
+#     tooling installs (Start demo site, then Wait for demo site)
+# Every other step is Umbraco.Build's, unchanged.
+#
+# Jobs:
+#   Changes         - whether a pull request needs the suite, and whether only its changed specs or
+#                     its smoke tests (detect-acceptance-changes.yml@build), and the matrix
+#   AcceptanceTests - one Windows job per leg (shards of the whole suite, or one changed-specs or
+#                     smoke leg), each with its own demo site and LocalDB, as the specs share site
+#                     data
+#
+# It depends on nothing, so it runs alongside Build and gates pull requests too: it builds the site
+# itself and needs nothing Build produces.
+#
+# SQL Server LocalDB, not the scaffold's SQLite: under the CMS SQLite connection string's shared
+# cache, the CMS cache-instruction sync job and an end-of-request insert can deadlock, stalling the
+# site for minutes and failing every spec in that window. See the acceptance tests' CLAUDE.md.
+
+parameters:
+  # The acceptance test project's folder, relative to the repo root.
+  - name: tests_dir
+    type: string
+  # The demo site's project file name, found under demos/ after scaffolding.
+  - name: demo_project_file
+    type: string
+  # bash `case` patterns: files that never need the suite, and the .NET test projects.
+  - name: skip_paths
+    type: object
+    default: []
+  - name: test_paths
+    type: object
+    default: []
+  # bash `case` patterns: files that need only the smoke tests, and exceptions to those patterns
+  # that need the whole suite (detect-acceptance-changes.yml@build has the rules).
+  - name: smoke_paths
+    type: object
+    default: []
+  - name: full_paths
+    type: object
+    default: []
+  # Legs for a full run. Each needs its own agent.
+  - name: shards
+    type: number
+    default: 4
+  - name: node_version
+    type: string
+    default: 24.x
+  - name: vm_image
+    type: string
+    default: windows-latest
+  # Windows agents build slowly, and a first boot against a new database runs the full install.
+  - name: timeout_minutes
+    type: number
+    default: 60
+
+stages:
+  - stage: AcceptanceTests
+    displayName: Acceptance Tests
+    dependsOn: []
+    jobs:
+      - job: Changes
+        displayName: Detect acceptance changes
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          # Only the PR merge commit and its two parents are needed
+          - checkout: self
+            fetchDepth: 2
+
+          - template: devops/monorepo/steps/detect-acceptance-changes.yml@build
+            parameters:
+              tests_dir: ${{ parameters.tests_dir }}
+              skip_paths: ${{ parameters.skip_paths }}
+              test_paths: ${{ parameters.test_paths }}
+              smoke_paths: ${{ parameters.smoke_paths }}
+              full_paths: ${{ parameters.full_paths }}
+
+          # The matrix, from the changes step's acceptanceScope:
+          #   full     `shards` legs of the whole suite. Each leg writes its own --test-list with
+          #            shard-test-list.js, which splits the suite by the durations in
+          #            shard-timings.json (Playwright's --shard gives every shard the same number of
+          #            tests, so shard 1 always finished last), then runs it.
+          #   changed  one leg running --only-changed against the PR's target branch tip. HEAD~1
+          #            rather than HEAD^1: the run step is cmd on Windows, where ^ is the escape
+          #            character. --pass-with-no-tests keeps a PR that only deletes specs green.
+          #   smoke    one leg running the @smoke tests. Setup projects still run: --grep filters
+          #            only the tests in the projects that depend on them. --grep=@smoke keeps the
+          #            tag attached, so no shell can read @smoke on its own.
+          # Each leg has a `leg` name (for step titles, test run titles and artifact names) and its
+          # `testCommand`, which run-acceptance-tests.yml@build runs in tests_dir.
+          - bash: |
+              shards=${{ parameters.shards }}
+              list=playwright/shard-test-list.txt
+              case "$(changes.acceptanceScope)" in
+                changed)
+                  matrix='{"Changed specs":{"leg":"Changed specs","testCommand":"npm run test -- --only-changed=HEAD~1 --pass-with-no-tests"}}'
+                  ;;
+                smoke)
+                  matrix='{"Smoke":{"leg":"Smoke","testCommand":"npm run test -- --grep=@smoke"}}'
+                  ;;
+                *)
+                  if [ "$shards" -le 1 ]; then
+                    matrix='{"All specs":{"leg":"All specs","testCommand":"npm run test"}}'
+                  else
+                    matrix='{'
+                    for i in $(seq 1 "$shards"); do
+                      [ "$i" -gt 1 ] && matrix="$matrix,"
+                      cmd="node shard-test-list.js $i/$shards $list && npm run test -- --test-list $list"
+                      matrix="$matrix\"Shard $i of $shards\":{\"leg\":\"Shard $i of $shards\",\"testCommand\":\"$cmd\"}"
+                    done
+                    matrix="$matrix}"
+                  fi
+                  ;;
+              esac
+              echo "Acceptance matrix: $matrix"
+              echo "##vso[task.setvariable variable=acceptanceMatrix;isOutput=true]$matrix"
+            name: acceptance
+            displayName: Compute acceptance matrix
+
+      - job: AcceptanceTests
+        displayName: Run Playwright Acceptance Tests
+        dependsOn: Changes
+        condition: and(succeeded(), ne(dependencies.Changes.outputs['changes.runAcceptance'], 'false'))
+        strategy:
+          matrix: $[ dependencies.Changes.outputs['acceptance.acceptanceMatrix'] ]
+        timeoutInMinutes: ${{ parameters.timeout_minutes }}
+        pool:
+          vmImage: ${{ parameters.vm_image }}
+        variables:
+          # Makes the Playwright config pick its CI profile and the npm postinstall skip prompts
+          CI: "true"
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: https://localhost:44380
+          PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
+          NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+          npm_config_cache: $(Pipeline.Workspace)/.npm
+          # MSBuild reads environment variables as properties, so this stops nbgv's MSBuild targets
+          # replacing the run's build number with a product version when the demo site is built
+          DisableCloudBuildNumber: "true"
+          # InstallMissingDatabase lets the unattended install create the database file
+          CONNECTIONSTRINGS__UMBRACODBDSN: Data Source=(localdb)\MSSQLLocalDB;AttachDbFilename=|DataDirectory|\Umbraco.mdf;Integrated Security=True
+          CONNECTIONSTRINGS__UMBRACODBDSN_PROVIDERNAME: Microsoft.Data.SqlClient
+          UMBRACO__CMS__GLOBAL__INSTALLMISSINGDATABASE: true
+        steps:
+          # Full history: nbgv needs it, and a changed-specs leg diffs against HEAD~1
+          - checkout: self
+            fetchDepth: 0
+
+          - template: devops/monorepo/steps/localdb.yml@build
+            parameters:
+              action: start
+
+          # The image's own SDK when one satisfies global.json, so most legs skip the SDK cache and
+          # install; the cache only serves a leg that has to install one
+          - template: devops/monorepo/steps/install-tools.yml@build
+            parameters:
+              node_version: ${{ parameters.node_version }}
+              cache_sdk: true
+              use_image_sdk: true
+
+          - template: devops/monorepo/steps/cache-packages.yml@build
+            parameters:
+              npm_key_files:
+                - package-lock.json
+                - ${{ parameters.tests_dir }}/package-lock.json
+              nuget_key_files:
+                - Directory.Packages.props
+                - scripts/install-demo-site.ps1
+
+          # The demo site serves the built bundles; without them the products' sections don't
+          # register and every UI spec fails with element-not-found
+          - template: devops/monorepo/steps/build-frontend.yml@build
+
+          - template: devops/monorepo/steps/scaffold-demo-site.yml@build
+            parameters:
+              install_script: scripts/install-demo-site.ps1
+              install_arguments: -SkipSolution
+              project_file: ${{ parameters.demo_project_file }}
+
+          - template: devops/monorepo/steps/localdb.yml@build
+            parameters:
+              action: wait
+
+          # Start the site as soon as it is built and its database is up, and install the test
+          # tooling while it boots (a first boot creates the database and runs the unattended
+          # install and the migrations). Umbraco.Build's demo-site.yml starts and waits in one go,
+          # so the start and the wait are Automate's own; its stop is used below. The output goes
+          # to the staging folder, which publish-acceptance-results.yml@build uploads.
+          - pwsh: |
+              $process = Start-Process dotnet "run --project `"$(demoProject)`" --configuration Release --no-build --no-launch-profile" -PassThru -NoNewWindow -RedirectStandardOutput "$(Build.ArtifactStagingDirectory)/demo-site.log" -RedirectStandardError "$(Build.ArtifactStagingDirectory)/demo-site.err.log"
+              Write-Host "##vso[task.setvariable variable=demoSitePid]$($process.Id)"
+              Write-Host "Demo site starting as PID $($process.Id)"
+            displayName: Start demo site
+
+          - template: devops/monorepo/steps/install-playwright.yml@build
+            parameters:
+              tests_dir: ${{ parameters.tests_dir }}
+
+          - template: devops/monorepo/steps/write-acceptance-env.yml@build
+            parameters:
+              tests_dir: ${{ parameters.tests_dir }}
+              user_login: admin@example.com
+              user_password: password1234
+
+          # Polls /umbraco every 3s for up to 15 minutes. Fails at once if the site has exited
+          # (the recorded PID is the `dotnet run` launcher, which exits with it), and prints the end
+          # of its logs on a failure.
+          - pwsh: |
+              $exited = $false
+              for ($i = 0; $i -lt 300; $i++) {
+                try {
+                  Invoke-WebRequest "$(ASPNETCORE_URLS)/umbraco" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 10 | Out-Null
+                  Write-Host "Demo site is up (attempt $i)"
+                  exit 0
+                } catch {
+                  if (-not (Get-Process -Id $(demoSitePid) -ErrorAction SilentlyContinue)) {
+                    $exited = $true
+                    break
+                  }
+                  Start-Sleep -Seconds 3
+                }
+              }
+              if ($exited) {
+                Write-Host "##vso[task.logissue type=error]Demo site exited before it responded"
+              } else {
+                Write-Host "##vso[task.logissue type=error]Demo site did not respond within 15 minutes"
+              }
+              Get-Content "$(Build.ArtifactStagingDirectory)/demo-site.log" -Tail 100 -ErrorAction SilentlyContinue
+              Get-Content "$(Build.ArtifactStagingDirectory)/demo-site.err.log" -Tail 100 -ErrorAction SilentlyContinue
+              exit 1
+            displayName: Wait for demo site
+
+          - template: devops/monorepo/steps/run-acceptance-tests.yml@build
+            parameters:
+              tests_dir: ${{ parameters.tests_dir }}
+
+          # Always runs, and kills the whole process tree (the site is a child of `dotnet run` and
+          # holds the log open)
+          - template: devops/monorepo/steps/demo-site.yml@build
+            parameters:
+              action: stop
+
+          - template: devops/monorepo/steps/localdb.yml@build
+            parameters:
+              action: stop
+
+          - template: devops/monorepo/steps/publish-acceptance-results.yml@build
+            parameters:
+              tests_dir: ${{ parameters.tests_dir }}
