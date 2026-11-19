@@ -109,7 +109,9 @@ test.describe('Binding picker', () => {
     expect(details.some((detail) => detail.includes('(optional)'))).toBe(true);
   });
 
-  test('inserts the chosen expression into the field', async ({
+  // @smoke: the step settings form with a binding inserted through the binding picker into a code
+  // editor. This test caught a front-end race on CI once (a binding lost while Monaco loaded).
+  test('@smoke inserts the chosen expression into the field', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi
