@@ -179,10 +179,17 @@ acceptance suite is deliberately **outside** the root workspaces, with its own l
 
 ## Keep the helper package aligned to the CMS range
 
-`package.json` must track `Umbraco.Cms.Core` in `Directory.Packages.props` (currently 19.0.0-rc1):
-`@umbraco-cms/acceptance-test-helpers` and the `@umbraco-cms/backoffice` devDep are both pinned
-`^19.0.0-rc1` so they float within the major. A stale pin can drift helper behaviour against the
-running site. Bumping affects the **whole** suite — re-run everything after a bump.
+`@umbraco-cms/acceptance-test-helpers` is the one package here that must track `Umbraco.Cms.Core`
+in `Directory.Packages.props` (currently 19.0.0-rc1). It is pinned `^19.0.0-rc1` so it floats
+within the major. A stale pin can drift helper behaviour against the running site. Bumping
+affects the **whole** suite — re-run everything after a bump.
+
+Do not add `@umbraco-cms/backoffice` back. It used to be a devDependency here, pinned to the same
+range, but nothing in `tests/`, `lib/`, `fixtures/` or the config imports it, and the helpers
+package doesn't need it (it depends only on `tslib`, with `@playwright/test` as a peer). With
+TipTap, Monaco, UUI and RxJS it was about 24k of the 27k installed files, and every CI leg paid
+for it in "Restore acceptance test packages" (a median 50 s). The specs drive the backoffice in a
+browser; they never import its code.
 
 ## Playwright version pin
 
