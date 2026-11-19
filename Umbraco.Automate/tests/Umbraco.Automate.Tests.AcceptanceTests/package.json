@@ -16,7 +16,6 @@
   "devDependencies": {
     "@playwright/test": "1.60.0",
     "@types/node": "^20.9.0",
-    "@umbraco-cms/backoffice": "^19.0.0-rc1",
     "prompt": "^1.3.0",
     "typescript": "^5.8.3"
   },

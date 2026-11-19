@@ -41,7 +41,9 @@ test.describe('Connection testing and authentication', () => {
     }
   });
 
-  test('offers a same-tab fallback when the sign-in popup is blocked (#348)', async ({
+  // @smoke: the connection workspace, and the only test that renders OpenIddict's OAuth editor
+  // (a separate front-end bundle) and reaches its challenge endpoint.
+  test('@smoke offers a same-tab fallback when the sign-in popup is blocked (#348)', async ({
     umbracoUi,
     umbracoAutomateUi,
     umbracoAutomateApi
