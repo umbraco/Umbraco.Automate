@@ -6,7 +6,8 @@
 # Automate's own stage, built from Umbraco.Build's monorepo step templates (`@build`). It started
 # as Umbraco.Build's devops/monorepo/stages/acceptance-tests.yml. What is Automate's own:
 #   - the matrix (Compute acceptance matrix below): full runs split the shards by recorded test
-#     duration with the acceptance folder's shard-test-list.js, not Playwright's --shard
+#     duration with the acceptance folder's shard-test-list.js, not Playwright's --shard, and a
+#     pull request into anything but a vN/dev branch always runs the whole suite
 #   - the demo site starts as soon as it is built and LocalDB is up, and boots while the test
 #     tooling installs (Start demo site, then Wait for demo site)
 # Every other step is Umbraco.Build's, unchanged.
@@ -95,12 +96,24 @@ stages:
           #   smoke    one leg running the @smoke tests. Setup projects still run: --grep filters
           #            only the tests in the projects that depend on them. --grep=@smoke keeps the
           #            tag attached, so no shell can read @smoke on its own.
+          # Only a pull request into a vN/dev branch narrows to changed or smoke: one into anything
+          # else (vN/main, a release or hotfix branch) runs the whole suite, as in Umbraco Forms,
+          # because no vN/dev push after merge will run it. Pushes and manual runs are full already.
           # Each leg has a `leg` name (for step titles, test run titles and artifact names) and its
           # `testCommand`, which run-acceptance-tests.yml@build runs in tests_dir.
           - bash: |
               shards=${{ parameters.shards }}
               list=playwright/shard-test-list.txt
-              case "$(changes.acceptanceScope)" in
+              scope="$(changes.acceptanceScope)"
+              target="${SYSTEM_PULLREQUEST_TARGETBRANCH:-}"
+              target="${target#refs/heads/}"
+              if [ "$BUILD_REASON" = PullRequest ] && [ "$scope" != full ]; then
+                case "$target" in
+                  v*/dev) ;;
+                  *) echo "Into $target, not a vN/dev branch: running the whole suite, not $scope."; scope=full ;;
+                esac
+              fi
+              case "$scope" in
                 changed)
                   matrix='{"Changed specs":{"leg":"Changed specs","testCommand":"npm run test -- --only-changed=HEAD~1 --pass-with-no-tests"}}'
                   ;;

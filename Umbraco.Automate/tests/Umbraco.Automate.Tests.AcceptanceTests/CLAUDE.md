@@ -305,7 +305,10 @@ the matrix and the demo site's start and wait are Automate's own steps.
   and Management API included) runs **one** leg of the `@smoke` tests. A PR that changes specs as
   well runs the whole suite: Playwright ANDs `--grep` with `--only-changed`, so no single leg
   covers both. Anything else, such as `Directory.Packages.props`, the root `package*.json` or
-  `scripts/install-demo-site.*`, runs the whole suite. Pushes always run the whole suite, so a
+  `scripts/install-demo-site.*`, runs the whole suite. All of that narrowing is for PRs into a
+  `vN/dev` branch: a PR into anything else (`vN/main`, a release or hotfix branch) always runs the
+  whole suite, as in Umbraco Forms, since no `vN/dev` push after merge will. The stage's matrix
+  step applies that rule from the PR's target branch. Pushes always run the whole suite, so a
   regression the smoke set misses shows up on the `vN/dev` push after merge. A manual run of the
   PR's branch forces it too. Use `HEAD~1`, never `HEAD^1`: npm runs the
   script through cmd.exe on Windows, where `^` is the escape character. The job condition skips
