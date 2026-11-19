@@ -198,7 +198,9 @@ test.describe('Automation canvas', () => {
     expect(overlaps).toBe(false);
   });
 
-  test('inserts a step between an output and its existing target (#346)', async ({
+  // @smoke: the designer's add-a-step path (action picker, step settings, Save), so a front-end PR
+  // that only gets the smoke tests still proves a step can be added on the canvas and saved.
+  test('@smoke inserts a step between an output and its existing target (#346)', async ({
     automateServiceAccountWorkspace,
     umbracoUi,
     umbracoAutomateUi,
