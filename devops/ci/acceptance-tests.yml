@@ -76,7 +76,7 @@ stages:
           - checkout: self
             fetchDepth: 2
 
-          - template: devops/monorepo/steps/detect-acceptance-changes.yml@build
+          - template: /devops/monorepo/steps/detect-acceptance-changes.yml@build
             parameters:
               tests_dir: ${{ parameters.tests_dir }}
               skip_paths: ${{ parameters.skip_paths }}
@@ -155,19 +155,19 @@ stages:
           - checkout: self
             fetchDepth: 0
 
-          - template: devops/monorepo/steps/localdb.yml@build
+          - template: /devops/monorepo/steps/localdb.yml@build
             parameters:
               action: start
 
           # The image's own SDK when one satisfies global.json, so most legs skip the SDK cache and
           # install; the cache only serves a leg that has to install one
-          - template: devops/monorepo/steps/install-tools.yml@build
+          - template: /devops/monorepo/steps/install-tools.yml@build
             parameters:
               node_version: ${{ parameters.node_version }}
               cache_sdk: true
               use_image_sdk: true
 
-          - template: devops/monorepo/steps/cache-packages.yml@build
+          - template: /devops/monorepo/steps/cache-packages.yml@build
             parameters:
               npm_key_files:
                 - package-lock.json
@@ -178,15 +178,15 @@ stages:
 
           # The demo site serves the built bundles; without them the products' sections don't
           # register and every UI spec fails with element-not-found
-          - template: devops/monorepo/steps/build-frontend.yml@build
+          - template: /devops/monorepo/steps/build-frontend.yml@build
 
-          - template: devops/monorepo/steps/scaffold-demo-site.yml@build
+          - template: /devops/monorepo/steps/scaffold-demo-site.yml@build
             parameters:
               install_script: scripts/install-demo-site.ps1
               install_arguments: -SkipSolution
               project_file: ${{ parameters.demo_project_file }}
 
-          - template: devops/monorepo/steps/localdb.yml@build
+          - template: /devops/monorepo/steps/localdb.yml@build
             parameters:
               action: wait
 
@@ -201,11 +201,11 @@ stages:
               Write-Host "Demo site starting as PID $($process.Id)"
             displayName: Start demo site
 
-          - template: devops/monorepo/steps/install-playwright.yml@build
+          - template: /devops/monorepo/steps/install-playwright.yml@build
             parameters:
               tests_dir: ${{ parameters.tests_dir }}
 
-          - template: devops/monorepo/steps/write-acceptance-env.yml@build
+          - template: /devops/monorepo/steps/write-acceptance-env.yml@build
             parameters:
               tests_dir: ${{ parameters.tests_dir }}
               user_login: admin@example.com
@@ -239,20 +239,20 @@ stages:
               exit 1
             displayName: Wait for demo site
 
-          - template: devops/monorepo/steps/run-acceptance-tests.yml@build
+          - template: /devops/monorepo/steps/run-acceptance-tests.yml@build
             parameters:
               tests_dir: ${{ parameters.tests_dir }}
 
           # Always runs, and kills the whole process tree (the site is a child of `dotnet run` and
           # holds the log open)
-          - template: devops/monorepo/steps/demo-site.yml@build
+          - template: /devops/monorepo/steps/demo-site.yml@build
             parameters:
               action: stop
 
-          - template: devops/monorepo/steps/localdb.yml@build
+          - template: /devops/monorepo/steps/localdb.yml@build
             parameters:
               action: stop
 
-          - template: devops/monorepo/steps/publish-acceptance-results.yml@build
+          - template: /devops/monorepo/steps/publish-acceptance-results.yml@build
             parameters:
               tests_dir: ${{ parameters.tests_dir }}
