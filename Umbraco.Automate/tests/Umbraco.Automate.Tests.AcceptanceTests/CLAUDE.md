@@ -303,11 +303,33 @@ inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automa
   can be created, and a published automation runs to completion. Tag a test `@smoke` only if a
   broken boot, migration, DI registration or engine run would fail it.
 - **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
-  its own `testCommand`, e.g. `npm run test -- --shard=1/4`), each against its **own** demo site
-  and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a
-  site. `fullyParallel: true` (with one worker) makes Playwright split by test rather than by file, so shards finish together; every shard runs `auth.setup.ts` itself. Each shard pays
-  the full setup (build, scaffold, first boot), so extra shards only help while the tests
-  themselves dominate; results and artifacts are named per leg.
+  its own `testCommand`), each against its **own** demo site and LocalDB. Specs share site data
+  and the suite runs a single worker, so shards must not share a site. Every shard runs
+  `auth.setup.ts` itself. Each shard pays the full setup (build, scaffold, first boot), so extra
+  shards only help while the tests themselves dominate; results and artifacts are named per leg.
+- **The shards are split by recorded test duration, not `--shard`** (`shard_timings:
+  shard-timings.json` in `azure-pipelines.yml`). `--shard` gives each shard the same number of
+  tests, so shard 1 always finished last: 824 s against 580 s for shard 4 (medians of 55 runs,
+  November 2026). Each leg's "Split the suite by test duration" step lists the suite
+  (`npm run test -- --list`), hands the tests out longest first to the least loaded shard using
+  `shard-timings.json`, and the leg then runs `npm run test -- --test-list shard-test-list.txt`.
+  That step's log shows every shard's estimate and the leg's tests.
+  - Every test runs on exactly one shard. A test with no recorded time (a new one) counts as the
+    median, so out-of-date timings only make the split less even.
+  - `fullyParallel: true` is what lets the split go test by test. A file with a serial or
+    default-mode describe stays whole, on one shard.
+  - Renaming a test (adding `@smoke` included) changes its key, so it counts as the median until
+    the next refresh. Changing `shard-timings.json` runs the whole suite on the PR.
+  - When the "Run acceptance tests" times drift apart, refresh the file from a few recent green
+    builds of this line's `dev` branch. The script lives in Umbraco.Build; run it with this
+    folder's npm packages installed and `az login` done. It keeps the median passed time per test:
+
+    ```bash
+    node <Umbraco.Build checkout>/devops/monorepo/scripts/update-shard-timings.mjs \
+      --project "https://dev.azure.com/umbraco/Umbraco Automate" \
+      --tests-dir Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests \
+      <buildId> <buildId> ...
+    ```
 - **Scaffolds the site with `scripts/install-demo-site.ps1`**, the same script developers run, so
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to

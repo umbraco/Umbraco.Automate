@@ -145,6 +145,10 @@ extends:
                   node_version: 24.x
                   tests_dir: Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
                   demo_project_file: Umbraco.Automate.DemoSite.csproj
+                  # Split the four shards by recorded test duration, not Playwright's --shard, which
+                  # gives each the same number of tests, so shard 1 always finished last. Refresh the
+                  # file as the acceptance tests' CLAUDE.md says ("How the CI stage works").
+                  shard_timings: shard-timings.json
                   # A PR that only touches these never runs the suite: docs, repo tooling, the dotnet new
                   # templates (not scripts/templates/), changelog and release tooling, marketplace JSON.
                   skip_paths:
