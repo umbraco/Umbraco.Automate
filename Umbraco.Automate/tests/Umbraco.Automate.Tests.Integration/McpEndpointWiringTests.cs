@@ -40,6 +40,7 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
     // Low enough that a test can reach them, high enough that the other tests never do.
     private const int RateLimitPerMinute = 3;
     private const long MaxPayloadBytes = 4096;
+    private const string Secret = "test-secret";
 
     private IHost _host = null!;
     private HttpClient _client = null!;
@@ -55,6 +56,7 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
             {
                 ["toolName"] = "Echo",
                 ["toolDescription"] = "Echoes input back.",
+                ["secret"] = Secret,
                 ["inputFields"] = new List<Dictionary<string, object?>>
                 {
                     new()
@@ -167,6 +169,7 @@ public sealed class McpEndpointWiringTests : IAsyncLifetime
         // requirement, not something particular to this test host.
         _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Secret);
     }
 
     private Task<HttpResponseMessage> PostAsync(Guid automationId, object body)

@@ -132,9 +132,9 @@ still works, standing in with a sample set of arguments the author can edit
 
 - Bearer token in the `Authorization` header, checked against
   `McpTriggerSettings.Secret`.
-- Optional: an author can leave `Secret` blank to run the endpoint without
-  auth, same as a webhook's authenticator can be configured that way today.
-  This is a deliberate author choice, not a default.
+- Required. The editor generates one, publish refuses an automation without
+  one, and the endpoint refuses calls to an automation that has none. There
+  is no unauthenticated mode.
 
 ## Execution & wait semantics
 

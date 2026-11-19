@@ -60,6 +60,7 @@ public sealed class McpTriggerSettingsTests
         {
             ["toolName"] = "send_welcome-email1",
             ["toolDescription"] = "Sends the welcome email.",
+            ["secret"] = "s3cret",
         };
 
         var resolved = trigger.ResolveSettings(settings);

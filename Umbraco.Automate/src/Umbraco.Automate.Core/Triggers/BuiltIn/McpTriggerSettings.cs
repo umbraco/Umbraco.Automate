@@ -30,10 +30,11 @@ public sealed class McpTriggerSettings
 
     [Field(
         Label = "Secret",
-        Description = "Bearer token the caller must send in the Authorization header. Leave blank to allow calls with no authentication.",
+        Description = "Bearer token the caller must send in the Authorization header. Generated for you; regenerate it to revoke access.",
         IsSensitive = true,
         EditorUiAlias = "Umb.Automate.WebhookSecretField",
         SortOrder = 30)]
+    [Required(ErrorMessage = "A secret is required. Every MCP call must send it as a bearer token.")]
     public string? Secret { get; set; }
 
     /// <summary>

@@ -30,7 +30,10 @@ public sealed class McpAuthenticationMiddlewareTests
         _triggers = new TriggerCollection(() => [new McpTrigger(new TriggerInfrastructure(modelResolver))]);
     }
 
-    private static Dictionary<string, object?> McpSettings(string? secret = null, string toolName = "DoThing")
+    private const string Secret = "correct-secret";
+    private const string ValidAuthorization = "Bearer " + Secret;
+
+    private static Dictionary<string, object?> McpSettings(string? secret = Secret, string toolName = "DoThing")
     {
         var settings = new Dictionary<string, object?>
         {
@@ -151,11 +154,19 @@ public sealed class McpAuthenticationMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_NoSecretConfigured_CallsNextWithThePublishedAutomation()
+    public async Task InvokeAsync_NoSecretConfigured_Returns401RatherThanServingUnauthenticated()
+    {
+        SetupPublished(McpSettings(secret: null));
+
+        ShouldBeRefused(await InvokeAsync());
+    }
+
+    [Fact]
+    public async Task InvokeAsync_CorrectBearerToken_CallsNextWithThePublishedAutomation()
     {
         var published = SetupPublished(McpSettings());
 
-        var context = await InvokeAsync();
+        var context = await InvokeAsync(ValidAuthorization);
 
         _nextCalled.ShouldBeTrue();
         context.Items[McpHttpContextItems.AutomationKey].ShouldBeSameAs(published);
@@ -163,46 +174,39 @@ public sealed class McpAuthenticationMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_SecretConfigured_MissingAuthorizationHeader_Returns401()
+    public async Task InvokeAsync_MissingAuthorizationHeader_Returns401()
     {
-        SetupPublished(McpSettings(secret: "correct-secret"));
+        SetupPublished(McpSettings());
 
         ShouldBeRefused(await InvokeAsync());
     }
 
     [Fact]
-    public async Task InvokeAsync_SecretConfigured_NonBearerScheme_Returns401()
+    public async Task InvokeAsync_NonBearerScheme_Returns401()
     {
-        SetupPublished(McpSettings(secret: "correct-secret"));
+        SetupPublished(McpSettings());
 
         ShouldBeRefused(await InvokeAsync("Basic xyz"));
     }
 
     [Fact]
-    public async Task InvokeAsync_SecretConfigured_WrongBearerToken_Returns401()
+    public async Task InvokeAsync_WrongBearerToken_Returns401()
     {
-        SetupPublished(McpSettings(secret: "correct-secret"));
+        SetupPublished(McpSettings());
 
         ShouldBeRefused(await InvokeAsync("Bearer wrong-secret"));
     }
 
     [Fact]
-    public async Task InvokeAsync_SecretConfigured_CorrectBearerToken_CallsNext()
+    public async Task InvokeAsync_DraftChangedTheSecret_OnlyThePublishedSecretWorks()
     {
-        SetupPublished(McpSettings(secret: "correct-secret"));
-
-        await InvokeAsync("Bearer correct-secret");
-
-        _nextCalled.ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task InvokeAsync_DraftClearedTheSecret_StillRequiresThePublishedSecret()
-    {
-        SetupCurrent(new AutomationBuilder().WithId(_automationId).WithTrigger(McpTrigger.WellKnownAlias, McpSettings()));
+        SetupCurrent(new AutomationBuilder().WithId(_automationId).WithTrigger(McpTrigger.WellKnownAlias, McpSettings(secret: "draft-secret")));
         SetupSnapshot(new AutomationBuilder().WithId(_automationId).WithTrigger(McpTrigger.WellKnownAlias, McpSettings(secret: "published-secret")));
 
-        ShouldBeRefused(await InvokeAsync());
+        ShouldBeRefused(await InvokeAsync("Bearer draft-secret"));
+
+        await InvokeAsync("Bearer published-secret");
+        _nextCalled.ShouldBeTrue();
     }
 
     [Fact]
@@ -212,7 +216,7 @@ public sealed class McpAuthenticationMiddlewareTests
         Automation published = new AutomationBuilder().WithId(_automationId).WithTrigger(McpTrigger.WellKnownAlias, McpSettings(toolName: "PublishedName"));
         SetupSnapshot(published);
 
-        var context = await InvokeAsync();
+        var context = await InvokeAsync(ValidAuthorization);
 
         _nextCalled.ShouldBeTrue();
         context.Items[McpHttpContextItems.AutomationKey].ShouldBeSameAs(published);

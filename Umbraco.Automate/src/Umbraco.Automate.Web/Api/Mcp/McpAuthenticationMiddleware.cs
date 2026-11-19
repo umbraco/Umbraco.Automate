@@ -14,7 +14,7 @@ namespace Umbraco.Automate.Web.Api.Mcp;
 /// Resolves the automation addressed by the MCP endpoint's <c>{automationId}</c> route value,
 /// loads its published version, checks it has an <see cref="McpTrigger"/>, and checks the caller's
 /// bearer token against that version's secret — all before the request reaches the MCP handler.
-/// A blank secret is a deliberate author choice to allow unauthenticated calls.
+/// A secret is required: an automation without one is refused, never served unauthenticated.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -108,7 +108,16 @@ internal sealed class McpAuthenticationMiddleware
             return;
         }
 
-        if (!string.IsNullOrEmpty(settings.Secret) && !HasValidBearerToken(context.Request, settings.Secret))
+        if (string.IsNullOrEmpty(settings.Secret))
+        {
+            _logger.LogWarning(
+                "MCP call refused: automation {AutomationId} has no MCP secret. Set one and republish.",
+                automationId);
+            Unauthorized(context);
+            return;
+        }
+
+        if (!HasValidBearerToken(context.Request, settings.Secret))
         {
             Unauthorized(context);
             return;

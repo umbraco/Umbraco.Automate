@@ -97,6 +97,7 @@ public class AutomationServicePublishTriggerSettingsValidationTests
         {
             ["toolName"] = "find_orders",
             ["toolDescription"] = "Finds orders.",
+            ["secret"] = "s3cret",
             ["inputFields"] = new List<Dictionary<string, object?>> { new() { ["name"] = "email" } },
         });
 
@@ -132,7 +133,7 @@ public class AutomationServicePublishTriggerSettingsValidationTests
     [Fact]
     public async Task Publish_McpTriggerWithOutOfRangeTimeout_IsRejected()
     {
-        var automation = GivenDraftMcp(new Dictionary<string, object?> { ["toolName"] = "find_orders", ["toolDescription"] = "Finds orders.", ["timeoutSeconds"] = 0 });
+        var automation = GivenDraftMcp(new Dictionary<string, object?> { ["toolName"] = "find_orders", ["toolDescription"] = "Finds orders.", ["secret"] = "s3cret", ["timeoutSeconds"] = 0 });
 
         var ex = await Should.ThrowAsync<AutomationValidationException>(
             () => _service.PublishAutomationAsync(automation.Id));
@@ -147,6 +148,7 @@ public class AutomationServicePublishTriggerSettingsValidationTests
         {
             ["toolName"] = "find_orders",
             ["toolDescription"] = "Finds orders.",
+            ["secret"] = "s3cret",
             ["inputFields"] = new List<Dictionary<string, object?>> { new() { ["name"] = "email" }, new() { ["name"] = "email" } },
         });
 
@@ -154,6 +156,21 @@ public class AutomationServicePublishTriggerSettingsValidationTests
             () => _service.PublishAutomationAsync(automation.Id));
 
         ex.Errors.ShouldContain(error => error.StartsWith("Trigger 'MCP Tool'") && error.Contains("email"));
+    }
+
+    [Fact]
+    public async Task Publish_McpTriggerWithNoSecret_IsRejected()
+    {
+        var automation = GivenDraftMcp(new Dictionary<string, object?>
+        {
+            ["toolName"] = "find_orders",
+            ["toolDescription"] = "Finds orders.",
+        });
+
+        var ex = await Should.ThrowAsync<AutomationValidationException>(
+            () => _service.PublishAutomationAsync(automation.Id));
+
+        ex.Errors.ShouldContain("Trigger 'MCP Tool': A secret is required. Every MCP call must send it as a bearer token.");
     }
 
     [Fact]
