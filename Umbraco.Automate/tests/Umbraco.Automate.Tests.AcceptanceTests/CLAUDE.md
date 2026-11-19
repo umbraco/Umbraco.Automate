@@ -280,8 +280,9 @@ bites in one place is usually this divergence, not a product bug.
 The `AcceptanceTests` stage is Automate's own `devops/ci/acceptance-tests.yml`, inserted through
 `additional_tests` in `azure-pipelines.yml`, as Umbraco Forms does with its `devops/ci/` stages.
 `azure-pipelines.yml` passes it the path patterns, the image and the Node version. The stage is
-built from Umbraco.Build's monorepo step templates (`devops/monorepo/steps/*.yml@build`, unchanged);
-the matrix and the demo site's start and wait are Automate's own steps.
+built from Umbraco.Build's step templates (`devops/monorepo/steps/*.yml@build`, unchanged). The
+matrix, the npm cache, the demo site's start and wait, and the results upload are Automate's own
+steps.
 
 - **Depends on nothing (`dependsOn: []`), so it runs alongside `Build`.** It uses nothing
   `Build` produces, so waiting for it only cost ~3.5 min of wall-clock; the price is a wasted
@@ -333,6 +334,9 @@ the matrix and the demo site's start and wait are Automate's own steps.
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to
   register and every UI spec fails with element-not-found.
+- **Caches npm packages, not NuGet packages.** Restoring the NuGet cache took a median 29 s (p90
+  51 s) per leg, and Umbraco Forms found its acceptance NuGet cache cost more than it saved, so
+  "Build demo site" restores from nuget.org. The npm and Playwright browser caches stay.
 - **Starts the demo site early.** "Start demo site" runs as soon as the site is built and LocalDB
   is up, and the test project's `npm ci`, the Playwright install and the `.env` run while it boots
   (a first boot creates the database and runs the unattended install and the migrations). "Wait

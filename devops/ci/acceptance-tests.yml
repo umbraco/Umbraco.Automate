@@ -3,7 +3,7 @@
 # development does. azure-pipelines.yml inserts it through additional_tests, as Umbraco Forms does
 # with its devops/ci/ stages.
 #
-# Automate's own stage, built from Umbraco.Build's monorepo step templates (`@build`). It started
+# Automate's own stage, built from Umbraco.Build's step templates (`@build`). It started
 # as Umbraco.Build's devops/monorepo/stages/acceptance-tests.yml. What is Automate's own:
 #   - the matrix (Compute acceptance matrix below): full runs split the shards by recorded test
 #     duration with the acceptance folder's shard-test-list.js, not Playwright's --shard, and a
@@ -11,6 +11,8 @@
 #   - the demo site starts as soon as it is built and LocalDB is up, and boots while the test
 #     tooling installs (Start demo site, then Wait for demo site)
 #   - the results upload skips the results folder when a leg has none
+#   - the package cache is npm only (the main template's cache-restore.yml@build), with no NuGet
+#     cache
 # Every other step is Umbraco.Build's, unchanged.
 #
 # Jobs:
@@ -181,14 +183,15 @@ stages:
               cache_sdk: true
               use_image_sdk: true
 
-          - template: /devops/monorepo/steps/cache-packages.yml@build
+          # npm only, with the same key Umbraco.Build's cache-packages.yml uses. No NuGet cache: it
+          # took a median 29 s (p90 51 s) per leg to restore, and Umbraco Forms found its acceptance
+          # NuGet cache cost more than it saved; "Build demo site" restores from nuget.org instead.
+          - template: /devops/steps/cache-restore.yml@build
             parameters:
-              npm_key_files:
-                - package-lock.json
-                - ${{ parameters.tests_dir }}/package-lock.json
-              nuget_key_files:
-                - Directory.Packages.props
-                - scripts/install-demo-site.ps1
+              display_name: Cache npm packages
+              key: "npm | package-lock.json | ${{ parameters.tests_dir }}/package-lock.json"
+              restore_keys: npm
+              path: $(npm_config_cache)
 
           # The demo site serves the built bundles; without them the products' sections don't
           # register and every UI spec fails with element-not-found
