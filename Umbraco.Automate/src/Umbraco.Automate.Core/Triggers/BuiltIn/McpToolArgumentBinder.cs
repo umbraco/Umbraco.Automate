@@ -1,7 +1,6 @@
 using System.Text.Json;
-using Umbraco.Automate.Core.Triggers.BuiltIn;
 
-namespace Umbraco.Automate.Web.Api.Mcp;
+namespace Umbraco.Automate.Core.Triggers.BuiltIn;
 
 /// <summary>
 /// Validates an incoming MCP tool call's arguments against an <see cref="McpTrigger"/>'s declared

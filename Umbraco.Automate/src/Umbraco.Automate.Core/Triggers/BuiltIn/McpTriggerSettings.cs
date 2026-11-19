@@ -36,10 +36,18 @@ public sealed class McpTriggerSettings
         SortOrder = 30)]
     public string? Secret { get; set; }
 
+    /// <summary>
+    /// The largest <see cref="TimeoutSeconds"/> the endpoint honours. Each waiting call holds a
+    /// request open and polls the run, so the wait is capped even for settings saved before the
+    /// range check existed.
+    /// </summary>
+    public const int MaxTimeoutSeconds = 300;
+
     [Field(
         Label = "Timeout (seconds)",
-        Description = "How long to wait for the run to finish before telling the agent it's still running.",
+        Description = "How long to wait for the run to finish before telling the agent it's still running. Between 1 and 300.",
         SortOrder = 40)]
+    [Range(1, MaxTimeoutSeconds, ErrorMessage = "Timeout must be between 1 and 300 seconds.")]
     public int TimeoutSeconds { get; set; } = 30;
 
     [Field(

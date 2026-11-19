@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Shouldly;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
-using Umbraco.Automate.Web.Api.Mcp;
+
 using Xunit;
 
 namespace Umbraco.Automate.Tests.Unit.Mcp;
