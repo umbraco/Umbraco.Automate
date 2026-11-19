@@ -176,16 +176,14 @@ extends:
                       - "Umbraco.Automate/tests/Directory.*"
                       - "Umbraco.Automate.OpenIddict/tests/*"
                       - "Umbraco.Automate.Slack/tests/*"
-                  # Server-side C# the backoffice doesn't call directly runs only the @smoke tests: the
-                  # .NET tests in Build cover its behaviour, and the smoke set proves the site still
-                  # builds, migrates, boots and serves the backoffice. The push to vN/dev after merge
-                  # runs the whole suite, and a manual run of the PR's branch forces it.
+                  # Product source runs only the @smoke tests on a pull request: server-side C#, the
+                  # Management API and the frontends alike. The .NET tests in Build cover the server
+                  # side, and the smoke set proves the site still builds, migrates, boots and serves its
+                  # main screens. The push to vN/dev after merge runs the whole suite, and a manual run
+                  # of the PR's branch forces it. A PR that also changes specs runs the whole suite, and
+                  # so does anything not listed here: Directory.Packages.props, the root package*.json,
+                  # scripts/install-demo-site.*, the acceptance project outside its specs.
                   smoke_paths:
                       - "Umbraco.Automate/src/*"
                       - "Umbraco.Automate.OpenIddict/src/*"
                       - "Umbraco.Automate.Slack/src/*"
-                  # Exceptions inside those: the Management API and the frontends run the whole suite.
-                  full_paths:
-                      - "Umbraco.Automate/src/Umbraco.Automate.Web/*"
-                      - "Umbraco.Automate/src/Umbraco.Automate.Web.StaticAssets/*"
-                      - "Umbraco.Automate.OpenIddict/src/*/Client/*"
