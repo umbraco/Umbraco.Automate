@@ -1,7 +1,7 @@
 # MCP Trigger — Design Spec
 
 Date: 2026-09-04
-Status: Draft, pending review
+Status: Implemented in PR #284
 
 ## Summary
 
@@ -83,7 +83,8 @@ public sealed class McpTriggerSettings
     public string? Secret { get; set; }
 
     // Seconds to wait for the run to finish before returning a
-    // "still running" result instead of the real one. Default 30.
+    // "still running" result instead of the real one. Default 30,
+    // between 1 and 300 (checked at publish, clamped at call time).
     public int TimeoutSeconds { get; set; } = 30;
 }
 
@@ -137,15 +138,21 @@ still works, standing in with a sample set of arguments the author can edit
 
 ## Execution & wait semantics
 
+0. Before the MCP handler runs, the endpoint loads the automation's
+   **published version** (not the current draft) and checks the secret
+   against it. A saved but unpublished change, such as a cleared secret or
+   an added step, doesn't go live until it's published. The run uses the
+   same published version.
 1. `tools/call` arrives, arguments validate against `InputFields`.
 2. The endpoint builds `McpTriggerOutput.Arguments` from the validated
    arguments and calls `IAutomationExecutor.ExecuteAsync` directly —
    targeting this one automation, the same pattern
    `TriggerAutomationController` and the webhook endpoint already use, not
    the fan-out dispatcher.
-3. The endpoint then polls `IAutomationRunService` for the run's status on a
-   short interval until it reaches a terminal status or `TimeoutSeconds`
-   elapses.
+3. The endpoint then polls `IAutomationRunService.GetRunStatusAsync` (the
+   status only, not the step runs) until it reaches a terminal status or
+   `TimeoutSeconds` elapses, starting at 250 ms and backing off to 2 s. It
+   loads the full run once, at the end.
    - **Polling, not the in-process `AutomationRunCompletedNotification`.**
      Automate can run on more than one app instance; the notification fires
      on whichever instance's `RunFinalizer` actually completes the run,
@@ -155,7 +162,9 @@ still works, standing in with a sample set of arguments the author can edit
      live-signal approach is exactly what breaks under multiple replicas.
 4. On terminal status: build the MCP tool result from the run's final
    status and step outputs.
-   - `Completed` → success result with the automation's meaningful output.
+   - `Completed` → success result with the output of the step that finished
+     last, masked and truncated by `IRunDataSanitizer` the way the backoffice
+     shows run data, because the caller may be unauthenticated.
    - `Failed` / `Rejected` → `isError: true`, with the run's error message.
 5. On timeout: return a result telling the agent the run is still going,
    including the run ID, rather than blocking indefinitely or erroring.
@@ -164,13 +173,16 @@ still works, standing in with a sample set of arguments the author can edit
 
 | Condition | Behavior |
 |---|---|
-| Automation not published, or its trigger isn't `McpTrigger` | Request fails before anything runs (404, matching the webhook endpoint) |
+| Automation missing or not published, its trigger isn't `McpTrigger`, or its trigger settings are invalid | 401 before anything runs, the same answer as a wrong secret, matching the webhook endpoint (the reason is logged) |
 | Missing/wrong secret | 401, nothing runs |
+| Request body over `McpOptions.MaxPayloadBytes` (default 1 MB) | 413, nothing runs |
+| Too many runs in progress, or the engine isn't running | Tool-level error telling the agent to try again |
 | Circuit breaker has auto-disabled the automation | Refused before starting, same as "Run now" today |
 | Required input field missing, or wrong type | Tool-level error (`isError: true`) with a message identifying the field — the agent can retry with corrected input, no exception surfaced |
 | A step fails during the run | Tool-level error with the run's own error message |
 | Run doesn't finish within `TimeoutSeconds` | Not an error — a result saying the run is still in progress, with its run ID |
-| High call volume | Same rate-limiting policy as the webhook endpoint |
+| High call volume | 429 past `McpOptions.RateLimitPerMinute` (default 60) calls per automation per minute |
+| Invalid tool name, missing description, duplicate or blank input field names, timeout out of range | Publish is refused with a message for each problem |
 
 ## Testing
 

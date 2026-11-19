@@ -8,7 +8,7 @@
 
 **Tech Stack:** .NET 10, ASP.NET Core, `ModelContextProtocol.AspNetCore` (new dependency), WorkflowCore (via existing `IAutomationExecutor`), xUnit + Shouldly + Moq.
 
-**Spec:** `docs/superpowers/specs/2026-09-04-mcp-trigger-design.md`
+**Spec:** [SPEC.md](SPEC.md)
 
 ## Global Constraints
 
