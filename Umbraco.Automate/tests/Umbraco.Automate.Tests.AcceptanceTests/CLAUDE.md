@@ -364,7 +364,8 @@ the matrix and the demo site's start and wait are Automate's own steps.
   the job attempt. A UI failure is rarely diagnosable from the error text alone. The condition is
   `always()`, as in Forms, because a job killed by its timeout is *cancelled*, and a cancelled job
   skips any step whose condition lacks `always()`, so the run that most needs diagnosing would
-  upload nothing.
+  upload nothing. `results/` is uploaded only when it exists: a leg that fails before Playwright
+  runs has none, and the upload used to fail on it (build 300725).
 - **`maxFailures` stops a run that is going nowhere.** If the site wedges, every remaining spec
   fails in setup with three attempts each, which used to run into the job timeout.
 

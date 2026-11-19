@@ -10,6 +10,7 @@
 #     pull request into anything but a vN/dev branch always runs the whole suite
 #   - the demo site starts as soon as it is built and LocalDB is up, and boots while the test
 #     tooling installs (Start demo site, then Wait for demo site)
+#   - the results upload skips the results folder when a leg has none
 # Every other step is Umbraco.Build's, unchanged.
 #
 # Jobs:
@@ -207,7 +208,7 @@ stages:
           # tooling while it boots (a first boot creates the database and runs the unattended
           # install and the migrations). Umbraco.Build's demo-site.yml starts and waits in one go,
           # so the start and the wait are Automate's own; its stop is used below. The output goes
-          # to the staging folder, which publish-acceptance-results.yml@build uploads.
+          # to the staging folder, which "Upload demo site logs" uploads.
           - pwsh: |
               $process = Start-Process dotnet "run --project `"$(demoProject)`" --configuration Release --no-build --no-launch-profile" -PassThru -NoNewWindow -RedirectStandardOutput "$(Build.ArtifactStagingDirectory)/demo-site.log" -RedirectStandardError "$(Build.ArtifactStagingDirectory)/demo-site.err.log"
               Write-Host "##vso[task.setvariable variable=demoSitePid]$($process.Id)"
@@ -266,6 +267,41 @@ stages:
             parameters:
               action: stop
 
-          - template: /devops/monorepo/steps/publish-acceptance-results.yml@build
-            parameters:
-              tests_dir: ${{ parameters.tests_dir }}
+          # The leg's JUnit results, plus, as artifacts, the results folder (traces, screenshots and
+          # video for failed tests) and the demo site logs. Umbraco.Build's
+          # publish-acceptance-results.yml, except that the results folder is uploaded only when it
+          # exists: a leg that fails before Playwright runs has none, and the upload then failed
+          # with "Path does not exist" (build 300725). Every step runs with always(): a job killed
+          # by its timeout is cancelled, and the run that most needs diagnosing would otherwise
+          # upload nothing. The leg and attempt keep shards and reruns from colliding on names.
+          - pwsh: |
+              $found = Test-Path "$(Build.SourcesDirectory)/${{ parameters.tests_dir }}/results"
+              Write-Host "##vso[task.setvariable variable=hasTestResults]$($found.ToString().ToLower())"
+              if (-not $found) { Write-Host "No results folder: Playwright didn't run" }
+            displayName: Check for test results
+            condition: always()
+
+          - task: PublishTestResults@2
+            displayName: Publish acceptance test results
+            condition: always()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: $(Build.SourcesDirectory)/${{ parameters.tests_dir }}/results/results.xml
+              testRunTitle: Acceptance Tests ($(leg))
+              mergeTestResults: true
+
+          - task: PublishPipelineArtifact@1
+            displayName: Upload failure diagnostics
+            condition: and(always(), eq(variables['hasTestResults'], 'true'))
+            inputs:
+              targetPath: $(Build.SourcesDirectory)/${{ parameters.tests_dir }}/results
+              artifact: acceptance-test-results - $(System.StageName) - $(leg) - Attempt $(System.JobAttempt)
+              publishLocation: pipeline
+
+          - task: PublishPipelineArtifact@1
+            displayName: Upload demo site logs
+            condition: always()
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: acceptance-demo-site-log - $(System.StageName) - $(leg) - Attempt $(System.JobAttempt)
+              publishLocation: pipeline
