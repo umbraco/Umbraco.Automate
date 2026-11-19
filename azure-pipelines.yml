@@ -106,7 +106,8 @@ resources:
         - repository: build
           type: github
           name: umbraco/Umbraco.Build
-          ref: refs/heads/main
+          # VALIDATION ONLY, revert before merge: Umbraco.Build's PR branch
+          ref: refs/heads/feature/acceptance-duration-shards
           endpoint: umbraco
 
 variables:
@@ -143,6 +144,9 @@ extends:
             - template: devops/monorepo/stages/acceptance-tests.yml@build
               parameters:
                   node_version: 24.x
+                  # VALIDATION ONLY, revert before merge: windows-latest's LocalDB rejects
+                  # AttachDbFilename (SqlException 15350)
+                  vm_image: windows-2025
                   tests_dir: Umbraco.Automate/tests/Umbraco.Automate.Tests.AcceptanceTests
                   demo_project_file: Umbraco.Automate.DemoSite.csproj
                   # Split the four shards by recorded test duration, not Playwright's --shard, which
