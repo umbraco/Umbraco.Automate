@@ -82,7 +82,7 @@ export class UaWebhookSecretFieldElement
         return html`
             <div class="row">
                 <uui-input
-                    label=${this.localize.term("uaWebhook_secret")}
+                    label=${this.localize.term("uaSecretField_secret")}
                     .value=${this.value ?? ""}
                     ?readonly=${this.readonly}
                     @input=${this.#onInput}
@@ -90,7 +90,7 @@ export class UaWebhookSecretFieldElement
                 <uui-button
                     compact
                     look="secondary"
-                    label="Copy secret"
+                    label=${this.localize.term("uaSecretField_copySecret")}
                     ?disabled=${!this.value}
                     @click=${this.#onCopy}
                 >
@@ -99,7 +99,7 @@ export class UaWebhookSecretFieldElement
                 <uui-button
                     compact
                     look="secondary"
-                    label="Regenerate secret"
+                    label=${this.localize.term("uaSecretField_regenerateSecret")}
                     ?disabled=${this.readonly}
                     @click=${this.#onRegenerate}
                 >

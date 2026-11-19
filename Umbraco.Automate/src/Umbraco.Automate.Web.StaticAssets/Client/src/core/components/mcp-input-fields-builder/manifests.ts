@@ -7,7 +7,7 @@ const mcpInputFieldsBuilder: UmbExtensionManifest = {
     element: () => import("./mcp-input-fields-builder.element.js"),
     meta: {
         label: "MCP Input Fields Builder",
-        icon: "icon-plug",
+        icon: "icon-wall-plug",
         group: "Automate",
     },
 };

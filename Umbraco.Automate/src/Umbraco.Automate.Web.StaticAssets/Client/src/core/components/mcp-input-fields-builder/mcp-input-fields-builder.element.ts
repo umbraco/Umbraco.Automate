@@ -63,46 +63,71 @@ export class UaMcpInputFieldsBuilderElement extends UmbLitElement implements Umb
                             <div class="field-header">
                                 <uui-input
                                     class="name-input"
-                                    label="Name"
-                                    placeholder="Argument name"
+                                    label=${this.localize.term("uaMcpInputFields_name")}
+                                    placeholder=${this.localize.term("uaMcpInputFields_namePlaceholder")}
                                     .value=${field.name}
-                                    @input=${(e: InputEvent) => this.#updateField(index, { name: (e.target as HTMLInputElement).value })}
+                                    @input=${(e: InputEvent) =>
+                                        this.#updateField(index, { name: (e.target as HTMLInputElement).value })}
                                 ></uui-input>
                                 <uui-select
                                     class="type-select"
+                                    label=${this.localize.term("uaMcpInputFields_type")}
                                     .options=${[
-                                        { name: "Text", value: "Text", selected: field.type === "Text" },
-                                        { name: "Number", value: "Number", selected: field.type === "Number" },
-                                        { name: "Boolean", value: "Boolean", selected: field.type === "Boolean" },
+                                        {
+                                            name: this.localize.term("uaMcpInputFields_typeText"),
+                                            value: "Text",
+                                            selected: field.type === "Text",
+                                        },
+                                        {
+                                            name: this.localize.term("uaMcpInputFields_typeNumber"),
+                                            value: "Number",
+                                            selected: field.type === "Number",
+                                        },
+                                        {
+                                            name: this.localize.term("uaMcpInputFields_typeBoolean"),
+                                            value: "Boolean",
+                                            selected: field.type === "Boolean",
+                                        },
                                     ]}
                                     @change=${(e: CustomEvent) =>
                                         this.#updateField(index, {
                                             type: (e.target as HTMLSelectElement).value as McpToolInputFieldRow["type"],
                                         })}
                                 ></uui-select>
-                                <uui-button compact look="secondary" label="Remove field" @click=${() => this.#removeField(index)}>
+                                <uui-button
+                                    compact
+                                    look="secondary"
+                                    label=${this.localize.term("uaMcpInputFields_removeField")}
+                                    @click=${() => this.#removeField(index)}
+                                >
                                     <uui-icon name="icon-trash"></uui-icon>
                                 </uui-button>
                             </div>
                             <uui-input
                                 class="description-input"
-                                label="Description"
-                                placeholder="Tells the agent what this argument is for"
+                                label=${this.localize.term("uaMcpInputFields_description")}
+                                placeholder=${this.localize.term("uaMcpInputFields_descriptionPlaceholder")}
                                 .value=${field.description ?? ""}
-                                @input=${(e: InputEvent) => this.#updateField(index, { description: (e.target as HTMLInputElement).value })}
+                                @input=${(e: InputEvent) =>
+                                    this.#updateField(index, { description: (e.target as HTMLInputElement).value })}
                             ></uui-input>
                             <uui-toggle
-                                label="Required"
+                                label=${this.localize.term("uaMcpInputFields_required")}
                                 ?checked=${field.required}
-                                @change=${(e: Event) => this.#updateField(index, { required: (e.target as HTMLInputElement).checked })}
+                                @change=${(e: Event) =>
+                                    this.#updateField(index, { required: (e.target as HTMLInputElement).checked })}
                             ></uui-toggle>
                         </uui-box>
                     `,
                 )}
             </div>
-            <uui-button look="secondary" label="Add field" @click=${() => this.#addField()}>
+            <uui-button
+                look="secondary"
+                label=${this.localize.term("uaMcpInputFields_addField")}
+                @click=${() => this.#addField()}
+            >
                 <uui-icon name="icon-add"></uui-icon>
-                Add field
+                ${this.localize.term("uaMcpInputFields_addField")}
             </uui-button>
         `;
     }

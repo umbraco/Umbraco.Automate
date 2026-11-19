@@ -155,7 +155,6 @@ export default {
         headline: "Webhook",
         unsavedHint: "Save this automation to get its webhook URL.",
         copyUrl: "Copy URL",
-        secret: "Webhook secret",
         urlCopied: "Webhook URL copied to clipboard.",
         urlCopyFailed: "Could not copy the URL. Select the value manually.",
         urlLoadFailed: "Could not load the webhook URL.",
@@ -167,6 +166,24 @@ export default {
         urlCopied: "MCP URL copied to clipboard.",
         urlCopyFailed: "Could not copy the URL. Select the value manually.",
         urlLoadFailed: "Could not load the MCP URL.",
+    },
+    uaMcpInputFields: {
+        name: "Name",
+        namePlaceholder: "Argument name",
+        type: "Type",
+        typeText: "Text",
+        typeNumber: "Number",
+        typeBoolean: "Boolean",
+        removeField: "Remove field",
+        description: "Description",
+        descriptionPlaceholder: "Tells the agent what this argument is for",
+        required: "Required",
+        addField: "Add field",
+    },
+    uaSecretField: {
+        secret: "Secret",
+        copySecret: "Copy secret",
+        regenerateSecret: "Regenerate secret",
     },
     uaCanvas: {
         nodeDeleteConfirm: (label: string) =>
