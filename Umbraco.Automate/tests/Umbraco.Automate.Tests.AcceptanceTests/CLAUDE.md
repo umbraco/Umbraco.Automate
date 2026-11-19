@@ -288,9 +288,9 @@ inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automa
   package.
 - **Skips or narrows itself on pull requests.** A small `Changes` job in the same stage sorts the
   PR's changed files into areas (the rules are in Umbraco.Build's
-  `devops/monorepo/steps/detect-acceptance-changes.yml`; Automate's `skip_paths`, `test_paths`,
-  `smoke_paths` and `full_paths` are in `azure-pipelines.yml`: update them when you add a project
-  or move code). A PR touching only docs, repo tooling or the
+  `devops/monorepo/steps/detect-acceptance-changes.yml`; Automate's `skip_paths`, `test_paths`
+  and `smoke_paths` are in `azure-pipelines.yml`: update them when you add a project or move
+  code). A PR touching only docs, repo tooling or the
   .NET unit/integration test projects skips the suite. A PR whose only acceptance changes are
   specs (`tests/`, `umbraco.config.ts`) runs **one** unsharded leg with Playwright's
   `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec importing a
@@ -298,17 +298,24 @@ inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automa
   imports `lib/index`, so `--only-changed` would pick everything and run it on one agent.
   `package*.json`, `playwright.config.ts`, `tsconfig.json` or install-script changes run the whole
   suite too, because specs don't import those files and `--only-changed` would miss them. A PR
-  whose only product changes are server-side C# outside the Management API and the frontends
-  (core `Umbraco.Automate/src/` except `Umbraco.Automate.Web` and `.Web.StaticAssets`, and the
-  OpenIddict and Slack `src/` except OpenIddict's `Client/`) runs **one** leg of the `@smoke`
-  tests; any other product change runs the whole suite. Pushes always run the whole suite, and so
-  does a manual run, which is how to force it for a PR. Use `HEAD~1`, never `HEAD^1`: npm runs the
+  whose only product changes are under a product's `src/` (core, OpenIddict and Slack, front end
+  and Management API included) runs **one** leg of the `@smoke` tests. A PR that changes specs as
+  well runs the whole suite: Playwright ANDs `--grep` with `--only-changed`, so no single leg
+  covers both. Anything else, such as `Directory.Packages.props`, the root `package*.json` or
+  `scripts/install-demo-site.*`, runs the whole suite. Pushes always run the whole suite, so a
+  regression the smoke set misses shows up on the `vN/dev` push after merge. A manual run of the
+  PR's branch forces it too. Use `HEAD~1`, never `HEAD^1`: npm runs the
   script through cmd.exe on Windows, where `^` is the escape character. The job condition skips
   only on an explicit `'false'`.
-- **`@smoke` gates server-side-only PRs.** Keep the tagged set small and about the site working
-  at all: the Automate section loads, the Management API answers, a workspace and an automation
-  can be created, and a published automation runs to completion. Tag a test `@smoke` only if a
-  broken boot, migration, DI registration or engine run would fail it.
+- **`@smoke` gates most product PRs, front end included.** Keep the tagged set small: one test
+  per main path, not every case. Today that is the Automate section and Overview dashboard, the
+  Management API, the sidebar and workspaces list, creating an automation, adding a step on the
+  designer canvas, inserting a binding in the step settings, publishing and running an automation
+  and opening the run, and the connection workspace with OpenIddict's OAuth editor. Tag a test
+  `@smoke` when a broken boot, migration, DI registration, engine run or front-end bundle would
+  fail it and no smoke test already would. If a `vN/dev` push catches a regression its PR's smoke
+  leg missed, consider tagging the test that caught it. The automation list in a workspace and the
+  version history have no tests yet, so smoke cannot cover them.
 - **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
   its own `testCommand`, e.g. `npm run test -- --shard=1/4`), each against its **own** demo site
   and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a
