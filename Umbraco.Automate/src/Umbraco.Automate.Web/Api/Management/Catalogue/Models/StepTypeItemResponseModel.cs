@@ -37,6 +37,13 @@ public class StepTypeItemResponseModel
     /// <summary>Whether this step type supports dynamic output schema resolution based on settings.</summary>
     public bool HasDynamicOutputSchema { get; set; }
 
+    /// <summary>The static outcomes this step type declares, in declaration order. Empty when none are declared.</summary>
+    [Required]
+    public IList<StepOutcomeResponseModel> Outcomes { get; set; } = [];
+
+    /// <summary>Whether this step type's outcomes depend on its settings and must be resolved per step.</summary>
+    public bool HasDynamicOutcomes { get; set; }
+
     /// <summary>The step type kind: "action", "controlFlow", or "trigger".</summary>
     [Required]
     public string Type { get; set; } = string.Empty;

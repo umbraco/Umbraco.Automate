@@ -31,6 +31,8 @@ public class WorkflowCoreDiCompositionTests
 
         // WorkflowLockProvider's constructor deps.
         services.AddSingleton(Mock.Of<IWorkflowLockStore>());
+        services.AddSingleton(Mock.Of<IWorkflowNodeHeartbeatStore>());
+        services.AddSingleton(Mock.Of<IExecutionNodeEligibility>());
         services.Configure<WorkflowLockOptions>(_ => { });
         services.AddSingleton(TimeProvider.System);
 

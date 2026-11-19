@@ -113,12 +113,22 @@ public sealed class TriggerAutomationController : AutomationControllerBase
             triggerOutputData = manualRunOutput.Data;
         }
 
-        await _executor.ExecuteAsync(
-            automation,
-            TriggerInitiatorType.User,
-            initiatorId: userKey?.ToString(),
-            triggerOutputData,
-            cancellationToken);
+        try
+        {
+            await _executor.ExecuteAsync(
+                automation,
+                TriggerInitiatorType.User,
+                initiatorId: userKey?.ToString(),
+                triggerOutputData,
+                cancellationToken);
+        }
+        catch (AutomationEngineNotRunningException ex)
+        {
+            return Conflict(new ProblemDetailsBuilder()
+                .WithTitle("Automation engine not running")
+                .WithDetail(ex.Message)
+                .Build());
+        }
 
         return Accepted();
     }

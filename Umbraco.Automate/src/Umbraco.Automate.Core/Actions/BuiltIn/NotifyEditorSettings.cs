@@ -11,7 +11,12 @@ public sealed class NotifyEditorSettings
     /// <summary>
     /// Gets or sets the key (GUID) of the content item whose editor should be notified.
     /// </summary>
-    [Field(Label = "Content Key", Description = "The key of the content item whose editor should be notified.", SupportsBindings = true)]
+    [Field(
+        Label = "Content Key",
+        Description = "The content item whose editor should be notified.",
+        EditorUiAlias = "Umb.PropertyEditorUi.DocumentPicker",
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""",
+        SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>

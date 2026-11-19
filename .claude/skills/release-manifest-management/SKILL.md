@@ -1,6 +1,6 @@
 ---
 name: release-manifest-management
-description: Generates and manages the release-manifest.json file. Use when you need to create or update the manifest file that specifies which products to include in a vN/release or vN/hotfix. Called by the release-management orchestration skill.
+description: Generates and manages the release-manifest.json file. Use when you need to create or update the manifest file that specifies which products to include in a vN/release or vN/hotfix. Called by the release-prepare orchestration skill.
 allowed-tools: Bash, Read, Write, Glob
 ---
 
@@ -95,11 +95,11 @@ Check the initial prompt/task for a `--products` parameter:
 - Manifest is validated by CI on `vN/release/*` and `vN/hotfix/*` branches
 - On release branches, CI ensures all changed products are in the manifest
 - The file path must be `release-manifest.json` at the repository root
-- This skill is typically invoked by the `/release-management` orchestration skill
+- This skill is typically invoked by the `/release-prepare` orchestration skill
 
 ## Example Flows
 
-### Automated Mode (from release-management skill)
+### Automated Mode (from release-prepare skill)
 
 ```
 Skill invoked with: --products="Umbraco.Automate,Umbraco.Automate.OpenIddict,Umbraco.Automate.Slack"

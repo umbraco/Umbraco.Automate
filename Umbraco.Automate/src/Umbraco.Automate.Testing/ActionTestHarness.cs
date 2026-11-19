@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -6,6 +7,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.StepTypes;
 
 namespace Umbraco.Automate.Testing;
 
@@ -28,7 +30,7 @@ public sealed class ActionTestHarness<TAction> where TAction : class, IAction
 
     internal ActionTestHarness()
     {
-        _services.AddSingleton(Mock.Of<IEditableModelResolver>());
+        _services.AddSingleton<IEditableModelResolver>(new HarnessModelResolver(() => _settings));
         _services.AddSingleton<ActionInfrastructure>();
         _services.AddLogging(b => b.ClearProviders().AddProvider(NullLoggerProvider.Instance));
     }
@@ -45,6 +47,13 @@ public sealed class ActionTestHarness<TAction> where TAction : class, IAction
     /// <summary>
     /// Sets the action settings on the context.
     /// </summary>
+    /// <remarks>
+    /// When no <see cref="IEditableModelResolver"/> is registered with <see cref="WithService{TService}"/>, the
+    /// harness's default resolver returns these settings for non-null data (previously it always returned null),
+    /// so action code that resolves settings or injects the resolver now sees the configured settings. With no
+    /// settings given, it returns a new instance of the requested settings type, as the real resolver does
+    /// for a step saved with empty settings.
+    /// </remarks>
     public ActionTestHarness<TAction> WithSettings<TSettings>(TSettings settings) where TSettings : class
     {
         _settings = settings;
@@ -150,8 +159,109 @@ public sealed class ActionTestHarness<TAction> where TAction : class, IAction
     public async Task<ActionResult> ExecuteAsync(CancellationToken cancellationToken = default)
     {
         using var sp = _services.BuildServiceProvider();
+        return await ExecuteActionAsync(ActivatorUtilities.CreateInstance<TAction>(sp), cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the outcomes the action declares for the settings given to
+    /// <see cref="WithSettings{TSettings}"/>, resolved the way a run does: a static declaration is read as
+    /// is, a dynamic one (<see cref="IStepType.HasDynamicOutcomes"/>) is resolved from the step's settings.
+    /// </summary>
+    /// <remarks>
+    /// Unless an <see cref="IEditableModelResolver"/> was registered with <see cref="WithService{TService}"/>,
+    /// the settings given to <see cref="WithSettings{TSettings}"/> are handed to the action as its typed
+    /// settings. When no settings were given, a dynamic action sees a new instance of its settings type
+    /// (its defaults), as at run time for a step saved with empty settings.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The declared outcomes in declaration order, or an empty list when none are declared.</returns>
+    public async Task<IReadOnlyList<StepOutcome>> GetOutcomesAsync(CancellationToken cancellationToken = default)
+    {
+        using var sp = _services.BuildServiceProvider();
         var action = ActivatorUtilities.CreateInstance<TAction>(sp);
 
+        return action.HasDynamicOutcomes
+            ? await action.GetOutcomesAsync(ToSavedSettings(), cancellationToken)
+            : action.GetOutcomes();
+    }
+
+    /// <summary>
+    /// Executes the action and works out which exit a run would follow, using the same rule as the
+    /// run engine: the outcome the action returned, or its default outcome when it returned none.
+    /// Dynamic outcomes are resolved from the settings given to <see cref="WithSettings{TSettings}"/>
+    /// (see <see cref="GetOutcomesAsync"/>).
+    /// </summary>
+    /// <remarks>
+    /// Problems are reported on the result rather than thrown, so a test can assert on them: when a
+    /// run would fail the step (invalid declaration, or no outcome returned and no default declared)
+    /// <see cref="RoutedActionResult.BranchOutcome"/> is null and
+    /// <see cref="RoutedActionResult.OutcomeProblem"/> carries the message.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<RoutedActionResult> ExecuteWithOutcomeAsync(CancellationToken cancellationToken = default)
+    {
+        using var sp = _services.BuildServiceProvider();
+        var action = ActivatorUtilities.CreateInstance<TAction>(sp);
+        var result = await ExecuteActionAsync(action, cancellationToken);
+
+        // Only a plain success follows an exit; failures, skips and suspensions never reach routing.
+        if (result.Status != ActionResultStatus.Success || result.Suspension is not null)
+        {
+            return new RoutedActionResult(result, null, null, null);
+        }
+
+        var savedSettings = action.HasDynamicOutcomes ? ToSavedSettings() : null;
+        var routing = await StepOutcomeRouter.ResolveAsync(action, savedSettings, result.Outcome, cancellationToken);
+        return new RoutedActionResult(result, routing.Outcome, routing.FailureMessage, routing.UndeclaredOutcomeWarning);
+    }
+
+    // Saved settings look like a camelCase JSON object; the step type only resolves them when non-empty.
+    // A run always has a settings dictionary, empty when nothing was saved, so this never returns null.
+    private Dictionary<string, object?> ToSavedSettings()
+    {
+        if (_settings is null)
+        {
+            return [];
+        }
+
+        var element = JsonSerializer.SerializeToElement(_settings, JsonSerializerOptions.Web);
+        return element.ValueKind == JsonValueKind.Object
+            ? element.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone())
+            : [];
+    }
+
+    /// <summary>
+    /// Default resolver, used when no <see cref="IEditableModelResolver"/> is registered with
+    /// <see cref="WithService{TService}"/>. Returns null when <c>data</c> is null (the resolver contract);
+    /// otherwise returns the object given to <c>WithSettings</c> when it fits the requested type.
+    /// Behaviour change: this default previously returned null for every call (a mock), so an action
+    /// that resolves its own settings via <c>ResolveSettings</c> now receives the <c>WithSettings</c> object.
+    /// </summary>
+    internal sealed class HarnessModelResolver(Func<object?> getSettings) : IEditableModelResolver
+    {
+        // With no settings given, resolve to the model's defaults, as the real resolver does for {}.
+        public TModel? ResolveModel<TModel>(string modelId, object? data, EditableModelSchema? schema = null)
+            where TModel : class, new()
+            => data is null ? null : getSettings() as TModel ?? new TModel();
+
+        public object? ResolveModel(string modelId, Type modelType, object? data, EditableModelSchema? schema = null)
+        {
+            if (data is null)
+            {
+                return null;
+            }
+
+            if (getSettings() is { } settings && modelType.IsInstanceOfType(settings))
+            {
+                return settings;
+            }
+
+            return modelType.GetConstructor(Type.EmptyTypes) is not null ? Activator.CreateInstance(modelType) : null;
+        }
+    }
+
+    private async Task<ActionResult> ExecuteActionAsync(TAction action, CancellationToken cancellationToken)
+    {
         var context = new ActionContext
         {
             AutomationId = _automationId,

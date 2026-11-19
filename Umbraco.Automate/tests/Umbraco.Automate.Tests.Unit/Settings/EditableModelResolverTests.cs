@@ -176,6 +176,57 @@ public class EditableModelResolverTests
         exception.Message.ShouldContain("not found");
     }
 
+    [Fact]
+    public void ResolveModel_WithResolveFailure_ThrowsSettingsResolutionException()
+    {
+        var settings = new FakeSettings { ApiToken = "$Slack:NonExistentKey" };
+        var resolver = CreateResolver();
+
+        var act = () => resolver.ResolveModel<FakeSettings>("test", settings);
+
+        Should.Throw<SettingsResolutionException>(act);
+    }
+
+    [Fact]
+    public void ResolveModel_WithFailedValidationRule_FromJsonElement_ThrowsSettingsResolutionException()
+    {
+        // Saved settings arrive as a JsonElement; a failed rule must surface as a settings problem
+        // so the catalogue endpoints return 400 rather than 500.
+        var settings = JsonSerializer.SerializeToElement(new { apiToken = "token" });
+        var resolver = CreateResolver();
+
+        var act = () => resolver.ResolveModel("test", typeof(FakeSettings), settings, RequiredBaseUrlSchema());
+
+        Should.Throw<SettingsResolutionException>(act).Message.ShouldContain("Validation failed for model 'test'");
+    }
+
+    [Fact]
+    public void ResolveModel_WithFailedValidationRule_FromObject_ThrowsSettingsResolutionException()
+    {
+        var settings = new FakeSettings { ApiToken = "token" };
+        var resolver = CreateResolver();
+
+        var act = () => resolver.ResolveModel<FakeSettings>("test", settings, RequiredBaseUrlSchema());
+
+        Should.Throw<SettingsResolutionException>(act).Message.ShouldContain("Validation failed for model 'test'");
+    }
+
+    private static EditableModelSchema RequiredBaseUrlSchema() => new()
+    {
+        Type = typeof(FakeSettings),
+        Fields =
+        [
+            new EditableModelFieldDescriptor
+            {
+                Key = "baseUrl",
+                Label = "Base URL",
+                PropertyName = nameof(FakeSettings.BaseUrl),
+                PropertyType = typeof(string),
+                ValidationRules = [new System.ComponentModel.DataAnnotations.RequiredAttribute()],
+            },
+        ],
+    };
+
     #endregion
 
     #region ResolveModel<TModel> — Configuration key allow-list

@@ -50,11 +50,12 @@ public sealed class ScriptingOptions
     /// <summary>
     /// Gets or sets the per-statement timeout enforced by the engine. Default: 3 seconds.
     /// </summary>
+    [Obsolete("This setting has no effect and is not read. Scripts are bounded by MaxStatements and TotalExecutionTimeout. Scheduled for removal in Umbraco Automate 19.")]
     public TimeSpan StatementTimeout { get; set; } = TimeSpan.FromSeconds(3);
 
     /// <summary>
-    /// Gets or sets the total wall-clock time a script may run before it is cancelled — the
-    /// backstop against never-resolving promises. Capped by the step timeout at execution time.
+    /// Gets or sets the total wall-clock time a script may run before it is cancelled, time spent
+    /// awaiting <c>fetch</c> included. Capped by the step timeout at execution time.
     /// Default: 15 seconds.
     /// </summary>
     public TimeSpan TotalExecutionTimeout { get; set; } = TimeSpan.FromSeconds(15);

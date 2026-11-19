@@ -1,3 +1,4 @@
+using System.Globalization;
 using Umbraco.Automate.Core.Bindings;
 
 namespace Umbraco.Automate.Core.Conditions;
@@ -114,11 +115,20 @@ public sealed class ConditionEvaluator
     /// </summary>
     private static int CompareNumeric(string left, string right)
     {
-        if (decimal.TryParse(left, out var leftNum) && decimal.TryParse(right, out var rightNum))
+        if (TryParseNumber(left, out var leftNum) && TryParseNumber(right, out var rightNum))
         {
             return leftNum.CompareTo(rightNum);
         }
 
         return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Reads a number with the invariant culture first, so "0.8" means the same on every
+    /// server. The server culture is only a fallback, so a value typed with its own decimal
+    /// separator (e.g. "0,8" on a da-DK server) still compares as a number.
+    /// </summary>
+    private static bool TryParseNumber(string value, out decimal result) =>
+        decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result)
+        || decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out result);
 }

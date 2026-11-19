@@ -1,0 +1,87 @@
+<!doctype html>
+<!--
+  Step picker (Automate's node-picker modal) with the new "Library" group.
+  Copied from catalogue/modals/node-picker/node-picker-modal.element.ts: umb-body-layout,
+  search input, one uui-box per group holding a uui-ref-list of uui-ref-node items.
+  Starter: modal-sidebar.html.
+-->
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Mockup: Step picker with the Library group</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@umbraco-ui/uui@2/dist/themes/light.css">
+	<link rel="stylesheet" href="_mockup.css">
+	<script type="module" src="_mockup.js"></script>
+	<style>
+		.main > uui-box { margin-bottom: var(--uui-size-space-4); }
+		.unchanged { opacity: .55; }
+	</style>
+</head>
+<body class="uui-font uui-text">
+	<header class="app-header">
+		<span class="logo">Umbraco</span>
+		<uui-tab-group class="sections">
+			<uui-tab label="Content">Content</uui-tab>
+			<uui-tab label="Media">Media</uui-tab>
+			<uui-tab label="Library">Library</uui-tab>
+			<uui-tab label="Automate" active>Automate</uui-tab>
+			<uui-tab label="Settings">Settings</uui-tab>
+		</uui-tab-group>
+		<div class="apps">
+			<uui-button look="primary" compact label="User"><uui-avatar name="Rick Butterfield"></uui-avatar></uui-button>
+		</div>
+	</header>
+	<div class="section">
+		<nav class="section-sidebar"><h3>Automate</h3></nav>
+		<main class="section-main"></main>
+	</div>
+
+	<div class="modal-backdrop"></div>
+	<aside class="modal-sidebar">
+		<div class="body-layout">
+			<div class="header">
+				<h3 class="headline">Add a step</h3>
+			</div>
+
+			<div class="main">
+				<!-- Replace from here -->
+				<uui-input placeholder="Search actions" label="Search" style="width:100%; margin-bottom: var(--uui-size-space-5)">
+					<uui-icon slot="prepend" name="icon-search" style="margin-left:9px"></uui-icon>
+				</uui-input>
+
+				<uui-box headline="Content" class="unchanged">
+					<uui-ref-list>
+						<uui-ref-node name="Get Content" detail="Fetches a published content item and exposes its properties for use in later steps."><uui-icon slot="icon" name="icon-document"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Update Content Property" detail="Writes a single property value on a content item (draft save)."><uui-icon slot="icon" name="icon-edit"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Publish Content" detail="Publishes a content item in Umbraco CMS."><uui-icon slot="icon" name="icon-globe"></uui-icon></uui-ref-node>
+					</uui-ref-list>
+				</uui-box>
+
+				<uui-box headline="Library">
+					<uui-ref-list>
+						<uui-ref-node name="Get Element" detail="Fetches a published Library element and exposes its properties for use in later steps."><uui-icon slot="icon" name="icon-plugin"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Get Element Property" detail="Fetches a single property value from a published Library element."><uui-icon slot="icon" name="icon-plugin"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Create Element" detail="Creates a new element in a Library folder (draft save)."><uui-icon slot="icon" name="icon-add"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Update Element Property" detail="Writes a single property value on a Library element (draft save)."><uui-icon slot="icon" name="icon-edit"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Publish Element" detail="Publishes a Library element, so every page that picks it shows the new values."><uui-icon slot="icon" name="icon-globe"></uui-icon></uui-ref-node>
+						<uui-ref-node name="Unpublish Element" detail="Unpublishes a Library element in Umbraco CMS."><uui-icon slot="icon" name="icon-globe"></uui-icon></uui-ref-node>
+					</uui-ref-list>
+				</uui-box>
+
+				<uui-box headline="Media" class="unchanged">
+					<uui-ref-list>
+						<uui-ref-node name="Get Media" detail="Fetches a media item and exposes its properties for use in later steps."><uui-icon slot="icon" name="icon-picture"></uui-icon></uui-ref-node>
+					</uui-ref-list>
+				</uui-box>
+				<!-- Replace to here -->
+			</div>
+
+			<div class="footer">
+				<div class="actions">
+					<uui-button label="Close">Close</uui-button>
+				</div>
+			</div>
+		</div>
+	</aside>
+</body>
+</html>

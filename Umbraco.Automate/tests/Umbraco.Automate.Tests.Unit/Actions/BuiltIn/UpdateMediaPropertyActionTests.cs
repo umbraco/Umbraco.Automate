@@ -52,6 +52,58 @@ public class UpdateMediaPropertyActionTests
         => _action.Alias.ShouldBe("umbracoAutomate.updateMediaProperty");
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe("notFound");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_DoesNotWrite()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        _mediaService.Verify(x => x.Save(It.IsAny<IMedia>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NodeAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt", Value = "x" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_InvalidMediaKey_ReturnsValidationError()
     {
         var context = CreateContext(new UpdateMediaPropertySettings
@@ -102,6 +154,27 @@ public class UpdateMediaPropertyActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Success);
         result.Outcome.ShouldBe(UpdateMediaPropertyAction.OutcomeNotFound);
+    }
+
+    // A root start node passes the authorizer for an item in the recycle bin (#507).
+    [Fact]
+    public async Task ExecuteAsync_MediaInRecycleBin_ReturnsNotFoundOutcome()
+    {
+        var mediaKey = SetupTrashedMedia();
+
+        var result = await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = mediaKey.ToString(), PropertyAlias = "alt", Value = "Sunset" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe(UpdateMediaPropertyAction.OutcomeNotFound);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MediaInRecycleBin_DoesNotSave()
+    {
+        var mediaKey = SetupTrashedMedia();
+
+        await _action.ExecuteAsync(CreateContext(new UpdateMediaPropertySettings { MediaKey = mediaKey.ToString(), PropertyAlias = "alt", Value = "Sunset" }, Guid.NewGuid()), CancellationToken.None);
+
+        _mediaService.Verify(x => x.Save(It.IsAny<IMedia>(), It.IsAny<int>()), Times.Never);
     }
 
     [Fact]
@@ -185,6 +258,15 @@ public class UpdateMediaPropertyActionTests
 
         result.Status.ShouldBe(ActionResultStatus.Failed);
         result.ErrorCategory.ShouldBe(StepRunErrorCategory.Cancelled);
+    }
+
+    private Guid SetupTrashedMedia()
+    {
+        var mediaKey = Guid.NewGuid();
+        var media = MockMedia(mediaKey, propertyAliases: ["alt"]);
+        media.SetupGet(x => x.Trashed).Returns(true);
+        _mediaService.Setup(x => x.GetById(mediaKey)).Returns(media.Object);
+        return mediaKey;
     }
 
     private static Mock<IMedia> MockMedia(Guid key, string[] propertyAliases)

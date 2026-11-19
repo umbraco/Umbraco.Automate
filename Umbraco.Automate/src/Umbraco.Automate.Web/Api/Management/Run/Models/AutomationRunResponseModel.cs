@@ -86,6 +86,27 @@ public sealed class StepRunResponseModel
     /// <summary>Duration in milliseconds.</summary>
     public double? DurationMs { get; set; }
 
+    /// <summary>
+    /// The outcome key the step left through: an action's returned or default outcome, an If's
+    /// <c>true</c>/<c>false</c>, or a Switch case or default. <c>null</c> for steps that do not
+    /// branch, failed steps, and runs recorded before this was saved.
+    /// </summary>
+    public string? BranchOutcome { get; set; }
+
+    /// <summary>
+    /// The zero-based index of the first item a sequential ForEach ran (the first to pass its
+    /// filters). <c>null</c> when no item ran, for parallel ForEach, While, steps that do not
+    /// loop, and runs recorded before this was saved.
+    /// </summary>
+    public int? IterationIndex { get; set; }
+
+    /// <summary>
+    /// ForEach: the number of items in the collection, including any its filters skip
+    /// (<c>0</c> when empty). While: the number of iterations that ran. <c>null</c> for steps
+    /// that do not loop and runs recorded before this was saved.
+    /// </summary>
+    public int? IterationTotal { get; set; }
+
     /// <summary>The log entries recorded by the action during execution.</summary>
     public IList<StepRunLogEntryResponseModel> LogEntries { get; set; } = [];
 }

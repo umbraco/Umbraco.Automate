@@ -16,7 +16,9 @@ public sealed class CreateMediaSettings
         Label = "Parent",
         Description = "The media folder the new item is created in. Leave empty to create at the media root.",
         EditorUiAlias = "Umb.PropertyEditorUi.MediaEntityPicker",
-        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""")]
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 0, "max": 1 } }]""",
+        SupportsBindings = true,
+        BindingMustResolve = true)]
     public string? ParentKey { get; set; }
 
     /// <summary>

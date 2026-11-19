@@ -1,4 +1,5 @@
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
+import { ensureOk } from './ApiResponse';
 import { ConstantHelper } from './ConstantHelper';
 import { AutomationApiHelper } from './AutomationApiHelper';
 import { toAlias, uniqueName } from './TestData';
@@ -42,6 +43,7 @@ export class WorkspaceApiHelper {
   async getAll() {
     const requestUrl = this.api.baseUrl + this.basePath + 'workspaces';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, 'Listing workspaces');
     const body = await response.json();
     return body.items ?? [];
   }
@@ -72,6 +74,7 @@ export class WorkspaceApiHelper {
       userGroups: options.userGroups ?? [],
       allowedConnections: options.allowedConnections ?? []
     });
+    await ensureOk(response, `Creating workspace "${name}"`);
 
     // The endpoint returns 201 with both a Location header and the new id as the body. Prefer
     // the header, but fall back to the body so a routing change to CreatedAtAction does not

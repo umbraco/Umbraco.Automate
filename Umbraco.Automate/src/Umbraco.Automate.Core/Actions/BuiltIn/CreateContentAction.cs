@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Extensions;
 using UmbracoConstants = Umbraco.Cms.Core.Constants;
 using Umbraco.Cms.Core.Actions;
 using Umbraco.Cms.Core.Models;
@@ -24,6 +26,12 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
     RequiredPermissions = [ActionNew.ActionLetter])]
 public sealed class CreateContentAction : ActionBase<CreateContentSettings, CreateContentOutput>, ICmsAction
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when the parent content item does not exist.
     /// </summary>
@@ -66,6 +74,15 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
     }
 
     /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_created") { IsDefault = true },
+            new StepOutcome(OutcomeParentNotFound, "#uaOutcomes_parentNotFound"),
+            new StepOutcome(OutcomeContentTypeNotFound, "#uaOutcomes_contentTypeNotFound"),
+        ];
+
+    /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<CreateContentSettings>();
@@ -97,17 +114,42 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
 
         // The root is not a node, so it takes its own check: a service account confined to a
         // start node can reach content inside it but must not write to the root.
-        var failure = atRoot
-            ? await _authorizer.AuthorizeContentRootOrFailAsync(RequiredPermissions, cancellationToken)
-            : await _authorizer.AuthorizeContentOrFailAsync(parentKey, RequiredPermissions, cancellationToken);
-
-        if (failure is not null)
+        if (atRoot)
         {
-            return failure;
+            if (await _authorizer.AuthorizeContentRootOrFailAsync(RequiredPermissions, cancellationToken) is { } rootFailure)
+            {
+                return rootFailure;
+            }
+        }
+        else
+        {
+            // A parent reported as not existing (deleted, or in the recycle bin for an account
+            // confined to a start node) is not a permission problem, so it routes to the
+            // parentNotFound outcome.
+            var authorization = await _authorizer.AuthorizeContentAsync(parentKey, RequiredPermissions, cancellationToken);
+            if (authorization.IsNotFound)
+            {
+                context.LogWarning($"Parent content {parentKey} was not found, so nothing was created");
+
+                return SuccessWithOutcome(OutcomeParentNotFound, new CreateContentOutput
+                {
+                    Name = settings.Name,
+                    ContentTypeKey = contentTypeKey,
+                    ParentKey = parentKey,
+                });
+            }
+
+            if (!authorization.Authorized)
+            {
+                return authorization.ToFailedActionResult();
+            }
         }
 
+        // A service account with a root start node is authorised for the recycle bin too, so a
+        // trashed parent gets this far. Treat it as missing: creating under it would save a live
+        // node inside the bin, where the recycle bin view doesn't list it.
         var parent = atRoot ? null : _contentService.GetById(parentKey);
-        if (!atRoot && parent is null)
+        if (!atRoot && (parent is null || parent.Trashed))
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Parent content {ParentKey} not found.",
@@ -140,8 +182,8 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
             });
         }
 
-        // Unlike media, a content type has to opt in to sitting at the root. Checking it here
-        // turns what would be a save-time throw into an actionable message.
+        // The backoffice only creates a content type at the root when it allows that, and only
+        // a child type the parent's type allows. IContentService.Create checks neither.
         if (atRoot && !contentType.AllowedAsRoot)
         {
             return ActionResult.Failed(
@@ -149,6 +191,19 @@ public sealed class CreateContentAction : ActionBase<CreateContentSettings, Crea
                     $"Content type '{contentType.Alias}' is not allowed at the content root. " +
                     "Pick a parent, or enable 'Allow as root' on the content type."),
                 StepRunErrorCategory.Validation);
+        }
+
+        if (parent is not null)
+        {
+            var parentType = _contentTypeService.Get(parent.ContentType.Key);
+            if (parentType?.AllowedContentTypes?.Any(t => t.Key == contentTypeKey) != true)
+            {
+                return ActionResult.Failed(
+                    new ArgumentException(
+                        $"Content type '{contentType.Alias}' is not allowed under '{parent.Name}'. " +
+                        $"Pick another parent, or add it to the allowed child types of '{parentType?.Alias}'."),
+                    StepRunErrorCategory.Validation);
+            }
         }
 
         var variesByCulture = (contentType.Variations & ContentVariation.Culture) != 0;

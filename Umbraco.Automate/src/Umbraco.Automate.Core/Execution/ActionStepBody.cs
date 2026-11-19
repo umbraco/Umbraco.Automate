@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,6 +14,7 @@ using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Cms.Core.Events;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -80,7 +82,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Resume path: workflow is resuming after Sleep with persisted data.
         if (context.PersistenceData is SleepPersistenceData sleepData)
         {
-            return await HandleSleepResumeAsync(sleepData, data, cancellationToken);
+            return await HandleSleepResumeAsync(sleepData, context, cancellationToken);
         }
 
         // Resume path: workflow is resuming after WaitForEvent with the event data.
@@ -117,8 +119,13 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             resolvedInputs = ResolveInputMappings(_stepConfig.InputMappings, bindingData);
 
+            // Resolve settings even when none were saved. The flow editor does not persist a
+            // default value the user left untouched, so a step saved as {} still carries the
+            // settings type's property-initializer defaults, ${ } bindings included (for
+            // example "${ trigger.formId }"). Skipping resolution left the action to build its
+            // own default instance through GetSettings<T>(), and those bindings were never evaluated.
             settings = null;
-            if (_action.SettingsType is not null && _stepConfig.Settings.Count > 0)
+            if (_action.SettingsType is not null)
             {
                 settings = _action.ResolveSettings(_stepConfig.Settings);
             }
@@ -189,6 +196,31 @@ internal sealed class ActionStepBody : StepBodyAsync
         // Execute through the middleware pipeline with the timeout-linked token.
         var result = await _pipeline.ExecuteAsync(_action, actionContext, stepCancellationToken);
 
+        // Map what the action returned onto the exit the run follows. Done before the log entries
+        // are captured so a warning about an undeclared outcome lands in the step's run log. A
+        // broken declaration or a missing outcome turns the result into a Validation failure, which
+        // the Failed handling below records and (being a terminal category) never retries.
+        var routedOutcome = result.Outcome;
+        if (result.Status == ActionResultStatus.Success && result.Suspension is null)
+        {
+            var routing = await ResolveOutcomeRoutingAsync(result.Outcome, cancellationToken, stepCancellationToken);
+            if (routing.FailureMessage is not null)
+            {
+                result = ActionResult.Failed(new ValidationException(routing.FailureMessage), StepRunErrorCategory.Validation);
+            }
+            else
+            {
+                routedOutcome = routing.Outcome;
+                if (routing.UndeclaredOutcomeWarning is not null)
+                {
+                    actionContext.LogWarning(routing.UndeclaredOutcomeWarning);
+                    _logger.LogWarning(
+                        "Action '{ActionAlias}' returned outcome '{Outcome}', which it does not declare, for step {StepId}",
+                        _action.Alias, routedOutcome, _stepConfig.Id);
+                }
+            }
+        }
+
         // Capture any log entries the action recorded, regardless of outcome. Reads from
         // the same ActionContext instance the pipeline just executed — ErrorHandlingMiddleware
         // catches exceptions on this same context, so entries recorded before a throw survive
@@ -245,6 +277,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             case ActionResultStatus.Success:
                 stepRun.Status = StepRunStatus.Completed;
+                stepRun.BranchOutcome = routedOutcome;
                 StoreOutputData(result.OutputData, stepRun, data, iterationContext);
                 _metrics.StepExecuted(_action.Alias);
                 break;
@@ -268,66 +301,110 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
-        // Pipeline-caught failures: decide retry/terminate/skip based on the configured
+        // Pipeline-caught failures: decide retry/terminate/suspend based on the configured
         // ErrorBehavior (applied via WorkflowCore on the WorkflowStep) and the classifier.
         if (result.Status == ActionResultStatus.Failed)
         {
             var exception = result.Exception ?? new InvalidOperationException($"Step '{_stepConfig.Name}' failed.");
-            return DecideFailureOutcome(exception, result.ErrorCategory ?? StepRunErrorCategory.Unknown, context);
+            throw SelectFailureToThrow(exception, result.ErrorCategory ?? StepRunErrorCategory.Unknown, context);
         }
 
-        // If the action returned a named outcome, route via WorkflowCore's outcome matching.
-        if (result.Status == ActionResultStatus.Success && result.Outcome is not null)
+        // Route via WorkflowCore's outcome matching: the action's own outcome, or the default
+        // exit it declared when it returned none.
+        if (result.Status == ActionResultStatus.Success && routedOutcome is not null)
         {
-            return ExecutionResult.Outcome(result.Outcome);
+            return ExecutionResult.Outcome(routedOutcome);
         }
 
         return ExecutionResult.Next();
     }
 
     /// <summary>
-    /// Decides how to surface a step failure to WorkflowCore. The step's
-    /// <see cref="StepErrorBehavior"/> is wired onto the <c>WorkflowStep</c> at compile
-    /// time, so WorkflowCore honors retry/suspend/terminate/compensate when we throw.
-    /// Terminate and Suspend always throw — the whole point of those modes is to halt
-    /// the run regardless of retry budget or error category. Only the Retry path applies
-    /// the terminal-category and retry-budget guards, short-circuiting with
-    /// <see cref="ExecutionResult.Next"/> when retrying cannot help.
+    /// Works out which exit a successful action result follows, from the step's saved, unbound
+    /// settings (never the binding-resolved settings the action ran with) so run time agrees with
+    /// what the author published. The rule itself lives in <see cref="StepOutcomeRouter"/>.
     /// </summary>
-    private ExecutionResult DecideFailureOutcome(
+    /// <param name="returnedOutcome">The outcome the action returned, or <c>null</c> for none.</param>
+    /// <param name="cancellationToken">The workflow host's token. Its cancellation is a real cancellation and escapes.</param>
+    /// <param name="stepCancellationToken">
+    /// The step's timeout-linked token, so a step type whose outcome list hangs is bounded by the
+    /// step timeout like the action itself. Running out of time is reported as a routing failure.
+    /// </param>
+    private async Task<StepOutcomeRouting> ResolveOutcomeRoutingAsync(
+        string? returnedOutcome,
+        CancellationToken cancellationToken,
+        CancellationToken stepCancellationToken)
+    {
+        StepOutcomeRouting routing;
+        try
+        {
+            routing = await StepOutcomeRouter.ResolveAsync(_action, _stepConfig.Settings, returnedOutcome, stepCancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            routing = StepOutcomeRouting.Failure(
+                $"Action '{_action.Alias}' could not list its outcomes before the step timed out.", ex);
+        }
+
+        if (routing.Exception is not null)
+        {
+            _logger.LogError(routing.Exception, "Action '{ActionAlias}' could not list its outcomes for step {StepId}", _action.Alias, _stepConfig.Id);
+        }
+
+        return routing;
+    }
+
+    /// <summary>
+    /// Decides which exception surfaces a step failure to WorkflowCore; every caller throws it. The step's
+    /// <see cref="StepErrorBehavior"/> is wired onto the <c>WorkflowStep</c> at compile time, so
+    /// WorkflowCore's error handler for that behaviour applies. Terminate, Suspend and Compensate
+    /// always surface the step's own error — those modes halt the run (Compensate after running its
+    /// compensation) and never retry, so the retry-budget and terminal-category guards have nothing
+    /// to decide. Only Retry applies the guards: when retrying cannot help, the step's error is
+    /// wrapped in a <see cref="NonRetryableStepFailureException"/>, which
+    /// <see cref="AutomateRetryHandler"/> hands to WorkflowCore's Terminate handler, so the run
+    /// ends Failed and no outcome edge out of the step is followed.
+    /// </summary>
+    private Exception SelectFailureToThrow(
         Exception exception,
         StepRunErrorCategory category,
         IStepExecutionContext context)
     {
-        // Terminate always aborts the workflow — WorkflowCore's Terminate handler stops
-        // execution and does not retry, because we set the step's ErrorBehavior.
-        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
+        switch (_stepConfig.ErrorBehavior)
         {
-            _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
-            throw exception;
-        }
+            // Terminate always aborts the workflow — WorkflowCore's Terminate handler stops
+            // execution and does not retry, because we set the step's ErrorBehavior.
+            case StepErrorBehavior.Terminate:
+                _logger.LogError("Step {StepId} failed with Terminate behavior, aborting workflow", _stepConfig.Id);
+                return exception;
 
-        // Suspend pauses the workflow for manual intervention — throw unconditionally so
-        // WorkflowCore applies the Suspend handler. The retry-budget and terminal-category
-        // guards below intentionally do not apply: the whole point of Suspend is that a
-        // human fixes the underlying issue (e.g. bad config, missing credentials) before
-        // resuming, which is exactly the case where retry cannot help.
-        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Suspend)
-        {
-            _logger.LogError(
-                "Step {StepId} failed with Suspend behavior ({Category}) — suspending workflow",
-                _stepConfig.Id, category);
-            throw exception;
+            // Suspend pauses the workflow for manual intervention. The guards below intentionally
+            // do not apply: the whole point of Suspend is that a human fixes the underlying issue
+            // (e.g. bad config, missing credentials) before resuming, which is exactly the case
+            // where retry cannot help.
+            case StepErrorBehavior.Suspend:
+                _logger.LogError(
+                    "Step {StepId} failed with Suspend behavior ({Category}) — suspending workflow",
+                    _stepConfig.Id, category);
+                return exception;
+
+            // Compensate hands the failure to WorkflowCore's Compensate handler, which does not
+            // retry either — there is no retry budget to guard.
+            case StepErrorBehavior.Compensate:
+                _logger.LogError(
+                    "Step {StepId} failed with Compensate behavior ({Category}) — compensating",
+                    _stepConfig.Id, category);
+                return exception;
         }
 
         // Terminal category + Retry behavior: retrying cannot change the outcome
-        // (bad settings, missing auth, etc.). Skip past the failed step without retry.
+        // (bad settings, missing auth, etc.), so stop the run without retrying.
         if (_errorClassifier.IsTerminal(category))
         {
             _logger.LogError(
-                "Step {StepId} failed with terminal category {Category} — skipping without retry",
+                "Step {StepId} failed with terminal category {Category} — stopping the run without retry",
                 _stepConfig.Id, category);
-            return ExecutionResult.Next();
+            return new NonRetryableStepFailureException(exception);
         }
 
         // Transient failure. Cap retries at the step's configured MaxRetries, falling back
@@ -336,14 +413,14 @@ internal sealed class ActionStepBody : StepBodyAsync
         if (context.ExecutionPointer.RetryCount >= maxRetries)
         {
             _logger.LogError(
-                "Step {StepId} exhausted retry budget ({MaxRetries}) — skipping past failure",
+                "Step {StepId} exhausted retry budget ({MaxRetries}) — stopping the run",
                 _stepConfig.Id, maxRetries);
-            return ExecutionResult.Next();
+            return new NonRetryableStepFailureException(exception);
         }
 
-        // Throw so WorkflowCore applies the configured Retry behavior (with interval) via
+        // Rethrown so WorkflowCore applies the configured Retry behavior (with interval) via
         // the step-level settings set at compile time.
-        throw exception;
+        return exception;
     }
 
     /// <summary>
@@ -383,7 +460,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         await _runRepository.AddStepRunAsync(stepRun, cancellationToken);
         _metrics.StepFailed(_action.Alias);
 
-        return DecideFailureOutcome(exception, category, context);
+        throw SelectFailureToThrow(exception, category, context);
     }
 
     /// <summary>
@@ -421,21 +498,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         // Deserialize the decision from the execution pointer's event data.
         // WorkflowCore's SeedSubscription sets EventData on the pointer, not ContextItem.
-        var eventData = context.ExecutionPointer.EventData;
-        ApprovalDecision? decision = null;
-        if (eventData is JsonElement jsonElement)
-        {
-            decision = JsonSerializer.Deserialize<ApprovalDecision>(
-                jsonElement.GetRawText(), Dispatch.JsonOptions.Default);
-        }
-        else if (eventData is ApprovalDecision directDecision)
-        {
-            decision = directDecision;
-        }
-        else if (eventData is Newtonsoft.Json.Linq.JObject jObject)
-        {
-            decision = jObject.ToObject<ApprovalDecision>();
-        }
+        var decision = ApprovalDecisionReader.Read(context.ExecutionPointer.EventData);
 
         // Find the existing step run for this step.
         var run = await _runRepository.GetAsync(data.RunId, cancellationToken);
@@ -443,8 +506,7 @@ internal sealed class ActionStepBody : StepBodyAsync
 
         if (stepRun is null)
         {
-            _logger.LogWarning("No WaitingForInput step run found for step {StepId} in run {RunId}", _stepConfig.Id, data.RunId);
-            return ExecutionResult.Next();
+            return await RouteByRecordedDecisionAsync(run, data, context, cancellationToken);
         }
 
         // The run was marked Suspended when this step started waiting (SuspendRunForInputAsync);
@@ -498,39 +560,143 @@ internal sealed class ActionStepBody : StepBodyAsync
         {
             var approved = decision.Outcome == ApprovalOutcome.Approved;
 
+            var outcome = approved
+                ? RequestApprovalAction.ApprovedOutcome
+                : RequestApprovalAction.RejectedOutcome;
+
             stepRun.Status = approved ? StepRunStatus.Completed : StepRunStatus.Rejected;
+            stepRun.BranchOutcome = outcome;
             await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
             _metrics.StepExecuted(_action.Alias);
 
-            return ExecutionResult.Outcome(approved
-                ? RequestApprovalAction.ApprovedOutcome
-                : RequestApprovalAction.RejectedOutcome);
+            return ExecutionResult.Outcome(outcome);
         }
 
         // No decision on the event — the step was resumed by something that is not an approval
         // submission. That is a genuine error rather than an outcome.
         //
         // Categorised as a configuration error, not as Cancelled: nothing was cancelled, and this is
-        // the category DefaultStepErrorClassifier already gives the InvalidOperationException thrown
-        // just below. Both are terminal, so retry behaviour is unchanged — a resume payload that was
-        // not a decision will not become one on a second attempt.
+        // the category DefaultStepErrorClassifier gives the InvalidOperationException raised below.
+        // It is terminal, so under Retry the run stops rather than retrying — a resume payload that
+        // was not a decision will not become one on a second attempt. Routed through the same
+        // decision as every other failure so Terminate, Suspend and Retry behave consistently.
+        // Under Suspend, ActionWorkflowStep.PrimeForRetry drops the bad payload from the pointer,
+        // so when an operator resumes the run this step asks for a decision again rather than
+        // re-reading the payload (or, finding this step run already Failed, moving on).
         stepRun.Status = StepRunStatus.Failed;
         _metrics.StepFailed(_action.Alias);
         stepRun.Error = "Approval step resumed without a valid decision";
         stepRun.ErrorCategory = StepRunErrorCategory.ConfigurationError;
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
-        if (_stepConfig.ErrorBehavior == StepErrorBehavior.Terminate)
+        throw SelectFailureToThrow(
+            new InvalidOperationException(stepRun.Error),
+            StepRunErrorCategory.ConfigurationError,
+            context);
+    }
+
+    /// <summary>
+    /// Handles a resumed approval step that has no step run left waiting for input. This happens when
+    /// the decision was saved on the step run but the workflow was not persisted afterwards (persisting
+    /// it failed, or the node executing it stopped), and the instance is then re-run: in the same
+    /// process, on another node, or after a restart. The engine re-runs this step with the same event, but
+    /// the decision has already been applied. The step run's status is the record of that decision —
+    /// <see cref="StepRunStatus.Completed"/> for an approval, <see cref="StepRunStatus.Rejected"/> for a
+    /// refusal — so the step routes by it, to the line that decision chose. Nothing is saved or
+    /// published again: the step run, the run's return to Running and the metrics were all written
+    /// before. Only the step's output is put back on the workflow data, which was lost with the
+    /// unpersisted workflow, so later steps can still bind to the decision.
+    /// </summary>
+    /// <remarks>
+    /// After a restart this is only reached because stuck-run recovery leaves such a run alone: its
+    /// instance still holds the delivered event on this step's pointer (see
+    /// <c>EFCoreStuckRunRecovery.ReadRunsWithUnroutedEventsAsync</c>). A run that also has a step left
+    /// Pending or Running is still failed there, so this method never runs alongside a repeated step.
+    /// <para>
+    /// The latest step run for this step is taken as the one the event belongs to: a step only waits
+    /// for an event after saving its step run as waiting, so in a sequential loop no other run of this
+    /// step (a previous iteration, say) can be newer. That does not hold under a parallel ForEach
+    /// (<c>RunParallel</c>): iterations of the same step run side by side, step runs carry no iteration
+    /// identity, and the approval event key (<c>{RunId}:{StepId}</c>) is shared by every iteration. The
+    /// newest run may then belong to a sibling iteration, so recovery fails closed (the sibling's run
+    /// is undecided) or follows the sibling's decision. This is the same blind spot as the
+    /// waiting-run lookup in <c>HandleResumeAsync</c>; matching runs to iterations properly needs
+    /// iteration identity on <see cref="StepRun"/>, which is out of scope here.
+    /// </para>
+    /// <para>
+    /// When the latest run does not record a decision, the step cannot tell what
+    /// happened, and following its unnamed lines would let the run carry on as if it had been
+    /// approved. It fails instead, through the same decision as every other failure, and records a
+    /// failed step run so the reason shows in the run history, not only in the log. The event is
+    /// dropped from the pointer first so that, under Suspend, an operator resuming the run gets a
+    /// fresh request for a decision rather than this same failure again.
+    /// </para>
+    /// </remarks>
+    private async Task<ExecutionResult> RouteByRecordedDecisionAsync(
+        AutomationRun? run,
+        AutomationWorkflowData data,
+        IStepExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var latest = run?.StepRuns
+            .Where(sr => sr.StepId == _stepConfig.Id)
+            .MaxBy(sr => sr.StartedUtc);
+
+        var recordedOutcome = latest?.Status switch
         {
-            throw new InvalidOperationException(stepRun.Error);
+            StepRunStatus.Completed => RequestApprovalAction.ApprovedOutcome,
+            StepRunStatus.Rejected => RequestApprovalAction.RejectedOutcome,
+            _ => null,
+        };
+
+        if (latest is not null && recordedOutcome is not null)
+        {
+            _logger.LogWarning(
+                "Step {StepId} in run {RunId} was resumed after its decision was already recorded; following the recorded '{Outcome}' outcome",
+                _stepConfig.Id, data.RunId, recordedOutcome);
+
+            if (latest.OutputData is { } outputJson)
+            {
+                PublishOutput(outputJson, latest.Id, data, context.Item as ForEachIterationContext);
+            }
+
+            return ExecutionResult.Outcome(recordedOutcome);
         }
 
-        return ExecutionResult.Next();
+        _logger.LogError(
+            "Step {StepId} in run {RunId} was resumed but has neither a step run waiting for input nor a recorded decision (latest step run status: {Status})",
+            _stepConfig.Id, data.RunId, latest?.Status);
+
+        var exception = new InvalidOperationException(
+            $"Approval step '{_stepConfig.Name}' was resumed, but no step run is waiting for a decision and none has been recorded.");
+
+        var now = DateTime.UtcNow;
+        await _runRepository.AddStepRunAsync(
+            new StepRun
+            {
+                Id = Guid.NewGuid(),
+                RunId = data.RunId,
+                StepId = _stepConfig.Id,
+                ActionAlias = _action.Alias,
+                Status = StepRunStatus.Failed,
+                StartedUtc = now,
+                CompletedUtc = now,
+                Duration = TimeSpan.Zero,
+                Error = exception.Message,
+                ErrorCategory = StepRunErrorCategory.ConfigurationError,
+            },
+            cancellationToken);
+        _metrics.StepFailed(_action.Alias);
+
+        context.ExecutionPointer.EventPublished = false;
+        context.ExecutionPointer.EventData = null;
+
+        throw SelectFailureToThrow(exception, StepRunErrorCategory.ConfigurationError, context);
     }
 
     private async Task<ExecutionResult> HandleSleepResumeAsync(
         SleepPersistenceData sleepData,
-        AutomationWorkflowData data,
+        IStepExecutionContext context,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Step {StepId} resumed after sleep", sleepData.StepId);
@@ -544,7 +710,13 @@ internal sealed class ActionStepBody : StepBodyAsync
             return ExecutionResult.Next();
         }
 
-        stepRun.Status = StepRunStatus.Completed;
+        // A sleeping action can't name an outcome, so it finishes on its default exit, the same as
+        // an action that succeeds without naming one. Without this, an action that declares outcomes
+        // would resume with no outcome and none of its named lines would run.
+        using var routingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        routingCts.CancelAfter(_executionOptions.Value.DefaultTimeout);
+        var routing = await ResolveOutcomeRoutingAsync(returnedOutcome: null, cancellationToken, routingCts.Token);
+
         stepRun.CompletedUtc = DateTime.UtcNow;
         stepRun.Duration = stepRun.CompletedUtc - stepRun.StartedUtc;
 
@@ -553,10 +725,23 @@ internal sealed class ActionStepBody : StepBodyAsync
             _metrics.RecordStepDuration(stepRun.Duration.Value.TotalMilliseconds, _action.Alias);
         }
 
+        if (routing.FailureMessage is not null)
+        {
+            stepRun.Status = StepRunStatus.Failed;
+            stepRun.Error = routing.FailureMessage;
+            stepRun.ErrorCategory = StepRunErrorCategory.Validation;
+            _metrics.StepFailed(_action.Alias);
+            await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
+
+            throw SelectFailureToThrow(new ValidationException(routing.FailureMessage), StepRunErrorCategory.Validation, context);
+        }
+
+        stepRun.Status = StepRunStatus.Completed;
+        stepRun.BranchOutcome = routing.Outcome;
         _metrics.StepExecuted(_action.Alias);
         await _runRepository.UpdateStepRunAsync(stepRun, cancellationToken);
 
-        return ExecutionResult.Next();
+        return routing.Outcome is null ? ExecutionResult.Next() : ExecutionResult.Outcome(routing.Outcome);
     }
 
     private void StoreOutputData(
@@ -573,6 +758,19 @@ internal sealed class ActionStepBody : StepBodyAsync
         var outputJson = JsonSerializer.Serialize(outputData, Dispatch.JsonOptions.Default);
         stepRun.OutputData = outputJson;
 
+        PublishOutput(outputJson, stepRun.Id, data, iterationContext);
+    }
+
+    /// <summary>
+    /// Makes a step run's recorded output readable by later steps' bindings, by putting it on the
+    /// workflow data.
+    /// </summary>
+    private void PublishOutput(
+        string outputJson,
+        Guid stepRunId,
+        AutomationWorkflowData data,
+        ForEachIterationContext? iterationContext)
+    {
         // Small outputs are deserialized to a case-insensitive dictionary with plain .NET
         // types (not JsonElement) so values survive the WorkflowCore Newtonsoft.Json
         // persistence round-trip and are accessible to BindingEvaluator.ResolvePath.
@@ -581,7 +779,7 @@ internal sealed class ActionStepBody : StepBodyAsync
         // is written once) goes into the workflow data — binding evaluation hydrates it on
         // demand via StepOutputHydrationCache.
         var unwrapped = StepOutputReference.CreateInlineOrMarker(
-            outputJson, stepRun.Id, _executionOptions.Value.MaxInlineOutputBytes);
+            outputJson, stepRunId, _executionOptions.Value.MaxInlineOutputBytes);
 
         // Write to the run-global table so steps after the loop (and external observers)
         // can still read the most recent value. Inside an iteration the global entry is

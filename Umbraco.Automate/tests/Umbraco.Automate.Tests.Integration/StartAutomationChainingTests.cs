@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
@@ -144,6 +145,7 @@ public class StartAutomationChainingTests : IAsyncLifetime
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
         services.AddSingleton<IEventAggregator>(Mock.Of<IEventAggregator>());
+        services.AddSingleton<AutomateReadinessSignal>();
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();

@@ -1,6 +1,7 @@
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Dispatch.Authorization;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.BuiltIn;
 using Umbraco.Automate.Testing.Builders;
@@ -100,6 +101,246 @@ public class NodeScopedTriggerDispatchAuthorizerTests
         _nodeAuthorizer.Verify(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_SingleContentOutputAllowed_LeavesOutputUnchanged()
+    {
+        var output = new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid() };
+        AllowContent(output.ContentKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(output), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_SingleContentOutputDenied_IsDenied()
+    {
+        var output = new ContentSavedTriggerOutput { ContentKey = Guid.NewGuid() };
+        DenyContent(output.ContentKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(output), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_BatchAllItemsAllowed_IsAuthorized()
+    {
+        var (batch, _, _) = BuildMixedContentBatch();
+        AllowContent(batch.Items[0].ContentKey);
+        AllowContent(batch.Items[1].ContentKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_BatchAllItemsAllowed_LeavesOutputUnchanged()
+    {
+        var (batch, _, _) = BuildMixedContentBatch();
+        AllowContent(batch.Items[0].ContentKey);
+        AllowContent(batch.Items[1].ContentKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_BatchMixedAccess_IsAuthorized()
+    {
+        var (batch, allowedKey, deniedKey) = BuildMixedContentBatch();
+        AllowContent(allowedKey);
+        DenyContent(deniedKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_BatchMixedAccess_KeepsOnlyAllowedItems()
+    {
+        var (batch, allowedKey, deniedKey) = BuildMixedContentBatch();
+        AllowContent(allowedKey);
+        DenyContent(deniedKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeOfType<BatchTriggerOutput<ContentSavedTriggerOutput>>()
+            .Items.Select(i => i.ContentKey).ShouldBe([allowedKey]);
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_BatchMixedAccess_RecomputesCount()
+    {
+        var (batch, allowedKey, deniedKey) = BuildMixedContentBatch();
+        AllowContent(allowedKey);
+        DenyContent(deniedKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeOfType<BatchTriggerOutput<ContentSavedTriggerOutput>>().Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_BatchMixedAccess_DoesNotMutateOriginalBatch()
+    {
+        // The original typed output is shared across every automation subscribed to the
+        // event; narrowing for one service account must not leak into another's run.
+        var (batch, allowedKey, deniedKey) = BuildMixedContentBatch();
+        AllowContent(allowedKey);
+        DenyContent(deniedKey);
+
+        await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        batch.Items.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_BatchNoItemsAllowed_IsDenied()
+    {
+        var (batch, _, _) = BuildMixedContentBatch();
+        DenyContent(batch.Items[0].ContentKey);
+        DenyContent(batch.Items[1].ContentKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_BatchNoItemsAllowed_IsDenied()
+    {
+        // The plain ITriggerDispatchAuthorizer contract must agree with the narrowing one.
+        var (batch, _, _) = BuildMixedContentBatch();
+        DenyContent(batch.Items[0].ContentKey);
+        DenyContent(batch.Items[1].ContentKey);
+
+        var result = await _sut.AuthorizeAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Authorized.ShouldBeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(BatchTriggerTypes))]
+    public void BatchTrigger_OutputType_IsNarrowableBatch(Type triggerType)
+    {
+        var trigger = CreateTrigger(triggerType);
+
+        typeof(IBatchTriggerOutput).IsAssignableFrom(trigger.OutputType).ShouldBeTrue();
+    }
+
+    [Theory]
+    [MemberData(nameof(NodeCheckedBatchTriggerTypes))]
+    public async Task AuthorizeAndNarrowAsync_NodeCheckedBatchTriggerWithDeniedItem_IsDenied(Type triggerType)
+    {
+        // Every content batch trigger and the media saved/trashed batch triggers carry items
+        // whose single-item trigger is node-checked, so the batch must be checked too.
+        DenyAllNodes();
+
+        var result = await _sut.AuthorizeAndNarrowAsync(
+            BuildContext(BuildSingleItemBatch(triggerType)), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_MediaBatchDeleted_IsNotNodeChecked()
+    {
+        // Deleted media no longer exists, so CMS would always report NotFound and the
+        // trigger would never fire. The single-item MediaDeletedTrigger is not node-checked
+        // for the same reason; the batch form matches it.
+        DenyAllNodes();
+
+        var result = await _sut.AuthorizeAndNarrowAsync(
+            BuildContext(BuildSingleItemBatch(typeof(MediaBatchDeletedTrigger))), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeTrue();
+    }
+
+    public static TheoryData<Type> BatchTriggerTypes => new()
+    {
+        typeof(ContentBatchPublishedTrigger),
+        typeof(ContentBatchSavedTrigger),
+        typeof(ContentBatchUnpublishedTrigger),
+        typeof(MediaBatchSavedTrigger),
+        typeof(MediaBatchTrashedTrigger),
+        typeof(MediaBatchDeletedTrigger),
+    };
+
+    public static TheoryData<Type> NodeCheckedBatchTriggerTypes => new()
+    {
+        typeof(ContentBatchPublishedTrigger),
+        typeof(ContentBatchSavedTrigger),
+        typeof(ContentBatchUnpublishedTrigger),
+        typeof(MediaBatchSavedTrigger),
+        typeof(MediaBatchTrashedTrigger),
+    };
+
+    private static ITrigger CreateTrigger(Type triggerType)
+        => (ITrigger)Activator.CreateInstance(triggerType, new TriggerInfrastructure(Mock.Of<IEditableModelResolver>()))!;
+
+    /// <summary>
+    /// Builds a one-item batch of the trigger's own declared output type, so the case fails
+    /// if the item factory and the trigger's real output type drift apart.
+    /// </summary>
+    private static object BuildSingleItemBatch(Type triggerType)
+    {
+        var key = Guid.NewGuid();
+        object item = triggerType.Name switch
+        {
+            nameof(ContentBatchPublishedTrigger) => new ContentPublishedTriggerOutput { ContentKey = key },
+            nameof(ContentBatchSavedTrigger) => new ContentSavedTriggerOutput { ContentKey = key },
+            nameof(ContentBatchUnpublishedTrigger) => new ContentUnpublishedTriggerOutput { ContentKey = key },
+            nameof(MediaBatchSavedTrigger) => new MediaSavedTriggerOutput { MediaKey = key },
+            nameof(MediaBatchTrashedTrigger) => new MediaTrashedTriggerOutput { MediaKey = key },
+            nameof(MediaBatchDeletedTrigger) => new MediaDeletedTriggerOutput { MediaKey = key },
+            _ => throw new ArgumentOutOfRangeException(nameof(triggerType), triggerType.Name, "Not a batch trigger."),
+        };
+
+        var empty = (IBatchTriggerOutput)Activator.CreateInstance(CreateTrigger(triggerType).OutputType!)!;
+        return empty.WithItems([item]);
+    }
+
+    private static (BatchTriggerOutput<ContentSavedTriggerOutput> Batch, Guid AllowedKey, Guid DeniedKey) BuildMixedContentBatch()
+    {
+        var allowedKey = Guid.NewGuid();
+        var deniedKey = Guid.NewGuid();
+        var batch = new BatchTriggerOutput<ContentSavedTriggerOutput>
+        {
+            Items =
+            [
+                new ContentSavedTriggerOutput { ContentKey = allowedKey, ContentName = "Inside" },
+                new ContentSavedTriggerOutput { ContentKey = deniedKey, ContentName = "Outside" },
+            ],
+            Count = 2,
+        };
+
+        return (batch, allowedKey, deniedKey);
+    }
+
+    private void AllowContent(Guid key)
+        => _nodeAuthorizer
+            .Setup(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
+    private void DenyContent(Guid key)
+        => _nodeAuthorizer
+            .Setup(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Outside start-node path."));
+
+    private void DenyAllNodes()
+    {
+        _nodeAuthorizer
+            .Setup(a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Outside start-node path."));
+        _nodeAuthorizer
+            .Setup(a => a.AuthorizeMediaAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Outside start-node path."));
+    }
+
     private static TriggerDispatchAuthorizationContext BuildContext(object? typedOutput, IUser? user = null)
         => new()
         {
@@ -110,4 +351,275 @@ public class NodeScopedTriggerDispatchAuthorizerTests
             ServiceAccount = user ?? Mock.Of<IUser>(),
             Automation = new AutomationBuilder().WithTrigger("any").Build(),
         };
+
+    // These use a stand-in output (ElementOutput below) so they compile at T16, before the element
+    // trigger outputs exist; each Element*TriggerTests file checks its real output carries the marker.
+
+    #region Element outputs: happy path
+
+    // R21: an element the service account can read starts the run
+    [Fact]
+    public async Task AuthorizeAsync_ElementOutputAllowed_IsAuthorized()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.Authorized.ShouldBeTrue();
+    }
+
+    // STORY-9 AC17: the check is Read on the element (folder permissions included, inside the authorizer)
+    [Fact]
+    public async Task AuthorizeAsync_ElementOutput_AsksForElementRead()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        _nodeAuthorizer.Verify(
+            a => a.AuthorizeElementAsync(
+                It.IsAny<IUser>(),
+                output.ElementKey.Value,
+                It.Is<IReadOnlySet<string>>(p => p.SetEquals(new[] { Umbraco.Cms.Core.Actions.ActionElementBrowse.ActionLetter })),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // R21: the check runs as the workspace's service account, not an ambient user
+    [Fact]
+    public async Task AuthorizeAsync_ElementOutput_ChecksTheServiceAccount()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        var user = Mock.Of<IUser>();
+        AllowElement(output.ElementKey.Value);
+
+        await _sut.AuthorizeAsync(BuildContext(output, user), CancellationToken.None);
+
+        _nodeAuthorizer.Verify(
+            a => a.AuthorizeElementAsync(user, output.ElementKey.Value, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // R21: an element key is never looked up as a document
+    [Fact]
+    public async Task AuthorizeAsync_ElementOutput_DoesNotCheckContent()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        _nodeAuthorizer.Verify(
+            a => a.AuthorizeContentAsync(It.IsAny<IUser>(), It.IsAny<Guid>(), It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    // R21: a single allowed element is dispatched as it is
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_SingleElementOutputAllowed_LeavesOutputUnchanged()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        AllowElement(output.ElementKey.Value);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(output), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeNull();
+    }
+
+    // IElementScopedTriggerOutput contract: a null key means "not bound to one element", as for content
+    [Fact]
+    public async Task AuthorizeAsync_ElementOutputWithoutKey_IsAuthorized()
+    {
+        var result = await _sut.AuthorizeAsync(BuildContext(new ElementOutput { ElementKey = null }), CancellationToken.None);
+
+        result.Authorized.ShouldBeTrue();
+    }
+
+    // R21: every element in the batch readable, nothing removed
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchAllItemsAllowed_LeavesOutputUnchanged()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        AllowElement(reviewsKey);
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeNull();
+    }
+
+    // STORY-9 AC19: Batch leaves out unreadable elements
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_IsAuthorized()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeTrue();
+    }
+
+    // STORY-9 AC19: Batch leaves out unreadable elements
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_KeepsOnlyReadableElements()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeOfType<BatchTriggerOutput<ElementOutput>>()
+            .Items.Select(i => i.ElementKey).ShouldBe([campaignsKey]);
+    }
+
+    // STORY-9 AC19: Batch leaves out unreadable elements
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_RecomputesCount()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.NarrowedOutput.ShouldBeOfType<BatchTriggerOutput<ElementOutput>>().Count.ShouldBe(1);
+    }
+
+    #endregion
+
+    #region Element outputs: sad path
+
+    // STORY-9 AC17: No Read on the folder
+    [Fact]
+    public async Task AuthorizeAsync_ElementOutputWithoutRead_IsDenied()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        DenyElement(output.ElementKey.Value, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC18: Outside the start node. The authorizer's reason reaches the dispatcher log.
+    [Fact]
+    public async Task AuthorizeAsync_ElementOutsideStartNode_PropagatesFailureReason()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        DenyElement(output.ElementKey.Value, "Outside Library start node.");
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.FailureReason.ShouldBe("Outside Library start node.");
+    }
+
+    // STORY-9 AC17: single output denied, nothing dispatched
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_SingleElementOutputDenied_IsDenied()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        DenyElement(output.ElementKey.Value, "Outside Library start node.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(output), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeFalse();
+    }
+
+    // R21: an element in the recycle bin is hidden from an account whose Library start node is a
+    // folder. The authorizer reports NotFound there (STORY-1 AC10); dispatch must still deny.
+    [Fact]
+    public async Task AuthorizeAsync_TrashedElementForScopedAccount_IsDenied()
+    {
+        var output = new ElementOutput { ElementKey = Guid.NewGuid() };
+        _nodeAuthorizer
+            .Setup(a => a.AuthorizeElementAsync(It.IsAny<IUser>(), output.ElementKey.Value, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound("Element not found."));
+
+        var result = await _sut.AuthorizeAsync(BuildContext(output), CancellationToken.None);
+
+        result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC20: Batch with nothing readable
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchNoItemsReadable_IsDenied()
+    {
+        var (batch, firstKey, secondKey) = BuildMixedElementBatch();
+        DenyElement(firstKey, "Missing Umb.Element.Read on folder Reviews.");
+        DenyElement(secondKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC20: Batch with nothing readable. The plain contract agrees with the narrowing one.
+    [Fact]
+    public async Task AuthorizeAsync_ElementBatchNoItemsReadable_IsDenied()
+    {
+        var (batch, firstKey, secondKey) = BuildMixedElementBatch();
+        DenyElement(firstKey, "Missing Umb.Element.Read on folder Reviews.");
+        DenyElement(secondKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        var result = await _sut.AuthorizeAsync(BuildContext(batch), CancellationToken.None);
+
+        result.Authorized.ShouldBeFalse();
+    }
+
+    // STORY-9 AC19: narrowing for one workspace must not leak into another's run
+    [Fact]
+    public async Task AuthorizeAndNarrowAsync_ElementBatchMixedAccess_DoesNotMutateOriginalBatch()
+    {
+        var (batch, campaignsKey, reviewsKey) = BuildMixedElementBatch();
+        AllowElement(campaignsKey);
+        DenyElement(reviewsKey, "Missing Umb.Element.Read on folder Reviews.");
+
+        await _sut.AuthorizeAndNarrowAsync(BuildContext(batch), CancellationToken.None);
+
+        batch.Items.Count.ShouldBe(2);
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Stand-in for the element trigger outputs (T17-T19), which implement the same internal marker.
+    /// </summary>
+    private sealed class ElementOutput : IElementScopedTriggerOutput
+    {
+        public Guid? ElementKey { get; init; }
+
+        public Guid? GetElementKey() => ElementKey;
+    }
+
+    private static (BatchTriggerOutput<ElementOutput> Batch, Guid CampaignsKey, Guid ReviewsKey) BuildMixedElementBatch()
+    {
+        var campaignsKey = Guid.NewGuid();
+        var reviewsKey = Guid.NewGuid();
+        var batch = new BatchTriggerOutput<ElementOutput>
+        {
+            Items =
+            [
+                new ElementOutput { ElementKey = campaignsKey },
+                new ElementOutput { ElementKey = reviewsKey },
+            ],
+            Count = 2,
+        };
+
+        return (batch, campaignsKey, reviewsKey);
+    }
+
+    private void AllowElement(Guid key)
+        => _nodeAuthorizer
+            .Setup(a => a.AuthorizeElementAsync(It.IsAny<IUser>(), key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Success);
+
+    private void DenyElement(Guid key, string reason)
+        => _nodeAuthorizer
+            .Setup(a => a.AuthorizeElementAsync(It.IsAny<IUser>(), key, It.IsAny<IReadOnlySet<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail(reason));
 }

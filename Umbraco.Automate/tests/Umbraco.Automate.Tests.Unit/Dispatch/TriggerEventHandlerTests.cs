@@ -53,6 +53,7 @@ public class TriggerEventHandlerTests
             {
                 new ContentSavedTrigger(infra),
                 new ContentPublishedTrigger(infra),
+                new ContentBatchSavedTrigger(infra),
             };
         });
 
@@ -862,6 +863,274 @@ public class TriggerEventHandlerTests
             It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
     }
 
+    [Fact]
+    public async Task HandleAsync_BatchAllItemsAllowed_RunReceivesAllItems()
+    {
+        var (batch, _, _) = BuildMixedContentSavedBatch();
+        var captured = CaptureRunData();
+        await HandleBatchAsync(batch, CreatePublishedAutomation(ContentBatchSavedAlias));
+
+        GetItemKeys(captured()).ShouldBe(batch.Items.Select(i => i.ContentKey.ToString()));
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchMixedAccess_RunReceivesOnlyAllowedItems()
+    {
+        var (batch, allowedKey, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(deniedKey);
+        var captured = CaptureRunData();
+
+        await HandleBatchAsync(batch, CreatePublishedAutomation(ContentBatchSavedAlias));
+
+        GetItemKeys(captured()).ShouldBe([allowedKey.ToString()]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchMixedAccess_RunCountMatchesAllowedItems()
+    {
+        var (batch, _, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(deniedKey);
+        var captured = CaptureRunData();
+
+        await HandleBatchAsync(batch, CreatePublishedAutomation(ContentBatchSavedAlias));
+
+        captured()!["count"].ShouldBe(1L);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchNoItemsAllowed_SkipsAutomation()
+    {
+        var (batch, allowedKey, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(allowedKey);
+        DenyContentNode(deniedKey);
+
+        await HandleBatchAsync(batch, CreatePublishedAutomation(ContentBatchSavedAlias));
+
+        VerifyNoRunStarted();
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchSettingsMatchedOnlyByDeniedItem_SkipsAutomation()
+    {
+        // Batch settings filters match if *any* item matches. When the only matching item is
+        // one the service account can't see, the run must not fire — firing would itself
+        // reveal that a hidden node of that type changed.
+        var (batch, _, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(deniedKey);
+        var deniedTypeKey = batch.Items.Single(i => i.ContentKey == deniedKey).ContentTypeKey;
+        var automation = new AutomationBuilder()
+            .WithTrigger(ContentBatchSavedAlias, new Dictionary<string, object?>
+            {
+                ["contentTypes"] = deniedTypeKey.ToString(),
+            })
+            .Build();
+
+        await HandleBatchAsync(batch, automation);
+
+        VerifyNoRunStarted();
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchSettingsMatchedByAllowedItem_StartsRun()
+    {
+        var (batch, allowedKey, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(deniedKey);
+        var automation = BuildContentBatchSavedAutomationFilteredTo(batch, allowedKey);
+
+        await HandleBatchAsync(batch, automation);
+
+        _executor.Verify(e => e.ExecuteAsync(
+            automation,
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchSettingsMatchedByAllowedItem_RunReceivesOnlyAllowedItem()
+    {
+        var (batch, allowedKey, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(deniedKey);
+        var captured = CaptureRunData();
+
+        await HandleBatchAsync(batch, BuildContentBatchSavedAutomationFilteredTo(batch, allowedKey));
+
+        GetItemKeys(captured()).ShouldBe([allowedKey.ToString()]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchForAutomationsSharingServiceAccount_ChecksEachItemOnce()
+    {
+        // Narrowing depends only on the service account and the output, so a second
+        // automation on the same account reuses the first one's per-item checks.
+        var (batch, _, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(deniedKey);
+
+        await HandleBatchAsync(
+            batch,
+            CreatePublishedAutomation(ContentBatchSavedAlias),
+            CreatePublishedAutomation(ContentBatchSavedAlias));
+
+        _nodeAuthorizer.Verify(a => a.AuthorizeContentAsync(
+            It.IsAny<IUser>(),
+            It.IsAny<Guid>(),
+            It.IsAny<IReadOnlySet<string>>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(batch.Items.Count));
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchForAutomationsWithDifferentServiceAccounts_ChecksItemsPerAccount()
+    {
+        // The narrowing cache must never carry one account's view over to another account.
+        var (batch, _, _) = BuildMixedContentSavedBatch();
+        var workspaceA = Guid.NewGuid();
+        var workspaceB = Guid.NewGuid();
+        SetServiceAccount(workspaceA, Guid.NewGuid());
+        SetServiceAccount(workspaceB, Guid.NewGuid());
+
+        await HandleBatchAsync(
+            batch,
+            new AutomationBuilder().WithTrigger(ContentBatchSavedAlias).WithWorkspaceId(workspaceA).Build(),
+            new AutomationBuilder().WithTrigger(ContentBatchSavedAlias).WithWorkspaceId(workspaceB).Build());
+
+        _nodeAuthorizer.Verify(a => a.AuthorizeContentAsync(
+            It.IsAny<IUser>(),
+            It.IsAny<Guid>(),
+            It.IsAny<IReadOnlySet<string>>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(batch.Items.Count * 2));
+    }
+
+    [Fact]
+    public async Task HandleAsync_BatchNarrowed_LaterAuthorizerSeesNarrowedOutput()
+    {
+        // Provider authorisers registered after the built-in one judge only the items the run
+        // will actually receive.
+        var (batch, _, deniedKey) = BuildMixedContentSavedBatch();
+        DenyContentNode(deniedKey);
+        var recorder = new RecordingAuthorizer(deny: false, reason: string.Empty);
+        var handler = CreateHandler(new ITriggerDispatchAuthorizer[]
+        {
+            new NodeScopedTriggerDispatchAuthorizer(_nodeAuthorizer.Object),
+            recorder,
+        });
+
+        await HandleBatchAsync(batch, CreatePublishedAutomation(ContentBatchSavedAlias), handler);
+
+        recorder.LastOutput.ShouldBeOfType<BatchTriggerOutput<ContentSavedTriggerOutput>>().Count.ShouldBe(1);
+    }
+
+    private const string ContentBatchSavedAlias = "umbracoAutomate.contentBatchSaved";
+
+    private TriggerEventHandler CreateHandler(ITriggerDispatchAuthorizer[] authorizers)
+        => new(
+            _automationService.Object,
+            Mock.Of<IEntityVersionService>(),
+            _executor.Object,
+            _nodeEligibility.Object,
+            _triggers,
+            _serviceAccountResolver.Object,
+            new SectionAccessChecker(),
+            new TriggerDispatchAuthorizerCollection(() => authorizers),
+            CreateExecutionOptionsMonitor(),
+            Mock.Of<ILogger<TriggerEventHandler>>());
+
+    private Task HandleBatchAsync(
+        BatchTriggerOutput<ContentSavedTriggerOutput> batch,
+        Automation automation,
+        TriggerEventHandler? handler = null)
+        => HandleBatchAsync(batch, [automation], handler);
+
+    private Task HandleBatchAsync(
+        BatchTriggerOutput<ContentSavedTriggerOutput> batch,
+        params Automation[] automations)
+        => HandleBatchAsync(batch, automations, handler: null);
+
+    private async Task HandleBatchAsync(
+        BatchTriggerOutput<ContentSavedTriggerOutput> batch,
+        Automation[] automations,
+        TriggerEventHandler? handler)
+    {
+        _automationService.Setup(s => s.GetAllAutomationsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automations);
+
+        var body = SerializeMessage(new TriggerEventMessage
+        {
+            TriggerAlias = ContentBatchSavedAlias,
+            InitiatorType = "system",
+            OutputData = JsonSerializer.Serialize(batch, JsonOptions.Default),
+        });
+
+        await (handler ?? _handler).HandleAsync(body, CancellationToken.None);
+    }
+
+    private Func<Dictionary<string, object?>?> CaptureRunData()
+    {
+        Dictionary<string, object?>? captured = null;
+        _executor.Setup(e => e.ExecuteAsync(
+                It.IsAny<Automation>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, object?>?>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IReadOnlyList<Guid>>()))
+            .Callback<Automation, string, string?, Dictionary<string, object?>?, CancellationToken, IReadOnlyList<Guid>?>(
+                (_, _, _, data, _, _) => captured = data)
+            .ReturnsAsync(Guid.NewGuid());
+
+        return () => captured;
+    }
+
+    private static IEnumerable<string?> GetItemKeys(Dictionary<string, object?>? runData)
+        => ((List<object?>)runData!["items"]!)
+            .Cast<Dictionary<string, object?>>()
+            .Select(item => item["contentKey"] as string);
+
+    private void DenyContentNode(Guid key)
+        => _nodeAuthorizer.Setup(a => a.AuthorizeContentAsync(
+                It.IsAny<IUser>(),
+                key,
+                It.IsAny<IReadOnlySet<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Outside start-node path."));
+
+    private static Automation BuildContentBatchSavedAutomationFilteredTo(
+        BatchTriggerOutput<ContentSavedTriggerOutput> batch,
+        Guid itemKey)
+        => new AutomationBuilder()
+            .WithTrigger(ContentBatchSavedAlias, new Dictionary<string, object?>
+            {
+                ["contentTypes"] = batch.Items.Single(i => i.ContentKey == itemKey).ContentTypeKey.ToString(),
+            })
+            .Build();
+
+    private void SetServiceAccount(Guid workspaceId, Guid userKey)
+        => _serviceAccountResolver.Setup(r => r.GetServiceAccountAsync(workspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<IUser>(u => u.Key == userKey && u.AllowedSections == new[] { "content" }));
+
+    private void VerifyNoRunStarted()
+        => _executor.Verify(e => e.ExecuteAsync(
+            It.IsAny<Automation>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<Dictionary<string, object?>?>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<IReadOnlyList<Guid>>()), Times.Never);
+
+    private static (BatchTriggerOutput<ContentSavedTriggerOutput> Batch, Guid AllowedKey, Guid DeniedKey) BuildMixedContentSavedBatch()
+    {
+        var allowed = BuildContentSavedOutput();
+        var denied = BuildContentSavedOutput();
+        var batch = new BatchTriggerOutput<ContentSavedTriggerOutput>
+        {
+            Items = [allowed, denied],
+            Count = 2,
+        };
+
+        return (batch, allowed.ContentKey, denied.ContentKey);
+    }
+
     private sealed class RecordingAuthorizer : ITriggerDispatchAuthorizer
     {
         private readonly bool _deny;
@@ -875,11 +1144,14 @@ public class TriggerEventHandlerTests
 
         public int Calls { get; private set; }
 
+        public object? LastOutput { get; private set; }
+
         public Task<AutomationAuthorizationResult> AuthorizeAsync(
             TriggerDispatchAuthorizationContext context,
             CancellationToken cancellationToken)
         {
             Calls++;
+            LastOutput = context.TypedOutput;
             return Task.FromResult(_deny
                 ? AutomationAuthorizationResult.Fail(_reason)
                 : AutomationAuthorizationResult.Success);

@@ -60,6 +60,45 @@ public class GetMediaPropertyActionTests
         => _action.Alias.ShouldBe("umbracoAutomate.getMediaProperty");
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt" }), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsNodeNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt" }), CancellationToken.None);
+
+        result.Outcome.ShouldBe("notFound");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NodeAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new GetMediaPropertySettings { MediaKey = key.ToString(), PropertyAlias = "alt" }), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_InvalidMediaKey_ReturnsValidationError()
     {
         var context = CreateContext(new GetMediaPropertySettings

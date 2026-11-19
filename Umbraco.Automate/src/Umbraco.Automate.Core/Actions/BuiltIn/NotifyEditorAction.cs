@@ -1,6 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Realtime;
+using Umbraco.Automate.Core.Security;
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
+using Umbraco.Cms.Core.Actions;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.Automate.Core.Actions.BuiltIn;
@@ -12,9 +18,17 @@ namespace Umbraco.Automate.Core.Actions.BuiltIn;
 [Action("umbracoAutomate.notifyEditor", "Notify Editor",
     Description = "Sends a realtime toast to any backoffice user currently editing the specified content item.",
     Group = "Content",
-    Icon = "icon-megaphone")]
+    Icon = "icon-megaphone",
+    RequiredSections = [UmbracoConstants.Applications.Content],
+    RequiredPermissions = [ActionBrowse.ActionLetter])]
 public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, NotifyEditorOutput>
 {
+    /// <summary>
+    /// Outcome key for the normal result. It is the default outcome, so it is also the key of
+    /// the canvas handle that a connection from a successful step leaves from.
+    /// </summary>
+    public const string OutcomeSuccess = "success";
+
     /// <summary>
     /// Outcome emitted when no content item exists for the configured key.
     /// </summary>
@@ -23,24 +37,56 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
     private readonly IContentService _contentService;
     private readonly IAutomationService _automationService;
     private readonly IEditorNotifier _editorNotifier;
+    private readonly IAutomationActionAuthorizer _authorizer;
     private readonly ILogger<NotifyEditorAction> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NotifyEditorAction"/> class.
     /// </summary>
+    [Obsolete("Use the constructor that takes an IAutomationActionAuthorizer. Scheduled for removal in Umbraco Automate 19.")]
     public NotifyEditorAction(
         ActionInfrastructure infrastructure,
         IContentService contentService,
         IAutomationService automationService,
         IEditorNotifier editorNotifier,
         ILogger<NotifyEditorAction> logger)
+        : this(
+            infrastructure,
+            contentService,
+            automationService,
+            editorNotifier,
+            StaticServiceProvider.Instance.GetRequiredService<IAutomationActionAuthorizer>(),
+            logger)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NotifyEditorAction"/> class.
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
+    public NotifyEditorAction(
+        ActionInfrastructure infrastructure,
+        IContentService contentService,
+        IAutomationService automationService,
+        IEditorNotifier editorNotifier,
+        IAutomationActionAuthorizer authorizer,
+        ILogger<NotifyEditorAction> logger)
         : base(infrastructure)
     {
         _contentService = contentService;
         _automationService = automationService;
         _editorNotifier = editorNotifier;
+        _authorizer = authorizer;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<StepOutcome> GetOutcomes()
+        =>
+        [
+            new StepOutcome(OutcomeSuccess, "#uaOutcomes_sent") { IsDefault = true },
+            new StepOutcome(OutcomeNotFound, "#uaOutcomes_notFound"),
+        ];
 
     /// <inheritdoc />
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -55,8 +101,10 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
         }
 
         // Use IContentService so editors on unpublished / draft content still get notified.
+        // A trashed item counts as missing for every account, including one with a root start
+        // node, which the authorizer below would otherwise let through to the recycle bin.
         var content = _contentService.GetById(contentKey);
-        if (content is null)
+        if (content is null || content.Trashed)
         {
             _logger.LogDebug(
                 "Automation {AutomationId} / Run {RunId}: Content {ContentKey} not found — skipping editor notification.",
@@ -65,6 +113,16 @@ public sealed class NotifyEditorAction : ActionBase<NotifyEditorSettings, Notify
             context.LogWarning($"Content {contentKey} was not found, so no editors were notified");
 
             return SuccessWithOutcome(OutcomeNotFound, new NotifyEditorOutput { ContentKey = contentKey });
+        }
+
+        // Node-level authorisation: the service account's start node / granular permissions may
+        // scope it to a subset of the Content section. This runs after the existence check on
+        // purpose: the real authorizer reports a missing node as a failure, which would turn the
+        // documented notFound outcome into an Authentication error. Nothing about the item (its
+        // name) is read or logged before this point.
+        if (await _authorizer.AuthorizeContentOrFailAsync(contentKey, RequiredPermissions, cancellationToken) is { } failure)
+        {
+            return failure;
         }
 
         // Resolve the automation name up-front — it's used in both default title and

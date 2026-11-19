@@ -10,7 +10,12 @@ public sealed class PublishContentSettings
     /// <summary>
     /// Gets or sets the key (GUID) of the content item to publish.
     /// </summary>
-    [Field(Label = "Content Key", Description = "The key of the content item to publish.", SupportsBindings = true)]
+    [Field(
+        Label = "Content Key",
+        Description = "The content item to publish.",
+        EditorUiAlias = "Umb.PropertyEditorUi.DocumentPicker",
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }]""",
+        SupportsBindings = true)]
     public string ContentKey { get; set; } = string.Empty;
 
     /// <summary>

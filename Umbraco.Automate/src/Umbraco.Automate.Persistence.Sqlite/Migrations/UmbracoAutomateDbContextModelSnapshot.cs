@@ -15,7 +15,7 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Automations.AutomationEntity", b =>
                 {
@@ -282,6 +282,9 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BranchOutcome")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("CompletedUtc")
                         .HasColumnType("TEXT");
 
@@ -296,6 +299,12 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
 
                     b.Property<string>("InputData")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("IterationIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("IterationTotal")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("LogEntries")
                         .HasColumnType("TEXT");
@@ -659,6 +668,22 @@ namespace Umbraco.Automate.Persistence.Sqlite.Migrations
                     b.HasKey("LockId");
 
                     b.ToTable("umbracoAutomateWorkflowLock", (string)null);
+                });
+
+            modelBuilder.Entity("Umbraco.Automate.Persistence.Workflows.WorkflowNodeHeartbeatEntity", b =>
+                {
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Beat")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("HeartbeatUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("NodeId");
+
+                    b.ToTable("umbracoAutomateWorkflowNodeHeartbeat", (string)null);
                 });
 
             modelBuilder.Entity("Umbraco.Automate.Persistence.Workspaces.WorkspaceConnectionEntity", b =>

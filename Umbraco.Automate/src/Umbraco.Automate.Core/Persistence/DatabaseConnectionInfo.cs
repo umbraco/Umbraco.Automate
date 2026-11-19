@@ -46,9 +46,12 @@ public static class DatabaseConnectionInfo
     /// unconfigured connection string (a fresh, not-yet-installed site; an ephemeral CI boot serving
     /// only <c>swagger.json</c>) must not throw at that point the way <see cref="Resolve(IConfiguration)"/>
     /// does. Composing against this placeholder instead defers the failure: nothing reads or writes
-    /// through the resulting context before <c>AutomateReadinessSignal</c> is signalled, which never
-    /// happens below <c>RuntimeLevel.Run</c>. See
-    /// <see href="https://github.com/umbraco/Umbraco.Automate/issues/226"/>.
+    /// through the resulting context before <c>AutomateReadinessSignal</c> is signalled. The placeholder
+    /// lasts only until a connection string resolves: the resolving factory retries on each create and
+    /// then switches to a real pool, so a connection string written after boot (the installer, with no
+    /// process restart) is picked up without a restart. See
+    /// <see href="https://github.com/umbraco/Umbraco.Automate/issues/226"/> and
+    /// <see href="https://github.com/umbraco/Umbraco.Automate/issues/531"/>.
     /// </remarks>
     internal static readonly (string ConnectionString, string ProviderName) PlaceholderConnection =
         ("Data Source=:memory:", Umbraco.Cms.Core.Constants.ProviderNames.SQLLite);

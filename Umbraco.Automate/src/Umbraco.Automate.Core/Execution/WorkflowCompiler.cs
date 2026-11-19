@@ -106,11 +106,6 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
                 : Array.Empty<ContainerBranchEdge>();
 
             var workflowStep = CompileStep(stepConfig, edges);
-            if (workflowStep is null)
-            {
-                continue;
-            }
-
             var currentIndex = stepIndex++;
             stepIdToIndex[stepConfig.Id] = currentIndex;
 
@@ -188,7 +183,7 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
         return containerIds;
     }
 
-    private WorkflowStep? CompileStep(StepConfiguration stepConfig, IReadOnlyList<ContainerBranchEdge> branchEdges)
+    private WorkflowStep CompileStep(StepConfiguration stepConfig, IReadOnlyList<ContainerBranchEdge> branchEdges)
     {
         // Try action collection first.
         var action = _actions.GetByAlias(stepConfig.ActionAlias);
@@ -222,12 +217,23 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             return CompileControlFlowStep(stepConfig, controlFlow, branchEdges);
         }
 
-        _logger.LogWarning("Step type '{ActionAlias}' not found in action or control flow collections, skipping step {StepId}",
+        _logger.LogWarning("Step type '{ActionAlias}' not found in action or control flow collections; step {StepId} will fail when it runs",
             stepConfig.ActionAlias, stepConfig.Id);
-        return null;
+        return CompileUnavailableStep(stepConfig);
     }
 
-    private ControlFlowWorkflowStep? CompileControlFlowStep(
+    /// <summary>
+    /// Compiles a step that can't be resolved into one that fails when it runs. Leaving it out would
+    /// let the run carry on without it, with later steps binding to its missing output.
+    /// </summary>
+    private WorkflowStep CompileUnavailableStep(StepConfiguration stepConfig)
+    {
+        var workflowStep = new ControlFlowWorkflowStep(new UnavailableStepBody(stepConfig, _runRepository, _metrics, _logger));
+        ApplyErrorBehavior(workflowStep, stepConfig, _serviceProvider.GetRequiredService<IOptions<ExecutionOptions>>().Value);
+        return workflowStep;
+    }
+
+    private WorkflowStep CompileControlFlowStep(
         StepConfiguration stepConfig,
         IControlFlow controlFlow,
         IReadOnlyList<ContainerBranchEdge> branchEdges)
@@ -266,9 +272,9 @@ internal sealed class WorkflowCompiler : IWorkflowCompiler
             }
 
             default:
-                _logger.LogWarning("Control flow type '{Alias}' does not have a compiled step body, skipping step {StepId}",
+                _logger.LogWarning("Control flow type '{Alias}' does not have a compiled step body; step {StepId} will fail when it runs",
                     controlFlow.Alias, stepConfig.Id);
-                return null;
+                return CompileUnavailableStep(stepConfig);
         }
     }
 

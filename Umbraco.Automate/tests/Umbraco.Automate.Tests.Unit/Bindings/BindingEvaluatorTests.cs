@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Bindings.Filters;
@@ -15,6 +16,7 @@ public class BindingEvaluatorTests
             new UppercaseFilter(),
             new FallbackFilter(),
             new StripHtmlFilter(),
+            new FormatDateFilter(),
         ]));
 
     [Fact]
@@ -363,6 +365,74 @@ public class BindingEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_UnknownFilter_Throws()
+    {
+        var act = () => _evaluator.Evaluate("${ trigger.contentName | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>();
+    }
+
+    [Fact]
+    public void Evaluate_UnknownFilter_MessageNamesTheFilterAndThePath()
+    {
+        var act = () => _evaluator.Evaluate("${ trigger.contentName | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>().Message
+            .ShouldBe("The binding filter 'uppercse' used on 'trigger.contentName' does not exist.");
+    }
+
+    [Fact]
+    public void Evaluate_UnknownFilter_MessageLeavesOutTheFilterArguments()
+    {
+        // Arguments can hold literal text from a sensitive field (e.g. a fallback secret), so the
+        // error that reaches the step run and the logs names the filter but never its arguments.
+        var act = () => _evaluator.Evaluate("${ trigger.empty | fallbak:sk_live_abc }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>().Message.ShouldNotContain("sk_live_abc");
+    }
+
+    [Fact]
+    public void Evaluate_PipeInsideAFilterArgument_DoesNotEchoTheArgumentText()
+    {
+        // The tokenizer splits on every '|', so the text after it comes back as a filter "alias".
+        var act = () => _evaluator.Evaluate("${ trigger.empty | fallback:a | top secret }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>().Message.ShouldNotContain("top secret");
+    }
+
+    [Fact]
+    public void Evaluate_UnknownFilterAfterAKnownOne_Throws()
+    {
+        var act = () => _evaluator.Evaluate("${ trigger.contentName | lowercase | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>();
+    }
+
+    [Fact]
+    public void Evaluate_KnownFilterInADifferentCase_IsApplied()
+    {
+        var result = _evaluator.Evaluate("${ trigger.contentName | UPPERCASE }", _data);
+
+        result.ShouldBe("HELLO WORLD");
+    }
+
+    [Fact]
+    public void EvaluateRaw_UnknownFilter_Throws()
+    {
+        var act = () => _evaluator.EvaluateRaw("${ trigger.cultures | uppercse }", _data);
+
+        act.ShouldThrow<UnknownBindingFilterException>();
+    }
+
+    [Fact]
+    public void IsKnownFilter_RegisteredAlias_ReturnsTrue()
+        => _evaluator.IsKnownFilter("truncate").ShouldBeTrue();
+
+    [Fact]
+    public void IsKnownFilter_UnregisteredAlias_ReturnsFalse()
+        => _evaluator.IsKnownFilter("uppercse").ShouldBeFalse();
+
+    [Fact]
     public void Evaluate_WithChainedFilters()
     {
         var result = _evaluator.Evaluate("${ trigger.body | stripHtml | truncate:10:... }", _data);
@@ -677,4 +747,117 @@ public class BindingEvaluatorTests
         BindingEvaluator.ResolvePath("steps.abc-123.availableCultures.length", data)
             .ShouldBe(2);
     }
+
+    // Regression (#489): numbers were formatted with the server culture, so a da-DK
+    // server wrote "701,1" and downstream numeric comparisons misread it.
+    [Fact]
+    public void Evaluate_NumberOnCommaDecimalCulture_UsesInvariantFormat()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["steps"] = new Dictionary<string, object?>
+            {
+                ["extract"] = new Dictionary<string, object?> { ["amount"] = 701.1m, ["ratio"] = 0.25d },
+            },
+        };
+
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("da-DK");
+        try
+        {
+            _evaluator.Evaluate("${ steps.extract.amount } / ${ steps.extract.ratio }", data)
+                .ShouldBe("701.1 / 0.25");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    // Regression (#517): dates were formatted with the server culture, so the same automation
+    // wrote different text on every server. They now render as ISO 8601 round-trip ("O"),
+    // both as a bare binding and through formatDate with no format.
+    [Fact]
+    public void Evaluate_DateOnAnyServerCulture_UsesIso8601RoundTrip()
+    {
+        var data = new Dictionary<string, object?>
+        {
+            ["trigger"] = new Dictionary<string, object?>
+            {
+                ["utc"] = new DateTime(2026, 11, 4, 10, 0, 0, DateTimeKind.Utc),
+                ["offset"] = new DateTimeOffset(2026, 11, 4, 10, 0, 0, TimeSpan.FromHours(1)),
+
+                // No time zone attached: written as is, without guessing one.
+                ["unspecified"] = new DateTime(2026, 11, 4, 10, 0, 0, DateTimeKind.Unspecified),
+                ["day"] = new DateOnly(2026, 11, 4),
+
+                // formatDate with no format leaves a non-date to the normal rendering.
+                ["amount"] = 0.8m,
+            },
+        };
+
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("da-DK");
+        try
+        {
+            _evaluator.Evaluate(
+                    "${ trigger.utc } | ${ trigger.offset } | ${ trigger.utc | formatDate } | ${ trigger.unspecified } | ${ trigger.day } | ${ trigger.amount | formatDate }",
+                    data)
+                .ShouldBe("2026-11-04T10:00:00.0000000Z | 2026-11-04T10:00:00.0000000+01:00 | 2026-11-04T10:00:00.0000000Z | 2026-11-04T10:00:00.0000000 | 2026-11-04 | 0.8");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    // Regression (#538): trigger-edge filters bind against trigger output read with
+    // System.Text.Json, where a date is still an ISO 8601 string, so formatDate left it
+    // unchanged. ISO strings now format like the typed dates steps see; other strings don't.
+    [Theory]
+    [InlineData("${ trigger.value | formatDate:yyyy }", "2026-11-04T10:00:00Z", "2026")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00Z", "2026-11-04T10:00:00.0000000Z")]
+    [InlineData("${ trigger.value | formatDate:fffffff }", "2026-11-04T10:00:00.1234567Z", "1234567")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00+01:00", "2026-11-04T10:00:00.0000000+01:00")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00", "2026-11-04T10:00:00.0000000")]
+    [InlineData("${ trigger.value | formatDate }", "2026-11-04T10:00:00-05:00", "2026-11-04T10:00:00.0000000-05:00")]
+    [InlineData("${ trigger.value | formatDate:yyyy }", "2026-11-04", "2026")]
+    public void Evaluate_FormatDateOnAnIsoString_FormatsItAsADate(string expression, string value, string expected)
+        => _evaluator.Evaluate(expression, TriggerValue(value)).ShouldBe(expected);
+
+    // Anything that isn't an ISO 8601 date is left as it is, rather than read in a guessed culture.
+    [Theory]
+    [InlineData("11/04/2026")]
+    [InlineData("2026-ish")]
+    [InlineData("2026-11-04X")]
+    [InlineData("2026-11-04 10:00:00")]
+    [InlineData("2026-11-04T10:00:00 junk-1")]
+    [InlineData("not a date")]
+    public void Evaluate_FormatDateOnANonIsoString_LeavesItUnchanged(string value)
+        => _evaluator.Evaluate("${ trigger.value | formatDate:yyyy }", TriggerValue(value)).ShouldBe(value);
+
+    // A format that doesn't fit the value (a time format on a date with no time, or the other
+    // way round) leaves the value unchanged instead of throwing FormatException and failing
+    // the step.
+    [Theory]
+    [InlineData("${ trigger.value | formatDate:HH }", "2026-11-04", "2026-11-04")]
+    [InlineData("${ trigger.value | formatDate:yyyy-MM-dd HH:mm }", "2026-11-04", "2026-11-04")]
+    public void Evaluate_FormatDateWithAFormatThatDoesNotFitTheValue_LeavesItUnchanged(string expression, string value, string expected)
+        => _evaluator.Evaluate(expression, TriggerValue(value)).ShouldBe(expected);
+
+    [Fact]
+    public void Evaluate_FormatDateWithADateFormatOnATypedTime_LeavesItUnchanged()
+        => _evaluator.Evaluate(
+                "${ trigger.value | formatDate:yyyy }",
+                new Dictionary<string, object?>
+                {
+                    ["trigger"] = new Dictionary<string, object?> { ["value"] = new TimeOnly(10, 30) },
+                })
+            .ShouldBe("10:30:00.0000000");
+
+    private static Dictionary<string, object?> TriggerValue(string value)
+        => new()
+        {
+            ["trigger"] = new Dictionary<string, object?> { ["value"] = value },
+        };
 }

@@ -122,6 +122,26 @@ public class TriggerAutomationControllerTests
         _executor.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task TriggerAutomation_EngineNotRunning_Returns409()
+    {
+        var controller = GivenController(new FakeTrigger(ManualRunOutput.None));
+        var automation = GivenPublishedAutomation();
+        _executor
+            .Setup(e => e.ExecuteAsync(
+                It.IsAny<Automation>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<Dictionary<string, object?>?>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<IReadOnlyList<Guid>?>()))
+            .ThrowsAsync(new AutomationEngineNotRunningException());
+
+        var result = await controller.TriggerAutomation(automation.Id);
+
+        result.ShouldBeOfType<ConflictObjectResult>();
+    }
+
     private TriggerAutomationController GivenController(ITrigger trigger)
     {
         var authorizationService = new Mock<IAuthorizationService>();

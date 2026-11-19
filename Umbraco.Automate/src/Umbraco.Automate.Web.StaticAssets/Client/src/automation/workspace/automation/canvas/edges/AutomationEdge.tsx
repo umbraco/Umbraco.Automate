@@ -88,7 +88,7 @@ function AutomationEdge({
                 // renders the text upside down. A fixed-position label sidesteps that entirely.
                 <EdgeLabelRenderer>
                     <div
-                        className="ua-edge__label"
+                        className={`ua-edge__label${edgeData?.notTaken ? " ua-edge__label--not-taken" : ""}`}
                         style={{
                             position: "absolute",
                             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,

@@ -46,7 +46,9 @@ test.describe('Automation runs', () => {
     await umbracoUi.goToBackOffice();
   });
 
-  test('publishes, runs on demand, and shows a successful run whose script read upstream data (#345)', async ({
+  // @smoke: the one smoke test that executes an automation (service account, engine, Run Script,
+  // run tracking), so PRs that change only server-side code still prove a run completes.
+  test('@smoke publishes, runs on demand, and shows a successful run whose script read upstream data (#345)', async ({
     automateServiceAccountWorkspace,
     umbracoAutomateUi,
     umbracoAutomateApi

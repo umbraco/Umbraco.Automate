@@ -153,7 +153,144 @@ public class ContentValueNormaliserTests
         depth.ShouldBeLessThan(6);
     }
 
+    [Fact]
+    public void NormaliseProperties_ElementText_MatchesContentShape()
+        => ElementProperties(("title", "Hello")).ShouldBe(ContentProperties(("title", "Hello")));
+
+    [Fact]
+    public void NormaliseProperties_ElementNumber_MatchesContentShape()
+        => ElementProperties(("count", 5)).ShouldBe(ContentProperties(("count", 5)));
+
+    [Fact]
+    public void NormaliseProperties_ElementPicker_SummarisesPickedContent()
+    {
+        var pickedKey = Guid.NewGuid();
+        var picked = MockPublishedContent(pickedKey, "About", "page").Object;
+
+        var result = ElementProperties(("link", picked));
+
+        (result["link"] as IDictionary<string, object?>)!["key"].ShouldBe(pickedKey);
+    }
+
+    [Fact]
+    public void NormaliseProperties_ElementPicker_MatchesContentShape()
+    {
+        var picked = MockPublishedContent(Guid.NewGuid(), "About", "page").Object;
+
+        var fromElement = ElementProperties(("link", picked))["link"] as IDictionary<string, object?>;
+        var fromContent = ContentProperties(("link", picked))["link"] as IDictionary<string, object?>;
+
+        fromElement!.ShouldBe(fromContent!);
+    }
+
+    [Fact]
+    public void ReadProperty_Element_ReturnsNormalisedValue()
+    {
+        var element = MockPublishedElement("block", ("title", "Hello")).Object;
+
+        _sut.ReadProperty(element, "title", culture: null).ShouldBe("Hello");
+    }
+
+    [Fact]
+    public void ReadProperty_ElementPicker_MatchesContentShape()
+    {
+        var picked = MockPublishedContent(Guid.NewGuid(), "About", "page").Object;
+        var element = MockPublishedElement("block", ("link", picked)).Object;
+        var content = MockPublishedContentWithProperties(("link", picked));
+
+        var fromElement = _sut.ReadProperty(element, "link", culture: null) as IDictionary<string, object?>;
+        var fromContent = _sut.ReadProperty(content, "link", culture: null) as IDictionary<string, object?>;
+
+        fromElement!.ShouldBe(fromContent!);
+    }
+
+    [Fact]
+    public void NormaliseProperties_DefaultImplementation_ForwardsContentToExistingMethod()
+    {
+        IContentValueNormaliser legacy = new LegacyNormaliser();
+        IPublishedElement content = MockPublishedContent(Guid.NewGuid(), "About", "page").Object;
+
+        legacy.NormaliseProperties(content, culture: null).ShouldContainKey("legacy");
+    }
+
+    [Fact]
+    public void ReadProperty_ContentWithNoValue_UsesContentFallbackOverload()
+    {
+        var content = MockPublishedContent(Guid.NewGuid(), "Page", "page").Object;
+
+        _sut.ReadProperty(content, "missing", culture: null);
+
+        _fallback.Verify(
+            x => x.TryGetValue(
+                It.IsAny<IPublishedContent>(),
+                "missing",
+                null,
+                null,
+                Fallback.ToLanguage,
+                null,
+                out It.Ref<object?>.IsAny,
+                out It.Ref<IPublishedProperty?>.IsAny),
+            Times.Once);
+    }
+
+    [Fact]
+    public void ReadProperty_DefaultImplementation_ForwardsContentToExistingMethod()
+    {
+        IContentValueNormaliser legacy = new LegacyNormaliser();
+        IPublishedElement content = MockPublishedContent(Guid.NewGuid(), "About", "page").Object;
+
+        legacy.ReadProperty(content, "title", culture: null).ShouldBe("legacy");
+    }
+
+    [Fact]
+    public void NormaliseProperties_DefaultImplementation_ThrowsForPlainElement()
+    {
+        IContentValueNormaliser legacy = new LegacyNormaliser();
+        var element = MockPublishedElement("block", ("title", "Hello")).Object;
+
+        Should.Throw<NotSupportedException>(() => legacy.NormaliseProperties(element, culture: null));
+    }
+
+    [Fact]
+    public void ReadProperty_DefaultImplementation_ThrowsForPlainElement()
+    {
+        IContentValueNormaliser legacy = new LegacyNormaliser();
+        var element = MockPublishedElement("block", ("title", "Hello")).Object;
+
+        Should.Throw<NotSupportedException>(() => legacy.ReadProperty(element, "title", culture: null));
+    }
+
     // --- helpers ---
+
+    private IDictionary<string, object?> ElementProperties(params (string Alias, object? Value)[] properties)
+        => _sut.NormaliseProperties(MockPublishedElement("block", properties).Object, culture: null);
+
+    private IDictionary<string, object?> ContentProperties(params (string Alias, object? Value)[] properties)
+        => _sut.NormaliseProperties(MockPublishedContentWithProperties(properties), culture: null);
+
+    private static IPublishedContent MockPublishedContentWithProperties(params (string Alias, object? Value)[] properties)
+    {
+        var content = MockPublishedContent(Guid.NewGuid(), "Page", "page");
+        var props = properties.Select(p => MockProperty(p.Alias, p.Value).Object).ToList();
+        content.SetupGet(x => x.Properties).Returns(props);
+        foreach (var prop in props)
+        {
+            content.Setup(x => x.GetProperty(prop.Alias)).Returns(prop);
+        }
+
+        return content.Object;
+    }
+
+    // Implements only the members that existed before the element overloads, as a third party would.
+    private sealed class LegacyNormaliser : IContentValueNormaliser
+    {
+        public object? Normalise(object? value, string? culture) => value;
+
+        public IDictionary<string, object?> NormaliseProperties(IPublishedContent content, string? culture)
+            => new Dictionary<string, object?> { ["legacy"] = true };
+
+        public object? ReadProperty(IPublishedContent content, string alias, string? culture) => "legacy";
+    }
 
     private static Mock<IPublishedContent> MockPublishedContent(Guid key, string name, string typeAlias)
     {

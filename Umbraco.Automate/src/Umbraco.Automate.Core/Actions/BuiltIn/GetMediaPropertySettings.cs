@@ -12,7 +12,9 @@ public sealed class GetMediaPropertySettings
     /// </summary>
     [Field(
         Label = "Media Key",
-        Description = "The key of the media item to read from.",
+        Description = "The media item to read from.",
+        EditorUiAlias = Constants.EditorUiAliases.MediaKeyPicker,
+        EditorConfig = """[{ "alias": "validationLimit", "value": { "min": 1, "max": 1 } }, { "alias": "folderFilter", "value": "filesOnly" }]""",
         SupportsBindings = true)]
     public string MediaKey { get; set; } = string.Empty;
 

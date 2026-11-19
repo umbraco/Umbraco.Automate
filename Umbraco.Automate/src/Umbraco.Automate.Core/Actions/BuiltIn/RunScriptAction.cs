@@ -205,7 +205,6 @@ public sealed class RunScriptAction : ActionBase<RunScriptSettings, RunScriptOut
             MaxRecursionDepth = scripting.MaxRecursionDepth,
             MaxArraySize = scripting.MaxArraySize,
             MaxStatements = scripting.MaxStatements,
-            StatementTimeout = scripting.StatementTimeout,
             TotalExecutionTimeout = totalTimeout,
             HttpRequestTimeout = scripting.HttpRequestTimeout,
             MaxResponseBodyBytes = scripting.MaxResponseBodyBytes,

@@ -63,6 +63,58 @@ public class CreateMediaActionTests
         => _action.Alias.ShouldBe("umbracoAutomate.createMedia");
 
     [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_SucceedsWithNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Success);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_EmitsNotFoundOutcome()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe("parentNotFound");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuthorizerReportsParentNotFound_DoesNotWrite()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.NotFound($"Media node '{key}' not found."));
+
+        await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        _mediaService.Verify(x => x.CreateMedia(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentAuthorizationDenied_ReturnsAuthenticationError()
+    {
+        var key = Guid.NewGuid();
+        _authorizer
+            .Setup(a => a.AuthorizeMediaAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AutomationAuthorizationResult.Fail("Out of start-node path."));
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = key.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Authentication);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_EmptyMediaType_ReturnsValidationError()
     {
         var context = CreateContext(new CreateMediaSettings
@@ -135,6 +187,7 @@ public class CreateMediaActionTests
         var mediaType = new Mock<IMediaType>();
         mediaType.SetupGet(x => x.Alias).Returns("Image");
         mediaType.SetupGet(x => x.Variations).Returns(ContentVariation.Nothing);
+        mediaType.SetupGet(x => x.AllowedAsRoot).Returns(true);
         _mediaTypeService.Setup(x => x.Get(mediaTypeKey)).Returns(mediaType.Object);
 
         var created = new Mock<IMedia>();
@@ -215,12 +268,70 @@ public class CreateMediaActionTests
         output.MediaTypeKey.ShouldBe(mediaTypeKey);
     }
 
+    // A root start node passes the authorizer for a parent in the recycle bin (#507).
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_ReturnsParentNotFoundOutcome()
+    {
+        var parentKey = SetupTrashedParent();
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = parentKey.ToString(), MediaType = Guid.NewGuid().ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Outcome.ShouldBe(CreateMediaAction.OutcomeParentNotFound);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParentInRecycleBin_DoesNotWrite()
+    {
+        var parentKey = SetupTrashedParent();
+        var mediaTypeKey = Guid.NewGuid();
+        var mediaType = new Mock<IMediaType>();
+        mediaType.SetupGet(x => x.Alias).Returns("Image");
+        mediaType.SetupGet(x => x.Variations).Returns(ContentVariation.Nothing);
+        _mediaTypeService.Setup(x => x.Get(mediaTypeKey)).Returns(mediaType.Object);
+
+        await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = parentKey.ToString(), MediaType = mediaTypeKey.ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        _mediaService.Verify(x => x.CreateMedia(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    // The backoffice refuses a child type the parent's type doesn't allow; IMediaService doesn't (#515).
+    [Fact]
+    public async Task ExecuteAsync_ParentTypeDoesNotAllowTheMediaType_ReturnsValidationErrorWithoutCreating()
+    {
+        var setup = ArrangeCreatableMedia();
+        var parentKey = Guid.Parse(((CreateMediaSettings)setup.Context.Settings!).ParentKey!);
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(Guid.NewGuid()));
+
+        var result = await _action.ExecuteAsync(setup.Context, CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        _mediaService.Verify(x => x.CreateMedia(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    // Media types opt in to the root as content types do; the backoffice checks both (#515).
+    [Fact]
+    public async Task ExecuteAsync_NoParentAndTypeNotAllowedAtRoot_ReturnsValidationErrorWithoutCreating()
+    {
+        var mediaTypeKey = Guid.NewGuid();
+        var mediaType = new Mock<IMediaType>();
+        mediaType.SetupGet(x => x.Alias).Returns("Image");
+        mediaType.SetupGet(x => x.AllowedAsRoot).Returns(false);
+        _mediaTypeService.Setup(x => x.Get(mediaTypeKey)).Returns(mediaType.Object);
+
+        var result = await _action.ExecuteAsync(CreateContext(new CreateMediaSettings { ParentKey = null, MediaType = mediaTypeKey.ToString(), Name = "New Image" }, Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.ShouldBe(ActionResultStatus.Failed);
+        result.ErrorCategory.ShouldBe(StepRunErrorCategory.Validation);
+        _mediaService.Verify(x => x.CreateMedia(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
     [Fact]
     public async Task ExecuteAsync_MediaTypeNotFound_ReturnsMediaTypeNotFoundOutcome()
     {
         var parentKey = Guid.NewGuid();
         var mediaTypeKey = Guid.NewGuid();
-        _mediaService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IMedia>());
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(mediaTypeKey));
         _mediaTypeService.Setup(x => x.Get(mediaTypeKey)).Returns((IMediaType?)null);
 
         var context = CreateContext(
@@ -244,7 +355,7 @@ public class CreateMediaActionTests
         var parentKey = Guid.NewGuid();
         var mediaTypeKey = Guid.NewGuid();
         var mediaKey = Guid.NewGuid();
-        _mediaService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IMedia>());
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(mediaTypeKey));
 
         var mediaType = new Mock<IMediaType>();
         mediaType.SetupGet(x => x.Alias).Returns("Image");
@@ -290,7 +401,7 @@ public class CreateMediaActionTests
     {
         var parentKey = Guid.NewGuid();
         var mediaTypeKey = Guid.NewGuid();
-        _mediaService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IMedia>());
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(mediaTypeKey));
 
         var mediaType = new Mock<IMediaType>();
         mediaType.SetupGet(x => x.Alias).Returns("Image");
@@ -399,7 +510,7 @@ public class CreateMediaActionTests
     {
         var parentKey = Guid.NewGuid();
         var mediaTypeKey = Guid.NewGuid();
-        _mediaService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IMedia>());
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(mediaTypeKey));
 
         var mediaType = new Mock<IMediaType>();
         mediaType.SetupGet(x => x.Alias).Returns("Image");
@@ -441,7 +552,7 @@ public class CreateMediaActionTests
         var mediaTypeKey = Guid.NewGuid();
         var mediaKey = Guid.NewGuid();
 
-        _mediaService.Setup(x => x.GetById(parentKey)).Returns(Mock.Of<IMedia>());
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(ParentAllowing(mediaTypeKey));
 
         var mediaType = new Mock<IMediaType>();
         mediaType.SetupGet(x => x.Alias).Returns("Image");
@@ -488,6 +599,32 @@ public class CreateMediaActionTests
         }));
 
     private sealed record MediaSetup(ActionContext Context, IMedia Created, Guid MediaKey, string? SourceUrl);
+
+    /// <summary>
+    /// A live parent whose media type allows <paramref name="childTypeKey"/> as a child.
+    /// </summary>
+    private IMedia ParentAllowing(Guid childTypeKey)
+    {
+        var parentTypeKey = Guid.NewGuid();
+        var parentType = new Mock<IMediaType>();
+        parentType.SetupGet(x => x.Alias).Returns("Folder");
+        parentType.SetupGet(x => x.AllowedContentTypes).Returns([new ContentTypeSort(childTypeKey, 0, "Image")]);
+        _mediaTypeService.Setup(x => x.Get(parentTypeKey)).Returns(parentType.Object);
+
+        var parent = new Mock<IMedia>();
+        parent.SetupGet(x => x.ContentType).Returns(Mock.Of<ISimpleContentType>(t => t.Key == parentTypeKey));
+        return parent.Object;
+    }
+
+    private Guid SetupTrashedParent()
+    {
+        var parentKey = Guid.NewGuid();
+        var parent = new Mock<IMedia>();
+        parent.SetupGet(x => x.Key).Returns(parentKey);
+        parent.SetupGet(x => x.Trashed).Returns(true);
+        _mediaService.Setup(x => x.GetById(parentKey)).Returns(parent.Object);
+        return parentKey;
+    }
 
     private static ActionContext CreateContext(CreateMediaSettings settings, Guid? serviceAccountKey = null)
         => new()

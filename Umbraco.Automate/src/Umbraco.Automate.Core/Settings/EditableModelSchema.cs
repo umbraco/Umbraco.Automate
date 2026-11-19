@@ -55,6 +55,12 @@ public sealed class EditableModelFieldDescriptor
     public Type PropertyType { get; init; } = null!;
 
     /// <summary>
+    /// Gets whether the field holds a string, another single value or a collection.
+    /// Derived from the property's CLR type.
+    /// </summary>
+    public EditableModelValueKind ValueKind { get; init; }
+
+    /// <summary>
     /// Gets the Umbraco editor UI alias. Set from <see cref="EditableModelFieldAttribute.EditorUiAlias"/>
     /// when provided, otherwise inferred from the CLR property type by the schema builder.
     /// </summary>

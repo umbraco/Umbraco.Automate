@@ -1,3 +1,5 @@
+import type { UaStepOutcome } from "../../../../catalogue/types.js";
+
 export interface TriggerNodeData {
     triggerAlias: string;
     label: string;
@@ -16,6 +18,23 @@ export interface ActionNodeData {
     hasSettings?: boolean;
     settings: Record<string, unknown>;
     cases?: string[];
+    /**
+     * True when the action declares outcomes (static or dynamic), so it renders exits on its
+     * right edge. Set on action nodes only. Independent of how many exits there are right now.
+     */
+    declaresOutcomes?: boolean;
+    /**
+     * The exits to render, in declaration order. For a dynamic action this is the resolved list,
+     * or the catalogue's static fallback when `outcomesUnknown` is true.
+     */
+    outcomes?: UaStepOutcome[];
+    /**
+     * True when a dynamic action's outcomes could not be resolved (request failed or returned
+     * nothing). `outcomes` is then only the static fallback. T14 must NOT show a line as stale
+     * ("Missing outcome") on such a node: render a neutral handle for every connected outcome key
+     * and keep every line, without judging it.
+     */
+    outcomesUnknown?: boolean;
     [key: string]: unknown;
 }
 
@@ -23,6 +42,10 @@ export interface CatalogueLookupEntry {
     name: string;
     icon?: string;
     hasSettings?: boolean;
+    /** The action's declared outcomes (the static fallback when `hasDynamicOutcomes`). */
+    outcomes?: UaStepOutcome[];
+    /** True when the action's outcomes depend on its settings and must be resolved per step. */
+    hasDynamicOutcomes?: boolean;
 }
 
 export interface CanvasState {
@@ -79,6 +102,8 @@ import type { ConditionSetModel } from "../../../../api/types.gen.js";
 
 export interface EdgeFilterData {
     filter?: ConditionSetModel | null;
+    /** Run view only: the run did not leave through this line's exit, so its label is dimmed. */
+    notTaken?: boolean;
 }
 
 export interface EdgeFilterOpenDetail {

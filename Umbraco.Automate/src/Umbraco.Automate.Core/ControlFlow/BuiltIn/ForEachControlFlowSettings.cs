@@ -11,7 +11,7 @@ public sealed class ForEachControlFlowSettings
     /// Gets or sets the binding expression that resolves to the collection to iterate over.
     /// </summary>
     [Field(Label = "Collection",
-        Description = "A binding expression that resolves to the collection to iterate (e.g. ${trigger.items}).",
+        Description = "A binding expression that resolves to the collection to iterate (e.g. `${trigger.items}`).",
         SupportsBindings = true)]
     public string Collection { get; set; } = string.Empty;
 

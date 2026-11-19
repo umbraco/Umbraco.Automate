@@ -1,8 +1,10 @@
 using Asp.Versioning;
+using Json.Schema;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.ControlFlow;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.StepTypes;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Web.Api.Management.Catalogue.Models;
@@ -45,6 +47,7 @@ public sealed class ResolveStepTypeOutputSchemaController : CatalogueControllerB
     [HttpPost("step-types/{alias}/output-schema")]
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(Dictionary<string, object?>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResolveOutputSchema(
         string alias,
@@ -63,7 +66,19 @@ public sealed class ResolveStepTypeOutputSchemaController : CatalogueControllerB
                 .Build());
         }
 
-        var schema = await stepType.GetOutputSchemaAsync(requestModel.Settings, cancellationToken);
+        JsonSchema? schema;
+
+        try
+        {
+            schema = await stepType.GetOutputSchemaAsync(requestModel.Settings, cancellationToken);
+        }
+        catch (SettingsResolutionException ex)
+        {
+            // Settings resolution (EditableModelResolver / ConfigurationReferenceResolver) signals
+            // rejected settings with SettingsResolutionException. Other exceptions (bugs in the action itself)
+            // are deliberately not caught.
+            return InvalidSettings(ex);
+        }
 
         return Ok(OutputSchemaSerializer.Serialize(schema));
     }

@@ -130,6 +130,12 @@ internal sealed class TriggerEventHandler : IMessageHandler
         // to the same trigger from the same workspace.
         var serviceAccountCache = new Dictionary<Guid, IUser?>();
 
+        // Per-invocation cache of narrowing results. A narrowing authoriser's answer depends
+        // only on the service account and the output it is given (see
+        // IOutputNarrowingTriggerDispatchAuthorizer), so automations sharing a service
+        // account reuse it instead of repeating one node lookup per batch item.
+        var narrowingCache = new Dictionary<NarrowingCacheKey, NarrowingCacheEntry>();
+
         foreach (var automation in matching)
         {
             // Resolve the published version snapshot for execution.
@@ -155,7 +161,11 @@ internal sealed class TriggerEventHandler : IMessageHandler
             // Filter: apply the trigger's per-automation settings predicate against the
             // published snapshot's settings. Skip when there are no configured settings,
             // no trigger, or the trigger declares no settings type — nothing to match on.
+            // The resolved settings are kept so the filter can be re-applied if a dispatch
+            // authoriser later narrows the output (see below).
             var triggerSettings = executionAutomation.Trigger?.Settings;
+            var settingsFilterApplied = false;
+            object? resolvedSettings = null;
             if (trigger is not null
                 && trigger.SettingsType is not null
                 && triggerSettings is { Count: > 0 })
@@ -168,7 +178,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
 
                 if (typedOutput is not null)
                 {
-                    var resolvedSettings = trigger.ResolveSettings(triggerSettings);
+                    resolvedSettings = trigger.ResolveSettings(triggerSettings);
 
                     // Origin-aware filtering: only relevant when the event was caused by an
                     // automation (chain non-empty). Three postures, configured per trigger:
@@ -198,6 +208,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
                         }
                     }
 
+                    settingsFilterApplied = true;
                     if (!trigger.CanHandle(typedOutput, resolvedSettings))
                     {
                         _logger.LogDebug(
@@ -214,6 +225,9 @@ internal sealed class TriggerEventHandler : IMessageHandler
             // sections the trigger requires. After that, run any registered dispatch
             // authorisers — built-in NodeScopedTriggerDispatchAuthorizer plus any provider
             // packages have registered (e.g. Commerce store-scoped).
+            // An authoriser may narrow the output (e.g. drop batch items the account can't
+            // see); the run then starts with that narrowed payload instead of the original.
+            var runOutputData = triggerOutputData;
             var sectionGated = trigger is not null && trigger.RequiredSections.Count > 0;
             var hasDispatchAuthorizers = _dispatchAuthorizers.Count > 0;
             if (sectionGated || hasDispatchAuthorizers)
@@ -251,13 +265,34 @@ internal sealed class TriggerEventHandler : IMessageHandler
                         Automation = executionAutomation,
                     };
 
-                    var deny = await EvaluateAuthorizersAsync(authContext, cancellationToken);
-                    if (deny is not null)
+                    var authorization = await EvaluateAuthorizersAsync(authContext, narrowingCache, cancellationToken);
+                    if (authorization.Denial is { } deny)
                     {
                         _logger.LogInformation(
                             "Automation {AutomationId} skipped by dispatch authoriser {Authoriser} (trigger {TriggerAlias}): {Reason}",
-                            executionAutomation.Id, deny.Value.AuthorizerName, message.TriggerAlias, deny.Value.Result.FailureReason);
+                            executionAutomation.Id, deny.AuthorizerName, message.TriggerAlias, deny.Result.FailureReason);
                         continue;
+                    }
+
+                    if (authorization.NarrowedOutput is { } narrowedOutput)
+                    {
+                        // The settings filter matched against the full output (batch triggers
+                        // match if any item matches). Re-check against what the account may
+                        // actually see so a run never fires only because of a hidden item.
+                        if (settingsFilterApplied && !trigger.CanHandle(narrowedOutput, resolvedSettings))
+                        {
+                            _logger.LogDebug(
+                                "Automation {AutomationId} skipped by trigger {TriggerAlias} settings filter after dispatch authorisation narrowed the output",
+                                executionAutomation.Id, message.TriggerAlias);
+                            continue;
+                        }
+
+                        _logger.LogDebug(
+                            "Dispatch authorisation narrowed the output of trigger {TriggerAlias} for automation {AutomationId}",
+                            message.TriggerAlias, executionAutomation.Id);
+
+                        runOutputData = JsonOptions.DeserializeToUnwrappedDictionary(
+                            JsonSerializer.Serialize(narrowedOutput, narrowedOutput.GetType(), JsonOptions.Default));
                     }
                 }
             }
@@ -272,7 +307,7 @@ internal sealed class TriggerEventHandler : IMessageHandler
                     executionAutomation,
                     message.InitiatorType,
                     message.InitiatorId,
-                    triggerOutputData,
+                    runOutputData,
                     cancellationToken,
                     originChain: message.OriginAutomationChain);
             }
@@ -288,21 +323,80 @@ internal sealed class TriggerEventHandler : IMessageHandler
         }
     }
 
-    private async Task<(AutomationAuthorizationResult Result, string AuthorizerName)?> EvaluateAuthorizersAsync(
+    private async Task<AuthorizerEvaluation> EvaluateAuthorizersAsync(
         TriggerDispatchAuthorizationContext context,
+        Dictionary<NarrowingCacheKey, NarrowingCacheEntry> narrowingCache,
         CancellationToken cancellationToken)
     {
+        object? narrowedOutput = null;
+
         foreach (var authorizer in _dispatchAuthorizers)
         {
-            var result = await authorizer.AuthorizeAsync(context, cancellationToken);
+            AutomationAuthorizationResult result;
+            if (authorizer is IOutputNarrowingTriggerDispatchAuthorizer narrowing)
+            {
+                var narrowingResult = await NarrowAsync(narrowing, context, narrowingCache, cancellationToken);
+                result = narrowingResult.Result;
+
+                if (result.Authorized && narrowingResult.NarrowedOutput is { } narrowed)
+                {
+                    // Later authorisers judge only what the run will actually receive.
+                    narrowedOutput = narrowed;
+                    context = new TriggerDispatchAuthorizationContext
+                    {
+                        Trigger = context.Trigger,
+                        TypedOutput = narrowed,
+                        ServiceAccount = context.ServiceAccount,
+                        Automation = context.Automation,
+                    };
+                }
+            }
+            else
+            {
+                result = await authorizer.AuthorizeAsync(context, cancellationToken);
+            }
+
             if (!result.Authorized)
             {
-                return (result, authorizer.GetType().Name);
+                return new AuthorizerEvaluation((result, authorizer.GetType().Name), null);
             }
         }
 
-        return null;
+        return new AuthorizerEvaluation(null, narrowedOutput);
     }
+
+    private static async Task<TriggerDispatchNarrowingResult> NarrowAsync(
+        IOutputNarrowingTriggerDispatchAuthorizer authorizer,
+        TriggerDispatchAuthorizationContext context,
+        Dictionary<NarrowingCacheKey, NarrowingCacheEntry> cache,
+        CancellationToken cancellationToken)
+    {
+        var key = new NarrowingCacheKey(authorizer, context.ServiceAccount.Key);
+
+        // Reuse only when the authoriser saw the very same output instance: an earlier
+        // narrowing authoriser may have handed this one a different output.
+        if (cache.TryGetValue(key, out var cached) && ReferenceEquals(cached.Input, context.TypedOutput))
+        {
+            return cached.Result;
+        }
+
+        var result = await authorizer.AuthorizeAndNarrowAsync(context, cancellationToken);
+        cache[key] = new NarrowingCacheEntry(context.TypedOutput, result);
+        return result;
+    }
+
+    private readonly record struct NarrowingCacheKey(IOutputNarrowingTriggerDispatchAuthorizer Authorizer, Guid ServiceAccountKey);
+
+    private readonly record struct NarrowingCacheEntry(object? Input, TriggerDispatchNarrowingResult Result);
+
+    /// <summary>
+    /// Outcome of running the dispatch authoriser collection for one automation.
+    /// </summary>
+    /// <param name="Denial">The first denial and the authoriser that issued it, or <c>null</c> when all passed.</param>
+    /// <param name="NarrowedOutput">The narrowed output to run with, or <c>null</c> when unchanged.</param>
+    private readonly record struct AuthorizerEvaluation(
+        (AutomationAuthorizationResult Result, string AuthorizerName)? Denial,
+        object? NarrowedOutput);
 
     private async Task<IUser?> ResolveServiceAccountAsync(
         Guid workspaceId,

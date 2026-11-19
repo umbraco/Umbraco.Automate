@@ -34,6 +34,13 @@ namespace Umbraco.Automate.Core.Execution;
 /// extension point, so the reuse stays within the engine's model.
 /// </para>
 /// <para>
+/// It also skips any step whose workflow has already left <see cref="WorkflowStatus.Runnable"/>
+/// earlier in the same execution pass. WorkflowCore's executor walks every pointer it collected at
+/// the start of a pass without re-checking the workflow status, so once a step has terminated or
+/// suspended the workflow, a sibling Parallel branch or parallel ForEach iteration would otherwise
+/// still run its step.
+/// </para>
+/// <para>
 /// The status check is cached per run for a short TTL (see <see cref="StatusCacheDuration"/>)
 /// because this middleware wraps every step of every run, including every re-entry of
 /// ForEach/While/If/Switch containers and every loop iteration — without a cache, a tight loop
@@ -73,6 +80,23 @@ internal sealed class RunCancellationStepMiddleware : IWorkflowStepMiddleware
         if (context.Workflow.Data is not AutomationWorkflowData data)
         {
             return await next();
+        }
+
+        // An earlier step in this same execution pass has already ended the workflow — a step
+        // failing under Terminate/Suspend, or under Retry when retrying cannot help (see
+        // AutomateRetryHandler), via WorkflowCore's error handlers. WorkflowExecutor still walks
+        // every pointer it collected at the start of the pass, so without this a sibling Parallel
+        // branch or parallel ForEach iteration would run its step after the run was over. Leave
+        // the pointer unadvanced, as below, so a Suspended workflow re-runs it on resume.
+        if (context.Workflow.Status != WorkflowStatus.Runnable)
+        {
+            _logger.LogInformation(
+                "Workflow {WorkflowInstanceId} is {Status} — skipping step for run {RunId}",
+                context.Workflow.Id,
+                context.Workflow.Status,
+                data.RunId);
+
+            return ExecutionResult.Persist(context.PersistenceData);
         }
 
         // Any terminal status stops the workflow, not only Cancelled. Only RunFinalizer writes the

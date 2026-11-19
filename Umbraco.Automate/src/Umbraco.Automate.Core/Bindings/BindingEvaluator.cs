@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
 
@@ -43,6 +45,9 @@ public sealed class BindingEvaluator
     /// <param name="template">The template string containing bindings.</param>
     /// <param name="data">The run data to resolve paths against.</param>
     /// <returns>The evaluated string with all bindings resolved.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// A binding uses a filter alias that no registered filter declares.
+    /// </exception>
     public string Evaluate(string template, IReadOnlyDictionary<string, object?> data)
     {
         if (string.IsNullOrEmpty(template))
@@ -66,10 +71,14 @@ public sealed class BindingEvaluator
 
             foreach (var filter in token.Filters)
             {
-                if (_filters.TryGetValue(filter.Alias, out var filterImpl))
+                // An unknown alias is almost always a typo. Passing the value through unfiltered
+                // would let the run carry on with data the author never meant to send.
+                if (!_filters.TryGetValue(filter.Alias, out var filterImpl))
                 {
-                    value = filterImpl.Apply(value, filter.Args);
+                    throw new UnknownBindingFilterException(filter.Alias, token.Path);
                 }
+
+                value = filterImpl.Apply(value, filter.Args);
             }
 
             var replacement = Stringify(value);
@@ -80,12 +89,22 @@ public sealed class BindingEvaluator
     }
 
     /// <summary>
+    /// Gets whether a binding filter with this alias is registered, using the same
+    /// case-insensitive match that <see cref="Evaluate"/> applies, so publish validation and the
+    /// run agree on which filter names exist.
+    /// </summary>
+    internal bool IsKnownFilter(string alias) => _filters.ContainsKey(alias);
+
+    /// <summary>
     /// Evaluates a template that is expected to be a single unfiltered binding
     /// (e.g. <c>${ steps.x.matches }</c>) and returns the raw resolved value —
     /// useful for callers that need to inspect collection emptiness or types
     /// rather than a stringified form. Templates with surrounding text or filters
     /// fall back to the string-producing <see cref="Evaluate"/>.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// A binding uses a filter alias that no registered filter declares.
+    /// </exception>
     public object? EvaluateRaw(string template, IReadOnlyDictionary<string, object?> data)
     {
         if (string.IsNullOrEmpty(template))
@@ -178,7 +197,8 @@ public sealed class BindingEvaluator
 
     /// <summary>
     /// Converts a resolved value to its string representation.
-    /// Lists and dictionaries are serialized to JSON; primitives use <see cref="object.ToString"/>.
+    /// Lists and dictionaries are serialized to JSON; numbers use the invariant culture;
+    /// dates use ISO 8601 round-trip; other values use <see cref="object.ToString"/>.
     /// </summary>
     internal static string Stringify(object? value)
     {
@@ -195,6 +215,22 @@ public sealed class BindingEvaluator
         if (value is IList<object?> or IDictionary<string, object?> or IReadOnlyDictionary<string, object?>)
         {
             return JsonSerializer.Serialize(value, Dispatch.JsonOptions.Default);
+        }
+
+        // Numbers use the invariant culture so they read the same on every server; a
+        // comma-decimal culture (e.g. da-DK) would write "0,8", which downstream numeric
+        // comparisons and other servers misread.
+        if (value is sbyte or byte or short or ushort or int or uint or long or ulong or nint or nuint
+            or Int128 or UInt128 or BigInteger or Half or float or double or decimal)
+        {
+            return ((IFormattable)value).ToString(null, CultureInfo.InvariantCulture);
+        }
+
+        // Dates render as ISO 8601 round-trip ("O") for the same reason; a date with no time
+        // zone is written as is, without guessing one. formatDate:<format> gives readable text.
+        if (value is DateTime or DateTimeOffset or DateOnly or TimeOnly)
+        {
+            return ((IFormattable)value).ToString("O", CultureInfo.InvariantCulture);
         }
 
         return value.ToString() ?? string.Empty;

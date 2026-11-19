@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { ApiHelpers } from '@umbraco-cms/acceptance-test-helpers';
+import { ensureOk } from './ApiResponse';
 import { ConstantHelper } from './ConstantHelper';
 import { toAlias } from './TestData';
 
@@ -39,6 +40,7 @@ export class AutomationApiHelper {
   async getAll() {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, 'Listing automations');
     const body = await response.json();
     return body.items ?? [];
   }
@@ -64,6 +66,7 @@ export class AutomationApiHelper {
 
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + item.id;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting automation "${name}"`);
     return await response.json();
   }
 
@@ -86,6 +89,7 @@ export class AutomationApiHelper {
       connections: options.connections ?? [],
       notificationSettings: options.notificationSettings
     });
+    await ensureOk(response, `Creating automation "${name}"`);
 
     const location = response.headers()['location'];
     if (location) {
@@ -99,6 +103,7 @@ export class AutomationApiHelper {
   async getById(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting automation ${id}`);
     return await response.json();
   }
 
@@ -119,9 +124,7 @@ export class AutomationApiHelper {
       notificationSettings: current.notificationSettings,
       version: current.version
     });
-    if (!response.ok()) {
-      throw new Error(`Renaming automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Renaming automation ${id}`);
   }
 
   /* Publishes through the API. Throws with the server's problem detail on a validation failure,
@@ -129,42 +132,86 @@ export class AutomationApiHelper {
   async publish(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/publish';
     const response = await this.api.post(requestUrl, {});
-    if (!response.ok()) {
-      throw new Error(`Publishing automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Publishing automation ${id}`);
   }
 
   /* Unpublishes through the API, as the Unpublish workspace action does. */
   async unpublish(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/unpublish';
     const response = await this.api.post(requestUrl, {});
-    if (!response.ok()) {
-      throw new Error(`Unpublishing automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Unpublishing automation ${id}`);
   }
 
   /* Starts a run, as Run now does. The automation must be published and have a manual trigger. */
   async run(id: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/trigger';
     const response = await this.api.post(requestUrl, {});
-    if (!response.ok()) {
-      throw new Error(`Running automation ${id} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Running automation ${id}`);
   }
 
   /* The runs of one automation, newest first. */
   async getRuns(id: string): Promise<any[]> {
     const requestUrl = this.api.baseUrl + this.basePath + 'automations/' + id + '/runs';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Listing the runs of automation ${id}`);
     const body = await response.json();
     return body.items ?? [];
+  }
+
+  /* The data the trigger passed to a run, parsed, from `runs/{id}/trigger-data`. Null when it has none. */
+  async getRunTriggerData(runId: string): Promise<any> {
+    const response = await this.api.get(this.api.baseUrl + this.basePath + 'runs/' + runId + '/trigger-data');
+    await ensureOk(response, `Getting the trigger data of run ${runId}`);
+    const body = await response.json();
+    return body.triggerData ? JSON.parse(body.triggerData) : null;
+  }
+
+  /* Waits until the automation has `count` runs, and returns them (newest first). */
+  async waitForRuns(id: string, count: number = 1, timeout: number = 30000): Promise<any[]> {
+    await expect.poll(async () => (await this.getRuns(id)).length, { timeout }).toBe(count);
+    return await this.getRuns(id);
+  }
+
+  /**
+   * Watches the automation's runs for `windowMs` and fails as soon as the count is not `count`.
+   * This is how a spec shows that something did **not** start a run. A bounded wait can only show
+   * that nothing started within the window: the default is 20 polls of the outbox dispatcher
+   * (OutboxOptions.PollInterval, 500 ms).
+   */
+  async expectRunCountToStay(id: string, count: number, windowMs: number = 10_000, pollMs: number = 1_000) {
+    const deadline = Date.now() + windowMs;
+    do {
+      const runs = await this.getRuns(id);
+      expect(runs, `runs of automation ${id} within ${windowMs} ms`).toHaveLength(count);
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    } while (Date.now() < deadline);
   }
 
   /* One run, including its per-step runs. The runs listing leaves `stepRuns` empty. */
   async getRun(runId: string) {
     const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId;
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, `Getting run ${runId}`);
     return await response.json();
+  }
+
+  /* The step runs of one run that belong to the step with this id. */
+  stepRunOf(run: any, stepId: string) {
+    const stepRun = run.stepRuns.find((s: any) => s.stepId === stepId);
+    if (!stepRun) {
+      throw new Error(`Run ${run.id} has no step run for step ${stepId}.`);
+    }
+    return stepRun;
+  }
+
+  /* What one step wrote as its output, parsed. Loaded from `runs/{id}/step-runs/{id}/data`, the
+   * way the run view's Output tab does, because the run detail itself leaves it out. */
+  async getStepOutput(runId: string, stepId: string): Promise<any> {
+    const stepRun = this.stepRunOf(await this.getRun(runId), stepId);
+    const requestUrl = this.api.baseUrl + this.basePath + 'runs/' + runId + '/step-runs/' + stepRun.id + '/data';
+    const response = await this.api.get(requestUrl);
+    const body = await response.json();
+    return body.output ? JSON.parse(body.output) : null;
   }
 
   /**
@@ -187,6 +234,15 @@ export class AutomationApiHelper {
    */
   async publishAndRunUntil(automationId: string, status: string, timeout: number = 30000): Promise<string> {
     await this.publish(automationId);
+    return await this.runUntil(automationId, status, timeout);
+  }
+
+  /**
+   * Runs an automation that is already published, waits for its newest run to reach `status`,
+   * and returns that run's id. For a spec that has to change something between publishing and
+   * running, such as trashing the item a step points at.
+   */
+  async runUntil(automationId: string, status: string, timeout: number = 30000): Promise<string> {
     await this.run(automationId);
 
     let runId = '';
@@ -232,6 +288,7 @@ export class AutomationApiHelper {
   async getPendingApprovals(automationId: string): Promise<any[]> {
     const requestUrl = this.api.baseUrl + this.basePath + 'approvals/pending';
     const response = await this.api.get(requestUrl);
+    await ensureOk(response, 'Listing pending approvals');
     const items = await response.json();
     return (items ?? []).filter((item: any) => item.automationId === automationId);
   }
@@ -241,9 +298,7 @@ export class AutomationApiHelper {
   async decideApproval(runId: string, stepId: string, outcome: ApprovalOutcome) {
     const requestUrl = this.api.baseUrl + this.basePath + 'approvals/' + runId + '/steps/' + stepId + '/decision';
     const response = await this.api.post(requestUrl, { outcome });
-    if (!response.ok()) {
-      throw new Error(`Deciding approval ${runId}/${stepId} failed (${response.status()}): ${await response.text()}`);
-    }
+    await ensureOk(response, `Deciding approval ${runId}/${stepId}`);
   }
 
   /**

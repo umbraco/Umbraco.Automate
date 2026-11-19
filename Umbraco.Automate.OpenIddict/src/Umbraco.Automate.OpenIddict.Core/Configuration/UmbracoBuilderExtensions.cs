@@ -1,13 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenIddict.Client;
 using Umbraco.Automate.Core.Connections;
-using Umbraco.Automate.Core.Persistence;
 using Umbraco.Automate.Extensions;
-using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Automate.OpenIddict;
 using Umbraco.Automate.OpenIddict.Credentials;
 using Umbraco.Automate.OpenIddict.Credentials.Persistence;
@@ -15,7 +12,6 @@ using Umbraco.Automate.OpenIddict.Providers;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
-using Umbraco.Cms.Persistence.EFCore;
 using Umbraco.Extensions;
 
 namespace Umbraco.Automate.OpenIddict.Extensions;
@@ -94,36 +90,7 @@ public static class UmbracoBuilderExtensions
 
     private static void AddPersistence(IUmbracoBuilder builder)
     {
-        // Resolve the connection string lazily inside the factory (run time), not here at
-        // composition time: hosts like Umbraco Cloud / Deploy synthesise the DSN through the
-        // ConnectionStrings options pipeline, which has not run yet during AddComposers().
-        //
-        // shareUmbracoConnection: false — nothing here resolves an IEfCoreScope<OpenIddictDbContext>.
-        // Sharing the ambient connection is handled by AmbientDbContextFactory below, which decides
-        // per call rather than once at composition time.
-        builder.Services.AddUmbracoDbContext<OpenIddictDbContext>(
-            (IServiceProvider serviceProvider, DbContextOptionsBuilder options, string? _, string? _) =>
-            {
-                var (connectionString, providerName) = DatabaseConnectionInfo.Resolve(
-                    serviceProvider.GetRequiredService<IOptionsMonitor<ConnectionStrings>>(),
-                    serviceProvider.GetRequiredService<IConfiguration>());
-                OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
-            },
-            shareUmbracoConnection: false);
-
-        // Same reasoning as Umbraco.Automate's own persistence: this DbContext resolves the same
-        // Automate connection string, so when that points at the Umbraco CMS database a second
-        // connection would compete with the ambient scope for it — and on SQLite, which permits one
-        // writer per database file, deadlock against a caller holding the write lock across the write.
-        // See AmbientDbContextFactory.
-        builder.Services.EnlistDbContextFactoryInAmbientScope(
-            (_, connection, providerName) =>
-            {
-                var options = new DbContextOptionsBuilder<OpenIddictDbContext>();
-                OpenIddictDbContext.ConfigureProvider(options, connection, providerName);
-
-                return new OpenIddictDbContext(options.Options);
-            });
+        builder.Services.AddOpenIddictDbContext();
 
         builder.Services.AddSingleton<OAuthCredentialsFactory>();
         builder.Services.AddSingleton<IOAuthCredentialsRepository, EFCoreOAuthCredentialsRepository>();
@@ -131,4 +98,60 @@ public static class UmbracoBuilderExtensions
         // Run pending migrations on startup.
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunOpenIddictMigrationNotificationHandler>();
     }
+
+    /// <summary>
+    /// Registers the pooled <see cref="OpenIddictDbContext"/> factory and enlists it in the ambient
+    /// Umbraco scope. Split out of <c>AddPersistence</c> so the composition tests exercise this exact
+    /// registration instead of a hand-kept copy of it.
+    /// </summary>
+    internal static IServiceCollection AddOpenIddictDbContext(this IServiceCollection services)
+    {
+        // See AddAutomatePooledDbContext for how the connection string is resolved, why a connection
+        // string added after boot is picked up, and why sharing the ambient connection is decided per
+        // call. The enlisted context lets OpenIddict join the ambient Umbraco transaction when its
+        // connection string points at the Umbraco CMS database; a second connection would compete with
+        // the ambient scope for it and, on SQLite, deadlock on the held write lock.
+        services.AddAutomatePooledDbContext<OpenIddictDbContext>(
+            OpenIddictPooledDbContextOptions.Configure,
+            (_, connection, providerName) =>
+            {
+                var options = new DbContextOptionsBuilder<OpenIddictDbContext>();
+                OpenIddictDbContext.ConfigureProvider(options, connection, providerName);
+
+                return new OpenIddictDbContext(options.Options);
+            },
+            placeholderWarning:
+                "Umbraco Automate OpenIddict has no database connection string configured yet. OAuth " +
+                "connections stay inactive until one is configured. A connection string added by the " +
+                "installer is picked up straight away; one added any other way needs the application to " +
+                "restart.",
+            foundMessage:
+                "Umbraco Automate OpenIddict found its database connection string and OAuth connections " +
+                "are now available.",
+            loggerCategory: typeof(OpenIddictPooledDbContextOptions).FullName!);
+
+        return services;
+    }
+}
+
+/// <summary>
+/// Applies the provider setup for the pooled <see cref="OpenIddictDbContext"/> factory.
+/// </summary>
+/// <remarks>
+/// Resolving the connection string, the placeholder fallback for a not-yet-configured site (see
+/// <see href="https://github.com/umbraco/Umbraco.Automate/issues/487"/>) and the switch to the real
+/// connection string once it appears all live in <c>AddAutomatePooledDbContext</c> and
+/// <c>ResolvingPooledDbContextFactory</c> (see
+/// <see href="https://github.com/umbraco/Umbraco.Automate/issues/531"/> and
+/// <see href="https://github.com/umbraco/Umbraco.Automate/issues/532"/>). This only configures the
+/// provider for whichever connection string they hand it.
+/// </remarks>
+internal static class OpenIddictPooledDbContextOptions
+{
+    internal static void Configure(
+        IServiceProvider serviceProvider,
+        DbContextOptionsBuilder options,
+        string connectionString,
+        string providerName)
+        => OpenIddictDbContext.ConfigureProvider(options, connectionString, providerName);
 }

@@ -2,6 +2,7 @@ using System.Data;
 using Shouldly;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
+using Umbraco.Automate.Core.Bindings;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
@@ -9,6 +10,7 @@ using Umbraco.Automate.Core.Notifications;
 using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Runs;
 using Umbraco.Automate.Core.Security;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Automate.Core.Versioning;
@@ -74,7 +76,9 @@ public class AutomationServiceTests
                 actions, triggers, controlFlows, connectionTypes,
                 new WebhookAuthenticatorCollection(() => []),
                 new NotificationChannelCollection(() => [])),
-            new SectionAccessChecker());
+            new SectionAccessChecker(),
+            Mock.Of<IConfigurationReferenceResolver>(),
+            new BindingEvaluator(new BindingFilterCollection(Array.Empty<IBindingFilter>)));
     }
 
     [Fact]

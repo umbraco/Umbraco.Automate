@@ -38,6 +38,7 @@ public sealed class ImportNewAutomationController : AutomationControllerBase
     [MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(AutomationImportResult), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> ImportNewAutomation(
         ImportAutomationRequestModel requestModel,
         CancellationToken cancellationToken = default)
@@ -48,10 +49,18 @@ public sealed class ImportNewAutomationController : AutomationControllerBase
             return forbidden;
         }
 
-        var result = await _automationService.ImportAutomationAsync(
-            requestModel.ExportModel,
-            requestModel.WorkspaceId,
-            cancellationToken: cancellationToken);
+        AutomationImportResult result;
+        try
+        {
+            result = await _automationService.ImportAutomationAsync(
+                requestModel.ExportModel,
+                requestModel.WorkspaceId,
+                cancellationToken: cancellationToken);
+        }
+        catch (AutomationValidationException ex)
+        {
+            return ValidationFailed(ex);
+        }
 
         if (!result.Success)
         {

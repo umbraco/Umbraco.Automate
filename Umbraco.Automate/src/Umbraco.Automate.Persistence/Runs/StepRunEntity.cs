@@ -25,6 +25,22 @@ internal sealed class StepRunEntity
 
     public string? LogEntries { get; set; }
 
+    /// <summary>
+    /// The outcome key the step exited through (action, If or Switch). Null when none was recorded.
+    /// </summary>
+    public string? BranchOutcome { get; set; }
+
+    /// <summary>
+    /// The zero-based index of the first item a sequential ForEach ran. Null when none ran,
+    /// for parallel ForEach, While and other steps.
+    /// </summary>
+    public int? IterationIndex { get; set; }
+
+    /// <summary>
+    /// ForEach: the collection's item count. While: the iterations that ran. Null for other steps.
+    /// </summary>
+    public int? IterationTotal { get; set; }
+
     public string? Error { get; set; }
 
     public int? ErrorCategory { get; set; }

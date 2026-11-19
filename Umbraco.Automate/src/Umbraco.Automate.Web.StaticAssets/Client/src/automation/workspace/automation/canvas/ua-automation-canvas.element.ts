@@ -6,6 +6,7 @@ import type { Node, Edge, Viewport, ColorMode } from "@xyflow/react";
 import AutomationCanvas from "./AutomationCanvas.js";
 import type { CanvasChangeDetail, AddNodeRequestDetail, NodeDeleteRequestDetail } from "./types.js";
 import { UMB_THEME_CONTEXT } from "@umbraco-cms/backoffice/themes";
+import { UMB_MODAL_MANAGER_CONTEXT } from "@umbraco-cms/backoffice/modal";
 
 // Import CSS as strings (Vite ?inline) so we can inject into shadow DOM.
 import reactFlowCss from "@xyflow/react/dist/style.css?inline";
@@ -31,6 +32,15 @@ export class UaAutomationCanvasElement extends UmbLitElement {
     @state()
     private _colorMode: ColorMode = "light";
 
+    #modalOpen = false;
+
+    // New identity whenever localization changes, so memoised nodes re-render translated labels.
+    #localizeString = this.#createLocalizeString();
+
+    #createLocalizeString() {
+        return (value: string) => this.localize.string(value);
+    }
+
     #root: Root | null = null;
     #container: HTMLDivElement | null = null;
 
@@ -45,7 +55,40 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 }
             });
         });
+        this.consumeContext(UMB_MODAL_MANAGER_CONTEXT, (context) => {
+            if (!context) return;
+            this.observe(context.modals, (modals) => {
+                this.#modalOpen = modals.length > 0;
+            });
+        });
     }
+
+    override connectedCallback() {
+        super.connectedCallback();
+        document.body.addEventListener("keydown", this.#onBodyKeyDown);
+        // firstUpdated only runs once, so re-create the root that disconnectedCallback tore down
+        // when the element is re-attached. On first connect the container doesn't exist yet.
+        this.#mountReact();
+    }
+
+    /**
+     * React Flow listens for Space (pan) and Backspace/Delete (remove) on the whole document and
+     * only leaves them alone in plain inputs and contenteditable elements. A Monaco code editor in a
+     * modal over the canvas is neither, so the canvas took those keys from it (#511). While a modal
+     * is open, stop them on `<body>`, after the editor has had them and before React Flow's
+     * document and window listeners do.
+     *
+     * Turning React Flow's key codes off instead would detach its listeners while a key is held
+     * (the delete confirmation is itself a modal), so it would miss the keyup and ignore the next
+     * press. Focus can't tell either: Monaco takes focus without a focusin reaching the document.
+     */
+    #onBodyKeyDown = (event: KeyboardEvent) => {
+        if (!this.#modalOpen) return;
+        // By `code`, as React Flow matches them (an IME sends `key: "Process"`).
+        if (event.code !== "Space" && event.code !== "Backspace" && event.code !== "Delete") return;
+        if (event.composedPath().includes(this)) return;
+        event.stopPropagation();
+    };
 
     override firstUpdated() {
         // Inject React Flow + custom styles into the shadow root
@@ -54,22 +97,33 @@ export class UaAutomationCanvasElement extends UmbLitElement {
         this.shadowRoot!.prepend(styleEl);
 
         this.#container = this.shadowRoot!.querySelector<HTMLDivElement>("#canvas-container");
-        if (this.#container) {
-            this.#root = createRoot(this.#container);
-            this._mounted = true;
-            this.#renderReact();
-        }
+        this.#mountReact();
+    }
+
+    #mountReact() {
+        if (!this.#container || this.#root) return;
+
+        this.#root = createRoot(this.#container);
+        this._mounted = true;
+        this.#renderReact();
     }
 
     override updated(changedProperties: Map<string, unknown>) {
         super.updated(changedProperties);
-        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport") || changedProperties.has("readOnly"))) {
+        // The localization controller calls requestUpdate() with no property when terms load or
+        // the language changes, which arrives here as an empty change set.
+        const localizationChanged = changedProperties.size === 0;
+        if (localizationChanged) {
+            this.#localizeString = this.#createLocalizeString();
+        }
+        if (this._mounted && (changedProperties.has("nodes") || changedProperties.has("edges") || changedProperties.has("viewport") || changedProperties.has("readOnly") || localizationChanged)) {
             this.#renderReact();
         }
     }
 
     override disconnectedCallback() {
         super.disconnectedCallback();
+        document.body.removeEventListener("keydown", this.#onBodyKeyDown);
         this.#root?.unmount();
         this.#root = null;
         this._mounted = false;
@@ -85,6 +139,7 @@ export class UaAutomationCanvasElement extends UmbLitElement {
                 viewport: this.viewport,
                 colorMode: this._colorMode,
                 readOnly: this.readOnly,
+                localize: this.#localizeString,
                 onCanvasChange: this.#onCanvasChange,
                 onAddNodeRequest: this.#onAddNodeRequest,
                 onDeleteRequest: this.#onDeleteRequest,

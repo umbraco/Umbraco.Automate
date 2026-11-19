@@ -43,6 +43,10 @@
     <!-- Add JSON schema file to package output -->
     <PropertyGroup>
         <_UmbracoAutomateSlackJsonSchemaReference>appsettings-schema.Umbraco.Automate.Slack.json</_UmbracoAutomateSlackJsonSchemaReference>
+        <!-- Copy package dependencies (e.g. Umbraco.Automate.OpenIddict.Core) next to the output so
+             JsonSchemaGenerate can load them when building against packages (UseProjectReferences=false),
+             as the release pack does. See the Umbraco.JsonSchema.Extensions README. -->
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
     <ItemGroup>
         <Content Include="$(_UmbracoAutomateSlackJsonSchemaReference)" PackagePath="" Visible="false" />

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Execution;
 using Umbraco.Cms.Core.Sync;
@@ -68,12 +69,44 @@ public class ExecutionNodeEligibilityTests
         reason.ShouldContain("expected");
     }
 
-    private static ExecutionNodeEligibility Build(ServerRole role, ExecutionMode mode)
+    [Fact]
+    public void WhenEngineStartFailed_ReturnsFalse()
+    {
+        // Even in Distributed mode, where every role is otherwise eligible: a node whose engine
+        // never started must leave workflow work pending rather than claim it.
+        var sut = Build(ServerRole.Single, ExecutionMode.Distributed, EngineStartFailedSignal());
+
+        sut.CanExecuteWorkflows().ShouldBeFalse();
+    }
+
+    [Fact]
+    public void WhenEngineStartFailed_ReasonExplainsRecoveryFailure()
+    {
+        var sut = Build(ServerRole.Single, ExecutionMode.Distributed, EngineStartFailedSignal());
+
+        sut.CanExecuteWorkflows(out var reason);
+
+        reason.ShouldNotBeNull().ShouldContain("startup recovery failed");
+    }
+
+    private static AutomateReadinessSignal EngineStartFailedSignal()
+    {
+        var signal = new AutomateReadinessSignal();
+        signal.Signal();
+        signal.SignalEngineStartFailed();
+        return signal;
+    }
+
+    private static ExecutionNodeEligibility Build(
+        ServerRole role,
+        ExecutionMode mode,
+        AutomateReadinessSignal? readinessSignal = null)
     {
         var serverRole = new Mock<IServerRoleAccessor>();
         serverRole.Setup(s => s.CurrentServerRole).Returns(role);
         return new ExecutionNodeEligibility(
             serverRole.Object,
-            Options.Create(new ExecutionOptions { Mode = mode }));
+            Options.Create(new ExecutionOptions { Mode = mode }),
+            readinessSignal ?? new AutomateReadinessSignal());
     }
 }

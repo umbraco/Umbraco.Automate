@@ -391,4 +391,44 @@ public class WorkflowCompilerTests
         definition.Steps.Count.ShouldBe(1);
         definition.Steps.FindById(0).Name.ShouldBe("Connected");
     }
+
+    [Fact]
+    public void Compile_UnregisteredActionAlias_KeepsTheStepAsAnUnavailablePlaceholder()
+    {
+        StepConfiguration missing = new StepConfigurationBuilder()
+            .WithActionAlias("removedPackage.action").WithName("Missing");
+        StepConfiguration after = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("After");
+
+        var automation = new AutomationBuilder()
+            .AddStep(missing)
+            .AddStep(after)
+            .WithTriggerConnection(missing.Id)
+            .WithConnection(missing.Id, after.Id)
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+
+        definition.Steps.FindById(0).BodyType.ShouldBe(typeof(UnavailableStepBody));
+    }
+
+    [Fact]
+    public void Compile_UnregisteredActionAlias_KeepsTheStepsTransitions()
+    {
+        StepConfiguration missing = new StepConfigurationBuilder()
+            .WithActionAlias("removedPackage.action").WithName("Missing");
+        StepConfiguration after = new StepConfigurationBuilder()
+            .WithActionAlias("testAction").WithName("After");
+
+        var automation = new AutomationBuilder()
+            .AddStep(missing)
+            .AddStep(after)
+            .WithTriggerConnection(missing.Id)
+            .WithConnection(missing.Id, after.Id)
+            .Build();
+
+        var definition = _compiler.Compile(automation, "test-wf");
+
+        definition.Steps.FindById(0).Outcomes.ShouldContain(o => ((ValueOutcome)o).NextStep == 1);
+    }
 }

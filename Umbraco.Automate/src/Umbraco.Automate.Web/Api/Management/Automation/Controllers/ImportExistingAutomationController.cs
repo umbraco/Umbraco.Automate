@@ -39,6 +39,7 @@ public sealed class ImportExistingAutomationController : AutomationControllerBas
     [ProducesResponseType(typeof(AutomationImportResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> ImportExistingAutomation(
         Guid id,
         AutomationExportModel exportModel,
@@ -56,11 +57,19 @@ public sealed class ImportExistingAutomationController : AutomationControllerBas
             return forbidden;
         }
 
-        var result = await _automationService.ImportAutomationAsync(
-            exportModel,
-            existing.WorkspaceId,
-            existingAutomationId: id,
-            cancellationToken: cancellationToken);
+        AutomationImportResult result;
+        try
+        {
+            result = await _automationService.ImportAutomationAsync(
+                exportModel,
+                existing.WorkspaceId,
+                existingAutomationId: id,
+                cancellationToken: cancellationToken);
+        }
+        catch (AutomationValidationException ex)
+        {
+            return ValidationFailed(ex);
+        }
 
         if (!result.Success)
         {

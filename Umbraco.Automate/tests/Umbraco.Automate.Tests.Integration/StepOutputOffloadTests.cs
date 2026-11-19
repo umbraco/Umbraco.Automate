@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Umbraco.Automate.Core;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Actions.BuiltIn;
 using Umbraco.Automate.Core.Actions.Middleware;
@@ -150,6 +151,7 @@ public class StepOutputOffloadTests : IAsyncLifetime
         services.AddSingleton<IWorkflowCompiler, WorkflowCompiler>();
         services.AddSingleton<ICircuitBreakerService, StubCircuitBreakerService>();
         services.AddSingleton<IEventAggregator>(Mock.Of<IEventAggregator>());
+        services.AddSingleton<AutomateReadinessSignal>();
         services.AddSingleton<IAutomationExecutor, AutomationExecutor>();
 
         _provider = services.BuildServiceProvider();
