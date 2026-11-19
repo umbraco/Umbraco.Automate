@@ -33,6 +33,9 @@ internal sealed class AutomationRunService : IAutomationRunService
     public Task<AutomationRun?> GetRunAsync(Guid id, CancellationToken cancellationToken = default)
         => _runRepository.GetAsync(id, cancellationToken);
 
+    public Task<AutomationRunStatus?> GetRunStatusAsync(Guid id, CancellationToken cancellationToken = default)
+        => _runRepository.GetRunStatusAsync(id, cancellationToken);
+
     public async Task<StepRunData?> GetStepRunDataAsync(Guid runId, Guid stepRunId, CancellationToken cancellationToken = default)
     {
         var stored = await _runRepository.GetStepRunDataAsync(runId, stepRunId, cancellationToken);

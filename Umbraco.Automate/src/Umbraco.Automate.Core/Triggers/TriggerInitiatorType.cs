@@ -21,6 +21,13 @@ public static class TriggerInitiatorType
     public const string Replay = "replay";
 
     /// <summary>
+    /// Triggered by an AI agent calling an automation's MCP tool. Deliberately not
+    /// <see cref="IsInteractive"/> — an agent call is an autonomous action, not the kind of
+    /// deliberate human action the circuit breaker lets bypass an auto-disabled automation.
+    /// </summary>
+    public const string AiAgent = "ai-agent";
+
+    /// <summary>
     /// Returns true when the initiator represents a deliberate human action (a manual "run now"
     /// or a replay) rather than an automatic trigger (<see cref="System"/> / <see cref="Scheduled"/>
     /// / <see cref="Webhook"/>). Used by the circuit breaker to allow interactive test runs while

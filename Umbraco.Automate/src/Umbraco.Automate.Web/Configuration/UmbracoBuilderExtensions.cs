@@ -13,6 +13,7 @@ using Microsoft.OpenApi;
 using OpenIddict.Validation.AspNetCore;
 using Umbraco.Automate.Core.Configuration;
 using Umbraco.Automate.Core.Realtime;
+using Umbraco.Automate.Web.Api.Mcp;
 using Umbraco.Automate.Web.Authorization;
 using Umbraco.Automate.Web;
 using Umbraco.Automate.Web.Realtime;
@@ -48,6 +49,7 @@ public static partial class UmbracoBuilderExtensions
         builder.AddUmbracoAutomateAuthorization();
         builder.AddUmbracoAutomateManagementApi();
         builder.AddUmbracoAutomateWebhookApi();
+        builder.AddUmbracoAutomateMcpApi();
         builder.AddUmbracoAutomateMapDefinitions();
         builder.AddUmbracoAutomateRealtime();
 
@@ -154,6 +156,29 @@ public static partial class UmbracoBuilderExtensions
             }));
 
         builder.AddUmbracoAutomateWebhookRateLimiting();
+
+        return builder;
+    }
+
+    private static IUmbracoBuilder AddUmbracoAutomateMcpApi(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddMcpServer().WithHttpTransport(options => McpEndpointWiring.ConfigureHttpTransport(options));
+
+        // Registers the MCP rate limit policy only — the rate limiter middleware itself
+        // (UseRateLimiter()) is already installed globally by AddUmbracoAutomateWebhookRateLimiting.
+        // If that method's filter is ever removed, this policy will stop being enforced; the two
+        // are coupled on purpose to avoid registering the same middleware twice.
+        builder.Services.AddRateLimiter(McpEndpointWiring.AddRateLimitPolicy);
+
+        builder.Services.Configure<UmbracoPipelineOptions>(options =>
+        {
+            options.AddFilter(new UmbracoPipelineFilter("UmbracoAutomateMcp")
+            {
+                PreRouting = McpEndpointWiring.UsePreRouting,
+                PostRouting = McpEndpointWiring.UsePostRouting,
+                Endpoints = app => app.UseEndpoints(McpEndpointWiring.MapEndpoints),
+            });
+        });
 
         return builder;
     }

@@ -7,12 +7,13 @@ import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import type { UaAutomationDetailModel } from "../../../types.js";
 import { UA_AUTOMATION_ENTITY_TYPE } from "../../../constants.js";
 import { UA_EMPTY_GUID, formatDateTime } from "../../../../core/index.js";
-import { UA_WEBHOOK_TRIGGER_ALIAS } from "../../../triggers/constants.js";
+import { UA_MCP_TRIGGER_ALIAS, UA_WEBHOOK_TRIGGER_ALIAS } from "../../../triggers/constants.js";
 import { AutomationsService } from "../../../../api/sdk.gen.js";
 import { UA_AUTOMATION_WORKSPACE_CONTEXT } from "../automation-workspace.context-token.js";
 
 import "../../../../core/version-history/components/version-history/version-history.element.js";
 import "../../../../core/components/webhook-url-field/webhook-url-field.element.js";
+import "../../../../core/components/mcp-url-field/mcp-url-field.element.js";
 
 @customElement("ua-automation-info-workspace-view")
 export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
@@ -82,7 +83,7 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
                               </umb-property-layout>
                           `
                         : ""}
-                    ${this.#renderWebhookUrl()}
+                    ${this.#renderWebhookUrl()} ${this.#renderMcpUrl()}
                 </uui-box>
             </div>
         `;
@@ -95,6 +96,17 @@ export class UaAutomationInfoWorkspaceViewElement extends UmbLitElement {
         return html`
             <umb-property-layout label=${this.localize.term("uaLabels_webhookUrl")} orientation="vertical">
                 <ua-webhook-url-field slot="editor" automation-id=${this._model.unique}></ua-webhook-url-field>
+            </umb-property-layout>
+        `;
+    }
+
+    #renderMcpUrl() {
+        if (!this._model?.trigger || this._model.trigger.triggerAlias !== UA_MCP_TRIGGER_ALIAS) return html``;
+        if (this._model.unique === UA_EMPTY_GUID) return html``;
+
+        return html`
+            <umb-property-layout label=${this.localize.term("uaLabels_mcpUrl")} orientation="vertical">
+                <ua-mcp-url-field slot="editor" automation-id=${this._model.unique}></ua-mcp-url-field>
             </umb-property-layout>
         `;
     }

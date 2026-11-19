@@ -14,6 +14,15 @@ public interface IAutomationRunService
     Task<AutomationRun?> GetRunAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets a run's status without loading its step runs, or <c>null</c> when the run does not
+    /// exist. Cheap enough to poll while waiting for a run to finish.
+    /// </summary>
+    // TODO (V19): Remove the default implementation.
+    // The default keeps existing implementations of this interface compiling.
+    async Task<AutomationRunStatus?> GetRunStatusAsync(Guid id, CancellationToken cancellationToken = default)
+        => (await GetRunAsync(id, cancellationToken))?.Status;
+
+    /// <summary>
     /// Gets the recorded input and output of a single step run, prepared for display, or
     /// <c>null</c> when the step run does not exist or does not belong to <paramref name="runId"/>.
     /// The values are masked (sensitive keys, and fields the action's settings schema marks

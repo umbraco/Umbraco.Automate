@@ -9,7 +9,9 @@ namespace Umbraco.Automate.Core.StepTypes;
 /// the publish if any errors are returned.
 /// </summary>
 /// <remarks>
-/// Only actions are validated; control-flow step types that implement this interface are not called.
+/// Actions and triggers are validated; control-flow step types that implement this interface are not called.
+/// A trigger that implements it is called with the automation's trigger settings, after its settings
+/// type's own rules (such as required fields) have been checked.
 /// <para>
 /// <see cref="IValidatableStepType"/> runs on every draft save, so it should only reject values that
 /// are malformed. This runs only on publish, so it is the place to require a setting to be filled in

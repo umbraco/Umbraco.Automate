@@ -220,6 +220,7 @@ internal sealed class AutomationService : IAutomationService
         AddUnknownBindingFilterErrors(automation, errors);
         await AddDanglingOutcomeErrorsAsync(automation, errors, cancellationToken);
         await AddStepPublishSettingsErrorsAsync(automation, errors, cancellationToken);
+        await AddTriggerPublishSettingsErrorsAsync(automation, errors, cancellationToken);
 
         if (workspace.ServiceAccountKey != Guid.Empty)
         {
@@ -564,7 +565,7 @@ internal sealed class AutomationService : IAutomationService
                 continue;
             }
 
-            var settingsErrors = GetStepSettingsErrors(stepType, step);
+            var settingsErrors = GetSettingsErrors(stepType, step.Settings);
             if (settingsErrors.Count > 0)
             {
                 var label = string.IsNullOrEmpty(step.Alias) ? $"Step '{step.Name}'" : $"Step '{step.Name}' ({step.Alias})";
@@ -596,6 +597,51 @@ internal sealed class AutomationService : IAutomationService
     }
 
     /// <summary>
+    /// Collects a message for each problem with the trigger's settings when the trigger opts into
+    /// <see cref="IPublishValidatableStepType"/>, such as the MCP trigger requiring a valid tool name.
+    /// </summary>
+    /// <remarks>
+    /// Opt-in rather than applied to every trigger, so publishing an automation whose trigger has
+    /// always been accepted keeps working. A trigger that opts in gets its settings type's rules
+    /// checked as well as its own publish checks.
+    /// </remarks>
+    private async Task AddTriggerPublishSettingsErrorsAsync(
+        Automation automation,
+        List<string> errors,
+        CancellationToken cancellationToken)
+    {
+        if (automation.Trigger is not { } triggerConfiguration
+            || _triggers.GetByAlias(triggerConfiguration.TriggerAlias) is not { } trigger
+            || trigger is not IPublishValidatableStepType validatable)
+        {
+            return;
+        }
+
+        var settingsErrors = GetSettingsErrors(trigger, triggerConfiguration.Settings);
+        if (settingsErrors.Count > 0)
+        {
+            errors.AddRange(settingsErrors.Select(error => $"Trigger '{trigger.Name}': {error}"));
+            return;
+        }
+
+        object? resolved;
+        try
+        {
+            resolved = trigger.ResolveSettings(triggerConfiguration.Settings);
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"Trigger '{trigger.Name}' has invalid settings: {ex.Message}");
+            return;
+        }
+
+        foreach (var error in await validatable.ValidateSettingsForPublishAsync(resolved, automation, cancellationToken))
+        {
+            errors.Add($"Trigger '{trigger.Name}': {error}");
+        }
+    }
+
+    /// <summary>
     /// Checks a step's saved settings against its settings type's schema with the same
     /// deserialization and rules the runtime applies when it resolves them
     /// (<see cref="EditableModelResolver"/>), so the two cannot drift. A value holding a
@@ -603,7 +649,7 @@ internal sealed class AutomationService : IAutomationService
     /// the run: neither has its final value until then, and a referenced configuration key may only
     /// be set on the environment the automation runs on.
     /// </summary>
-    private List<string> GetStepSettingsErrors(IStepType stepType, StepConfiguration step)
+    private List<string> GetSettingsErrors(IStepType stepType, Dictionary<string, object?> rawSettings)
     {
         if (stepType.SettingsType is not { } settingsType || stepType.GetSettingsSchema() is not { } schema)
         {
@@ -613,7 +659,7 @@ internal sealed class AutomationService : IAutomationService
         object? settings;
         try
         {
-            settings = EditableModelResolver.DeserializeModel(settingsType, step.Settings);
+            settings = EditableModelResolver.DeserializeModel(settingsType, rawSettings);
         }
         catch (Exception ex)
         {
