@@ -179,10 +179,17 @@ acceptance suite is deliberately **outside** the root workspaces, with its own l
 
 ## Keep the helper package aligned to the CMS range
 
-`package.json` must track `Umbraco.Cms.Core` in `Directory.Packages.props` (currently 18.1.0):
-`@umbraco-cms/acceptance-test-helpers` and the `@umbraco-cms/backoffice` devDep are both pinned
-`^18.1.0` so they float within the major. A stale pin can drift helper behaviour against the
-running site. Bumping affects the **whole** suite — re-run everything after a bump.
+`@umbraco-cms/acceptance-test-helpers` is the one package here that must track `Umbraco.Cms.Core`
+in `Directory.Packages.props` (currently 18.1.0). It is pinned `^18.1.0` so it floats within the
+major. A stale pin can drift helper behaviour against the running site. Bumping affects the
+**whole** suite — re-run everything after a bump.
+
+Do not add `@umbraco-cms/backoffice` back. It used to be a devDependency here, pinned to the same
+range, but nothing in `tests/`, `lib/`, `fixtures/` or the config imports it, and the helpers
+package doesn't need it (it depends only on `tslib`, with `@playwright/test` as a peer). With
+TipTap, Monaco, UUI and RxJS it was about 24k of the 27k installed files, and every CI leg paid
+for it in "Restore acceptance test packages" (a median 50 s). The specs drive the backoffice in a
+browser; they never import its code.
 
 ## Playwright version pin
 
@@ -270,8 +277,12 @@ bites in one place is usually this divergence, not a product bug.
 
 ## How the CI stage works
 
-The `AcceptanceTests` stage is Umbraco.Build's `devops/monorepo/stages/acceptance-tests.yml`,
-inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automate's own settings:
+The `AcceptanceTests` stage is Automate's own `devops/ci/acceptance-tests.yml`, inserted through
+`additional_tests` in `azure-pipelines.yml`, as Umbraco Forms does with its `devops/ci/` stages.
+`azure-pipelines.yml` passes it the path patterns, the image and the Node version. The stage is
+built from Umbraco.Build's step templates (`devops/monorepo/steps/*.yml@build`, unchanged). The
+matrix, the npm cache, the demo site's start and wait, and the results upload are Automate's own
+steps.
 
 - **Depends on nothing (`dependsOn: []`), so it runs alongside `Build`.** It uses nothing
   `Build` produces, so waiting for it only cost ~3.5 min of wall-clock; the price is a wasted
@@ -281,9 +292,9 @@ inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automa
   package.
 - **Skips or narrows itself on pull requests.** A small `Changes` job in the same stage sorts the
   PR's changed files into areas (the rules are in Umbraco.Build's
-  `devops/monorepo/steps/detect-acceptance-changes.yml`; Automate's `skip_paths`, `test_paths`,
-  `smoke_paths` and `full_paths` are in `azure-pipelines.yml`: update them when you add a project
-  or move code). A PR touching only docs, repo tooling or the
+  `devops/monorepo/steps/detect-acceptance-changes.yml`, which the stage calls; Automate's
+  `skip_paths`, `test_paths` and `smoke_paths` are in `azure-pipelines.yml`: update them when you
+  add a project or move code). A PR touching only docs, repo tooling or the
   .NET unit/integration test projects skips the suite. A PR whose only acceptance changes are
   specs (`tests/`, `umbraco.config.ts`) runs **one** unsharded leg with Playwright's
   `--only-changed=HEAD~1 --pass-with-no-tests`: the changed specs plus any spec importing a
@@ -291,28 +302,49 @@ inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automa
   imports `lib/index`, so `--only-changed` would pick everything and run it on one agent.
   `package*.json`, `playwright.config.ts`, `tsconfig.json` or install-script changes run the whole
   suite too, because specs don't import those files and `--only-changed` would miss them. A PR
-  whose only product changes are server-side C# outside the Management API and the frontends
-  (core `Umbraco.Automate/src/` except `Umbraco.Automate.Web` and `.Web.StaticAssets`, and the
-  OpenIddict and Slack `src/` except OpenIddict's `Client/`) runs **one** leg of the `@smoke`
-  tests; any other product change runs the whole suite. Pushes always run the whole suite, and so
-  does a manual run, which is how to force it for a PR. Use `HEAD~1`, never `HEAD^1`: npm runs the
+  whose only product changes are under a product's `src/` (core, OpenIddict and Slack, front end
+  and Management API included) runs **one** leg of the `@smoke` tests. A PR that changes specs as
+  well runs the whole suite: Playwright ANDs `--grep` with `--only-changed`, so no single leg
+  covers both. Anything else, such as `Directory.Packages.props`, the root `package*.json` or
+  `scripts/install-demo-site.*`, runs the whole suite. All of that narrowing is for PRs into a
+  `vN/dev` branch: a PR into anything else (`vN/main`, a release or hotfix branch) always runs the
+  whole suite, as in Umbraco Forms, since no `vN/dev` push after merge will. The stage's matrix
+  step applies that rule from the PR's target branch. Pushes always run the whole suite, so a
+  regression the smoke set misses shows up on the `vN/dev` push after merge. A manual run of the
+  PR's branch forces it too. Use `HEAD~1`, never `HEAD^1`: npm runs the
   script through cmd.exe on Windows, where `^` is the escape character. The job condition skips
   only on an explicit `'false'`.
-- **`@smoke` gates server-side-only PRs.** Keep the tagged set small and about the site working
-  at all: the Automate section loads, the Management API answers, a workspace and an automation
-  can be created, and a published automation runs to completion. Tag a test `@smoke` only if a
-  broken boot, migration, DI registration or engine run would fail it.
-- **Is sharded across four parallel agents** (a matrix from the `Changes` job; each leg carries
-  its own `testCommand`, e.g. `npm run test -- --shard=1/4`), each against its **own** demo site
-  and LocalDB. Specs share site data and the suite runs a single worker, so shards must not share a
-  site. `fullyParallel: true` (with one worker) makes Playwright split by test rather than by file, so shards finish together; every shard runs `auth.setup.ts` itself. Each shard pays
-  the full setup (build, scaffold, first boot), so extra shards only help while the tests
-  themselves dominate; results and artifacts are named per leg.
+- **`@smoke` gates most product PRs, front end included.** Keep the tagged set small: one test
+  per main path, not every case. Today that is the Automate section and Overview dashboard, the
+  Management API, the sidebar and workspaces list, creating an automation, adding a step on the
+  designer canvas, inserting a binding in the step settings, publishing and running an automation
+  and opening the run, and the connection workspace with OpenIddict's OAuth editor. Tag a test
+  `@smoke` when a broken boot, migration, DI registration, engine run or front-end bundle would
+  fail it and no smoke test already would. If a `vN/dev` push catches a regression its PR's smoke
+  leg missed, consider tagging the test that caught it. The automation list in a workspace and the
+  version history have no tests yet, so smoke cannot cover them.
+- **Is sharded across three parallel agents** (`shards` in the stage; a matrix from the `Changes`
+  job, each leg with its own `testCommand`), each against its **own** demo site and LocalDB. Specs
+  share site data and the suite runs a single worker, so shards must not share a site. The shards
+  are split by recorded test duration, not `--shard`: see "CI shards are split by duration" below.
+  Every shard runs `auth.setup.ts` itself. Each shard pays the full setup (about 6 min of build,
+  scaffold and first boot), so extra shards only help while the tests themselves dominate.
+  Results and artifacts are named per leg.
 - **Scaffolds the site with `scripts/install-demo-site.ps1`**, the same script developers run, so
   the CI leg and the local workflow cannot drift apart. No test site is committed.
 - **Builds the frontend first.** Without `wwwroot` the Automate section silently fails to
   register and every UI spec fails with element-not-found.
-- **Runs on `windows-latest` against SQL Server LocalDB, not SQLite.** It overrides the
+- **Caches npm packages, not NuGet packages.** Restoring the NuGet cache took a median 29 s (p90
+  51 s) per leg, and Umbraco Forms found its acceptance NuGet cache cost more than it saved, so
+  "Build demo site" restores from nuget.org. The npm and Playwright browser caches stay.
+- **Starts the demo site early.** "Start demo site" runs as soon as the site is built and LocalDB
+  is up, and the test project's `npm ci`, the Playwright install and the `.env` run while it boots
+  (a first boot creates the database and runs the unattended install and the migrations). "Wait
+  for demo site" then polls `/umbraco` for up to 15 minutes, fails at once if the site process has
+  exited, and prints the end of the site's logs on a failure. Umbraco.Build's `demo-site.yml`
+  starts and waits in one go, which is why these two steps are Automate's own; its `stop` is used.
+- **Runs on Windows (`windows-2025`, see `azure-pipelines.yml`) against SQL Server LocalDB, not
+  SQLite.** It overrides the
   scaffold's connection string with `CONNECTIONSTRINGS__UMBRACODBDSN` and its provider name.
   Automate shares that connection (`UseNamedConnectionString = umbracoDbDSN`), so both move.
   The reason is a CMS deadlock on SQLite. The CMS cache-instruction sync job and an
@@ -336,13 +368,15 @@ inserted through `additional_tests` in `azure-pipelines.yml`, which holds Automa
   the job attempt. A UI failure is rarely diagnosable from the error text alone. The condition is
   `always()`, as in Forms, because a job killed by its timeout is *cancelled*, and a cancelled job
   skips any step whose condition lacks `always()`, so the run that most needs diagnosing would
-  upload nothing.
+  upload nothing. `results/` is uploaded only when it exists: a leg that fails before Playwright
+  runs has none, and the upload used to fail on it (build 300725).
 - **`maxFailures` stops a run that is going nowhere.** If the site wedges, every remaining spec
   fails in setup with three attempts each, which used to run into the job timeout.
 
-Two things to know if you edit that stage (in Umbraco.Build). Azure macro-expands `$(name)` before bash or pwsh
-sees the script. PowerShell subexpressions such as `$($process.Id)` are safe, because Azure only
-matches a variable name after `$(`, but bash `$(command)` substitution is not. And
+Two things to know if you edit the stage, or the Umbraco.Build steps it calls. Azure
+macro-expands `$(name)` before bash or pwsh sees the script. PowerShell subexpressions such as
+`$($process.Id)` are safe, because Azure only matches a variable name after `$(`, but bash
+`$(command)` substitution is not. And
 `config.js` is deliberately **not** used in CI: it is interactive and reads the per-worktree
 port from git config, which is a local-development affordance, whereas CI fixes the URL via
 `ASPNETCORE_URLS` and writes `.env` directly. The checkout needs `fetchDepth: 0`, like the
@@ -351,3 +385,33 @@ on a shallow clone.
 
 `Pack` waits for this stage. A failed or cancelled run stops packaging; a skipped one (a pull
 request that didn't need the suite) doesn't.
+
+## CI shards are split by duration (`shard-test-list.js`)
+
+CI's three full-run shards don't use `--shard`. Each runs
+`node shard-test-list.js <n>/3 playwright/shard-test-list.txt && npm run test -- --test-list playwright/shard-test-list.txt`
+(the matrix in `devops/ci/acceptance-tests.yml`). The script lists the suite the way `npm run test`
+runs it (`playwright test DefaultConfig --list --no-deps`), hands the tests out longest first to the
+least loaded shard using `shard-timings.json`, and writes that shard's `--test-list`. `--shard`
+gives each shard the same number of tests, so shard 1 always got the slow automation specs and
+finished last: 824 s against 580 s for shard 4 (medians of 55 runs on four shards, November 2026).
+The split works for any shard count; `shards` in the stage sets it.
+
+- The test list comes from the live suite, so every test runs on exactly one shard. A new test with
+  no recorded time counts as the median; out-of-date timings only make the split less even.
+- The log of "Run acceptance tests" starts with each shard's estimate. When the real shard times
+  drift apart, refresh the timings from a few recent green builds of this line's `dev` branch, with
+  this folder's npm packages installed and `az login` done:
+  `node update-shard-timings.js <buildId> <buildId> ...`
+- Changing `shard-test-list.js`, `update-shard-timings.js`, `shard-timings.json` or the stage runs
+  the full sharded suite on the PR.
+- Renaming a test (adding `@smoke` included) changes its key: rename it in `shard-timings.json` too,
+  or it counts as the median until the next refresh.
+- `TEST_ARGS` in `shard-test-list.js` must match the `test` script in `package.json`, or the split
+  and the run see different tests.
+- The setup project still runs on every shard: Playwright adds it as a dependency of the listed
+  tests (`--no-deps` only keeps it out of the split).
+- `fullyParallel: true` is what lets the split go test by test. A file with a serial or
+  default-mode describe stays whole, on one shard.
+- The listing's JSON goes to a file, not stdout, because dotenv logs to stdout when the config
+  loads it.
