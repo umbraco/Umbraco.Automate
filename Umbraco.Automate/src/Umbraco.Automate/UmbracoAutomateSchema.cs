@@ -35,6 +35,11 @@ internal sealed class UmbracoAutomateSchema
         public required WebhookOptions Webhook { get; set; }
 
         /// <summary>
+        /// MCP trigger endpoint configuration.
+        /// </summary>
+        public required McpOptions Mcp { get; set; }
+
+        /// <summary>
         /// Automation execution configuration.
         /// </summary>
         public required ExecutionOptions Execution { get; set; }

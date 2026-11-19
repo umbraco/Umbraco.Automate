@@ -17,26 +17,38 @@ namespace Umbraco.Automate.Web.Api.Mcp;
 /// more than one instance — the run may finalize on an instance other than the one holding this
 /// request open.
 /// </summary>
+/// <remarks>
+/// Like a manual "Run now", this starts the run directly rather than through trigger dispatch, so
+/// trigger dispatch authorisers aren't consulted. They decide whether a service account may see a
+/// trigger's output (content, media and similar); this trigger's output is only the caller's own
+/// arguments. The executor still runs the automation as the workspace's service account.
+/// </remarks>
 internal sealed class AutomationMcpTool : McpServerTool
 {
+    private static readonly TimeSpan DefaultInitialPollInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan MaxPollInterval = TimeSpan.FromSeconds(2);
+
     private readonly Automation _automation;
     private readonly McpTriggerSettings _settings;
     private readonly IAutomationExecutor _executor;
     private readonly IAutomationRunService _runService;
-    private readonly TimeSpan _pollInterval;
+    private readonly IRunDataSanitizer _runDataSanitizer;
+    private readonly TimeSpan _initialPollInterval;
 
     public AutomationMcpTool(
         Automation automation,
         McpTriggerSettings settings,
         IAutomationExecutor executor,
         IAutomationRunService runService,
-        TimeSpan? pollInterval = null)
+        IRunDataSanitizer runDataSanitizer,
+        TimeSpan? initialPollInterval = null)
     {
         _automation = automation;
         _settings = settings;
         _executor = executor;
         _runService = runService;
-        _pollInterval = pollInterval ?? TimeSpan.FromMilliseconds(250);
+        _runDataSanitizer = runDataSanitizer;
+        _initialPollInterval = initialPollInterval ?? DefaultInitialPollInterval;
 
         ProtocolTool = new Tool
         {
@@ -67,46 +79,51 @@ internal sealed class AutomationMcpTool : McpServerTool
         var triggerOutputData = JsonOptions.DeserializeToUnwrappedDictionary(
             JsonSerializer.Serialize(output, JsonOptions.Default));
 
-        var runId = await _executor.ExecuteAsync(
-            _automation,
-            TriggerInitiatorType.AiAgent,
-            initiatorId: null,
-            triggerOutputData,
-            cancellationToken);
+        Guid runId;
+        try
+        {
+            // Not the request's token: once the run is saved it must go on to start and record its
+            // workflow instance, even if the agent disconnects, or it's left looking stuck.
+            runId = await _executor.ExecuteAsync(
+                _automation,
+                TriggerInitiatorType.AiAgent,
+                initiatorId: null,
+                triggerOutputData,
+                CancellationToken.None);
+        }
+        catch (RateLimitExceededException)
+        {
+            return ErrorResult("Too many runs of this automation are in progress. Wait and try again.");
+        }
+        catch (AutomationEngineNotRunningException)
+        {
+            return ErrorResult("The automation engine isn't running on this server. Try again shortly.");
+        }
 
         if (runId == Guid.Empty)
         {
             return ErrorResult("This automation has been auto-disabled by the circuit breaker. Re-enable it to run.");
         }
 
-        var deadline = DateTime.UtcNow.AddSeconds(_settings.TimeoutSeconds);
-        AutomationRun? run;
-        while (true)
-        {
-            run = await _runService.GetRunAsync(runId, cancellationToken);
-            if (run is not null && IsTerminal(run.Status))
-            {
-                break;
-            }
-
-            if (DateTime.UtcNow >= deadline)
-            {
-                break;
-            }
-
-            await Task.Delay(_pollInterval, cancellationToken);
-        }
-
-        if (run is null || !IsTerminal(run.Status))
+        var timeoutSeconds = Math.Clamp(_settings.TimeoutSeconds, 1, McpTriggerSettings.MaxTimeoutSeconds);
+        var status = await WaitForTerminalStatusAsync(runId, TimeSpan.FromSeconds(timeoutSeconds), cancellationToken);
+        if (status is null || !IsTerminal(status.Value))
         {
             return new CallToolResult
             {
                 IsError = false,
                 Content = [new TextContentBlock
                 {
-                    Text = $"Still running after {_settings.TimeoutSeconds}s. Run ID: {runId}.",
+                    Text = $"Still running after {timeoutSeconds}s. Run ID: {runId}.",
                 }],
             };
+        }
+
+        // Load the full run once, now that it's finished, rather than on every poll.
+        var run = await _runService.GetRunAsync(runId, cancellationToken);
+        if (run is null)
+        {
+            return ErrorResult($"Run {runId} could not be found.");
         }
 
         if (run.Status is AutomationRunStatus.Failed or AutomationRunStatus.Rejected or AutomationRunStatus.Cancelled)
@@ -121,16 +138,71 @@ internal sealed class AutomationMcpTool : McpServerTool
         };
     }
 
+    /// <summary>
+    /// Polls the run's status (not the whole run) until it finishes or the timeout passes, backing
+    /// off from the initial interval to <see cref="MaxPollInterval"/> so a long wait doesn't query
+    /// the database several times a second.
+    /// </summary>
+    private async Task<AutomationRunStatus?> WaitForTerminalStatusAsync(
+        Guid runId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        var interval = _initialPollInterval;
+
+        while (true)
+        {
+            var status = await _runService.GetRunStatusAsync(runId, cancellationToken);
+            if (status is not null && IsTerminal(status.Value))
+            {
+                return status;
+            }
+
+            var remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+            {
+                return status;
+            }
+
+            await Task.Delay(interval < remaining ? interval : remaining, cancellationToken);
+            interval = TimeSpan.FromTicks(Math.Min(interval.Ticks * 2, MaxPollInterval.Ticks));
+        }
+    }
+
     private static bool IsTerminal(AutomationRunStatus status)
         => status is AutomationRunStatus.Completed or AutomationRunStatus.Failed
             or AutomationRunStatus.Cancelled or AutomationRunStatus.Rejected;
 
-    private static string BuildResultText(AutomationRun run)
+    /// <summary>
+    /// The output of the step that finished last, masked and truncated the way the backoffice shows
+    /// run data: the caller may be unauthenticated, so sensitive values (tokens, cookies, fields the
+    /// action marks sensitive) must not reach it, and a large output is cut to a readable size.
+    /// </summary>
+    /// <remarks>
+    /// "Finished last" is by completion time, so in a flow with parallel branches it's the branch
+    /// that ended the run, not the one that started last.
+    /// </remarks>
+    private string BuildResultText(AutomationRun run)
     {
         var lastOutput = run.StepRuns
-            .LastOrDefault(sr => sr.Status == StepRunStatus.Completed && sr.OutputData is not null);
+            .Where(sr => sr.Status == StepRunStatus.Completed && sr.OutputData is not null)
+            .OrderBy(sr => sr.CompletedUtc ?? sr.StartedUtc)
+            .LastOrDefault();
+        if (lastOutput is null)
+        {
+            return "Automation completed.";
+        }
 
-        return lastOutput?.OutputData ?? "Automation completed.";
+        var sanitized = _runDataSanitizer.SanitizeStepOutput(lastOutput.ActionAlias, lastOutput.OutputData);
+        if (sanitized.Value is null)
+        {
+            return "Automation completed.";
+        }
+
+        return sanitized.Truncated
+            ? $"{sanitized.Value}\n\n[Output truncated to {IRunDataSanitizer.MaxValueLength} characters.]"
+            : sanitized.Value;
     }
 
     private static CallToolResult ErrorResult(string message) => new()

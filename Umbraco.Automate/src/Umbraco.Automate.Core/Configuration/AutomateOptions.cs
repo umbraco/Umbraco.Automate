@@ -141,6 +141,14 @@ public sealed class McpOptions
     /// Default: 60.
     /// </summary>
     public int RateLimitPerMinute { get; set; } = 60;
+
+    /// <summary>
+    /// Gets or sets the maximum allowed MCP request body size in bytes. A tool call's arguments
+    /// are stored with its run, so this also caps what one call can add to the runs table.
+    /// Requests exceeding this limit are rejected with <c>413 Payload Too Large</c>.
+    /// Default: 1 MB.
+    /// </summary>
+    public long MaxPayloadBytes { get; set; } = 1_048_576;
 }
 
 /// <summary>
