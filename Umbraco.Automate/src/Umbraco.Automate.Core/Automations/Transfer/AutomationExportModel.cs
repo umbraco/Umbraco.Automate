@@ -133,6 +133,12 @@ public sealed class ExportStepModel
     public string? ConnectionAlias { get; init; }
 
     /// <summary>
+    /// Gets or sets the connection binding expression. Exported as-is, since it refers to run
+    /// data rather than to a specific connection. Null if the step doesn't bind its connection.
+    /// </summary>
+    public string? ConnectionBinding { get; init; }
+
+    /// <summary>
     /// Gets or sets the step settings (sensitive fields stripped).
     /// </summary>
     public Dictionary<string, object?> Settings { get; init; } = [];

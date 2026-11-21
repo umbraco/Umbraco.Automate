@@ -49,7 +49,10 @@ public class AutomationTransferTests
                 It.IsAny<bool>()))
             .Returns(_scope.Object);
 
-        _actions = new ActionCollection(() => []);
+        // One registered action, so imported steps that use it pass the "step type is registered" check.
+        var slackAction = new Mock<IAction>();
+        slackAction.Setup(a => a.Alias).Returns("sendSlackMessage");
+        _actions = new ActionCollection(() => [slackAction.Object]);
         _triggers = new TriggerCollection(() => []);
         _controlFlows = new ControlFlowCollection(() => []);
         var connectionTypes = new ConnectionTypeCollection(() => []);
@@ -206,6 +209,31 @@ public class AutomationTransferTests
         result.ConnectionReferences[0].Alias.ShouldBe("slack-connection");
         result.ConnectionReferences[0].Type.ShouldBe("slack");
         result.ConnectionReferences[0].Name.ShouldBe("Slack Connection");
+    }
+
+    [Fact]
+    public async Task ExportAutomationAsync_ExportsConnectionBindingAsIs_WithoutAConnectionReference()
+    {
+        var automation = new AutomationBuilder()
+            .WithManualTrigger()
+            .AddStep(new StepConfiguration
+            {
+                Id = Guid.NewGuid(),
+                ActionAlias = "sendSlackMessage",
+                Name = "Send Slack",
+                ConnectionBinding = "${ loop.item.id }",
+            })
+            .Build();
+
+        _repo.Setup(r => r.GetAsync(automation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(automation);
+
+        var result = await _service.ExportAutomationAsync(automation.Id);
+
+        result.ShouldNotBeNull();
+        result.Automation.Steps[0].ConnectionBinding.ShouldBe("${ loop.item.id }");
+        result.Automation.Steps[0].ConnectionAlias.ShouldBeNull();
+        result.ConnectionReferences.ShouldBeEmpty();
     }
 
     #endregion
@@ -419,6 +447,50 @@ public class AutomationTransferTests
         captured.ShouldNotBeNull();
         captured!.Status.ShouldBe(AutomationStatus.Draft);
         captured.WorkspaceId.ShouldBe(workspaceId);
+    }
+
+    [Fact]
+    public async Task ImportAutomationAsync_PreservesConnectionBinding()
+    {
+        var baseModel = BuildValidExportModel(alias: "with-binding", triggerAlias: null);
+        var exportModel = new AutomationExportModel
+        {
+            FormatVersion = baseModel.FormatVersion,
+            ExportedAt = baseModel.ExportedAt,
+            ExportedFrom = baseModel.ExportedFrom,
+            ConnectionReferences = baseModel.ConnectionReferences,
+            Automation = new AutomationExportDefinition
+            {
+                Id = baseModel.Automation.Id,
+                Alias = baseModel.Automation.Alias,
+                Name = baseModel.Automation.Name,
+                Steps =
+                [
+                    new ExportStepModel
+                    {
+                        Id = Guid.NewGuid(),
+                        ActionAlias = "sendSlackMessage",
+                        Name = "Send Slack",
+                        ConnectionBinding = "${ loop.item.id }",
+                        Position = new StepPosition(),
+                    },
+                ],
+                Connections = [],
+            },
+        };
+        var workspaceId = SetupValidWorkspace();
+
+        Automation? captured = null;
+        _repo.Setup(r => r.SaveAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback<Automation, Guid?, CancellationToken>((a, _, _) => captured = a)
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var result = await _service.ImportAutomationAsync(exportModel, workspaceId);
+
+        result.Success.ShouldBeTrue();
+        captured.ShouldNotBeNull();
+        captured!.Steps.ShouldHaveSingleItem().ConnectionBinding.ShouldBe("${ loop.item.id }");
+        captured.Steps[0].ConnectionId.ShouldBeNull();
     }
 
     [Fact]

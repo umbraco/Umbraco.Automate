@@ -135,17 +135,11 @@ internal sealed class ActionStepBody : StepBodyAsync
                 _settingsBindingResolver.ResolveBindings(settings, bindingData);
             }
 
-            // Resolve connection for this step.
-            // Priority: explicit step connectionId > auto-resolve by action's connection type alias.
-            connection = null;
-            if (_stepConfig.ConnectionId is { } connectionId)
-            {
-                connection = await _connectionService.GetConfiguredConnectionAsync(connectionId, cancellationToken);
-            }
-            else if (_action.ConnectionTypeAlias is { } typeAlias)
-            {
-                connection = await ResolveConnectionByTypeAsync(typeAlias, data.ExecutionContext, cancellationToken);
-            }
+            // Resolve connection for this step: explicit connectionId > connection binding >
+            // auto-resolve by the action's connection type alias. A binding that resolves to
+            // a connection the step may not use throws a terminal ConnectionBindingException.
+            connection = await new StepConnectionResolver(_connectionService, _bindingEvaluator, _logger)
+                .ResolveConnectionAsync(_stepConfig, _action.ConnectionTypeAlias, data.ExecutionContext, bindingData, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -802,37 +796,6 @@ internal sealed class ActionStepBody : StepBodyAsync
             iterOutputs[_stepConfig.Id] = unwrapped;
             data.IterationLastCompletedStepId[scopePath] = _stepConfig.Id;
         }
-    }
-
-    private async Task<ConfiguredConnection?> ResolveConnectionByTypeAsync(
-        string connectionTypeAlias,
-        AutomationExecutionContext executionContext,
-        CancellationToken cancellationToken)
-    {
-        var allConfigured = await _connectionService.GetConfiguredConnectionsByIdsAsync(
-            executionContext.AllowedConnections, cancellationToken);
-
-        var matches = allConfigured
-            .Where(c => string.Equals(c.Type, connectionTypeAlias, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (matches.Count == 0)
-        {
-            _logger.LogWarning(
-                "No connection of type '{ConnectionTypeAlias}' found in workspace '{WorkspaceId}' for step {StepId}",
-                connectionTypeAlias, executionContext.WorkspaceId, _stepConfig.Id);
-
-            return null;
-        }
-
-        if (matches.Count > 1)
-        {
-            _logger.LogWarning(
-                "Multiple connections of type '{ConnectionTypeAlias}' found in workspace '{WorkspaceId}' for step {StepId}. Using first match '{ConnectionId}'",
-                connectionTypeAlias, executionContext.WorkspaceId, _stepConfig.Id, matches[0].Id);
-        }
-
-        return matches[0];
     }
 
     /// <summary>

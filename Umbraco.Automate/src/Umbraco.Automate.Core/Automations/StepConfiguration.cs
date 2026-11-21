@@ -29,8 +29,21 @@ public sealed class StepConfiguration
 
     /// <summary>
     /// Gets or sets the optional named connection ID for this step.
+    /// Mutually exclusive with <see cref="ConnectionBinding"/>.
     /// </summary>
     public Guid? ConnectionId { get; set; }
+
+    /// <summary>
+    /// Gets or sets an optional <c>${ }</c> binding expression that resolves to a connection ID at
+    /// run time, e.g. <c>${ loop.item.id }</c> or <c>${ trigger.connectionId }</c>.
+    /// Mutually exclusive with <see cref="ConnectionId"/>.
+    /// </summary>
+    /// <remarks>
+    /// Because the connection is only known at run time, it is checked when the step runs rather
+    /// than when the automation is published: it must exist, be allowed in the automation's
+    /// workspace, and match the action's connection type. Otherwise the step fails without retrying.
+    /// </remarks>
+    public string? ConnectionBinding { get; set; }
 
     /// <summary>
     /// Gets or sets the step settings as a key-value dictionary.

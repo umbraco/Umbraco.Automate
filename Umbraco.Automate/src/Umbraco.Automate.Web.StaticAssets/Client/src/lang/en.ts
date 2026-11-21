@@ -118,6 +118,9 @@ export default {
         stepConnectionDescription:
             "Choose which of the workspace's connections this step should use. Leave as auto-resolve to pick one that matches the action automatically.",
         stepConnectionAutoResolve: "Auto-resolve",
+        stepConnectionBindingLabel: "Connection binding",
+        stepConnectionBindingDescription:
+            "A binding that resolves to a connection ID when the step runs, for example ${ loop.item.id }. The connection must be allowed in this workspace and match the action's connection type, otherwise the step fails.",
         stepErrorBehaviorRetry: "Retry",
         stepErrorBehaviorSuspend: "Suspend",
         stepErrorBehaviorTerminate: "Terminate",
