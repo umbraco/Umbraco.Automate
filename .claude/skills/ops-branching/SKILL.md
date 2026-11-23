@@ -133,17 +133,18 @@ not duplicated.
 Create a work branch, named this repo's way, rooted on the right base.
 
 1. Resolve the integration branch for the named line.
-2. Name the branch **`<line>/<type>/<slug>`** — e.g. `v18/feature/issue-165`. Two rules that
+2. Name the branch **`<line>/<type>/<slug>`** — e.g. `v18/topic/issue-165`. Two rules that
    differ from the engine default and are **enforced by `.githooks/pre-push.sh`**, so a wrong
    name is not a style problem, it is a push that fails:
-   - **The `vN/` prefix is mandatory.** A bare `feature/<slug>` is rejected at push time.
-   - **`type` is one of `feature` / `hotfix` / `release` only.** There is no `fix`, `chore`,
+   - **The `vN/` prefix is mandatory.** A bare `topic/<slug>` is rejected at push time.
+   - **`type` is one of `topic` / `hotfix` / `release` only.** There is no `fix`, `chore`,
      `docs`, `refactor` or `test` branch type here — those are *commit* scopes, not branch
-     types. A fix goes on a `feature/` branch. Use `feature` unless the caller is the release
+     types. A fix goes on a `topic/` branch. Use `topic` unless the caller is the release
      path.
 
    `release` and `hotfix` are the release path's to create, not a caller's: `start-branch`
-   should only ever be asked for `feature` in loop use.
+   should only ever be asked for `topic` in loop use. `feature` is the old name for `topic`:
+   the hook still accepts it so older branches push, but never create a new one.
 3. Create it from that base (`github-ops` → *Create a branch*).
 
 **Idempotent:** if the branch exists, return it.
