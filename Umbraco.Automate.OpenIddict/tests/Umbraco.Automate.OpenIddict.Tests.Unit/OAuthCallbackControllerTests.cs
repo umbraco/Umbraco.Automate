@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
@@ -78,6 +79,45 @@ public class OAuthCallbackControllerTests
 
         saved.ShouldNotBeNull();
         saved.Provider.ShouldBe(routeSegment);
+    }
+
+    [Fact]
+    public async Task Callback_PersistsAccessTokenExpiry_NotStateTokenExpiry()
+    {
+        // AuthenticationProperties.ExpiresUtc is the state token's expiry (15 minutes by default).
+        var accessTokenExpiry = new DateTimeOffset(2026, 1, 1, 13, 0, 0, TimeSpan.Zero);
+        SetUpSuccessfulAuthentication(
+            "Google",
+            stateTokenExpiry: accessTokenExpiry.AddMinutes(-45),
+            accessTokenExpiry: accessTokenExpiry);
+
+        var saved = await CallbackAndCaptureAsync("google");
+
+        saved.ExpiresUtc.ShouldBe(accessTokenExpiry.UtcDateTime);
+        saved.ExpiresUtc!.Value.Kind.ShouldBe(DateTimeKind.Utc);
+    }
+
+    [Fact]
+    public async Task Callback_PersistsNoExpiry_WhenProviderReturnsNone()
+    {
+        SetUpSuccessfulAuthentication("Google", stateTokenExpiry: new DateTimeOffset(2026, 1, 1, 12, 15, 0, TimeSpan.Zero));
+
+        var saved = await CallbackAndCaptureAsync("google");
+
+        saved.ExpiresUtc.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Callback_PersistsNoExpiry_WhenThereIsNoRefreshToken()
+    {
+        SetUpSuccessfulAuthentication(
+            "Slack",
+            accessTokenExpiry: new DateTimeOffset(2026, 1, 1, 13, 0, 0, TimeSpan.Zero),
+            refreshToken: null);
+
+        var saved = await CallbackAndCaptureAsync("slack");
+
+        saved.ExpiresUtc.ShouldBeNull();
     }
 
     [Fact]
@@ -184,19 +224,50 @@ public class OAuthCallbackControllerTests
                 return c;
             });
 
-    private void SetUpSuccessfulAuthentication(string? providerName, string? returnUrl = null, string? accessToken = "test-access-token")
+    private async Task<OAuthCredentials> CallbackAndCaptureAsync(string routeSegment)
     {
-        var properties = new AuthenticationProperties();
+        OAuthCredentials? saved = null;
+        _credentialsService
+            .Setup(s => s.CreateCredentialsAsync(It.IsAny<OAuthCredentials>(), It.IsAny<CancellationToken>()))
+            .Callback<OAuthCredentials, CancellationToken>((c, _) => saved = c)
+            .ReturnsAsync((OAuthCredentials c, CancellationToken _) => c);
+
+        await _controller.Callback(routeSegment);
+
+        return saved.ShouldNotBeNull();
+    }
+
+    private void SetUpSuccessfulAuthentication(
+        string? providerName,
+        string? returnUrl = null,
+        string? accessToken = "test-access-token",
+        string? refreshToken = "test-refresh-token",
+        DateTimeOffset? stateTokenExpiry = null,
+        DateTimeOffset? accessTokenExpiry = null)
+    {
+        var properties = new AuthenticationProperties { ExpiresUtc = stateTokenExpiry };
         if (returnUrl is not null)
         {
             properties.Items[OAuthReturnUrl.UrlPropertyKey] = returnUrl;
             properties.Items[OAuthReturnUrl.NoncePropertyKey] = "nonce-1";
         }
 
-        var tokens = new List<AuthenticationToken>
+        var tokens = new List<AuthenticationToken>();
+        if (refreshToken is not null)
         {
-            new() { Name = Tokens.RefreshToken, Value = "test-refresh-token" },
-        };
+            tokens.Add(new AuthenticationToken { Name = Tokens.RefreshToken, Value = refreshToken });
+        }
+
+        if (accessTokenExpiry is not null)
+        {
+            // The format OpenIddict's ASP.NET Core handler writes.
+            tokens.Add(new AuthenticationToken
+            {
+                Name = Tokens.BackchannelAccessTokenExpirationDate,
+                Value = accessTokenExpiry.Value.ToString("o", CultureInfo.InvariantCulture),
+            });
+        }
+
         if (accessToken is not null)
         {
             tokens.Add(new AuthenticationToken { Name = Tokens.BackchannelAccessToken, Value = accessToken });
