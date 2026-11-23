@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
@@ -60,7 +61,15 @@ public sealed class OAuthCallbackController : ControllerBase
 
         var accessToken = result.Properties?.GetTokenValue(Tokens.BackchannelAccessToken);
         var refreshToken = result.Properties?.GetTokenValue(Tokens.RefreshToken);
-        var expiresAt = result.Properties?.ExpiresUtc;
+
+        // Not Properties.ExpiresUtc: that is the expiry of OpenIddict's state token (15 minutes by default).
+        DateTimeOffset? expiresAt = DateTimeOffset.TryParse(
+            result.Properties?.GetTokenValue(Tokens.BackchannelAccessTokenExpirationDate),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var accessTokenExpiry)
+            ? accessTokenExpiry
+            : null;
 
         if (string.IsNullOrEmpty(accessToken))
         {

@@ -78,6 +78,9 @@ public static class UmbracoBuilderExtensions
             {
                 options.AllowAuthorizationCodeFlow();
 
+                // Needed by OAuthCredentialsService to renew expired access tokens.
+                options.AllowRefreshTokenFlow();
+
                 // Placeholder — provider-specific callback URIs are added dynamically
                 // by OpenIddictClientCredentialsConfigurator, but OpenIddict requires
                 // at least one redirection endpoint at configuration time.
