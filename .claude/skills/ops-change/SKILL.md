@@ -1,7 +1,7 @@
 ---
 name: ops-change
 description: >-
-  Build one change in Umbraco.Automate: implement it on a `vN/feature/*` branch, prove it with
+  Build one change in Umbraco.Automate: implement it on a `vN/topic/*` branch, prove it with
   `dotnet build` + the affected product's tests and its dependents' tests, and close the issue
   once it has landed on every line a human confirmed as a target. Ports are never opened without
   that confirmation. Called by name with (action, context-json). NOT for direct use — never select it from a
@@ -46,9 +46,8 @@ guess at one, and never silently succeed.
 | 2 | `Umbraco.Automate.Slack` | `Umbraco.Automate.Slack/` | OpenIddict, Core | **none** |
 
 **Branch naming is hook-enforced.** `.githooks/pre-push` rejects any branch that is not
-`vN/dev`, `vN/main`, `vN/{feature,release,hotfix}/*` or `claude/*`. Only `v*/feature/*` is in
-the Azure Pipelines push trigger, so a `claude/*` branch would push but never get CI — and the
-issue loop needs CI green. Work branches are therefore **always** `vN/feature/…`.
+`vN/dev`, `vN/main`, `vN/{topic,release,hotfix}/*` (plus the old `vN/feature/*`) or
+`claude/*`. Work branches are **always** `vN/topic/…`. CI runs on the PR, not the push.
 
 **Commits are linted.** `.githooks/commit-msg` runs commitlint. Every commit must be
 `<type>(<scope>): <Sentence case description>` with a type and scope from `CLAUDE.md`.
@@ -78,8 +77,8 @@ port source this is a port, not a replay: adapt the change to the target line.
 ### Steps
 
 1. **Work out the branch name first**, because it is also the idempotency key:
-   `<line>/feature/issue-<issue.number>-<slug>`, where `<slug>` is a short kebab-case phrase from
-   the issue title. Example: `v17/feature/issue-112-binding-case-insensitive-lookup`.
+   `<line>/topic/issue-<issue.number>-<slug>`, where `<slug>` is a short kebab-case phrase from
+   the issue title. Example: `v17/topic/issue-112-binding-case-insensitive-lookup`.
 
    > This action names and creates its own branch rather than calling
    > `ops-branching · start-branch`. **Reason:** the engine default names branches
@@ -158,7 +157,7 @@ enough detail for the caller to act on a failure.
 **Context it receives** (guidance — never validate it at runtime):
 
 ```json
-{"branch":"v17/feature/issue-112-binding-case-insensitive-lookup"}
+{"branch":"v17/topic/issue-112-binding-case-insensitive-lookup"}
 ```
 
 - `branch` — string — the branch to verify
@@ -248,7 +247,7 @@ Told that a PR has landed, work out which issue it was for and close that issue 
 ### Steps
 
 1. **Resolve the issue.** Use `context.issue` if the caller supplied it. Otherwise read the PR
-   via `github-ops` and take the number from its **head branch**: `vN/feature/issue-<N>-<slug>`.
+   via `github-ops` and take the number from its **head branch**: `vN/topic/issue-<N>-<slug>` (or the older `vN/feature/issue-<N>-<slug>`).
    The branch is the reliable source here — merged PRs in this repo routinely have an empty body.
    Fall back to a `#N` reference in the PR body or title only if the branch carries no number. If
    nothing resolves, return `{"ok": false, "detail": "cannot resolve an issue for PR #…"}` and
@@ -273,7 +272,7 @@ Told that a PR has landed, work out which issue it was for and close that issue 
    lines>"], "detail": "awaiting a port decision"}`.
 
 4. **Check each target line has landed.** For each one, search for a merged PR whose head branch
-   is `<line>/feature/issue-<N>-…`. The lines with no merged PR go in `waiting_on`.
+   is `<line>/topic/issue-<N>-…` or the older `<line>/feature/issue-<N>-…`. The lines with no merged PR go in `waiting_on`.
 
 5. **If `waiting_on` is non-empty**, return `{"ok": true, "closed": false, "issue": {...},
    "waiting_on": [...]}`. Close nothing. Half a change is not a fixed issue.
