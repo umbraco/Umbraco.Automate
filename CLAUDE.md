@@ -254,6 +254,19 @@ All commits should follow the [Conventional Commits](https://www.conventionalcom
 
 **Subject must be sentence-case** - Capitalize the first word after the scope.
 
+## Security process
+
+How `advisory-fix` handles a reported vulnerability in this package.
+
+- Report a vulnerability to: security@umbraco.dk
+- Reports arrive as: a work item in the InfoSec project on Azure DevOps, which names the GitHub security advisory when there is one
+- Read with: the Azure DevOps MCP server
+- Updates go to: a private Slack channel per advisory, named dxp-security-{ticket}
+- Security team needs: affected and fixed version ranges for each package
+- Approves release: the release date is approved in advance; the dev team pushes the release on that date
+- Advisory published by: InfoSec, once the release is out
+- Private fork: GitHub advisory fork
+
 ## Issue tracker
 - Type: GitHub Issues
 - Location: umbraco/Umbraco.Automate (same repo as the source code)
